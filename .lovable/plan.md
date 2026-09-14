@@ -1,33 +1,44 @@
-# Conectar este projeto ao GitHub e trazer o código existente
+# Trazer o Team Builder Pro para este projeto
 
-O Lovable não importa um repositório do GitHub direto para dentro de um projeto. O caminho que funciona é o inverso: conectar este projeto a um repositório e usar a sincronia nos dois sentidos para trazer o código antigo.
+Li o repositório `AB5Lucas/team-builder-pro`. Boa notícia: ele já usa exatamente a mesma base deste projeto, então é uma cópia direta, sem reescrita.
 
-## Passo a passo
+## O que o app tem hoje
 
-1. **Conectar ao GitHub (você faz na interface)**
-   - No editor, abra o menu "+" ao lado do campo de conversa → GitHub → Conectar projeto.
-   - Autorize o app do Lovable e escolha a conta ou organização.
-   - Clique em "Criar repositório". Isso publica o código atual deste projeto em um repositório novo.
+Sistema de gestão de equipes de obra, com login e 22 telas:
 
-2. **Trazer o código antigo para esse repositório (feito por você, localmente)**
-   - Clone o repositório novo criado no passo 1.
-   - Copie para dentro dele os arquivos do projeto antigo: telas, componentes, imagens e demais recursos.
-   - Envie as alterações. Elas aparecem aqui automaticamente, sem precisar de nenhuma ação extra.
+- Painel geral (dashboard) e relatórios
+- Colaboradores: lista e estrutura (departamentos, setores, cargos)
+- Obras: lista, equipes-base e requisitos
+- Programação: hoje, diária, semanal e histórico
+- Ausências: férias, atestados e folgas
+- Benefícios: vale-transporte e prêmio-viagem
+- Veículos: frota, motoristas e transporte
+- Treinamentos
+- Administração: usuários, configurações e auditoria
 
-3. **Ajuste da estrutura (eu faço aqui)**
-   - Depois que o código chegar, eu adapto o que for necessário para rodar na estrutura deste projeto: organização das páginas, estilos e configuração.
-   - Se o projeto antigo usar banco de dados, contas de usuário ou envio de e-mails, eu ativo o Lovable Cloud e recrio essa parte.
+O banco tem 22 tabelas (colaboradores, obras, escalas, alocações, férias, veículos, regras de vale-transporte e prêmio-viagem, registros de auditoria, entre outras), com controle de acesso por perfil de usuário.
+
+## Como vou trazer
+
+1. **Ativar o Lovable Cloud** neste projeto, para ter banco de dados e login.
+2. **Copiar todo o código**: as 22 telas, o menu lateral, o quadro de programação diária, o gerenciador de ausências, as regras de cálculo e o design (cores e estilos).
+3. **Recriar o banco**: aplicar as três migrações do repositório, criando tabelas, permissões e regras de acesso idênticas.
+4. **Ajustar o login** para a base de contas deste projeto.
+5. **Testar**: abrir cada área principal, criar e editar um registro de exemplo e conferir que nada quebrou. Depois apago os registros de teste.
+
+## O que não vem junto
+
+- **Os dados já cadastrados** (colaboradores, obras, escalas) não vêm no código. O app abre com o banco vazio. Se quiser trazer os registros, você exporta as tabelas em CSV no projeto antigo e me envia depois.
+- **As contas de usuário** também não migram. Será preciso cadastrar de novo as pessoas que vão acessar.
 
 ## Detalhes técnicos
 
-Este projeto usa TanStack Start (React 19 + Vite 7) com Tailwind v4. Código vindo de outra base provavelmente precisará de adaptação:
-
-- Páginas passam a ser arquivos em `src/routes/` (roteamento por arquivo); `react-router-dom` não é suportado.
-- Chamadas de servidor usam `createServerFn`; webhooks e APIs públicas ficam em `src/routes/api/`.
-- Estilos globais e tokens de cor ficam em `src/styles.css`.
-- Projetos em Vue, Angular, Svelte ou mobile nativo não rodam aqui e precisariam ser reescritos.
+- Mesmo stack: TanStack Start + React 19 + Vite + Tailwind v4 + shadcn/ui.
+- Diferenças de versão de pacotes são mínimas; mantenho as versões fixadas deste projeto e adiciono `@supabase/supabase-js`.
+- Rotas protegidas ficam sob `_authenticated/`, com o gate já presente no repositório de origem, adaptado à integração gerenciada aqui.
+- Migrações: `20260804133011`, `20260804133032`, `20260914124652`, aplicadas na ordem.
 
 ## O que preciso de você
 
-- Confirmar quando a conexão com o GitHub estiver feita e o código antigo enviado.
-- Dizer quais tecnologias o projeto antigo usa (React? outro framework? tem banco de dados?), para eu já prever o esforço de adaptação.
+- Aprovar este plano para eu começar.
+- Opcional: exportar os dados atuais em CSV, se quiser o conteúdo junto.
