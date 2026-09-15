@@ -33,7 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseNum } from "@/lib/import-helpers";
+import { emptyToNull, insertSequentially, normText, parseNum, titleCaseOrNull } from "@/lib/import-helpers";
 
 const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "placa", required: true, example: "ABC1D23" },
@@ -221,11 +221,11 @@ function VehiclesPage() {
         line,
         values: {
           plate: r["placa"]!.trim().toUpperCase(),
-          brand: emptyToNull(r["marca"] ?? ""),
-          model: emptyToNull(r["modelo"] ?? ""),
+          brand: titleCaseOrNull(r["marca"] ?? ""),
+          model: titleCaseOrNull(r["modelo"] ?? ""),
           year: parseNum(r["ano"] ?? ""),
-          color: emptyToNull(r["cor"] ?? ""),
-          type: emptyToNull(r["tipo"] ?? ""),
+          color: titleCaseOrNull(r["cor"] ?? ""),
+          type: titleCaseOrNull(r["tipo"] ?? ""),
           passenger_capacity: parseNum(r["capacidade_passageiros"] ?? "") ?? 0,
           fuel_type: emptyToNull(r["combustivel"] ?? ""),
           status: STATUS_FROM_TEXT[normText(r["situacao"] ?? "")] ?? "available",

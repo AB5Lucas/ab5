@@ -34,7 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseDate, parseNum } from "@/lib/import-helpers";
+import { emptyToNull, insertSequentially, normText, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "codigo", required: true, example: "OB-001" },
@@ -316,12 +316,12 @@ function WorksPage() {
         line,
         values: {
           code: r["codigo"]!.trim(),
-          name: r["nome"]!.trim(),
-          client: emptyToNull(r["cliente"] ?? ""),
-          address: emptyToNull(r["endereco"] ?? ""),
+          name: titleCase(r["nome"]!),
+          client: titleCaseOrNull(r["cliente"] ?? ""),
+          address: titleCaseOrNull(r["endereco"] ?? ""),
           number: emptyToNull(r["numero"] ?? ""),
-          neighborhood: emptyToNull(r["bairro"] ?? ""),
-          city: emptyToNull(r["cidade"] ?? ""),
+          neighborhood: titleCaseOrNull(r["bairro"] ?? ""),
+          city: titleCaseOrNull(r["cidade"] ?? ""),
           state: emptyToNull((r["uf"] ?? "").toUpperCase()),
           zip_code: emptyToNull(r["cep"] ?? ""),
           distance_km: parseNum(r["distancia_km"] ?? ""),
