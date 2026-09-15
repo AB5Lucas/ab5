@@ -75,7 +75,7 @@ function TransportPage() {
     queryKey: ["transport-base"],
     queryFn: async () => {
       const [works, vehicles, drivers] = await Promise.all([
-        supabase.from("works").select("id, name, code, entry_time, exit_time, status").eq("active", true).order("name"),
+        supabase.from("works").select("id, name, entry_time, exit_time, status").eq("active", true).order("name"),
         supabase.from("vehicles").select("id, plate, model, passenger_capacity, status").order("plate"),
         supabase
           .from("collaborators")
@@ -114,7 +114,7 @@ function TransportPage() {
 
   const nameOf = useMemo(() => {
     const map = new Map<string, string>();
-    base.data?.works.forEach((w) => map.set(w.id, `${w.code} · ${w.name}`));
+    base.data?.works.forEach((w) => map.set(w.id, w.name));
     base.data?.vehicles.forEach((v) => map.set(v.id, `${v.plate}${v.model ? ` · ${v.model}` : ""}`));
     base.data?.drivers.forEach((d) => map.set(d.id, d.full_name));
     return map;
@@ -302,7 +302,7 @@ function TransportPage() {
                 <SelectTrigger><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
                 <SelectContent>
                   {base.data?.works.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>{w.code} · {w.name}</SelectItem>
+                    <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

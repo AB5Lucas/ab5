@@ -77,9 +77,9 @@ function RequirementsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("works")
-        .select("id, code, name")
+        .select("id, name")
         .eq("active", true)
-        .order("code");
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -214,7 +214,7 @@ function RequirementsPage() {
           <SelectContent>
             {(works.data ?? []).map((w) => (
               <SelectItem key={w.id} value={w.id}>
-                {w.code} — {w.name}
+                {w.name}
               </SelectItem>
             ))}
           </SelectContent>
