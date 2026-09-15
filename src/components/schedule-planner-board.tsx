@@ -22,8 +22,16 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { addDays, checkRequirements, fetchScheduleContext, formatBR, todayISO } from "@/lib/scheduling";
-import type { ScheduleContext } from "@/lib/scheduling";
+import {
+  addDays,
+  checkIntegration,
+  checkRequirements,
+  fetchScheduleContext,
+  formatBR,
+  formatDateBR,
+  todayISO,
+} from "@/lib/scheduling";
+import type { IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<string, string> = {
