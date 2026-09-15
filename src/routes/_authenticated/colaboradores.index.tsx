@@ -144,6 +144,8 @@ const emptyForm: FormState = {
   is_driver: false,
   driver_license_category: "",
   driver_license_expiry: "",
+  salary: "",
+  contract_type: NONE,
   notes: "",
 };
 
