@@ -116,7 +116,27 @@ export async function fetchScheduleContext(date: string) {
     collabTrainings: collabTrainings.data ?? [],
     absences,
     holiday: holidays.data?.[0]?.name ?? null,
+    integrations: (integrations.data ?? []) as Integration[],
   };
+}
+
+/** Status da integração de um colaborador com o cliente de uma obra. */
+export function checkIntegration(
+  ctx: ScheduleContext,
+  workId: string,
+  collaboratorId: string,
+  date: string,
+): { status: IntegrationStatus; expiresAt: string | null } {
+  const work = ctx.works.find((w) => w.id === workId);
+  const clientId = work?.client_id ?? null;
+  if (!clientId) return { status: "no_client", expiresAt: null };
+  const rec = ctx.integrations.find((i) => i.collaborator_id === collaboratorId && i.client_id === clientId);
+  if (!rec) return { status: "missing", expiresAt: null };
+  if (!rec.expires_at) return { status: "valid", expiresAt: null };
+  if (rec.expires_at < date) return { status: "expired", expiresAt: rec.expires_at };
+  if (rec.expires_at <= addDays(date, INTEGRATION_WARN_DAYS))
+    return { status: "expiring", expiresAt: rec.expires_at };
+  return { status: "valid", expiresAt: rec.expires_at };
 }
 
 export type ScheduleContext = Awaited<ReturnType<typeof fetchScheduleContext>>;
