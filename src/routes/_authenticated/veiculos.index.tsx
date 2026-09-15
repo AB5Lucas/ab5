@@ -208,6 +208,43 @@ function VehiclesPage() {
     setOpen(true);
   }
 
+  async function importVehicles(rows: ImportRow[]) {
+    const errors: string[] = [];
+    const records: { line: number; values: Record<string, unknown> }[] = [];
+    rows.forEach((r, i) => {
+      const line = i + 2;
+      if (!r["placa"]) {
+        errors.push(`Linha ${line}: placa é obrigatória.`);
+        return;
+      }
+      records.push({
+        line,
+        values: {
+          plate: r["placa"]!.trim().toUpperCase(),
+          brand: emptyToNull(r["marca"] ?? ""),
+          model: emptyToNull(r["modelo"] ?? ""),
+          year: parseNum(r["ano"] ?? ""),
+          color: emptyToNull(r["cor"] ?? ""),
+          type: emptyToNull(r["tipo"] ?? ""),
+          passenger_capacity: parseNum(r["capacidade_passageiros"] ?? "") ?? 0,
+          fuel_type: emptyToNull(r["combustivel"] ?? ""),
+          status: STATUS_FROM_TEXT[normText(r["situacao"] ?? "")] ?? "available",
+          notes: emptyToNull(r["observacoes"] ?? ""),
+        },
+      });
+    });
+    const result = await insertSequentially(
+      records,
+      async (values) => {
+        const { error } = await supabase.from("vehicles").insert(values as never);
+        return { error };
+      },
+      errors,
+    );
+    await queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+    return result;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -215,10 +252,18 @@ function VehiclesPage() {
         description="Cadastro dos veículos, capacidade de passageiros e situação operacional."
         actions={
           canWrite && (
-            <Button onClick={openNew}>
-              <Plus className="h-4 w-4" />
-              Novo veículo
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <ImportDialog
+                entity="veículos"
+                description="Importe a frota de uma vez a partir de um arquivo .xlsx ou .csv."
+                columns={IMPORT_COLUMNS}
+                onImport={importVehicles}
+              />
+              <Button onClick={openNew}>
+                <Plus className="h-4 w-4" />
+                Novo veículo
+              </Button>
+            </div>
           )
         }
       />
