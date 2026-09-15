@@ -1109,19 +1109,18 @@ export function SchedulePlannerBoard({
                     aria-expanded={open}
                     className="flex w-full items-center gap-1.5 px-2 py-1 text-left"
                   >
-                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", LEVEL_DOT[ev.level])} aria-hidden />
+                    <span
+                      className={cn("h-1.5 w-1.5 shrink-0 rounded-full", LEVEL_DOT[ev.level])}
+                      title={LEVEL_TEXT[ev.level]}
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium leading-tight">{p.full_name}</p>
                       <p className="truncate text-[10px] leading-tight text-muted-foreground">
                         {p.position_id ? positionById.get(p.position_id) ?? "Sem função" : "Sem função"}
                       </p>
                     </div>
-                    <Badge
-                      variant={ev.level === "block" ? "destructive" : "outline"}
-                      className="shrink-0 px-1 py-0 text-[9px]"
-                    >
-                      {LEVEL_TEXT[ev.level]}
-                    </Badge>
+                    <span className="sr-only">{LEVEL_TEXT[ev.level]}</span>
+
                     <ChevronDown
                       className={cn("h-3 w-3 shrink-0 text-muted-foreground transition", open && "rotate-180")}
                       aria-hidden
