@@ -170,6 +170,28 @@ export function SchedulePlannerBoard({
     },
   });
 
+  const statusEntries = useQuery({
+    queryKey: ["status-entries", scheduleId],
+    enabled: !!scheduleId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_status_entries")
+        .select("*")
+        .eq("schedule_id", scheduleId!)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const entries = statusEntries.data ?? [];
+
+  const entryByCollaborator = useMemo(() => {
+    const m = new Map<string, (typeof entries)[number]>();
+    entries.forEach((e) => m.set(e.collaborator_id, e));
+    return m;
+  }, [entries]);
+
   const rows = allocations.data ?? [];
   const c = ctx.data;
   const works = c?.works ?? [];
