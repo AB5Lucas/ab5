@@ -365,6 +365,19 @@ function ClientsPage() {
                 onChange={(e) => set("distance_km", e.target.value)}
               />
             </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 sm:col-span-2">
+              <div>
+                <Label htmlFor="requires-integration">Exige integração</Label>
+                <p className="text-xs text-muted-foreground">
+                  Desligue para clientes em que o colaborador pode ser escalado sem integração (ex.: Indústria).
+                </p>
+              </div>
+              <Switch
+                id="requires-integration"
+                checked={form.requires_integration}
+                onCheckedChange={(v) => set("requires_integration", v)}
+              />
+            </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Observações</Label>
               <Textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
