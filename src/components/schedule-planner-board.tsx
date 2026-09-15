@@ -1036,7 +1036,7 @@ export function SchedulePlannerBoard({
                   onDragStart={(e) => startDrag(e, { collaboratorId: p.id, allocationId: alloc?.id ?? null })}
                   onDragEnd={() => setDragging(null)}
                   className={cn(
-                    "text-sm",
+                    "text-xs",
                     canDrag ? "cursor-grab active:cursor-grabbing hover:bg-secondary" : "opacity-70",
                   )}
                 >
@@ -1044,21 +1044,24 @@ export function SchedulePlannerBoard({
                     type="button"
                     onClick={() => toggleExpanded(p.id)}
                     aria-expanded={open}
-                    className="flex w-full items-center gap-2 px-1 py-1 text-left"
+                    className="flex w-full items-center gap-1.5 px-1 py-0.5 text-left"
                   >
-                    <span className={cn("h-2 w-2 shrink-0 rounded-full", LEVEL_DOT[ev.level])} aria-hidden />
-                    <span className="min-w-0 flex-1 truncate font-medium">{p.full_name}</span>
-                    <Badge variant={ev.level === "block" ? "destructive" : "outline"} className="shrink-0 text-[10px]">
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", LEVEL_DOT[ev.level])} aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-tight">{p.full_name}</span>
+                    <Badge
+                      variant={ev.level === "block" ? "destructive" : "outline"}
+                      className="shrink-0 px-1 py-0 text-[9px]"
+                    >
                       {LEVEL_TEXT[ev.level]}
                     </Badge>
                     <ChevronDown
-                      className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition", open && "rotate-180")}
+                      className={cn("h-3 w-3 shrink-0 text-muted-foreground transition", open && "rotate-180")}
                       aria-hidden
                     />
                   </button>
                   {open && (
-                    <div className="pb-2 pl-5 pr-1">
-                      <p className="truncate text-xs text-muted-foreground">
+                    <div className="pb-1.5 pl-4 pr-1">
+                      <p className="truncate text-[10px] text-muted-foreground">
                         {p.position_id ? positionById.get(p.position_id) ?? "Sem função" : "Sem função"}
                         {p.is_driver ? " · motorista" : ""}
                         {p.contract_type ? ` · ${p.contract_type}` : ""}
