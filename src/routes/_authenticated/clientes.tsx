@@ -216,6 +216,7 @@ function ClientsPage() {
           zip_code: emptyToNull(r["cep"] ?? ""),
           distance_km: parseNum(r["distancia_km"] ?? ""),
           notes: emptyToNull(r["observacoes"] ?? ""),
+          requires_integration: (r["exige_integracao"] ?? "").trim() === "" ? true : parseBool(r["exige_integracao"]!),
         },
       });
     });
