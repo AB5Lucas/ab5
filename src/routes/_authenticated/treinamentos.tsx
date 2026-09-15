@@ -31,19 +31,13 @@ export const Route = createFileRoute("/_authenticated/treinamentos")({
 });
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
-
-const CATALOG_COLUMNS: ImportColumn[] = [
-  { key: "nome", required: true, example: "NR-10" },
-  { key: "descricao", example: "Segurança em instalações elétricas" },
-  { key: "validade_meses", hint: "Número inteiro de meses.", example: "24" },
-  { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
-];
+import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate } from "@/lib/import-helpers";
 
 const RECORD_COLUMNS: ImportColumn[] = [
   { key: "matricula", hint: "Matrícula do colaborador (use matrícula ou nome).", example: "1024" },
   { key: "colaborador", hint: "Nome completo, usado se a matrícula estiver vazia. Aceita variações de acento e maiúsculas." },
   { key: "treinamento", required: true, hint: "Nome do treinamento do catálogo. Aceita variações: sem acento, CAIXA ALTA, plural ou pequenas diferenças de escrita.", example: "NR-10" },
+  { key: "descricao", hint: "Use quando existir mais de um treinamento com o mesmo nome (ex.: NR18 Civil x NR18 Andaimes).", example: "Andaimes" },
   { key: "data_realizacao", required: true, hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2026-03-01" },
   { key: "data_vencimento", hint: "Se vazio, é calculado pela validade do treinamento." },
   { key: "documento_url", hint: "Link do certificado/documento.", example: "https://..." },
@@ -108,7 +102,7 @@ function TrainingsPage() {
   const nameById = useMemo(() => {
     const m = new Map<string, string>();
     (people.data ?? []).forEach((p) => m.set(p.id, p.full_name));
-    (trainings.data ?? []).forEach((t) => m.set(t.id, t.name));
+    (trainings.data ?? []).forEach((t) => m.set(t.id, t.description ? `${t.name} — ${t.description}` : t.name));
     return m;
   }, [people.data, trainings.data]);
 
@@ -210,44 +204,24 @@ function TrainingsPage() {
 
   const filtered = (records.data ?? []).filter((r) => filter === "all" || statusOf(r.expires_at) === filter);
 
-  async function importCatalog(rows: ImportRow[]) {
-    const errors: string[] = [];
-    const recs: { line: number; values: Record<string, unknown> }[] = [];
-    rows.forEach((r, i) => {
-      const line = i + 2;
-      const name = titleCase(r["nome"] ?? "");
-      if (!name) {
-        errors.push(`Linha ${line}: nome é obrigatório.`);
-        return;
-      }
-      recs.push({
-        line,
-        values: {
-          name,
-          description: titleCaseOrNull(r["descricao"] ?? ""),
-          validity_months: parseNum(r["validade_meses"] ?? "") ?? 12,
-          active: normText(r["ativo"] ?? "").startsWith("n") ? false : true,
-        },
-      });
-    });
-    const result = await insertSequentially(
-      recs,
-      async (values) => {
-        const { error } = await supabase.from("trainings").insert(values as never);
-        return { error };
-      },
-      errors,
-    );
-    await qc.invalidateQueries({ queryKey: ["trainings"] });
-    return result;
-  }
-
   async function importRecords(rows: ImportRow[]) {
     const errors: string[] = [];
     const { data: allPeople } = await supabase.from("collaborators").select("id, full_name, registration_number");
     const byReg = new Map((allPeople ?? []).map((p) => [normText(p.registration_number ?? ""), p.id]));
     const matchPerson = createNameMatcher((allPeople ?? []).map((p) => ({ id: p.id, name: p.full_name })));
-    const matchTraining = createNameMatcher(trainings.data ?? []);
+    const catalog = trainings.data ?? [];
+    /** Quando há vários treinamentos com o mesmo nome (ex.: NR18), a descrição decide qual é. */
+    const findTraining = (name: string, desc: string) => {
+      const sameName = catalog.filter((t) => createNameMatcher([t])(name));
+      if (sameName.length <= 1) return sameName[0] ?? createNameMatcher(catalog)(name) ?? null;
+      const d = normText(desc ?? "");
+      if (!d) return null;
+      return (
+        sameName.find((t) => normText(t.description ?? "") === d) ??
+        sameName.find((t) => normText(t.description ?? "").includes(d) || d.includes(normText(t.description ?? ""))) ??
+        null
+      );
+    };
 
     const recs: { line: number; values: Record<string, unknown> }[] = [];
     rows.forEach((r, i) => {
@@ -260,9 +234,11 @@ function TrainingsPage() {
         errors.push(`Linha ${line}: colaborador não encontrado (${reg || r["colaborador"] || "vazio"}).`);
         return;
       }
-      const training = matchTraining(r["treinamento"] ?? "");
+      const training = findTraining(r["treinamento"] ?? "", r["descricao"] ?? "");
       if (!training) {
-        errors.push(`Linha ${line}: treinamento "${r["treinamento"] ?? ""}" não existe no catálogo.`);
+        errors.push(
+          `Linha ${line}: treinamento "${r["treinamento"] ?? ""}" não encontrado no catálogo (se houver mais de um com esse nome, preencha a coluna descricao).`,
+        );
         return;
       }
       const done = parseDate(r["data_realizacao"] ?? "");
@@ -304,12 +280,6 @@ function TrainingsPage() {
         actions={
           canWrite && (
             <div className="flex flex-wrap gap-2">
-              <ImportDialog
-                entity="catálogo de treinamentos"
-                description="Importe a lista de treinamentos (.xlsx ou .csv)."
-                columns={CATALOG_COLUMNS}
-                onImport={importCatalog}
-              />
               <ImportDialog
                 entity="registros de treinamentos"
                 description="Importe treinamentos realizados e seus documentos (.xlsx ou .csv)."
@@ -488,7 +458,9 @@ function TrainingsPage() {
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   {(trainings.data ?? []).filter((t) => t.active).map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}{t.description ? ` — ${t.description}` : ""}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
