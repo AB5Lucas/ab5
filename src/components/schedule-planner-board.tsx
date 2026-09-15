@@ -212,6 +212,19 @@ export function SchedulePlannerBoard({
 
   const entries = statusEntries.data ?? [];
 
+  /** Ausências cadastradas (férias, atestado, folga) alimentam automaticamente as caixas. */
+  const absenceMembers = useMemo(() => {
+    const m = new Map<string, string[]>();
+    (ctx.data?.absences ?? new Map<string, string>()).forEach((reason, collaboratorId) => {
+      const key = ABSENCE_BOX[reason] ?? null;
+      if (!key) return;
+      const list = m.get(key) ?? [];
+      list.push(collaboratorId);
+      m.set(key, list);
+    });
+    return m;
+  }, [ctx.data]);
+
   const entryByCollaborator = useMemo(() => {
     const m = new Map<string, (typeof entries)[number]>();
     entries.forEach((e) => m.set(e.collaborator_id, e));
