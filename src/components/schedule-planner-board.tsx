@@ -239,6 +239,13 @@ export function SchedulePlannerBoard({
 
     if (absence) return base({ level: "block", reasons: [`Indisponível: ${absence.toLowerCase()}`] });
 
+    const entry = entryByCollaborator.get(collaboratorId);
+    if (entry)
+      return base({
+        level: "block",
+        reasons: [`Registrado em ${BOX_LABEL[entry.box_key] ?? entry.box_key}`],
+      });
+
     if (!workId) {
       if (current) return base({ level: "busy", reasons: [`Alocado em ${currentLabel()}`] });
       return base({ level: "ok" });
