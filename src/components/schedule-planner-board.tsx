@@ -1093,7 +1093,7 @@ export function SchedulePlannerBoard({
                         </div>
                       )}
                       {ev.reasons.length > 0 && (
-                        <p className="pt-1 text-xs text-muted-foreground">{ev.reasons.join(" · ")}</p>
+                        <p className="pt-1 text-[10px] text-muted-foreground">{ev.reasons.join(" · ")}</p>
                       )}
                     </div>
                   )}
@@ -1102,7 +1102,7 @@ export function SchedulePlannerBoard({
             })}
           </ul>
 
-          <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 border-t border-border pt-2 text-[10px] text-muted-foreground">
             Arraste um nome para o card da obra. Para retirar, arraste de volta para esta lista ou use o ✕.
           </p>
         </aside>
