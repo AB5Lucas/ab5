@@ -305,12 +305,6 @@ function TrainingsPage() {
           canWrite && (
             <div className="flex flex-wrap gap-2">
               <ImportDialog
-                entity="catálogo de treinamentos"
-                description="Importe a lista de treinamentos (.xlsx ou .csv)."
-                columns={CATALOG_COLUMNS}
-                onImport={importCatalog}
-              />
-              <ImportDialog
                 entity="registros de treinamentos"
                 description="Importe treinamentos realizados e seus documentos (.xlsx ou .csv)."
                 columns={RECORD_COLUMNS}
