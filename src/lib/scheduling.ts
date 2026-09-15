@@ -79,8 +79,9 @@ export async function fetchScheduleContext(date: string) {
     leaves,
     daysOff,
     holidays,
+    integrations,
   ] = await Promise.all([
-    supabase.from("works").select("id, name, entry_time, exit_time, exit_time_weekend, status, clients(name, city, distance_km)").eq("active", true).order("name"),
+    supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, clients(name, city, distance_km)").eq("active", true).order("name"),
     supabase
       .from("collaborators")
       .select("id, full_name, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry")
