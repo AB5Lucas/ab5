@@ -5,7 +5,7 @@ import {
   Users,
   Building2,
   Truck,
-  GraduationCap,
+  
   CalendarOff,
   Wallet,
   FileBarChart,
