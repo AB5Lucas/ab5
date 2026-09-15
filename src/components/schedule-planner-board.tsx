@@ -827,6 +827,92 @@ export function SchedulePlannerBoard({
               </section>
             );
           })}
+
+          {/* Caixas de situação */}
+          {STATUS_BOXES.filter((b) => visibleBoxes.has(b.key) || entries.some((e) => e.box_key === b.key)).map((b) => {
+            const boxRows = entries.filter((e) => e.box_key === b.key);
+            const isHover = hoverBox === b.key;
+            return (
+              <section
+                key={b.key}
+                onDragOver={(e) => {
+                  if (!editable) return;
+                  e.preventDefault();
+                  setHoverBox(b.key);
+                }}
+                onDragLeave={() => setHoverBox((h) => (h === b.key ? null : h))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setHoverBox(null);
+                  const p = readPayload(e);
+                  setDragging(null);
+                  if (!p || !editable) return;
+                  dropBox.mutate({ ...p, boxKey: b.key });
+                }}
+                className={cn(
+                  "panel flex h-fit flex-col overflow-hidden border-dashed transition",
+                  isHover && "ring-2 ring-primary",
+                )}
+              >
+                <header className="border-b border-border bg-muted/60 px-3 py-2">
+                  <div className="flex items-start gap-2">
+                    <h2 className="font-display flex-1 text-sm font-semibold uppercase leading-tight tracking-wide">
+                      {b.label}
+                    </h2>
+                    <Badge variant="outline" className="shrink-0">
+                      <Users className="mr-1 h-3 w-3" />
+                      {boxRows.length}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Caixa de situação do dia</p>
+                </header>
+                <ul className="max-h-64 flex-1 divide-y divide-border overflow-y-auto">
+                  {boxRows.length === 0 && (
+                    <li className="px-3 py-6 text-center text-xs text-muted-foreground">
+                      Arraste colaboradores para cá
+                    </li>
+                  )}
+                  {boxRows.map((entry) => {
+                    const p = personById.get(entry.collaborator_id);
+                    return (
+                      <li
+                        key={entry.id}
+                        draggable={editable}
+                        onDragStart={(e) =>
+                          startDrag(e, {
+                            collaboratorId: entry.collaborator_id,
+                            allocationId: null,
+                            entryId: entry.id,
+                          })
+                        }
+                        onDragEnd={() => setDragging(null)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm"
+                      >
+                        {editable && <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{p?.full_name ?? "—"}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
+                          </p>
+                        </div>
+                        {editable && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            aria-label="Remover da caixa"
+                            onClick={() => removeEntry.mutate(entry.id)}
+                          >
+                            <X className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
         </div>
 
         {/* Painel lateral de colaboradores */}
