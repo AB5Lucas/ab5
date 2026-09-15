@@ -1082,7 +1082,7 @@ export function SchedulePlannerBoard({
                           </Badge>
                           <Badge
                             variant={ev.reqBlocked ? "destructive" : ev.reqIssues > 0 ? "secondary" : "outline"}
-                            className="text-[10px]"
+                            className="px-1 py-0 text-[9px]"
                           >
                             {ev.reqBlocked
                               ? "Requisito bloqueante"
