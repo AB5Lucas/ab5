@@ -52,7 +52,22 @@ type Evaluation = {
   fit: boolean;
 };
 
-type DragPayload = { collaboratorId: string; allocationId: string | null };
+type DragPayload = { collaboratorId: string; allocationId: string | null; entryId?: string | null };
+
+/** Caixas de situação que podem ser exibidas junto aos cards de obra. */
+const STATUS_BOXES = [
+  { key: "folga", label: "FOLGAS" },
+  { key: "aso", label: "ASO" },
+  { key: "medico", label: "MÉDICO" },
+  { key: "atestado", label: "ATESTADO" },
+  { key: "afastado", label: "AFASTADO" },
+  { key: "falta", label: "FALTA" },
+  { key: "interjornada", label: "INTERJORNADA" },
+  { key: "treinamento", label: "TREINAMENTO" },
+] as const;
+
+const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
+const BOXES_STORAGE_KEY = "planner-status-boxes";
 
 const FILTERS = [
   { key: "available", label: "Disponíveis" },
