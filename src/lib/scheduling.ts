@@ -29,6 +29,7 @@ export type Collaborator = {
   is_driver: boolean;
   driver_license_category: string | null;
   driver_license_expiry: string | null;
+  contract_type: string | null;
 };
 
 export type Requirement = {
