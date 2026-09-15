@@ -42,8 +42,8 @@ const CATALOG_COLUMNS: ImportColumn[] = [
 
 const RECORD_COLUMNS: ImportColumn[] = [
   { key: "matricula", hint: "Matrícula do colaborador (use matrícula ou nome).", example: "1024" },
-  { key: "colaborador", hint: "Nome completo, usado se a matrícula estiver vazia." },
-  { key: "treinamento", required: true, hint: "Nome exato do treinamento no catálogo.", example: "NR-10" },
+  { key: "colaborador", hint: "Nome completo, usado se a matrícula estiver vazia. Aceita variações de acento e maiúsculas." },
+  { key: "treinamento", required: true, hint: "Nome do treinamento do catálogo. Aceita variações: sem acento, CAIXA ALTA, plural ou pequenas diferenças de escrita.", example: "NR-10" },
   { key: "data_realizacao", required: true, hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2026-03-01" },
   { key: "data_vencimento", hint: "Se vazio, é calculado pela validade do treinamento." },
   { key: "documento_url", hint: "Link do certificado/documento.", example: "https://..." },
