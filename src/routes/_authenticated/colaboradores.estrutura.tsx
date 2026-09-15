@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/colaboradores/estrutura")(
 });
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText } from "@/lib/import-helpers";
+import { insertSequentially, normText, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const POSITION_COLUMNS: ImportColumn[] = [
   { key: "nome", required: true, example: "Eletricista" },
@@ -195,7 +195,7 @@ function StructurePage() {
     const recs: { line: number; values: Record<string, unknown> }[] = [];
     rows.forEach((r, i) => {
       const line = i + 2;
-      const name = (r["nome"] ?? "").trim();
+      const name = titleCase(r["nome"] ?? "");
       if (!name) {
         errors.push(`Linha ${line}: nome é obrigatório.`);
         return;
@@ -204,7 +204,7 @@ function StructurePage() {
         name,
         active: !normText(r["ativo"] ?? "").startsWith("n"),
       };
-      if (table === "positions") values["description"] = emptyToNull(r["descricao"] ?? "");
+      if (table === "positions") values["description"] = titleCaseOrNull(r["descricao"] ?? "");
       recs.push({ line, values });
     });
     const result = await insertSequentially(

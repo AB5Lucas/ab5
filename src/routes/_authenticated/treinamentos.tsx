@@ -31,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/treinamentos")({
 });
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseDate, parseNum } from "@/lib/import-helpers";
+import { emptyToNull, insertSequentially, normText, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const CATALOG_COLUMNS: ImportColumn[] = [
   { key: "nome", required: true, example: "NR-10" },
@@ -215,7 +215,7 @@ function TrainingsPage() {
     const recs: { line: number; values: Record<string, unknown> }[] = [];
     rows.forEach((r, i) => {
       const line = i + 2;
-      const name = (r["nome"] ?? "").trim();
+      const name = titleCase(r["nome"] ?? "");
       if (!name) {
         errors.push(`Linha ${line}: nome é obrigatório.`);
         return;
@@ -224,7 +224,7 @@ function TrainingsPage() {
         line,
         values: {
           name,
-          description: emptyToNull(r["descricao"] ?? ""),
+          description: titleCaseOrNull(r["descricao"] ?? ""),
           validity_months: parseNum(r["validade_meses"] ?? "") ?? 12,
           active: normText(r["ativo"] ?? "").startsWith("n") ? false : true,
         },

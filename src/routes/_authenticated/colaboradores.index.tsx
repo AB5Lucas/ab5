@@ -35,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseBool, parseDate, parseNum } from "@/lib/import-helpers";
+import { emptyToNull, insertSequentially, normText, parseBool, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const CONTRACT_LABELS: Record<string, string> = {
   efetivo: "Efetivo",
@@ -319,8 +319,8 @@ function CollaboratorsPage() {
         line,
         values: {
           registration_number: r["matricula"]!.trim(),
-          full_name: r["nome_completo"]!.trim(),
-          social_name: emptyToNull(r["nome_social"] ?? ""),
+          full_name: titleCase(r["nome_completo"]!),
+          social_name: titleCaseOrNull(r["nome_social"] ?? ""),
           cpf: emptyToNull(r["cpf"] ?? ""),
           phone: emptyToNull(r["telefone"] ?? ""),
           email: emptyToNull(r["email"] ?? ""),

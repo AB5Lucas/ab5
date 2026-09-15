@@ -31,6 +31,39 @@ export function parseNum(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const SMALL_WORDS = new Set(["de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas", "a", "o", "as", "os", "para", "com", "por", "ao", "aos"]);
+
+/**
+ * Corrige textos digitados totalmente em CAIXA ALTA para "Iniciais Maiúsculas".
+ * Ex.: "MONTADOR DE ANDAIMES N1" -> "Montador de Andaimes N1".
+ * Textos que já possuem minúsculas são mantidos como estão.
+ */
+export function titleCase(v: string): string {
+  const s = (v ?? "").trim().replace(/\s+/g, " ");
+  if (s === "" || /[a-zà-ÿ]/.test(s)) return s;
+  return s
+    .toLocaleLowerCase("pt-BR")
+    .split(" ")
+    .map((word, i) =>
+      word
+        .split("-")
+        .map((part) => {
+          if (part === "") return part;
+          if (/\d/.test(part)) return part.toLocaleUpperCase("pt-BR");
+          if (i > 0 && SMALL_WORDS.has(part)) return part;
+          return part.charAt(0).toLocaleUpperCase("pt-BR") + part.slice(1);
+        })
+        .join("-"),
+    )
+    .join(" ");
+}
+
+/** Igual a emptyToNull, mas ajusta CAIXA ALTA para iniciais maiúsculas. */
+export const titleCaseOrNull = (v: string) => {
+  const s = titleCase(v ?? "");
+  return s === "" ? null : s;
+};
+
 export const emptyToNull = (v: string) => {
   const s = (v ?? "").trim();
   return s === "" ? null : s;
