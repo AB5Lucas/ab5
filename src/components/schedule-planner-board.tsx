@@ -836,7 +836,7 @@ export function SchedulePlannerBoard({
                               removeRow.mutate(r.id);
                             }}
                           >
-                            <X className="h-4 w-4 text-destructive" />
+                            <X className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         )}
                       </li>
