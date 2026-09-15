@@ -116,18 +116,52 @@ function similarity(a: string, b: string): number {
   return 1 - levenshtein(a, b) / max;
 }
 
+const ROMAN_LEVEL: Record<string, string> = { i: "1", ii: "2", iii: "3", iv: "4" };
+
+/**
+ * Extrai o nível de uma função: "N1", "nivel 2", "niv. 3", "III" -> "1" | "2" | "3" | "4".
+ * Retorna null quando o nome não indica nível.
+ */
+export function extractLevel(v: string): string | null {
+  const s = normText(v ?? "");
+  const m =
+    s.match(/\bn[ivel]*\s*\.?\s*([1-4])\b/) ??
+    s.match(/\b([1-4])\b\s*$/) ??
+    null;
+  if (m) return m[1]!;
+  const r = s.match(/\b(i{1,3}|iv)\b\s*$/);
+  if (r) return ROMAN_LEVEL[r[1]!] ?? null;
+  return null;
+}
+
+/** Remove a marcação de nível do nome, para comparar apenas a função base. */
+function stripLevel(v: string): string {
+  return normText(v ?? "")
+    .replace(/\bn[ivel]*\s*\.?\s*[1-4]\b/g, " ")
+    .replace(/\b(i{1,3}|iv)\b\s*$/g, " ")
+    .replace(/\b[1-4]\b\s*$/g, " ")
+    .trim();
+}
+
 /**
  * Cria um localizador de registros por nome tolerante a erros de planilha:
  * ignora acentos, maiúsculas, preposições, gênero ("Técnica" = "Técnico"),
- * plural e pequenas diferenças de digitação.
+ * plural e pequenas diferenças de digitação — mas NUNCA mistura níveis
+ * diferentes ("Montador de Andaimes N1" ≠ "Montador de Andaimes N2").
  */
 export function createNameMatcher<T extends { id: string; name: string }>(list: T[]) {
   const exact = new Map<string, T>();
   const keyed = new Map<string, T>();
+  const levelOf = new Map<string, string | null>();
   for (const item of list) {
     exact.set(normText(item.name), item);
-    const k = nameKey(item.name);
-    if (k && !keyed.has(k)) keyed.set(k, item);
+    const k = nameKey(stripLevel(item.name));
+    const lvl = extractLevel(item.name);
+    const mapKey = `${lvl ?? ""}|${k}`;
+    if (k && !keyed.has(mapKey)) {
+      keyed.set(mapKey, item);
+      levelOf.set(mapKey, lvl);
+    }
   }
   const entries = [...keyed.entries()];
 
@@ -136,24 +170,30 @@ export function createNameMatcher<T extends { id: string; name: string }>(list: 
     if (!raw) return null;
     const direct = exact.get(normText(raw));
     if (direct) return direct;
-    const key = nameKey(raw);
+    const level = extractLevel(raw);
+    const key = nameKey(stripLevel(raw));
     if (!key) return null;
-    const byKey = keyed.get(key);
+    const byKey = keyed.get(`${level ?? ""}|${key}`);
     if (byKey) return byKey;
 
+    // só compara candidatos do mesmo nível
+    const sameLevel = entries.filter(([mk]) => (levelOf.get(mk) ?? null) === level);
+    const stripped = sameLevel.map(([mk, item]) => [mk.slice(mk.indexOf("|") + 1), item] as const);
+
     // contém / está contido (ex.: "Tecnico Seguranca" x "Tecnico de Seguranca do Trabalho")
-    const contains = entries.filter(([k]) => k.includes(key) || key.includes(k));
+    const contains = stripped.filter(([k]) => k.includes(key) || key.includes(k));
     if (contains.length === 1) return contains[0]![1];
 
     // aproximação por similaridade
     let best: { item: T; score: number } | null = null;
-    for (const [k, item] of entries) {
+    for (const [k, item] of stripped) {
       const score = similarity(key, k);
       if (!best || score > best.score) best = { item, score };
     }
     return best && best.score >= 0.85 ? best.item : null;
   };
 }
+
 
 export const emptyToNull = (v: string) => {
   const s = (v ?? "").trim();
