@@ -65,7 +65,7 @@ type AllocRow = {
   confirmation_status: string;
   daily_schedules: { schedule_date: string } | null;
   works: { code: string; name: string } | null;
-  collaborators: { full_name: string; registration: string | null } | null;
+  collaborators: { full_name: string } | null;
 };
 
 function Page() {
@@ -78,7 +78,7 @@ function Page() {
       const { data, error } = await supabase
         .from("daily_allocations")
         .select(
-          "id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(code, name), collaborators(full_name, registration)",
+          "id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(code, name), collaborators(full_name)",
         )
         .gte("daily_schedules.schedule_date", from)
         .lte("daily_schedules.schedule_date", to);
