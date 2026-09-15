@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Copy,
   GripVertical,
+  LayoutGrid,
   Lock,
   LockOpen,
   MapPin,
