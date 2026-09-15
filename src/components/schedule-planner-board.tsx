@@ -79,6 +79,13 @@ const STATUS_BOXES = [
 ] as const;
 
 const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
+
+/** Ausências cadastradas → caixa correspondente (alimentada automaticamente). */
+const ABSENCE_BOX: Record<string, string> = {
+  "Férias": "ferias",
+  "Atestado": "atestado",
+  "Folga": "folga",
+};
 const BOXES_STORAGE_KEY = "planner-status-boxes";
 
 const FILTERS = [
@@ -211,6 +218,19 @@ export function SchedulePlannerBoard({
   });
 
   const entries = statusEntries.data ?? [];
+
+  /** Ausências cadastradas (férias, atestado, folga) alimentam automaticamente as caixas. */
+  const absenceMembers = useMemo(() => {
+    const m = new Map<string, string[]>();
+    (ctx.data?.absences ?? new Map<string, string>()).forEach((reason, collaboratorId) => {
+      const key = ABSENCE_BOX[reason] ?? null;
+      if (!key) return;
+      const list = m.get(key) ?? [];
+      list.push(collaboratorId);
+      m.set(key, list);
+    });
+    return m;
+  }, [ctx.data]);
 
   const entryByCollaborator = useMemo(() => {
     const m = new Map<string, (typeof entries)[number]>();
@@ -848,26 +868,38 @@ export function SchedulePlannerBoard({
           })}
 
           {/* Caixas de situação */}
-          {STATUS_BOXES.filter((b) => visibleBoxes.has(b.key) || entries.some((e) => e.box_key === b.key)).map((b) => {
+          {STATUS_BOXES.filter(
+            (b) =>
+              visibleBoxes.has(b.key) ||
+              entries.some((e) => e.box_key === b.key) ||
+              (absenceMembers.get(b.key)?.length ?? 0) > 0,
+          ).map((b) => {
             const boxRows = entries.filter((e) => e.box_key === b.key);
+            const autoRows = (absenceMembers.get(b.key) ?? []).filter(
+              (id) => !boxRows.some((r) => r.collaborator_id === id),
+            );
             const isHover = hoverBox === b.key;
+            const handleDrop = (e: React.DragEvent) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setHoverBox(null);
+              const p = readPayload(e);
+              setDragging(null);
+              if (!p || !editable) return;
+              dropBox.mutate({ ...p, boxKey: b.key });
+            };
+            const handleOver = (e: React.DragEvent) => {
+              if (!editable) return;
+              e.preventDefault();
+              e.stopPropagation();
+              setHoverBox(b.key);
+            };
             return (
               <section
                 key={b.key}
-                onDragOver={(e) => {
-                  if (!editable) return;
-                  e.preventDefault();
-                  setHoverBox(b.key);
-                }}
+                onDragOver={handleOver}
                 onDragLeave={() => setHoverBox((h) => (h === b.key ? null : h))}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setHoverBox(null);
-                  const p = readPayload(e);
-                  setDragging(null);
-                  if (!p || !editable) return;
-                  dropBox.mutate({ ...p, boxKey: b.key });
-                }}
+                onDrop={handleDrop}
                 className={cn(
                   "panel flex h-fit flex-col overflow-hidden border-dashed transition",
                   isHover && "ring-2 ring-primary",
@@ -880,17 +912,46 @@ export function SchedulePlannerBoard({
                     </h2>
                     <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
                       <Users className="mr-0.5 h-2.5 w-2.5" />
-                      {boxRows.length}
+                      {boxRows.length + autoRows.length}
                     </Badge>
                   </div>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">Caixa de situação do dia</p>
                 </header>
-                <ul className="max-h-56 flex-1 divide-y divide-border overflow-y-auto">
-                  {boxRows.length === 0 && (
-                    <li className="px-2 py-4 text-center text-[10px] text-muted-foreground">
+                <ul
+                  className="max-h-56 flex-1 divide-y divide-border overflow-y-auto"
+                  onDragOver={handleOver}
+                  onDrop={handleDrop}
+                >
+                  {boxRows.length + autoRows.length === 0 && (
+                    <li
+                      className="px-2 py-4 text-center text-[10px] text-muted-foreground"
+                      onDragOver={handleOver}
+                      onDrop={handleDrop}
+                    >
                       Arraste colaboradores para cá
                     </li>
                   )}
+                  {autoRows.map((id) => {
+                    const p = personById.get(id);
+                    return (
+                      <li
+                        key={`auto-${id}`}
+                        onDragOver={handleOver}
+                        onDrop={handleDrop}
+                        className="flex items-center gap-1.5 px-2 py-1 text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium leading-tight">{p?.full_name ?? "—"}</p>
+                          <p className="truncate text-[10px] leading-tight text-muted-foreground">
+                            {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="shrink-0 px-1 py-0 text-[9px]">
+                          Cadastrado
+                        </Badge>
+                      </li>
+                    );
+                  })}
                   {boxRows.map((entry) => {
                     const p = personById.get(entry.collaborator_id);
                     return (
@@ -905,6 +966,8 @@ export function SchedulePlannerBoard({
                           })
                         }
                         onDragEnd={() => setDragging(null)}
+                        onDragOver={handleOver}
+                        onDrop={handleDrop}
                         className="flex items-center gap-1.5 px-2 py-1 text-xs"
                       >
                         {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
