@@ -769,8 +769,36 @@ export function SchedulePlannerBoard({
                     {p.position_id ? positionById.get(p.position_id) ?? "Sem função" : "Sem função"}
                     {p.is_driver ? " · motorista" : ""}
                   </p>
+                  {selectedWork && (
+                    <div className="flex flex-wrap gap-1 pl-4 pt-1">
+                      <Badge
+                        variant={
+                          ev.integration === "valid"
+                            ? "outline"
+                            : ev.integration === "expiring"
+                              ? "secondary"
+                              : "destructive"
+                        }
+                        className="text-[10px]"
+                      >
+                        {ev.integration ? INTEGRATION_LABEL[ev.integration] : "Integração"}
+                      </Badge>
+                      <Badge
+                        variant={ev.reqBlocked ? "destructive" : ev.reqIssues > 0 ? "secondary" : "outline"}
+                        className="text-[10px]"
+                      >
+                        {ev.reqBlocked
+                          ? "Requisito bloqueante"
+                          : ev.reqIssues > 0
+                            ? `${ev.reqIssues} requisito(s) pendente(s)`
+                            : "Requisitos OK"}
+                      </Badge>
+                    </div>
+                  )}
                   {ev.reasons.length > 0 && (
-                    <p className="pl-4 text-xs text-muted-foreground">{ev.reasons.join(" · ")}</p>
+                    <p className="pl-4 text-xs text-muted-foreground" title={ev.reasons.join(" · ")}>
+                      {ev.reasons.join(" · ")}
+                    </p>
                   )}
                 </li>
               );
