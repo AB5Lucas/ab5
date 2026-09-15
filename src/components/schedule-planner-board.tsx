@@ -897,20 +897,9 @@ export function SchedulePlannerBoard({
             return (
               <section
                 key={b.key}
-                onDragOver={(e) => {
-                  if (!editable) return;
-                  e.preventDefault();
-                  setHoverBox(b.key);
-                }}
+                onDragOver={handleOver}
                 onDragLeave={() => setHoverBox((h) => (h === b.key ? null : h))}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setHoverBox(null);
-                  const p = readPayload(e);
-                  setDragging(null);
-                  if (!p || !editable) return;
-                  dropBox.mutate({ ...p, boxKey: b.key });
-                }}
+                onDrop={handleDrop}
                 className={cn(
                   "panel flex h-fit flex-col overflow-hidden border-dashed transition",
                   isHover && "ring-2 ring-primary",
