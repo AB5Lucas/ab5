@@ -210,6 +210,90 @@ function TrainingsPage() {
 
   const filtered = (records.data ?? []).filter((r) => filter === "all" || statusOf(r.expires_at) === filter);
 
+  async function importCatalog(rows: ImportRow[]) {
+    const errors: string[] = [];
+    const recs: { line: number; values: Record<string, unknown> }[] = [];
+    rows.forEach((r, i) => {
+      const line = i + 2;
+      const name = (r["nome"] ?? "").trim();
+      if (!name) {
+        errors.push(`Linha ${line}: nome é obrigatório.`);
+        return;
+      }
+      recs.push({
+        line,
+        values: {
+          name,
+          description: emptyToNull(r["descricao"] ?? ""),
+          validity_months: parseNum(r["validade_meses"] ?? "") ?? 12,
+          active: normText(r["ativo"] ?? "").startsWith("n") ? false : true,
+        },
+      });
+    });
+    const result = await insertSequentially(
+      recs,
+      async (values) => {
+        const { error } = await supabase.from("trainings").insert(values as never);
+        return { error };
+      },
+      errors,
+    );
+    await qc.invalidateQueries({ queryKey: ["trainings"] });
+    return result;
+  }
+
+  async function importRecords(rows: ImportRow[]) {
+    const errors: string[] = [];
+    const { data: allPeople } = await supabase.from("collaborators").select("id, full_name, registration_number");
+    const byReg = new Map((allPeople ?? []).map((p) => [normText(p.registration_number ?? ""), p.id]));
+    const byName = new Map((allPeople ?? []).map((p) => [normText(p.full_name), p.id]));
+    const trainingByName = new Map((trainings.data ?? []).map((t) => [normText(t.name), t]));
+
+    const recs: { line: number; values: Record<string, unknown> }[] = [];
+    rows.forEach((r, i) => {
+      const line = i + 2;
+      const reg = (r["matricula"] ?? "").trim();
+      const person = reg ? byReg.get(normText(reg)) : byName.get(normText(r["colaborador"] ?? ""));
+      if (!person) {
+        errors.push(`Linha ${line}: colaborador não encontrado (${reg || r["colaborador"] || "vazio"}).`);
+        return;
+      }
+      const training = trainingByName.get(normText(r["treinamento"] ?? ""));
+      if (!training) {
+        errors.push(`Linha ${line}: treinamento "${r["treinamento"] ?? ""}" não existe no catálogo.`);
+        return;
+      }
+      const done = parseDate(r["data_realizacao"] ?? "");
+      if (!done) {
+        errors.push(`Linha ${line}: data de realização inválida.`);
+        return;
+      }
+      const expires =
+        parseDate(r["data_vencimento"] ?? "") ??
+        (training.validity_months ? addMonths(done, training.validity_months) : null);
+      recs.push({
+        line,
+        values: {
+          collaborator_id: person,
+          training_id: training.id,
+          completed_at: done,
+          expires_at: expires,
+          document_url: emptyToNull(r["documento_url"] ?? ""),
+        },
+      });
+    });
+    const result = await insertSequentially(
+      recs,
+      async (values) => {
+        const { error } = await supabase.from("collaborator_trainings").insert(values as never);
+        return { error };
+      },
+      errors,
+    );
+    await qc.invalidateQueries({ queryKey: ["collaborator-trainings"] });
+    return result;
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -217,9 +301,23 @@ function TrainingsPage() {
         description="Catálogo de treinamentos e controle de validade por colaborador."
         actions={
           canWrite && (
-            <Button size="sm" onClick={() => setOpen(true)}>
-              <Plus className="h-4 w-4" /> Registrar treinamento
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <ImportDialog
+                entity="catálogo de treinamentos"
+                description="Importe a lista de treinamentos (.xlsx ou .csv)."
+                columns={CATALOG_COLUMNS}
+                onImport={importCatalog}
+              />
+              <ImportDialog
+                entity="registros de treinamentos"
+                description="Importe treinamentos realizados e seus documentos (.xlsx ou .csv)."
+                columns={RECORD_COLUMNS}
+                onImport={importRecords}
+              />
+              <Button size="sm" onClick={() => setOpen(true)}>
+                <Plus className="h-4 w-4" /> Registrar treinamento
+              </Button>
+            </div>
           )
         }
       />
