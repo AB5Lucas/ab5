@@ -342,8 +342,8 @@ function IntegrationsPage() {
       if (d) byCpf.set(d, p.id);
     });
     const matchClient = createNameMatcher(clients.data ?? []);
-    const existing = new Map(
-      (integrations.data ?? []).map((r) => [`${r.collaborator_id}|${r.client_id}`, r.id] as const),
+    const existing = new Map<string, string>(
+      (integrations.data ?? []).map((r) => [`${r.collaborator_id}|${r.client_id}`, r.id]),
     );
     const seen = new Set<string>();
 
