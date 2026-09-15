@@ -195,7 +195,7 @@ function StructurePage() {
     const recs: { line: number; values: Record<string, unknown> }[] = [];
     rows.forEach((r, i) => {
       const line = i + 2;
-      const name = (r["nome"] ?? "").trim();
+      const name = titleCase(r["nome"] ?? "");
       if (!name) {
         errors.push(`Linha ${line}: nome é obrigatório.`);
         return;
@@ -204,7 +204,7 @@ function StructurePage() {
         name,
         active: !normText(r["ativo"] ?? "").startsWith("n"),
       };
-      if (table === "positions") values["description"] = emptyToNull(r["descricao"] ?? "");
+      if (table === "positions") values["description"] = titleCaseOrNull(r["descricao"] ?? "");
       recs.push({ line, values });
     });
     const result = await insertSequentially(
