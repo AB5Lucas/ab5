@@ -112,6 +112,30 @@ export function SchedulePlannerBoard({
   const [dragging, setDragging] = useState<DragPayload | null>(null);
   const [hoverWork, setHoverWork] = useState<string | null>(null);
   const [hoverPanel, setHoverPanel] = useState(false);
+  const [hoverBox, setHoverBox] = useState<string | null>(null);
+  const [visibleBoxes, setVisibleBoxes] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = window.localStorage.getItem(BOXES_STORAGE_KEY);
+      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  function toggleBox(key: string) {
+    setVisibleBoxes((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try {
+        window.localStorage.setItem(BOXES_STORAGE_KEY, JSON.stringify([...next]));
+      } catch {
+        /* ignora */
+      }
+      return next;
+    });
+  }
 
   const ctx = useQuery({ queryKey: ["schedule-ctx", date], queryFn: () => fetchScheduleContext(date) });
 
