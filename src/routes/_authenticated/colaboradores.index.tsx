@@ -324,7 +324,10 @@ function CollaboratorsPage() {
 
     const result = await insertSequentially(
       records,
-      (values) => supabase.from("collaborators").insert(values as never).then(({ error }) => ({ error })),
+      async (values) => {
+        const { error } = await supabase.from("collaborators").insert(values as never);
+        return { error };
+      },
       errors,
     );
     await queryClient.invalidateQueries({ queryKey: ["collaborators"] });
