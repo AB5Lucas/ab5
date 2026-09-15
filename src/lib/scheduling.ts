@@ -146,3 +146,9 @@ export function checkRequirements(
   }
   return issues;
 }
+
+export const formatDateBR = (iso?: string | null) => {
+  if (!iso) return "—";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return y && m && d ? `${d}/${m}/${y}` : iso;
+};
