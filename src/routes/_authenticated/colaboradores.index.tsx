@@ -122,6 +122,8 @@ type FormState = {
   is_driver: boolean;
   driver_license_category: string;
   driver_license_expiry: string;
+  salary: string;
+  contract_type: string;
   notes: string;
 };
 
