@@ -976,25 +976,37 @@ export function SchedulePlannerBoard({
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="flex flex-wrap gap-1">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => toggleFilter(f.key)}
-                  className={cn(
-                    "rounded-full border border-border px-2 py-0.5 text-xs transition",
-                    filters.has(f.key) ? "bg-primary text-primary-foreground" : "hover:bg-secondary",
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex-1 justify-between">
+                    <span className="flex items-center gap-2">
+                      <SlidersHorizontal className="h-4 w-4" />
+                      Condições
+                    </span>
+                    {filters.size > 0 && <Badge variant="secondary">{filters.size}</Badge>}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-60">
+                  <DropdownMenuLabel>Filtrar colaboradores</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {FILTERS.map((f) => (
+                    <DropdownMenuCheckboxItem
+                      key={f.key}
+                      checked={filters.has(f.key)}
+                      onCheckedChange={() => toggleFilter(f.key)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {f.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               {filters.size > 0 && (
                 <button
                   type="button"
                   onClick={() => setFilters(new Set())}
-                  className="rounded-full px-2 py-0.5 text-xs text-muted-foreground underline"
+                  className="shrink-0 text-xs text-muted-foreground underline"
                 >
                   limpar
                 </button>
