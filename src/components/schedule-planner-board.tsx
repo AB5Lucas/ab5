@@ -16,6 +16,7 @@ import {
   LockOpen,
   MapPin,
   Search,
+  SlidersHorizontal,
   Users,
   X,
 } from "lucide-react";
