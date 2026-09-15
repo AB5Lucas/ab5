@@ -306,12 +306,16 @@ function CollaboratorsPage() {
         errors.push(`Linha ${line}: matrícula e nome completo são obrigatórios.`);
         return;
       }
-      const resolve = (label: string, map: Map<string, string>, value?: string) => {
+      const resolve = (
+        label: string,
+        match: (v: string) => { id: string } | null,
+        value?: string,
+      ) => {
         const v = (value ?? "").trim();
         if (!v) return null;
-        const id = map.get(normText(v));
-        if (!id) errors.push(`Linha ${line}: ${label} "${v}" não cadastrado(a).`);
-        return id ?? null;
+        const found = match(v);
+        if (!found) errors.push(`Linha ${line}: ${label} "${v}" não cadastrado(a).`);
+        return found?.id ?? null;
       };
       records.push({
         line,
