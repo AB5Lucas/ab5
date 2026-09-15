@@ -421,13 +421,13 @@ function CollaboratorsPage() {
           <TableBody>
             {collaborators.isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground">
+                <TableCell colSpan={6} className="text-muted-foreground">
                   Carregando colaboradores...
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground">
+                <TableCell colSpan={6} className="text-muted-foreground">
                   Nenhum colaborador encontrado.
                 </TableCell>
               </TableRow>
