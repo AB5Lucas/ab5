@@ -508,7 +508,7 @@ export function SchedulePlannerBoard({
                   drop.mutate({ ...p, workId: w.id });
                 }}
                 className={cn(
-                  "panel flex cursor-pointer flex-col overflow-hidden transition",
+                  "panel flex h-fit cursor-pointer flex-col overflow-hidden transition",
                   selectedWork === w.id && "ring-2 ring-primary",
                   isHover && !blockedTarget && "ring-2 ring-emerald-500",
                   isHover && blockedTarget && "ring-2 ring-destructive",
