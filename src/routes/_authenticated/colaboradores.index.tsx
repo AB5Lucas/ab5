@@ -34,6 +34,27 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
+import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { emptyToNull, insertSequentially, normText, parseBool, parseDate } from "@/lib/import-helpers";
+
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: "matricula", required: true, hint: "Código/matrícula única.", example: "1024" },
+  { key: "nome_completo", required: true, example: "Maria Aparecida Souza" },
+  { key: "nome_social" },
+  { key: "cpf", hint: "Somente números ou com pontuação.", example: "123.456.789-00" },
+  { key: "telefone", example: "(11) 99999-0000" },
+  { key: "email", example: "maria@empresa.com" },
+  { key: "data_nascimento", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "1990-05-12" },
+  { key: "data_admissao", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2023-01-10" },
+  { key: "cargo", hint: "Deve existir em Cargos e setores.", example: "Eletricista" },
+  { key: "departamento", hint: "Deve existir em Cargos e setores." },
+  { key: "setor", hint: "Deve existir em Cargos e setores." },
+  { key: "situacao", hint: "Ativo ou Inativo (padrão Ativo).", example: "Ativo" },
+  { key: "motorista", hint: "Sim ou Não.", example: "Não" },
+  { key: "cnh_categoria", example: "D" },
+  { key: "cnh_validade", hint: "AAAA-MM-DD ou DD/MM/AAAA." },
+  { key: "observacoes" },
+];
 
 export const Route = createFileRoute("/_authenticated/colaboradores/")({
   head: () => ({
