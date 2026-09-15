@@ -35,7 +35,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseBool, parseDate } from "@/lib/import-helpers";
+import { emptyToNull, insertSequentially, normText, parseBool, parseDate, parseNum } from "@/lib/import-helpers";
+
+const CONTRACT_LABELS: Record<string, string> = {
+  efetivo: "Efetivo",
+  pj: "PJ",
+  intermitente: "Intermitente",
+};
+
+const contractFromText = (v: string): "efetivo" | "pj" | "intermitente" | null => {
+  const t = normText(v);
+  if (!t) return null;
+  if (t.startsWith("efet") || t.startsWith("clt")) return "efetivo";
+  if (t.startsWith("pj") || t.includes("juridic")) return "pj";
+  if (t.startsWith("interm")) return "intermitente";
+  return null;
+};
 
 const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "matricula", required: true, hint: "Código/matrícula única.", example: "1024" },
