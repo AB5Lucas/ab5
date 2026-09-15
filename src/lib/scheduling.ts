@@ -54,7 +54,13 @@ export type Integration = {
 /** Dias de antecedência para considerar a integração "próxima do vencimento". */
 export const INTEGRATION_WARN_DAYS = 30;
 
-export type IntegrationStatus = "valid" | "expiring" | "expired" | "missing" | "no_client";
+export type IntegrationStatus =
+  | "valid"
+  | "expiring"
+  | "expired"
+  | "missing"
+  | "no_client"
+  | "not_required";
 
 export const INTEGRATION_LABEL: Record<IntegrationStatus, string> = {
   valid: "Integração válida",
@@ -62,6 +68,7 @@ export const INTEGRATION_LABEL: Record<IntegrationStatus, string> = {
   expired: "Integração vencida",
   missing: "Sem integração com o cliente",
   no_client: "Serviço sem cliente vinculado",
+  not_required: "Integração não exigida",
 };
 
 /** Data needed to build a schedule for a given date. */
