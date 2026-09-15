@@ -64,6 +64,97 @@ export const titleCaseOrNull = (v: string) => {
   return s === "" ? null : s;
 };
 
+const STOP_WORDS = new Set([
+  "de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas",
+  "a", "o", "as", "os", "para", "com", "por", "ao", "aos", "the",
+]);
+
+/** Reduz uma palavra a um radical tolerante a gênero/plural: "tecnica"/"tecnicos" -> "tecnic". */
+function stemWord(w: string): string {
+  let s = w.replace(/[^a-z0-9]/g, "");
+  if (!s) return "";
+  if (/\d/.test(s)) return s;
+  s = s.replace(/(oes|aes|ais|eis|ns)$/, "");
+  s = s.replace(/s$/, "");
+  s = s.replace(/[aoe]$/, "");
+  return s;
+}
+
+/** Chave canônica de um nome: sem acentos, sem preposições, tolerante a gênero e plural. */
+export function nameKey(v: string): string {
+  return normText(v ?? "")
+    .split(/[\s/\-_.]+/)
+    .filter((w) => w && !STOP_WORDS.has(w))
+    .map(stemWord)
+    .filter(Boolean)
+    .join(" ");
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(
+        prev[j]! + 1,
+        cur[j - 1]! + 1,
+        prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    prev = cur;
+  }
+  return prev[n]!;
+}
+
+function similarity(a: string, b: string): number {
+  const max = Math.max(a.length, b.length);
+  if (!max) return 0;
+  return 1 - levenshtein(a, b) / max;
+}
+
+/**
+ * Cria um localizador de registros por nome tolerante a erros de planilha:
+ * ignora acentos, maiúsculas, preposições, gênero ("Técnica" = "Técnico"),
+ * plural e pequenas diferenças de digitação.
+ */
+export function createNameMatcher<T extends { id: string; name: string }>(list: T[]) {
+  const exact = new Map<string, T>();
+  const keyed = new Map<string, T>();
+  for (const item of list) {
+    exact.set(normText(item.name), item);
+    const k = nameKey(item.name);
+    if (k && !keyed.has(k)) keyed.set(k, item);
+  }
+  const entries = [...keyed.entries()];
+
+  return function match(value: string): T | null {
+    const raw = (value ?? "").trim();
+    if (!raw) return null;
+    const direct = exact.get(normText(raw));
+    if (direct) return direct;
+    const key = nameKey(raw);
+    if (!key) return null;
+    const byKey = keyed.get(key);
+    if (byKey) return byKey;
+
+    // contém / está contido (ex.: "Tecnico Seguranca" x "Tecnico de Seguranca do Trabalho")
+    const contains = entries.filter(([k]) => k.includes(key) || key.includes(k));
+    if (contains.length === 1) return contains[0]![1];
+
+    // aproximação por similaridade
+    let best: { item: T; score: number } | null = null;
+    for (const [k, item] of entries) {
+      const score = similarity(key, k);
+      if (!best || score > best.score) best = { item, score };
+    }
+    return best && best.score >= 0.85 ? best.item : null;
+  };
+}
+
 export const emptyToNull = (v: string) => {
   const s = (v ?? "").trim();
   return s === "" ? null : s;

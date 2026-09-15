@@ -31,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/treinamentos")({
 });
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
+import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const CATALOG_COLUMNS: ImportColumn[] = [
   { key: "nome", required: true, example: "NR-10" },
@@ -42,8 +42,8 @@ const CATALOG_COLUMNS: ImportColumn[] = [
 
 const RECORD_COLUMNS: ImportColumn[] = [
   { key: "matricula", hint: "Matrícula do colaborador (use matrícula ou nome).", example: "1024" },
-  { key: "colaborador", hint: "Nome completo, usado se a matrícula estiver vazia." },
-  { key: "treinamento", required: true, hint: "Nome exato do treinamento no catálogo.", example: "NR-10" },
+  { key: "colaborador", hint: "Nome completo, usado se a matrícula estiver vazia. Aceita variações de acento e maiúsculas." },
+  { key: "treinamento", required: true, hint: "Nome do treinamento do catálogo. Aceita variações: sem acento, CAIXA ALTA, plural ou pequenas diferenças de escrita.", example: "NR-10" },
   { key: "data_realizacao", required: true, hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2026-03-01" },
   { key: "data_vencimento", hint: "Se vazio, é calculado pela validade do treinamento." },
   { key: "documento_url", hint: "Link do certificado/documento.", example: "https://..." },
@@ -246,19 +246,21 @@ function TrainingsPage() {
     const errors: string[] = [];
     const { data: allPeople } = await supabase.from("collaborators").select("id, full_name, registration_number");
     const byReg = new Map((allPeople ?? []).map((p) => [normText(p.registration_number ?? ""), p.id]));
-    const byName = new Map((allPeople ?? []).map((p) => [normText(p.full_name), p.id]));
-    const trainingByName = new Map((trainings.data ?? []).map((t) => [normText(t.name), t]));
+    const matchPerson = createNameMatcher((allPeople ?? []).map((p) => ({ id: p.id, name: p.full_name })));
+    const matchTraining = createNameMatcher(trainings.data ?? []);
 
     const recs: { line: number; values: Record<string, unknown> }[] = [];
     rows.forEach((r, i) => {
       const line = i + 2;
       const reg = (r["matricula"] ?? "").trim();
-      const person = reg ? byReg.get(normText(reg)) : byName.get(normText(r["colaborador"] ?? ""));
+      const person = reg
+        ? byReg.get(normText(reg))
+        : matchPerson(r["colaborador"] ?? "")?.id;
       if (!person) {
         errors.push(`Linha ${line}: colaborador não encontrado (${reg || r["colaborador"] || "vazio"}).`);
         return;
       }
-      const training = trainingByName.get(normText(r["treinamento"] ?? ""));
+      const training = matchTraining(r["treinamento"] ?? "");
       if (!training) {
         errors.push(`Linha ${line}: treinamento "${r["treinamento"] ?? ""}" não existe no catálogo.`);
         return;

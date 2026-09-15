@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/colaboradores/estrutura")(
 });
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { insertSequentially, normText, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
+import { createNameMatcher, insertSequentially, normText, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const POSITION_COLUMNS: ImportColumn[] = [
   { key: "nome", required: true, example: "Eletricista" },
@@ -193,6 +193,9 @@ function StructurePage() {
   async function importSimple(table: "positions" | "departments", rows: ImportRow[]) {
     const errors: string[] = [];
     const recs: { line: number; values: Record<string, unknown> }[] = [];
+    const existing = table === "positions" ? positions.data ?? [] : departments.data ?? [];
+    const matchExisting = createNameMatcher(existing.map((x) => ({ id: x.id, name: x.name })));
+    const seen: { id: string; name: string }[] = [];
     rows.forEach((r, i) => {
       const line = i + 2;
       const name = titleCase(r["nome"] ?? "");
@@ -200,6 +203,12 @@ function StructurePage() {
         errors.push(`Linha ${line}: nome é obrigatório.`);
         return;
       }
+      const already = matchExisting(name) ?? createNameMatcher(seen)(name);
+      if (already) {
+        errors.push(`Linha ${line}: "${name}" já existe como "${already.name}" — linha ignorada.`);
+        return;
+      }
+      seen.push({ id: name, name });
       const values: Record<string, unknown> = {
         name,
         active: !normText(r["ativo"] ?? "").startsWith("n"),

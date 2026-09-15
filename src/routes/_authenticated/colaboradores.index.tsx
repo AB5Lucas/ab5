@@ -35,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseBool, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
+import { createNameMatcher, emptyToNull, insertSequentially, normText, parseBool, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const CONTRACT_LABELS: Record<string, string> = {
   efetivo: "Efetivo",
@@ -62,8 +62,8 @@ const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "email", example: "maria@empresa.com" },
   { key: "data_nascimento", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "1990-05-12" },
   { key: "data_admissao", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2023-01-10" },
-  { key: "funcao", hint: "Deve existir em Funções e departamentos.", example: "Eletricista" },
-  { key: "departamento", hint: "Deve existir em Funções e departamentos.", example: "Serviços" },
+  { key: "funcao", hint: "Deve existir em Funções e departamentos. Aceita variações: sem acento, em CAIXA ALTA, no feminino ou no plural (Tecnica = Técnico).", example: "Técnico de Segurança do Trabalho" },
+  { key: "departamento", hint: "Deve existir em Funções e departamentos. Aceita variações de acento, maiúsculas e gênero.", example: "Serviços" },
   { key: "situacao", hint: "Ativo ou Inativo (padrão Ativo).", example: "Ativo" },
   { key: "motorista", hint: "Sim ou Não.", example: "Não" },
   { key: "cnh_categoria", example: "D" },
@@ -295,10 +295,8 @@ function CollaboratorsPage() {
   }
 
   async function importCollaborators(rows: ImportRow[]) {
-    const byName = (list: { id: string; name: string }[]) =>
-      new Map(list.map((x) => [normText(x.name), x.id]));
-    const positions = byName(lookups.data?.positions ?? []);
-    const departments = byName(lookups.data?.departments ?? []);
+    const positions = createNameMatcher(lookups.data?.positions ?? []);
+    const departments = createNameMatcher(lookups.data?.departments ?? []);
     const errors: string[] = [];
     const records: { line: number; values: Record<string, unknown> }[] = [];
 
@@ -308,12 +306,16 @@ function CollaboratorsPage() {
         errors.push(`Linha ${line}: matrícula e nome completo são obrigatórios.`);
         return;
       }
-      const resolve = (label: string, map: Map<string, string>, value?: string) => {
+      const resolve = (
+        label: string,
+        match: (v: string) => { id: string } | null,
+        value?: string,
+      ) => {
         const v = (value ?? "").trim();
         if (!v) return null;
-        const id = map.get(normText(v));
-        if (!id) errors.push(`Linha ${line}: ${label} "${v}" não cadastrado(a).`);
-        return id ?? null;
+        const found = match(v);
+        if (!found) errors.push(`Linha ${line}: ${label} "${v}" não cadastrado(a).`);
+        return found?.id ?? null;
       };
       records.push({
         line,
