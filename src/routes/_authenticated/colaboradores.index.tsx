@@ -68,6 +68,8 @@ const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "motorista", hint: "Sim ou Não.", example: "Não" },
   { key: "cnh_categoria", example: "D" },
   { key: "cnh_validade", hint: "AAAA-MM-DD ou DD/MM/AAAA." },
+  { key: "salario", hint: "Valor em reais, ex.: 3500,00.", example: "3500,00" },
+  { key: "tipo_contrato", hint: "Efetivo, PJ ou Intermitente.", example: "Efetivo" },
   { key: "observacoes" },
 ];
 
