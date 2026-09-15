@@ -79,10 +79,10 @@ function Page() {
         tables.map((t) => supabase.from(t).select("id", { count: "exact", head: true })),
       );
       return {
-        collaborators: results[0].count ?? 0,
-        works: results[1].count ?? 0,
-        vehicles: results[2].count ?? 0,
-        trainings: results[3].count ?? 0,
+        collaborators: results[0]?.count ?? 0,
+        works: results[1]?.count ?? 0,
+        vehicles: results[2]?.count ?? 0,
+        trainings: results[3]?.count ?? 0,
       };
     },
   });
