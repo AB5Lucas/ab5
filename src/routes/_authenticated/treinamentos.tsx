@@ -246,19 +246,21 @@ function TrainingsPage() {
     const errors: string[] = [];
     const { data: allPeople } = await supabase.from("collaborators").select("id, full_name, registration_number");
     const byReg = new Map((allPeople ?? []).map((p) => [normText(p.registration_number ?? ""), p.id]));
-    const byName = new Map((allPeople ?? []).map((p) => [normText(p.full_name), p.id]));
-    const trainingByName = new Map((trainings.data ?? []).map((t) => [normText(t.name), t]));
+    const matchPerson = createNameMatcher((allPeople ?? []).map((p) => ({ id: p.id, name: p.full_name })));
+    const matchTraining = createNameMatcher(trainings.data ?? []);
 
     const recs: { line: number; values: Record<string, unknown> }[] = [];
     rows.forEach((r, i) => {
       const line = i + 2;
       const reg = (r["matricula"] ?? "").trim();
-      const person = reg ? byReg.get(normText(reg)) : byName.get(normText(r["colaborador"] ?? ""));
+      const person = reg
+        ? byReg.get(normText(reg))
+        : matchPerson(r["colaborador"] ?? "")?.id;
       if (!person) {
         errors.push(`Linha ${line}: colaborador não encontrado (${reg || r["colaborador"] || "vazio"}).`);
         return;
       }
-      const training = trainingByName.get(normText(r["treinamento"] ?? ""));
+      const training = matchTraining(r["treinamento"] ?? "");
       if (!training) {
         errors.push(`Linha ${line}: treinamento "${r["treinamento"] ?? ""}" não existe no catálogo.`);
         return;
