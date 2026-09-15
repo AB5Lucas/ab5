@@ -29,6 +29,7 @@ export type Collaborator = {
   is_driver: boolean;
   driver_license_category: string | null;
   driver_license_expiry: string | null;
+  contract_type: string | null;
 };
 
 export type Requirement = {
@@ -91,7 +92,7 @@ export async function fetchScheduleContext(date: string) {
     supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, clients(name, city, distance_km, requires_integration)").eq("active", true).order("name"),
     supabase
       .from("collaborators")
-      .select("id, full_name, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry")
+      .select("id, full_name, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type")
       .eq("status", "active")
       .order("full_name"),
     supabase.from("positions").select("id, name").order("name"),
