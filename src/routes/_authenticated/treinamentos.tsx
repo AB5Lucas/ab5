@@ -240,9 +240,11 @@ function TrainingsPage() {
         errors.push(`Linha ${line}: colaborador não encontrado (${reg || r["colaborador"] || "vazio"}).`);
         return;
       }
-      const training = matchTraining(r["treinamento"] ?? "");
+      const training = findTraining(r["treinamento"] ?? "", r["descricao"] ?? "");
       if (!training) {
-        errors.push(`Linha ${line}: treinamento "${r["treinamento"] ?? ""}" não existe no catálogo.`);
+        errors.push(
+          `Linha ${line}: treinamento "${r["treinamento"] ?? ""}" não encontrado no catálogo (se houver mais de um com esse nome, preencha a coluna descricao).`,
+        );
         return;
       }
       const done = parseDate(r["data_realizacao"] ?? "");
