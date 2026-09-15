@@ -31,19 +31,13 @@ export const Route = createFileRoute("/_authenticated/treinamentos")({
 });
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
-
-const CATALOG_COLUMNS: ImportColumn[] = [
-  { key: "nome", required: true, example: "NR-10" },
-  { key: "descricao", example: "Segurança em instalações elétricas" },
-  { key: "validade_meses", hint: "Número inteiro de meses.", example: "24" },
-  { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
-];
+import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate } from "@/lib/import-helpers";
 
 const RECORD_COLUMNS: ImportColumn[] = [
   { key: "matricula", hint: "Matrícula do colaborador (use matrícula ou nome).", example: "1024" },
   { key: "colaborador", hint: "Nome completo, usado se a matrícula estiver vazia. Aceita variações de acento e maiúsculas." },
   { key: "treinamento", required: true, hint: "Nome do treinamento do catálogo. Aceita variações: sem acento, CAIXA ALTA, plural ou pequenas diferenças de escrita.", example: "NR-10" },
+  { key: "descricao", hint: "Use quando existir mais de um treinamento com o mesmo nome (ex.: NR18 Civil x NR18 Andaimes).", example: "Andaimes" },
   { key: "data_realizacao", required: true, hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2026-03-01" },
   { key: "data_vencimento", hint: "Se vazio, é calculado pela validade do treinamento." },
   { key: "documento_url", hint: "Link do certificado/documento.", example: "https://..." },
