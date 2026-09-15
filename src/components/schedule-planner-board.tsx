@@ -344,8 +344,50 @@ export function SchedulePlannerBoard({
   function invalidate(id?: string | null) {
     qc.invalidateQueries({ queryKey: ["schedule", date] });
     qc.invalidateQueries({ queryKey: ["allocations", id ?? scheduleId] });
+    qc.invalidateQueries({ queryKey: ["status-entries", id ?? scheduleId] });
     qc.invalidateQueries({ queryKey: ["dashboard"] });
   }
+
+  /** Move o colaborador para uma caixa de situação (folga, atestado, etc.). */
+  const dropBox = useMutation({
+    mutationFn: async ({ collaboratorId, allocationId, boxKey }: DragPayload & { boxKey: string }) => {
+      const person = personById.get(collaboratorId);
+      const name = person?.full_name ?? "Colaborador";
+      const id = await ensureSchedule();
+      const alloc = allocationId ?? allocByCollaborator.get(collaboratorId)?.id ?? null;
+      if (alloc) {
+        const { error } = await supabase.from("daily_allocations").delete().eq("id", alloc);
+        if (error) throw error;
+      }
+      const boxRows = entries.filter((e) => e.box_key === boxKey);
+      const sort = boxRows.length ? Math.max(...boxRows.map((e) => e.sort_order)) + 1 : 0;
+      const { error } = await supabase
+        .from("daily_status_entries")
+        .upsert(
+          { schedule_id: id, collaborator_id: collaboratorId, box_key: boxKey, sort_order: sort },
+          { onConflict: "schedule_id,collaborator_id" },
+        );
+      if (error) throw error;
+      return { id, name, boxKey };
+    },
+    onSuccess: (r) => {
+      toast.success(`${r.name} registrado em ${BOX_LABEL[r.boxKey] ?? r.boxKey}`);
+      invalidate(r.id);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeEntry = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("daily_status_entries").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Registro removido da caixa");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const drop = useMutation({
     mutationFn: async ({
