@@ -1020,9 +1020,9 @@ export function SchedulePlannerBoard({
             </div>
           </div>
 
-          <ul className="mt-3 flex-1 divide-y divide-border overflow-y-auto pr-1">
+          <ul className="mt-2 flex-1 divide-y divide-border overflow-y-auto pr-1">
             {filtered.length === 0 && (
-              <li className="py-6 text-center text-xs text-muted-foreground">Nenhum colaborador encontrado.</li>
+              <li className="py-4 text-center text-[10px] text-muted-foreground">Nenhum colaborador encontrado.</li>
             )}
             {filtered.map((p) => {
               const ev = evaluate(p.id, selectedWork);
