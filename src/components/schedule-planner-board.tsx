@@ -724,7 +724,7 @@ export function SchedulePlannerBoard({
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         {/* Obras */}
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {works.length === 0 && !ctx.isLoading && (
             <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground sm:col-span-2">
               Nenhum serviço ativo cadastrado.
