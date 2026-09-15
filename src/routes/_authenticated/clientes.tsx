@@ -187,6 +187,7 @@ function ClientsPage() {
       zip_code: c.zip_code ?? "",
       distance_km: c.distance_km != null ? String(c.distance_km) : "",
       notes: c.notes ?? "",
+      requires_integration: c.requires_integration ?? true,
     });
     setOpen(true);
   }
