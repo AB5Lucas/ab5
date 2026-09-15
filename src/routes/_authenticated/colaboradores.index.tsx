@@ -458,6 +458,11 @@ function CollaboratorsPage() {
                         Motorista {c.driver_license_category ? `· ${c.driver_license_category}` : ""}
                       </Badge>
                     )}
+                    {c.contract_type && (
+                      <Badge variant="secondary" className="mt-1 ml-1">
+                        {CONTRACT_LABELS[c.contract_type] ?? c.contract_type}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>{c.position_id ? nameById.get(c.position_id) ?? "—" : "—"}</TableCell>
                   <TableCell>{c.sector_id ? nameById.get(c.sector_id) ?? "—" : "—"}</TableCell>
