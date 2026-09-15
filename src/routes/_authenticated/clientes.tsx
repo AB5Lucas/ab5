@@ -274,6 +274,7 @@ function ClientsPage() {
               <TableHead className="hidden md:table-cell">Endereço</TableHead>
               <TableHead className="hidden lg:table-cell">Cidade</TableHead>
               <TableHead className="hidden lg:table-cell">Distância</TableHead>
+              <TableHead>Integração</TableHead>
               <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
