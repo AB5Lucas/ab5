@@ -454,7 +454,7 @@ export function DailyScheduleBoard({
                     {w.name}
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    {[w.entry_time?.slice(0, 5) && `Entrada ${w.entry_time.slice(0, 5)}`, w.distance_km && `${w.distance_km} km`]
+                    {[w.clients?.city, w.entry_time?.slice(0, 5) && `Entrada ${w.entry_time.slice(0, 5)}`, w.clients?.distance_km && `${w.clients.distance_km} km`]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>

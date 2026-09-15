@@ -173,7 +173,7 @@ function BonusPage() {
       const { data, error } = await supabase
         .from("daily_allocations")
         .select(
-          "collaborator_id, schedule_id, collaborators(full_name, registration_number), works(distance_km)",
+          "collaborator_id, schedule_id, collaborators(full_name, registration_number), works(distance_km, clients(distance_km))",
         )
         .in("schedule_id", ids);
       if (error) throw error;
@@ -183,14 +183,14 @@ function BonusPage() {
           collaborator_id: string;
           schedule_id: string;
           collaborators: { full_name: string; registration_number: string } | null;
-          works: { distance_km: number | null } | null;
+          works: { distance_km: number | null; clients: { distance_km: number | null } | null } | null;
         };
         return {
           collaborator_id: row.collaborator_id,
           schedule_id: row.schedule_id,
           name: row.collaborators?.full_name ?? "—",
           reg: row.collaborators?.registration_number ?? "",
-          distance: Number(row.works?.distance_km ?? 0),
+          distance: Number(row.works?.clients?.distance_km ?? row.works?.distance_km ?? 0),
         };
       });
     },
