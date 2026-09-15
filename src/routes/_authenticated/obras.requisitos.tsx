@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/obras/requisitos")({
   head: () => ({
     meta: [
       { title: "Requisitos das Obras | Programação Operacional" },
-      { name: "description", content: "Treinamentos, certificações, cargos e CNH exigidos por obra na alocação diária." },
+      { name: "description", content: "Treinamentos, certificações, funções e CNH exigidos por obra na alocação diária." },
       { property: "og:title", content: "Requisitos das Obras | Programação Operacional" },
       { property: "og:description", content: "Treinamentos, certificações e CNH exigidos por obra." },
       { property: "og:type", content: "website" },
@@ -41,7 +41,7 @@ type ReqType = Enums<"requirement_type">;
 const TYPE_LABEL: Record<ReqType, string> = {
   training: "Treinamento",
   certification: "Certificação",
-  position: "Cargo",
+  position: "Função",
   driver_license: "CNH",
   medical_exam: "Exame médico",
   custom: "Personalizado",
@@ -320,7 +320,7 @@ function RequirementsPage() {
 
             {needsReference ? (
               <div className="space-y-1">
-                <Label>{form.requirement_type === "training" ? "Treinamento" : "Cargo"} *</Label>
+                <Label>{form.requirement_type === "training" ? "Treinamento" : "Função"} *</Label>
                 <Select value={form.requirement_id} onValueChange={(v) => set("requirement_id", v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />

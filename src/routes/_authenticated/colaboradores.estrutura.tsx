@@ -12,16 +12,15 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/colaboradores/estrutura")({
   head: () => ({
     meta: [
-      { title: "Cargos, Setores e Departamentos | Programação Operacional" },
-      { name: "description", content: "Gestão dos cargos, setores e departamentos usados no cadastro de colaboradores." },
-      { property: "og:title", content: "Cargos, Setores e Departamentos" },
-      { property: "og:description", content: "Estrutura organizacional da operação: cargos, setores e departamentos." },
+      { title: "Funções e Departamentos | Programação Operacional" },
+      { name: "description", content: "Gestão das funções e departamentos usados no cadastro de colaboradores." },
+      { property: "og:title", content: "Funções e Departamentos" },
+      { property: "og:description", content: "Estrutura organizacional da operação: funções e departamentos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -32,21 +31,18 @@ export const Route = createFileRoute("/_authenticated/colaboradores/estrutura")(
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { emptyToNull, insertSequentially, normText } from "@/lib/import-helpers";
 
-const NONE = "__none__";
-
-const SIMPLE_COLUMNS: ImportColumn[] = [
+const POSITION_COLUMNS: ImportColumn[] = [
   { key: "nome", required: true, example: "Eletricista" },
-  { key: "descricao", example: "Equipe de manutenção elétrica" },
+  { key: "descricao", example: "Responsável por instalações elétricas" },
   { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
 ];
 
-const SECTOR_COLUMNS: ImportColumn[] = [
-  { key: "nome", required: true, example: "Manutenção" },
-  { key: "departamento", hint: "Nome de um departamento já cadastrado.", example: "Operações" },
+const DEPARTMENT_COLUMNS: ImportColumn[] = [
+  { key: "nome", required: true, example: "Serviços" },
   { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
 ];
 
-type Row = { id: string; name: string; active: boolean; description?: string | null; department_id?: string | null };
+type Row = { id: string; name: string; active: boolean; description?: string | null };
 
 function StructurePage() {
   const { canWrite, isAdmin } = useCurrentUser();
@@ -56,15 +52,6 @@ function StructurePage() {
     queryKey: ["departments"],
     queryFn: async () => {
       const { data, error } = await supabase.from("departments").select("*").order("name");
-      if (error) throw error;
-      return data as Row[];
-    },
-  });
-
-  const sectors = useQuery({
-    queryKey: ["sectors"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("sectors").select("*").order("name");
       if (error) throw error;
       return data as Row[];
     },
@@ -83,7 +70,7 @@ function StructurePage() {
 
   // --- shared mutations -----------------------------------------------------
   const toggleActive = useMutation({
-    mutationFn: async ({ table, id, active }: { table: "departments" | "sectors" | "positions"; id: string; active: boolean }) => {
+    mutationFn: async ({ table, id, active }: { table: "departments" | "positions"; id: string; active: boolean }) => {
       const { error } = await supabase.from(table).update({ active }).eq("id", id);
       if (error) throw error;
       return table;
@@ -93,7 +80,7 @@ function StructurePage() {
   });
 
   const removeRow = useMutation({
-    mutationFn: async ({ table, id }: { table: "departments" | "sectors" | "positions"; id: string }) => {
+    mutationFn: async ({ table, id }: { table: "departments" | "positions"; id: string }) => {
       const { error } = await supabase.from(table).delete().eq("id", id);
       if (error) throw error;
       return table;
@@ -122,34 +109,13 @@ function StructurePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // --- sector form ----------------------------------------------------------
-  const [sectorName, setSectorName] = useState("");
-  const [sectorDept, setSectorDept] = useState(NONE);
-  const createSector = useMutation({
-    mutationFn: async () => {
-      const name = sectorName.trim();
-      if (name.length < 2) throw new Error("Informe o nome do setor");
-      const { error } = await supabase
-        .from("sectors")
-        .insert({ name, department_id: sectorDept === NONE ? null : sectorDept });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      setSectorName("");
-      setSectorDept(NONE);
-      toast.success("Setor criado.");
-      invalidate("sectors");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   // --- position form --------------------------------------------------------
   const [posName, setPosName] = useState("");
   const [posDesc, setPosDesc] = useState("");
   const createPosition = useMutation({
     mutationFn: async () => {
       const name = posName.trim();
-      if (name.length < 2) throw new Error("Informe o nome do cargo");
+      if (name.length < 2) throw new Error("Informe o nome da função");
       const { error } = await supabase
         .from("positions")
         .insert({ name, description: posDesc.trim() === "" ? null : posDesc.trim() });
@@ -158,14 +124,11 @@ function StructurePage() {
     onSuccess: () => {
       setPosName("");
       setPosDesc("");
-      toast.success("Cargo criado.");
+      toast.success("Função criada.");
       invalidate("positions");
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
-  const deptName_ = (id?: string | null) =>
-    id ? departments.data?.find((d) => d.id === id)?.name ?? "—" : "—";
 
   function RowsTable({
     table,
@@ -174,7 +137,7 @@ function StructurePage() {
     extraHeader,
     extraCell,
   }: {
-    table: "departments" | "sectors" | "positions";
+    table: "departments" | "positions";
     rows: Row[] | undefined;
     loading: boolean;
     extraHeader?: string;
@@ -260,63 +223,23 @@ function StructurePage() {
     return result;
   }
 
-  async function importSectors(rows: ImportRow[]) {
-    const errors: string[] = [];
-    const deptByName = new Map((departments.data ?? []).map((d) => [normText(d.name), d.id]));
-    const recs: { line: number; values: Record<string, unknown> }[] = [];
-    rows.forEach((r, i) => {
-      const line = i + 2;
-      const name = (r["nome"] ?? "").trim();
-      if (!name) {
-        errors.push(`Linha ${line}: nome é obrigatório.`);
-        return;
-      }
-      const dept = (r["departamento"] ?? "").trim();
-      const deptId = dept ? deptByName.get(normText(dept)) ?? null : null;
-      if (dept && !deptId) errors.push(`Linha ${line}: departamento "${dept}" não cadastrado.`);
-      recs.push({
-        line,
-        values: {
-          name,
-          department_id: deptId,
-          active: !normText(r["ativo"] ?? "").startsWith("n"),
-        },
-      });
-    });
-    const result = await insertSequentially(
-      recs,
-      async (values) => {
-        const { error } = await supabase.from("sectors").insert(values as never);
-        return { error };
-      },
-      errors,
-    );
-    await invalidate("sectors");
-    return result;
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Cargos e Setores"
-        description="Estrutura organizacional usada no cadastro de colaboradores."
+        title="Funções e Departamentos"
+        description="Departamentos são as áreas da empresa (ex.: Serviços, Indústria) e funções são os cargos dos colaboradores."
         actions={
           <div className="flex flex-wrap gap-2">
             {canWrite && (
               <>
                 <ImportDialog
-                  entity="cargos"
-                  columns={SIMPLE_COLUMNS}
+                  entity="funções"
+                  columns={POSITION_COLUMNS}
                   onImport={(rows) => importSimple("positions", rows)}
                 />
                 <ImportDialog
-                  entity="setores"
-                  columns={SECTOR_COLUMNS}
-                  onImport={importSectors}
-                />
-                <ImportDialog
                   entity="departamentos"
-                  columns={SIMPLE_COLUMNS.filter((c) => c.key !== "descricao")}
+                  columns={DEPARTMENT_COLUMNS}
                   onImport={(rows) => importSimple("departments", rows)}
                 />
               </>
@@ -333,8 +256,7 @@ function StructurePage() {
 
       <Tabs defaultValue="positions">
         <TabsList>
-          <TabsTrigger value="positions">Cargos</TabsTrigger>
-          <TabsTrigger value="sectors">Setores</TabsTrigger>
+          <TabsTrigger value="positions">Funções</TabsTrigger>
           <TabsTrigger value="departments">Departamentos</TabsTrigger>
         </TabsList>
 
@@ -342,7 +264,7 @@ function StructurePage() {
           {canWrite && (
             <div className="panel flex flex-wrap items-end gap-3 p-4">
               <div className="min-w-[200px] flex-1 space-y-2">
-                <Label htmlFor="pos-name">Novo cargo</Label>
+                <Label htmlFor="pos-name">Nova função</Label>
                 <Input id="pos-name" value={posName} onChange={(e) => setPosName(e.target.value)} placeholder="Ex.: Eletricista" />
               </div>
               <div className="min-w-[200px] flex-1 space-y-2">
@@ -364,46 +286,12 @@ function StructurePage() {
           />
         </TabsContent>
 
-        <TabsContent value="sectors" className="space-y-4 pt-4">
-          {canWrite && (
-            <div className="panel flex flex-wrap items-end gap-3 p-4">
-              <div className="min-w-[200px] flex-1 space-y-2">
-                <Label htmlFor="sector-name">Novo setor</Label>
-                <Input id="sector-name" value={sectorName} onChange={(e) => setSectorName(e.target.value)} placeholder="Ex.: Manutenção" />
-              </div>
-              <div className="min-w-[200px] space-y-2">
-                <Label>Departamento</Label>
-                <Select value={sectorDept} onValueChange={setSectorDept}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>Sem departamento</SelectItem>
-                    {(departments.data ?? []).map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={() => createSector.mutate()} disabled={createSector.isPending}>
-                <Plus className="h-4 w-4" />
-                Adicionar
-              </Button>
-            </div>
-          )}
-          <RowsTable
-            table="sectors"
-            rows={sectors.data}
-            loading={sectors.isLoading}
-            extraHeader="Departamento"
-            extraCell={(r) => deptName_(r.department_id)}
-          />
-        </TabsContent>
-
         <TabsContent value="departments" className="space-y-4 pt-4">
           {canWrite && (
             <div className="panel flex flex-wrap items-end gap-3 p-4">
               <div className="min-w-[200px] flex-1 space-y-2">
                 <Label htmlFor="dept-name">Novo departamento</Label>
-                <Input id="dept-name" value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="Ex.: Operações" />
+                <Input id="dept-name" value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="Ex.: Serviços" />
               </div>
               <Button onClick={() => createDept.mutate()} disabled={createDept.isPending}>
                 <Plus className="h-4 w-4" />

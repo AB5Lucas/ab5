@@ -126,7 +126,7 @@ export function checkRequirements(
         break;
       }
       case "position": {
-        label = `Cargo: ${positionName ?? req.requirement_label ?? "—"}`;
+        label = `Função: ${positionName ?? req.requirement_label ?? "—"}`;
         ok = person.position_id === req.requirement_id;
         break;
       }

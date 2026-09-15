@@ -316,7 +316,7 @@ function BaseTeamsPage() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE}>Usar cargo do colaborador</SelectItem>
+                  <SelectItem value={NONE}>Usar função do colaborador</SelectItem>
                   {(positions.data ?? []).map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
