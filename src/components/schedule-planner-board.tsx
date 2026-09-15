@@ -246,7 +246,11 @@ export function SchedulePlannerBoard({
         if (f === "unavailable" && !absent) return false;
         if (f === "allocated" && !alloc) return false;
         if (f === "unallocated" && alloc) return false;
-        if (f === "int_ok" && !(ev.integration === "valid" || ev.integration === "expiring")) return false;
+        if (
+          f === "int_ok" &&
+          !(ev.integration === "valid" || ev.integration === "expiring" || ev.integration === "not_required")
+        )
+          return false;
         if (f === "int_bad" && !(ev.integration === "expired" || ev.integration === "missing")) return false;
         if (f === "req_ok" && (ev.reqIssues > 0 || ev.reqBlocked)) return false;
         if (f === "req_warn" && ev.reqIssues === 0) return false;
