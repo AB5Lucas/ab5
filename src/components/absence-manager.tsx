@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+import { formatDateBR } from "@/lib/scheduling";
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 type AbsenceTable = "vacations" | "medical_leaves" | "days_off";
@@ -191,11 +193,11 @@ export function AbsenceManager({
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}</TableCell>
                   {mode === "single" ? (
-                    <TableCell>{r.date}</TableCell>
+                    <TableCell>{formatDateBR(r.date)}</TableCell>
                   ) : (
                     <>
-                      <TableCell>{r.start_date}</TableCell>
-                      <TableCell>{r.end_date}</TableCell>
+                      <TableCell>{formatDateBR(r.start_date)}</TableCell>
+                      <TableCell>{formatDateBR(r.end_date)}</TableCell>
                     </>
                   )}
                   {extraFieldLabel && (

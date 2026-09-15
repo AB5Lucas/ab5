@@ -43,6 +43,8 @@ const RECORD_COLUMNS: ImportColumn[] = [
   { key: "documento_url", hint: "Link do certificado/documento.", example: "https://..." },
 ];
 
+import { formatDateBR } from "@/lib/scheduling";
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 function addMonths(dateStr: string, months: number) {
@@ -342,8 +344,10 @@ function TrainingsPage() {
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}</TableCell>
                         <TableCell>{nameById.get(r.training_id) ?? "—"}</TableCell>
-                        <TableCell className="hidden md:table-cell">{r.completed_at}</TableCell>
-                        <TableCell className="hidden md:table-cell">{r.expires_at ?? "Sem validade"}</TableCell>
+                        <TableCell className="hidden md:table-cell">{formatDateBR(r.completed_at)}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {r.expires_at ? formatDateBR(r.expires_at) : "Sem validade"}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={st === "expired" ? "destructive" : st === "expiring" ? "secondary" : "default"}>
                             {STATUS_LABEL[st]}
