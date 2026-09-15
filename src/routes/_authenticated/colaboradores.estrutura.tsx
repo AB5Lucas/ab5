@@ -32,7 +32,7 @@ import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/im
 import { createNameMatcher, insertSequentially, normText, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const POSITION_COLUMNS: ImportColumn[] = [
-  { key: "nome", required: true, example: "Eletricista" },
+  { key: "nome", required: true, hint: "Inclua o nível quando houver (N1, N2, N3, N4) — cada nível é uma função separada.", example: "Montador de Andaimes N1" },
   { key: "descricao", example: "Responsável por instalações elétricas" },
   { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
 ];
