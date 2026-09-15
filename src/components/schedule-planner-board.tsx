@@ -912,17 +912,46 @@ export function SchedulePlannerBoard({
                     </h2>
                     <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
                       <Users className="mr-0.5 h-2.5 w-2.5" />
-                      {boxRows.length}
+                      {boxRows.length + autoRows.length}
                     </Badge>
                   </div>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">Caixa de situação do dia</p>
                 </header>
-                <ul className="max-h-56 flex-1 divide-y divide-border overflow-y-auto">
-                  {boxRows.length === 0 && (
-                    <li className="px-2 py-4 text-center text-[10px] text-muted-foreground">
+                <ul
+                  className="max-h-56 flex-1 divide-y divide-border overflow-y-auto"
+                  onDragOver={handleOver}
+                  onDrop={handleDrop}
+                >
+                  {boxRows.length + autoRows.length === 0 && (
+                    <li
+                      className="px-2 py-4 text-center text-[10px] text-muted-foreground"
+                      onDragOver={handleOver}
+                      onDrop={handleDrop}
+                    >
                       Arraste colaboradores para cá
                     </li>
                   )}
+                  {autoRows.map((id) => {
+                    const p = personById.get(id);
+                    return (
+                      <li
+                        key={`auto-${id}`}
+                        onDragOver={handleOver}
+                        onDrop={handleDrop}
+                        className="flex items-center gap-1.5 px-2 py-1 text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium leading-tight">{p?.full_name ?? "—"}</p>
+                          <p className="truncate text-[10px] leading-tight text-muted-foreground">
+                            {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="shrink-0 px-1 py-0 text-[9px]">
+                          Cadastrado
+                        </Badge>
+                      </li>
+                    );
+                  })}
                   {boxRows.map((entry) => {
                     const p = personById.get(entry.collaborator_id);
                     return (
