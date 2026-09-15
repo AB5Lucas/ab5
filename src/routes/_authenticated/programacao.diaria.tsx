@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
-import { DailyScheduleBoard } from "@/components/daily-schedule-board";
+import { SchedulePlannerBoard } from "@/components/schedule-planner-board";
 import { todayISO } from "@/lib/scheduling";
 
 export const Route = createFileRoute("/_authenticated/programacao/diaria")({
@@ -25,9 +25,9 @@ function DailySchedulePage() {
     <div className="space-y-4">
       <PageHeader
         title="Programação Diária"
-        description="Monte a programação de qualquer data: gere pelas equipes base, copie o dia anterior e confirme as alocações."
+        description="Arraste os colaboradores da lista lateral para os cards de obra. O sistema valida disponibilidade, conflitos e requisitos."
       />
-      <DailyScheduleBoard date={date} onDateChange={setDate} />
+      <SchedulePlannerBoard date={date} onDateChange={setDate} />
     </div>
   );
 }
