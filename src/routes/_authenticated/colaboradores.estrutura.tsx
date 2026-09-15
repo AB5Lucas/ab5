@@ -17,10 +17,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 export const Route = createFileRoute("/_authenticated/colaboradores/estrutura")({
   head: () => ({
     meta: [
-      { title: "Funções e Departamentos | Programação Operacional" },
-      { name: "description", content: "Gestão das funções e departamentos usados no cadastro de colaboradores." },
-      { property: "og:title", content: "Funções e Departamentos" },
-      { property: "og:description", content: "Estrutura organizacional da operação: funções e departamentos." },
+      { title: "Funções | Programação Operacional" },
+      { name: "description", content: "Gestão das funções usadas no cadastro de colaboradores." },
+      { property: "og:title", content: "Funções" },
+      { property: "og:description", content: "Estrutura organizacional da operação: funções dos colaboradores." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
