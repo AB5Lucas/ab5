@@ -905,12 +905,12 @@ export function SchedulePlannerBoard({
                           })
                         }
                         onDragEnd={() => setDragging(null)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm"
+                        className="flex items-center gap-1.5 px-2 py-1 text-xs"
                       >
-                        {editable && <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium">{p?.full_name ?? "—"}</p>
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p className="truncate text-xs font-medium leading-tight">{p?.full_name ?? "—"}</p>
+                          <p className="truncate text-[10px] leading-tight text-muted-foreground">
                             {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
                           </p>
                         </div>
@@ -918,11 +918,11 @@ export function SchedulePlannerBoard({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 shrink-0"
+                            className="h-6 w-6 shrink-0"
                             aria-label="Remover da caixa"
                             onClick={() => removeEntry.mutate(entry.id)}
                           >
-                            <X className="h-4 w-4 text-destructive" />
+                            <X className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         )}
                       </li>
