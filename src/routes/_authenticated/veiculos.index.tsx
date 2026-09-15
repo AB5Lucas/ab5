@@ -32,6 +32,28 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
+import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { emptyToNull, insertSequentially, normText, parseNum } from "@/lib/import-helpers";
+
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: "placa", required: true, example: "ABC1D23" },
+  { key: "marca", example: "Fiat" },
+  { key: "modelo", example: "Ducato" },
+  { key: "ano", hint: "Somente números.", example: "2022" },
+  { key: "cor", example: "Branco" },
+  { key: "tipo", example: "Van" },
+  { key: "capacidade_passageiros", hint: "Número inteiro.", example: "15" },
+  { key: "combustivel", example: "Diesel" },
+  { key: "situacao", hint: "Disponível, Em uso, Manutenção ou Inativo.", example: "Disponível" },
+  { key: "observacoes" },
+];
+
+const STATUS_FROM_TEXT: Record<string, "available" | "in_use" | "maintenance" | "inactive"> = {
+  disponivel: "available",
+  "em uso": "in_use",
+  manutencao: "maintenance",
+  inativo: "inactive",
+};
 
 export const Route = createFileRoute("/_authenticated/veiculos/")({
   head: () => ({
