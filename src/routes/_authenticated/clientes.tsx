@@ -137,6 +137,7 @@ function ClientsPage() {
         zip_code: nn(form.zip_code),
         distance_km: form.distance_km.trim() === "" ? null : Number(form.distance_km),
         notes: nn(form.notes),
+        requires_integration: form.requires_integration,
       };
       if (editing) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editing.id);
