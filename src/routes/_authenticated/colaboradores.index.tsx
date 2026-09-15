@@ -57,6 +57,7 @@ const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "nome_completo", required: true, example: "Maria Aparecida Souza" },
   { key: "nome_social" },
   { key: "cpf", hint: "Somente números ou com pontuação.", example: "123.456.789-00" },
+  { key: "rg", hint: "Número do RG.", example: "12.345.678-9" },
   { key: "telefone", example: "(11) 99999-0000" },
   { key: "email", example: "maria@empresa.com" },
   { key: "data_nascimento", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "1990-05-12" },
@@ -609,6 +610,36 @@ function CollaboratorsPage() {
                 </div>
               </>
             )}
+
+            <div className="space-y-2">
+              <Label htmlFor="rg">RG</Label>
+              <Input id="rg" value={form.rg} onChange={(e) => set("rg", e.target.value)} placeholder="12.345.678-9" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="salary">Salário (R$)</Label>
+              <Input
+                id="salary"
+                inputMode="decimal"
+                value={form.salary}
+                onChange={(e) => set("salary", e.target.value.replace(/[^\d.,]/g, ""))}
+                placeholder="3500,00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de contrato</Label>
+              <Select value={form.contract_type} onValueChange={(v) => set("contract_type", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Não definido</SelectItem>
+                  <SelectItem value="efetivo">Efetivo</SelectItem>
+                  <SelectItem value="pj">PJ</SelectItem>
+                  <SelectItem value="intermitente">Intermitente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
 
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="notes">Observações</Label>
