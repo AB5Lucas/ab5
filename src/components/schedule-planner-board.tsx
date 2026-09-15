@@ -88,7 +88,11 @@ const FILTERS = [
   { key: "req_ok", label: "Requisitos atendidos" },
   { key: "req_warn", label: "Requisitos pendentes" },
   { key: "fit", label: "Aptos para esta obra" },
+  { key: "pj_int", label: "Intermitentes/PJs" },
 ] as const;
+
+/** Contratos ocultos por padrão na lista lateral. */
+const HIDDEN_CONTRACTS = ["pj", "intermitente"];
 
 type FilterKey = (typeof FILTERS)[number]["key"];
 
