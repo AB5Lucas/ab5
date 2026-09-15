@@ -124,6 +124,7 @@ type FormState = {
   driver_license_expiry: string;
   salary: string;
   contract_type: string;
+  rg: string;
   notes: string;
 };
 
