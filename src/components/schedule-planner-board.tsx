@@ -966,6 +966,8 @@ export function SchedulePlannerBoard({
                           })
                         }
                         onDragEnd={() => setDragging(null)}
+                        onDragOver={handleOver}
+                        onDrop={handleDrop}
                         className="flex items-center gap-1.5 px-2 py-1 text-xs"
                       >
                         {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
