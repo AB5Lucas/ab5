@@ -306,6 +306,11 @@ function ClientsPage() {
                   {c.distance_km != null ? `${c.distance_km} km` : "—"}
                 </TableCell>
                 <TableCell>
+                  <Badge variant={c.requires_integration ? "outline" : "secondary"} className="text-[10px]">
+                    {c.requires_integration ? "Exige integração" : "Não exige"}
+                  </Badge>
+                </TableCell>
+                <TableCell>
                   <div className="flex justify-end gap-1">
                     {canWrite && (
                       <Button variant="ghost" size="icon" onClick={() => openEdit(c)} aria-label="Editar cliente">
