@@ -1129,11 +1129,11 @@ export function SchedulePlannerBoard({
                   </button>
                   {open && (
                     <div className="pb-1.5 pl-4 pr-1">
-                      <p className="truncate text-[10px] text-muted-foreground">
-                        {p.position_id ? positionById.get(p.position_id) ?? "Sem função" : "Sem função"}
-                        {p.is_driver ? " · motorista" : ""}
-                        {p.contract_type ? ` · ${p.contract_type}` : ""}
-                      </p>
+                      {(p.is_driver || p.contract_type) && (
+                        <p className="truncate text-[10px] text-muted-foreground">
+                          {[p.is_driver ? "motorista" : null, p.contract_type].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
                       {selectedWork && (
                         <div className="flex flex-wrap gap-1 pt-1">
                           <Badge
