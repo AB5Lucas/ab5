@@ -1128,6 +1128,8 @@ export function SchedulePlannerBoard({
                   </button>
                   {open && (
                     <div className="pb-1.5 pl-4 pr-1">
+                      <p className="text-[10px] font-medium">{LEVEL_TEXT[ev.level]}</p>
+
                       {(p.is_driver || p.contract_type) && (
                         <p className="truncate text-[10px] text-muted-foreground">
                           {[p.is_driver ? "motorista" : null, p.contract_type].filter(Boolean).join(" · ")}
