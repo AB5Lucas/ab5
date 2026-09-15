@@ -64,7 +64,7 @@ type AllocRow = {
   driver: boolean;
   confirmation_status: string;
   daily_schedules: { schedule_date: string } | null;
-  works: { code: string; name: string } | null;
+  works: { name: string } | null;
   collaborators: { full_name: string } | null;
 };
 
@@ -78,7 +78,7 @@ function Page() {
       const { data, error } = await supabase
         .from("daily_allocations")
         .select(
-          "id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(code, name), collaborators(full_name)",
+          "id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(name), collaborators(full_name)",
         )
         .gte("daily_schedules.schedule_date", from)
         .lte("daily_schedules.schedule_date", to);
@@ -141,7 +141,7 @@ function Page() {
   const byWork = useMemo(() => {
     const map = new Map<string, { label: string; total: number; overnight: number; days: Set<string> }>();
     for (const a of data) {
-      const key = a.works ? `${a.works.code} — ${a.works.name}` : "Sem obra";
+      const key = a.works ? a.works.name : "Sem serviço";
       const entry = map.get(key) ?? { label: key, total: 0, overnight: 0, days: new Set<string>() };
       entry.total += 1;
       if (a.overnight) entry.overnight += 1;

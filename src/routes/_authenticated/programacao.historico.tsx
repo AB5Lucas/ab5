@@ -52,7 +52,7 @@ function Page() {
         : { data: [] as never[] };
 
       const [{ data: works }, { data: collaborators }] = await Promise.all([
-        supabase.from("works").select("id, code, name"),
+        supabase.from("works").select("id, name"),
         supabase.from("collaborators").select("id, full_name, registration_number"),
       ]);
 
@@ -130,7 +130,7 @@ function Page() {
                       return (
                         <div key={workId}>
                           <p className="text-sm font-semibold">
-                            <span className="font-mono text-xs text-muted-foreground">{w?.code}</span> {w?.name ?? "Obra"}
+                            {w?.name ?? "Obra"}
                           </p>
                           <ul className="mt-1 space-y-1">
                             {items.map((a, i) => {
