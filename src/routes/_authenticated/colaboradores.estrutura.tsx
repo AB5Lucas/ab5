@@ -29,7 +29,22 @@ export const Route = createFileRoute("/_authenticated/colaboradores/estrutura")(
   component: StructurePage,
 });
 
+import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { emptyToNull, insertSequentially, normText } from "@/lib/import-helpers";
+
 const NONE = "__none__";
+
+const SIMPLE_COLUMNS: ImportColumn[] = [
+  { key: "nome", required: true, example: "Eletricista" },
+  { key: "descricao", example: "Equipe de manutenção elétrica" },
+  { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
+];
+
+const SECTOR_COLUMNS: ImportColumn[] = [
+  { key: "nome", required: true, example: "Manutenção" },
+  { key: "departamento", hint: "Nome de um departamento já cadastrado.", example: "Operações" },
+  { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
+];
 
 type Row = { id: string; name: string; active: boolean; description?: string | null; department_id?: string | null };
 
