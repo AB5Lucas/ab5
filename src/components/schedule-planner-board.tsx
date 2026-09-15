@@ -774,7 +774,7 @@ export function SchedulePlannerBoard({
                     <div className="flex flex-wrap gap-1 pl-4 pt-1">
                       <Badge
                         variant={
-                          ev.integration === "valid"
+                          ev.integration === "valid" || ev.integration === "not_required"
                             ? "outline"
                             : ev.integration === "expiring"
                               ? "secondary"
