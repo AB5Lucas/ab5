@@ -451,7 +451,7 @@ export function DailyScheduleBoard({
               <header className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/60 px-4 py-3">
                 <div>
                   <h2 className="font-display text-sm font-semibold uppercase tracking-wide">
-                    {w.name}
+                    {w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}
                   </h2>
                   <p className="text-xs text-muted-foreground">
                     {[w.clients?.city, w.entry_time?.slice(0, 5) && `Entrada ${w.entry_time.slice(0, 5)}`, w.clients?.distance_km && `${w.clients.distance_km} km`]
@@ -563,7 +563,7 @@ export function DailyScheduleBoard({
                 <SelectContent>
                   {(c?.works ?? []).map((w) => (
                     <SelectItem key={w.id} value={w.id}>
-                      {w.name}
+                      {w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
