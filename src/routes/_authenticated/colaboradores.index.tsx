@@ -62,9 +62,8 @@ const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "email", example: "maria@empresa.com" },
   { key: "data_nascimento", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "1990-05-12" },
   { key: "data_admissao", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2023-01-10" },
-  { key: "cargo", hint: "Deve existir em Cargos e setores.", example: "Eletricista" },
-  { key: "departamento", hint: "Deve existir em Cargos e setores." },
-  { key: "setor", hint: "Deve existir em Cargos e setores." },
+  { key: "funcao", hint: "Deve existir em Funções e departamentos.", example: "Eletricista" },
+  { key: "departamento", hint: "Deve existir em Funções e departamentos.", example: "Serviços" },
   { key: "situacao", hint: "Ativo ou Inativo (padrão Ativo).", example: "Ativo" },
   { key: "motorista", hint: "Sim ou Não.", example: "Não" },
   { key: "cnh_categoria", example: "D" },
@@ -78,7 +77,7 @@ export const Route = createFileRoute("/_authenticated/colaboradores/")({
   head: () => ({
     meta: [
       { title: "Colaboradores | Programação Operacional" },
-      { name: "description", content: "Cadastro de colaboradores: dados pessoais, cargo, setor, supervisão e habilitação de motorista." },
+      { name: "description", content: "Cadastro de colaboradores: dados pessoais, função, departamento, supervisão e habilitação de motorista." },
       { property: "og:title", content: "Colaboradores | Programação Operacional" },
       { property: "og:description", content: "Cadastro completo de colaboradores da operação." },
       { property: "og:type", content: "website" },
@@ -118,7 +117,6 @@ type FormState = {
   hire_date: string;
   position_id: string;
   department_id: string;
-  sector_id: string;
   supervisor_id: string;
   status: "active" | "inactive";
   is_driver: boolean;
@@ -141,7 +139,6 @@ const emptyForm: FormState = {
   hire_date: "",
   position_id: NONE,
   department_id: NONE,
-  sector_id: NONE,
   supervisor_id: NONE,
   status: "active",
   is_driver: false,
@@ -165,7 +162,6 @@ function toForm(c: Collaborator): FormState {
     hire_date: c.hire_date ?? "",
     position_id: c.position_id ?? NONE,
     department_id: c.department_id ?? NONE,
-    sector_id: c.sector_id ?? NONE,
     supervisor_id: c.supervisor_id ?? NONE,
     status: c.status,
     is_driver: c.is_driver,
@@ -205,15 +201,13 @@ function CollaboratorsPage() {
   const lookups = useQuery({
     queryKey: ["collaborator-lookups"],
     queryFn: async () => {
-      const [positions, departments, sectors] = await Promise.all([
+      const [positions, departments] = await Promise.all([
         supabase.from("positions").select("id, name, active").eq("active", true).order("name"),
         supabase.from("departments").select("id, name, active").eq("active", true).order("name"),
-        supabase.from("sectors").select("id, name, department_id, active").eq("active", true).order("name"),
       ]);
       return {
         positions: positions.data ?? [],
         departments: departments.data ?? [],
-        sectors: sectors.data ?? [],
       };
     },
   });
@@ -223,7 +217,6 @@ function CollaboratorsPage() {
     (collaborators.data ?? []).forEach((c) => map.set(c.id, c.full_name));
     lookups.data?.positions.forEach((p) => map.set(p.id, p.name));
     lookups.data?.departments.forEach((d) => map.set(d.id, d.name));
-    lookups.data?.sectors.forEach((s) => map.set(s.id, s.name));
     return map;
   }, [collaborators.data, lookups.data]);
 
@@ -237,12 +230,6 @@ function CollaboratorsPage() {
         .some((v) => String(v).toLowerCase().includes(q));
     });
   }, [collaborators.data, search, statusFilter]);
-
-  const sectorOptions = useMemo(() => {
-    const all = lookups.data?.sectors ?? [];
-    if (form.department_id === NONE) return all;
-    return all.filter((s) => !s.department_id || s.department_id === form.department_id);
-  }, [lookups.data, form.department_id]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -262,7 +249,6 @@ function CollaboratorsPage() {
         hire_date: nn(form.hire_date),
         position_id: ref(form.position_id),
         department_id: ref(form.department_id),
-        sector_id: ref(form.sector_id),
         supervisor_id: ref(form.supervisor_id),
         status: form.status,
         is_driver: form.is_driver,
@@ -313,7 +299,6 @@ function CollaboratorsPage() {
       new Map(list.map((x) => [normText(x.name), x.id]));
     const positions = byName(lookups.data?.positions ?? []);
     const departments = byName(lookups.data?.departments ?? []);
-    const sectors = byName(lookups.data?.sectors ?? []);
     const errors: string[] = [];
     const records: { line: number; values: Record<string, unknown> }[] = [];
 
@@ -341,9 +326,8 @@ function CollaboratorsPage() {
           email: emptyToNull(r["email"] ?? ""),
           birth_date: parseDate(r["data_nascimento"] ?? ""),
           hire_date: parseDate(r["data_admissao"] ?? ""),
-          position_id: resolve("cargo", positions, r["cargo"]),
+          position_id: resolve("função", positions, r["funcao"]),
           department_id: resolve("departamento", departments, r["departamento"]),
-          sector_id: resolve("setor", sectors, r["setor"]),
           status: normText(r["situacao"] ?? "").startsWith("inat") ? "inactive" : "active",
           is_driver: parseBool(r["motorista"] ?? ""),
           driver_license_category: emptyToNull(r["cnh_categoria"] ?? ""),
@@ -372,13 +356,13 @@ function CollaboratorsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Colaboradores"
-        description="Cadastro de colaboradores, vínculo com cargo, setor, departamento e supervisão."
+        description="Cadastro de colaboradores, vínculo com função, departamento e supervisão."
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" asChild>
               <Link to="/colaboradores/estrutura">
                 <Settings2 className="h-4 w-4" />
-                Cargos e setores
+                Funções e departamentos
               </Link>
             </Button>
             {canWrite && (
@@ -427,8 +411,8 @@ function CollaboratorsPage() {
             <TableRow>
               <TableHead>Matrícula</TableHead>
               <TableHead>Nome</TableHead>
-              <TableHead>Cargo</TableHead>
-              <TableHead>Setor</TableHead>
+              <TableHead>Função</TableHead>
+              <TableHead>Departamento</TableHead>
               <TableHead>Supervisor</TableHead>
               <TableHead>Situação</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -465,7 +449,7 @@ function CollaboratorsPage() {
                     )}
                   </TableCell>
                   <TableCell>{c.position_id ? nameById.get(c.position_id) ?? "—" : "—"}</TableCell>
-                  <TableCell>{c.sector_id ? nameById.get(c.sector_id) ?? "—" : "—"}</TableCell>
+                  <TableCell>{c.department_id ? nameById.get(c.department_id) ?? "—" : "—"}</TableCell>
                   <TableCell>{c.supervisor_id ? nameById.get(c.supervisor_id) ?? "—" : "—"}</TableCell>
                   <TableCell>
                     <Badge variant={c.status === "active" ? "default" : "secondary"}>
@@ -535,7 +519,7 @@ function CollaboratorsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Cargo</Label>
+              <Label>Função</Label>
               <Select value={form.position_id} onValueChange={(v) => set("position_id", v)}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
@@ -550,25 +534,13 @@ function CollaboratorsPage() {
               <Label>Departamento</Label>
               <Select
                 value={form.department_id}
-                onValueChange={(v) => setForm((f) => ({ ...f, department_id: v, sector_id: NONE }))}
+                onValueChange={(v) => set("department_id", v)}
               >
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Não definido</SelectItem>
                   {lookups.data?.departments.map((d) => (
                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Setor</Label>
-              <Select value={form.sector_id} onValueChange={(v) => set("sector_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Não definido</SelectItem>
-                  {sectorOptions.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

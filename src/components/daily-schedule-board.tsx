@@ -595,7 +595,7 @@ export function DailyScheduleBoard({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>Usar cargo do colaborador</SelectItem>
+                    <SelectItem value={NONE}>Usar função do colaborador</SelectItem>
                     {(c?.positions ?? []).map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
