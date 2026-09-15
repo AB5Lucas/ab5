@@ -808,28 +808,28 @@ export function SchedulePlannerBoard({
                           if (!payload || !editable) return;
                           drop.mutate({ ...payload, workId: w.id, beforeSort: r.sort_order - 0.5 });
                         }}
-                        className="flex items-center gap-2 px-3 py-2 text-sm"
+                        className="flex items-center gap-1.5 px-2 py-1 text-xs"
                       >
-                        {editable && <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium">{p?.full_name ?? "—"}</p>
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p className="truncate text-xs font-medium leading-tight">{p?.full_name ?? "—"}</p>
+                          <p className="truncate text-[10px] leading-tight text-muted-foreground">
                             {(r.position_id ? positionById.get(r.position_id) : p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
                           </p>
                         </div>
                         {r.has_pending_requirement && (
-                          <Badge variant="destructive" className="shrink-0">
-                            <AlertTriangle className="mr-1 h-3 w-3" /> Pendência
+                          <Badge variant="destructive" className="shrink-0 px-1 py-0 text-[10px]">
+                            <AlertTriangle className="mr-0.5 h-2.5 w-2.5" /> Pendência
                           </Badge>
                         )}
                         {r.confirmation_status === "confirmed" && (
-                          <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+                          <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                         )}
                         {editable && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 shrink-0"
+                            className="h-6 w-6 shrink-0"
                             aria-label="Remover da obra"
                             onClick={(e) => {
                               e.stopPropagation();
