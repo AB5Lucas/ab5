@@ -117,7 +117,7 @@ type FormState = {
   hire_date: string;
   position_id: string;
   department_id: string;
-  supervisor_id: string;
+  
   status: "active" | "inactive";
   is_driver: boolean;
   driver_license_category: string;
@@ -139,7 +139,7 @@ const emptyForm: FormState = {
   hire_date: "",
   position_id: NONE,
   department_id: NONE,
-  supervisor_id: NONE,
+  
   status: "active",
   is_driver: false,
   driver_license_category: "",
@@ -162,7 +162,7 @@ function toForm(c: Collaborator): FormState {
     hire_date: c.hire_date ?? "",
     position_id: c.position_id ?? NONE,
     department_id: c.department_id ?? NONE,
-    supervisor_id: c.supervisor_id ?? NONE,
+    
     status: c.status,
     is_driver: c.is_driver,
     driver_license_category: c.driver_license_category ?? "",
@@ -249,7 +249,7 @@ function CollaboratorsPage() {
         hire_date: nn(form.hire_date),
         position_id: ref(form.position_id),
         department_id: ref(form.department_id),
-        supervisor_id: ref(form.supervisor_id),
+        
         status: form.status,
         is_driver: form.is_driver,
         driver_license_category: form.is_driver ? nn(form.driver_license_category) : null,
@@ -413,7 +413,7 @@ function CollaboratorsPage() {
               <TableHead>Nome</TableHead>
               <TableHead>Função</TableHead>
               <TableHead>Departamento</TableHead>
-              <TableHead>Supervisor</TableHead>
+              
               <TableHead>Situação</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -450,7 +450,7 @@ function CollaboratorsPage() {
                   </TableCell>
                   <TableCell>{c.position_id ? nameById.get(c.position_id) ?? "—" : "—"}</TableCell>
                   <TableCell>{c.department_id ? nameById.get(c.department_id) ?? "—" : "—"}</TableCell>
-                  <TableCell>{c.supervisor_id ? nameById.get(c.supervisor_id) ?? "—" : "—"}</TableCell>
+                  
                   <TableCell>
                     <Badge variant={c.status === "active" ? "default" : "secondary"}>
                       {c.status === "active" ? "Ativo" : "Inativo"}
@@ -542,20 +542,6 @@ function CollaboratorsPage() {
                   {lookups.data?.departments.map((d) => (
                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Supervisor</Label>
-              <Select value={form.supervisor_id} onValueChange={(v) => set("supervisor_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Não definido</SelectItem>
-                  {(collaborators.data ?? [])
-                    .filter((c) => c.status === "active" && c.id !== editing?.id)
-                    .map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
-                    ))}
                 </SelectContent>
               </Select>
             </div>
