@@ -33,6 +33,38 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
+import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { emptyToNull, insertSequentially, normText, parseDate, parseNum } from "@/lib/import-helpers";
+
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: "codigo", required: true, example: "OB-001" },
+  { key: "nome", required: true, example: "Subestação Norte" },
+  { key: "cliente", example: "Enel" },
+  { key: "endereco", example: "Rua das Palmeiras" },
+  { key: "numero", example: "150" },
+  { key: "bairro" },
+  { key: "cidade", example: "Campinas" },
+  { key: "uf", hint: "2 letras.", example: "SP" },
+  { key: "cep", example: "13000-000" },
+  { key: "distancia_km", hint: "Número, use vírgula ou ponto.", example: "85,5" },
+  { key: "tempo_viagem_min", hint: "Minutos.", example: "90" },
+  { key: "data_inicio", hint: "AAAA-MM-DD ou DD/MM/AAAA." },
+  { key: "data_fim_prevista", hint: "AAAA-MM-DD ou DD/MM/AAAA." },
+  { key: "hora_entrada", hint: "HH:MM.", example: "07:00" },
+  { key: "hora_saida", hint: "HH:MM.", example: "17:00" },
+  { key: "situacao", hint: "Planejada, Ativa, Pausada, Concluída ou Cancelada.", example: "Ativa" },
+  { key: "observacoes" },
+];
+
+const WORK_STATUS_FROM_TEXT: Record<string, WorkStatusValue> = {
+  planejada: "planned",
+  ativa: "active",
+  pausada: "paused",
+  concluida: "completed",
+  cancelada: "cancelled",
+};
+
+type WorkStatusValue = Tables<"works">["status"];
 
 export const Route = createFileRoute("/_authenticated/obras/")({
   head: () => ({
@@ -271,11 +303,63 @@ function WorksPage() {
     setOpen(true);
   }
 
+  async function importWorks(rows: ImportRow[]) {
+    const errors: string[] = [];
+    const recs: { line: number; values: Record<string, unknown> }[] = [];
+    rows.forEach((r, i) => {
+      const line = i + 2;
+      if (!r["codigo"] || !r["nome"]) {
+        errors.push(`Linha ${line}: código e nome são obrigatórios.`);
+        return;
+      }
+      recs.push({
+        line,
+        values: {
+          code: r["codigo"]!.trim(),
+          name: r["nome"]!.trim(),
+          client: emptyToNull(r["cliente"] ?? ""),
+          address: emptyToNull(r["endereco"] ?? ""),
+          number: emptyToNull(r["numero"] ?? ""),
+          neighborhood: emptyToNull(r["bairro"] ?? ""),
+          city: emptyToNull(r["cidade"] ?? ""),
+          state: emptyToNull((r["uf"] ?? "").toUpperCase()),
+          zip_code: emptyToNull(r["cep"] ?? ""),
+          distance_km: parseNum(r["distancia_km"] ?? ""),
+          estimated_travel_time: parseNum(r["tempo_viagem_min"] ?? ""),
+          start_date: parseDate(r["data_inicio"] ?? ""),
+          expected_end_date: parseDate(r["data_fim_prevista"] ?? ""),
+          entry_time: emptyToNull(r["hora_entrada"] ?? ""),
+          exit_time: emptyToNull(r["hora_saida"] ?? ""),
+          status: WORK_STATUS_FROM_TEXT[normText(r["situacao"] ?? "")] ?? "planned",
+          notes: emptyToNull(r["observacoes"] ?? ""),
+        },
+      });
+    });
+    const result = await insertSequentially(
+      recs,
+      async (values) => {
+        const { error } = await supabase.from("works").insert(values as never);
+        return { error };
+      },
+      errors,
+    );
+    await queryClient.invalidateQueries({ queryKey: ["works"] });
+    return result;
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader title="Obras" description="Cadastro de obras, endereços, distâncias e responsáveis."
         actions={
       <div className="flex flex-wrap gap-2">
+        {canWrite && (
+          <ImportDialog
+            entity="obras"
+            description="Importe várias obras de uma vez a partir de um arquivo .xlsx ou .csv."
+            columns={IMPORT_COLUMNS}
+            onImport={importWorks}
+          />
+        )}
         <Button variant="outline" size="sm" asChild>
           <Link to="/obras/equipes-base">
             <Users className="h-4 w-4" /> Equipes Base

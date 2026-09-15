@@ -34,6 +34,27 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
+import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { emptyToNull, insertSequentially, normText, parseBool, parseDate } from "@/lib/import-helpers";
+
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: "matricula", required: true, hint: "Código/matrícula única.", example: "1024" },
+  { key: "nome_completo", required: true, example: "Maria Aparecida Souza" },
+  { key: "nome_social" },
+  { key: "cpf", hint: "Somente números ou com pontuação.", example: "123.456.789-00" },
+  { key: "telefone", example: "(11) 99999-0000" },
+  { key: "email", example: "maria@empresa.com" },
+  { key: "data_nascimento", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "1990-05-12" },
+  { key: "data_admissao", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2023-01-10" },
+  { key: "cargo", hint: "Deve existir em Cargos e setores.", example: "Eletricista" },
+  { key: "departamento", hint: "Deve existir em Cargos e setores." },
+  { key: "setor", hint: "Deve existir em Cargos e setores." },
+  { key: "situacao", hint: "Ativo ou Inativo (padrão Ativo).", example: "Ativo" },
+  { key: "motorista", hint: "Sim ou Não.", example: "Não" },
+  { key: "cnh_categoria", example: "D" },
+  { key: "cnh_validade", hint: "AAAA-MM-DD ou DD/MM/AAAA." },
+  { key: "observacoes" },
+];
 
 export const Route = createFileRoute("/_authenticated/colaboradores/")({
   head: () => ({
@@ -256,19 +277,84 @@ function CollaboratorsPage() {
     setOpen(true);
   }
 
+  async function importCollaborators(rows: ImportRow[]) {
+    const byName = (list: { id: string; name: string }[]) =>
+      new Map(list.map((x) => [normText(x.name), x.id]));
+    const positions = byName(lookups.data?.positions ?? []);
+    const departments = byName(lookups.data?.departments ?? []);
+    const sectors = byName(lookups.data?.sectors ?? []);
+    const errors: string[] = [];
+    const records: { line: number; values: Record<string, unknown> }[] = [];
+
+    rows.forEach((r, i) => {
+      const line = i + 2;
+      if (!r["matricula"] || !r["nome_completo"]) {
+        errors.push(`Linha ${line}: matrícula e nome completo são obrigatórios.`);
+        return;
+      }
+      const resolve = (label: string, map: Map<string, string>, value?: string) => {
+        const v = (value ?? "").trim();
+        if (!v) return null;
+        const id = map.get(normText(v));
+        if (!id) errors.push(`Linha ${line}: ${label} "${v}" não cadastrado(a).`);
+        return id ?? null;
+      };
+      records.push({
+        line,
+        values: {
+          registration_number: r["matricula"]!.trim(),
+          full_name: r["nome_completo"]!.trim(),
+          social_name: emptyToNull(r["nome_social"] ?? ""),
+          cpf: emptyToNull(r["cpf"] ?? ""),
+          phone: emptyToNull(r["telefone"] ?? ""),
+          email: emptyToNull(r["email"] ?? ""),
+          birth_date: parseDate(r["data_nascimento"] ?? ""),
+          hire_date: parseDate(r["data_admissao"] ?? ""),
+          position_id: resolve("cargo", positions, r["cargo"]),
+          department_id: resolve("departamento", departments, r["departamento"]),
+          sector_id: resolve("setor", sectors, r["setor"]),
+          status: normText(r["situacao"] ?? "").startsWith("inat") ? "inactive" : "active",
+          is_driver: parseBool(r["motorista"] ?? ""),
+          driver_license_category: emptyToNull(r["cnh_categoria"] ?? ""),
+          driver_license_expiry: parseDate(r["cnh_validade"] ?? ""),
+          notes: emptyToNull(r["observacoes"] ?? ""),
+        },
+      });
+    });
+
+    const result = await insertSequentially(
+      records,
+      async (values) => {
+        const { error } = await supabase.from("collaborators").insert(values as never);
+        return { error };
+      },
+      errors,
+    );
+    await queryClient.invalidateQueries({ queryKey: ["collaborators"] });
+    return result;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Colaboradores"
         description="Cadastro de colaboradores, vínculo com cargo, setor, departamento e supervisão."
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" asChild>
               <Link to="/colaboradores/estrutura">
                 <Settings2 className="h-4 w-4" />
                 Cargos e setores
               </Link>
             </Button>
+            {canWrite && (
+              <ImportDialog
+                entity="colaboradores"
+                description="Importe vários colaboradores de uma vez a partir de um arquivo .xlsx ou .csv."
+                columns={IMPORT_COLUMNS}
+                onImport={importCollaborators}
+              />
+            )}
             {canWrite && (
               <Button onClick={openNew}>
                 <Plus className="h-4 w-4" />
