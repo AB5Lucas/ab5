@@ -1012,7 +1012,7 @@ export function SchedulePlannerBoard({
                 <button
                   type="button"
                   onClick={() => setFilters(new Set())}
-                  className="shrink-0 text-xs text-muted-foreground underline"
+                  className="shrink-0 text-[10px] text-muted-foreground underline"
                 >
                   limpar
                 </button>
