@@ -77,6 +77,7 @@ type FormState = {
   zip_code: string;
   distance_km: string;
   notes: string;
+  requires_integration: boolean;
 };
 
 const emptyForm: FormState = {
