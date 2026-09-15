@@ -47,6 +47,54 @@ export type Database = {
         }
         Relationships: []
       }
+      clients: {
+        Row: {
+          active: boolean
+          address: string | null
+          city: string | null
+          created_at: string
+          distance_km: number | null
+          id: string
+          name: string
+          neighborhood: string | null
+          notes: string | null
+          number: string | null
+          state: string | null
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          distance_km?: number | null
+          id?: string
+          name: string
+          neighborhood?: string | null
+          notes?: string | null
+          number?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          distance_km?: number | null
+          id?: string
+          name?: string
+          neighborhood?: string | null
+          notes?: string | null
+          number?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
       collaborator_trainings: {
         Row: {
           collaborator_id: string
@@ -928,12 +976,14 @@ export type Database = {
           address: string | null
           city: string | null
           client: string | null
-          code: string
+          client_id: string | null
+          code: string | null
           created_at: string
           distance_km: number | null
           entry_time: string | null
           estimated_travel_time: number | null
           exit_time: string | null
+          exit_time_weekend: string | null
           expected_end_date: string | null
           id: string
           latitude: number | null
@@ -955,12 +1005,14 @@ export type Database = {
           address?: string | null
           city?: string | null
           client?: string | null
-          code: string
+          client_id?: string | null
+          code?: string | null
           created_at?: string
           distance_km?: number | null
           entry_time?: string | null
           estimated_travel_time?: number | null
           exit_time?: string | null
+          exit_time_weekend?: string | null
           expected_end_date?: string | null
           id?: string
           latitude?: number | null
@@ -982,12 +1034,14 @@ export type Database = {
           address?: string | null
           city?: string | null
           client?: string | null
-          code?: string
+          client_id?: string | null
+          code?: string | null
           created_at?: string
           distance_km?: number | null
           entry_time?: string | null
           estimated_travel_time?: number | null
           exit_time?: string | null
+          exit_time_weekend?: string | null
           expected_end_date?: string | null
           id?: string
           latitude?: number | null
@@ -1005,6 +1059,13 @@ export type Database = {
           zip_code?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "works_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "works_manager_id_fkey"
             columns: ["manager_id"]
