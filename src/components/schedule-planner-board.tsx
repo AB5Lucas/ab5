@@ -1076,7 +1076,7 @@ export function SchedulePlannerBoard({
                                   ? "secondary"
                                   : "destructive"
                             }
-                            className="text-[10px]"
+                            className="px-1 py-0 text-[9px]"
                           >
                             {ev.integration ? INTEGRATION_LABEL[ev.integration] : "Integração"}
                           </Badge>
