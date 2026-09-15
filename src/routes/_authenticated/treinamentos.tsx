@@ -30,6 +30,25 @@ export const Route = createFileRoute("/_authenticated/treinamentos")({
   component: TrainingsPage,
 });
 
+import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { emptyToNull, insertSequentially, normText, parseDate, parseNum } from "@/lib/import-helpers";
+
+const CATALOG_COLUMNS: ImportColumn[] = [
+  { key: "nome", required: true, example: "NR-10" },
+  { key: "descricao", example: "Segurança em instalações elétricas" },
+  { key: "validade_meses", hint: "Número inteiro de meses.", example: "24" },
+  { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
+];
+
+const RECORD_COLUMNS: ImportColumn[] = [
+  { key: "matricula", hint: "Matrícula do colaborador (use matrícula ou nome).", example: "1024" },
+  { key: "colaborador", hint: "Nome completo, usado se a matrícula estiver vazia." },
+  { key: "treinamento", required: true, hint: "Nome exato do treinamento no catálogo.", example: "NR-10" },
+  { key: "data_realizacao", required: true, hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2026-03-01" },
+  { key: "data_vencimento", hint: "Se vazio, é calculado pela validade do treinamento." },
+  { key: "documento_url", hint: "Link do certificado/documento.", example: "https://..." },
+];
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 function addMonths(dateStr: string, months: number) {
