@@ -137,6 +137,7 @@ export function checkIntegration(
   const work = ctx.works.find((w) => w.id === workId);
   const clientId = work?.client_id ?? null;
   if (!clientId) return { status: "no_client", expiresAt: null };
+  if (work?.clients?.requires_integration === false) return { status: "not_required", expiresAt: null };
   const rec = ctx.integrations.find((i) => i.collaborator_id === collaboratorId && i.client_id === clientId);
   if (!rec) return { status: "missing", expiresAt: null };
   if (!rec.expires_at) return { status: "valid", expiresAt: null };
