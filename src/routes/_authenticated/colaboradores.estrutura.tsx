@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/colaboradores/estrutura")(
 });
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText } from "@/lib/import-helpers";
+import { insertSequentially, normText, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const POSITION_COLUMNS: ImportColumn[] = [
   { key: "nome", required: true, example: "Eletricista" },
