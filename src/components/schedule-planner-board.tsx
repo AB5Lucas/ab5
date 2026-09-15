@@ -34,18 +34,27 @@ const STATUS_LABEL: Record<string, string> = {
 
 type Level = "ok" | "warn" | "block" | "busy";
 
-type Evaluation = { level: Level; reasons: string[] };
+type Evaluation = {
+  level: Level;
+  reasons: string[];
+  integration: IntegrationStatus | null;
+  reqIssues: number;
+  reqBlocked: boolean;
+  fit: boolean;
+};
 
 type DragPayload = { collaboratorId: string; allocationId: string | null };
 
 const FILTERS = [
   { key: "available", label: "Disponíveis" },
-  { key: "unavailable", label: "Indisponíveis" },
+  { key: "unavailable", label: "Não disponíveis" },
   { key: "allocated", label: "Já alocados" },
   { key: "unallocated", label: "Não alocados" },
-  { key: "req_ok", label: "Requisitos ok" },
-  { key: "req_warn", label: "Com pendência" },
-  { key: "req_block", label: "Sem requisito / bloqueado" },
+  { key: "int_ok", label: "Integração válida" },
+  { key: "int_bad", label: "Integração vencida" },
+  { key: "req_ok", label: "Requisitos atendidos" },
+  { key: "req_warn", label: "Requisitos pendentes" },
+  { key: "fit", label: "Aptos para esta obra" },
 ] as const;
 
 type FilterKey = (typeof FILTERS)[number]["key"];
