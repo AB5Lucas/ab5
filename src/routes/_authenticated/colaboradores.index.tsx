@@ -62,7 +62,7 @@ const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "email", example: "maria@empresa.com" },
   { key: "data_nascimento", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "1990-05-12" },
   { key: "data_admissao", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2023-01-10" },
-  { key: "funcao", hint: "Deve existir em Funções e departamentos. Aceita variações: sem acento, em CAIXA ALTA, no feminino ou no plural (Tecnica = Técnico).", example: "Técnico de Segurança do Trabalho" },
+  { key: "funcao", hint: "Deve existir em Funções e departamentos. Aceita variações: sem acento, em CAIXA ALTA, no feminino ou no plural (Tecnica = Técnico). O nível faz parte da função: N1, N2, N3 e N4 são funções diferentes.", example: "Montador de Andaimes N1" },
   { key: "departamento", hint: "Deve existir em Funções e departamentos. Aceita variações de acento, maiúsculas e gênero.", example: "Serviços" },
   { key: "situacao", hint: "Ativo ou Inativo (padrão Ativo).", example: "Ativo" },
   { key: "motorista", hint: "Sim ou Não.", example: "Não" },
