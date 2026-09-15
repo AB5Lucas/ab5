@@ -44,6 +44,7 @@ const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "uf", hint: "2 letras.", example: "SP" },
   { key: "cep", example: "13000-000" },
   { key: "distancia_km", hint: "Número, use vírgula ou ponto.", example: "85,5" },
+  { key: "exige_integracao", hint: "sim ou nao. Em branco = sim.", example: "sim" },
   { key: "observacoes" },
 ];
 
