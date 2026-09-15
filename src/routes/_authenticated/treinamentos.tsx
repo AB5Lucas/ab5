@@ -488,7 +488,9 @@ function TrainingsPage() {
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   {(trainings.data ?? []).filter((t) => t.active).map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}{t.description ? ` — ${t.description}` : ""}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
