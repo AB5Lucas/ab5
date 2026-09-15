@@ -722,9 +722,9 @@ export function SchedulePlannerBoard({
         <p className="text-sm text-muted-foreground">Carregando programação...</p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_232px]">
         {/* Obras */}
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {works.length === 0 && !ctx.isLoading && (
             <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground sm:col-span-2">
               Nenhum serviço ativo cadastrado.
@@ -952,14 +952,14 @@ export function SchedulePlannerBoard({
             else if (p.allocationId) removeRow.mutate(p.allocationId);
           }}
           className={cn(
-            "panel sticky top-4 flex max-h-[calc(100vh-6rem)] flex-col p-3",
+            "panel sticky top-4 flex max-h-[calc(100vh-6rem)] flex-col p-2",
             hoverPanel && "ring-2 ring-primary",
           )}
         >
-          <div className="space-y-2">
-            <h3 className="font-display text-sm font-semibold uppercase tracking-wide">Colaboradores</h3>
+          <div className="space-y-1.5">
+            <h3 className="font-display text-[11px] font-semibold uppercase tracking-wide">Colaboradores</h3>
             {selectedWork && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground">
                 Filtrando para{" "}
                 <span className="font-medium text-foreground">
                   {(() => {
@@ -970,23 +970,27 @@ export function SchedulePlannerBoard({
               </p>
             )}
             <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
-                className="pl-8"
+                className="h-7 pl-7 text-xs"
                 placeholder="Buscar colaborador"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex-1 justify-between">
-                    <span className="flex items-center gap-2">
-                      <SlidersHorizontal className="h-4 w-4" />
+                  <Button variant="outline" size="sm" className="h-7 flex-1 justify-between px-2 text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
                       Condições
                     </span>
-                    {filters.size > 0 && <Badge variant="secondary">{filters.size}</Badge>}
+                    {filters.size > 0 && (
+                      <Badge variant="secondary" className="px-1 py-0 text-[10px]">
+                        {filters.size}
+                      </Badge>
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-60">
@@ -1008,7 +1012,7 @@ export function SchedulePlannerBoard({
                 <button
                   type="button"
                   onClick={() => setFilters(new Set())}
-                  className="shrink-0 text-xs text-muted-foreground underline"
+                  className="shrink-0 text-[10px] text-muted-foreground underline"
                 >
                   limpar
                 </button>
@@ -1016,9 +1020,9 @@ export function SchedulePlannerBoard({
             </div>
           </div>
 
-          <ul className="mt-3 flex-1 divide-y divide-border overflow-y-auto pr-1">
+          <ul className="mt-2 flex-1 divide-y divide-border overflow-y-auto pr-1">
             {filtered.length === 0 && (
-              <li className="py-6 text-center text-xs text-muted-foreground">Nenhum colaborador encontrado.</li>
+              <li className="py-4 text-center text-[10px] text-muted-foreground">Nenhum colaborador encontrado.</li>
             )}
             {filtered.map((p) => {
               const ev = evaluate(p.id, selectedWork);
@@ -1032,7 +1036,7 @@ export function SchedulePlannerBoard({
                   onDragStart={(e) => startDrag(e, { collaboratorId: p.id, allocationId: alloc?.id ?? null })}
                   onDragEnd={() => setDragging(null)}
                   className={cn(
-                    "text-sm",
+                    "text-xs",
                     canDrag ? "cursor-grab active:cursor-grabbing hover:bg-secondary" : "opacity-70",
                   )}
                 >
@@ -1040,21 +1044,24 @@ export function SchedulePlannerBoard({
                     type="button"
                     onClick={() => toggleExpanded(p.id)}
                     aria-expanded={open}
-                    className="flex w-full items-center gap-2 px-1 py-1 text-left"
+                    className="flex w-full items-center gap-1.5 px-1 py-0.5 text-left"
                   >
-                    <span className={cn("h-2 w-2 shrink-0 rounded-full", LEVEL_DOT[ev.level])} aria-hidden />
-                    <span className="min-w-0 flex-1 truncate font-medium">{p.full_name}</span>
-                    <Badge variant={ev.level === "block" ? "destructive" : "outline"} className="shrink-0 text-[10px]">
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", LEVEL_DOT[ev.level])} aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-tight">{p.full_name}</span>
+                    <Badge
+                      variant={ev.level === "block" ? "destructive" : "outline"}
+                      className="shrink-0 px-1 py-0 text-[9px]"
+                    >
                       {LEVEL_TEXT[ev.level]}
                     </Badge>
                     <ChevronDown
-                      className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition", open && "rotate-180")}
+                      className={cn("h-3 w-3 shrink-0 text-muted-foreground transition", open && "rotate-180")}
                       aria-hidden
                     />
                   </button>
                   {open && (
-                    <div className="pb-2 pl-5 pr-1">
-                      <p className="truncate text-xs text-muted-foreground">
+                    <div className="pb-1.5 pl-4 pr-1">
+                      <p className="truncate text-[10px] text-muted-foreground">
                         {p.position_id ? positionById.get(p.position_id) ?? "Sem função" : "Sem função"}
                         {p.is_driver ? " · motorista" : ""}
                         {p.contract_type ? ` · ${p.contract_type}` : ""}
@@ -1069,13 +1076,13 @@ export function SchedulePlannerBoard({
                                   ? "secondary"
                                   : "destructive"
                             }
-                            className="text-[10px]"
+                            className="px-1 py-0 text-[9px]"
                           >
                             {ev.integration ? INTEGRATION_LABEL[ev.integration] : "Integração"}
                           </Badge>
                           <Badge
                             variant={ev.reqBlocked ? "destructive" : ev.reqIssues > 0 ? "secondary" : "outline"}
-                            className="text-[10px]"
+                            className="px-1 py-0 text-[9px]"
                           >
                             {ev.reqBlocked
                               ? "Requisito bloqueante"
@@ -1086,7 +1093,7 @@ export function SchedulePlannerBoard({
                         </div>
                       )}
                       {ev.reasons.length > 0 && (
-                        <p className="pt-1 text-xs text-muted-foreground">{ev.reasons.join(" · ")}</p>
+                        <p className="pt-1 text-[10px] text-muted-foreground">{ev.reasons.join(" · ")}</p>
                       )}
                     </div>
                   )}
@@ -1095,7 +1102,7 @@ export function SchedulePlannerBoard({
             })}
           </ul>
 
-          <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 border-t border-border pt-2 text-[10px] text-muted-foreground">
             Arraste um nome para o card da obra. Para retirar, arraste de volta para esta lista ou use o ✕.
           </p>
         </aside>
