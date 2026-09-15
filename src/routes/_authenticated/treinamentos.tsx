@@ -102,7 +102,7 @@ function TrainingsPage() {
   const nameById = useMemo(() => {
     const m = new Map<string, string>();
     (people.data ?? []).forEach((p) => m.set(p.id, p.full_name));
-    (trainings.data ?? []).forEach((t) => m.set(t.id, t.name));
+    (trainings.data ?? []).forEach((t) => m.set(t.id, t.description ? `${t.name} — ${t.description}` : t.name));
     return m;
   }, [people.data, trainings.data]);
 
