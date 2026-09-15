@@ -127,6 +127,16 @@ export function SchedulePlannerBoard({
   const [hoverWork, setHoverWork] = useState<string | null>(null);
   const [hoverPanel, setHoverPanel] = useState(false);
   const [hoverBox, setHoverBox] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   const [visibleBoxes, setVisibleBoxes] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
