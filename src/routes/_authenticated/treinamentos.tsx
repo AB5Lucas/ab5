@@ -43,6 +43,8 @@ const RECORD_COLUMNS: ImportColumn[] = [
   { key: "documento_url", hint: "Link do certificado/documento.", example: "https://..." },
 ];
 
+import { formatDateBR } from "@/lib/scheduling";
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 function addMonths(dateStr: string, months: number) {
