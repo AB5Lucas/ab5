@@ -31,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/treinamentos")({
 });
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
+import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const CATALOG_COLUMNS: ImportColumn[] = [
   { key: "nome", required: true, example: "NR-10" },
