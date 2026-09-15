@@ -403,11 +403,16 @@ export function SchedulePlannerBoard({
       if (!c) throw new Error("Carregando dados");
       const person = personById.get(collaboratorId);
       const name = person?.full_name ?? "Colaborador";
-      const ev = evaluate(collaboratorId, workId);
+      const fromBox = entryByCollaborator.get(collaboratorId) ?? null;
+      const ev = evaluate(collaboratorId, workId, { ignoreEntry: true });
       if (ev.level === "block") throw new Error(`${name} não pode ser alocado nesta obra: ${ev.reasons.join(", ")}`);
 
       const issues = checkRequirements(c, workId, collaboratorId, date);
       const id = await ensureSchedule();
+      if (fromBox) {
+        const { error } = await supabase.from("daily_status_entries").delete().eq("id", fromBox.id);
+        if (error) throw error;
+      }
       const targetRows = rows.filter((r) => r.work_id === workId && r.collaborator_id !== collaboratorId);
       const sort = beforeSort ?? (targetRows.length ? Math.max(...targetRows.map((r) => r.sort_order)) + 1 : 0);
 
