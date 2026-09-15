@@ -679,7 +679,7 @@ export function SchedulePlannerBoard({
           {works.map((w) => {
             const workRows = rows.filter((r) => r.work_id === w.id);
             const blockedTarget =
-              !!dragging && evaluate(dragging.collaboratorId, w.id).level === "block";
+              !!dragging && evaluate(dragging.collaboratorId, w.id, { ignoreEntry: true }).level === "block";
             const isHover = hoverWork === w.id;
             return (
               <section
