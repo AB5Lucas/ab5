@@ -97,6 +97,7 @@ export async function fetchScheduleContext(date: string) {
     supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
     supabase.from("days_off").select("collaborator_id").eq("date", date),
     supabase.from("holidays").select("name").eq("date", date),
+    supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at"),
   ]);
 
   const absences = new Map<string, string>();
