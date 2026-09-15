@@ -5,7 +5,7 @@ import {
   Users,
   Building2,
   Truck,
-  GraduationCap,
+  
   CalendarOff,
   Wallet,
   FileBarChart,
@@ -46,6 +46,7 @@ const groups: Group[] = [
     items: [
       { title: "Colaboradores", url: "/colaboradores" },
       { title: "Funções e Departamentos", url: "/colaboradores/estrutura" },
+      { title: "Treinamentos", url: "/treinamentos" },
     ],
   },
   {
@@ -54,6 +55,7 @@ const groups: Group[] = [
     items: [
       { title: "Serviços", url: "/obras" },
       { title: "Clientes", url: "/clientes" },
+      { title: "Integrações", url: "/obras/integracoes" },
       { title: "Equipes Base", url: "/obras/equipes-base" },
       { title: "Requisitos", url: "/obras/requisitos" },
     ],
@@ -67,7 +69,7 @@ const groups: Group[] = [
       { title: "Transporte", url: "/veiculos/transporte" },
     ],
   },
-  { label: "Treinamentos", icon: GraduationCap, items: [{ title: "Treinamentos", url: "/treinamentos" }] },
+  
   {
     label: "Ausências",
     icon: CalendarOff,

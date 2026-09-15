@@ -47,6 +47,54 @@ export type Database = {
         }
         Relationships: []
       }
+      client_integrations: {
+        Row: {
+          client_id: string
+          collaborator_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          integration_date: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          collaborator_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          integration_date?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          collaborator_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          integration_date?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_integrations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_integrations_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           active: boolean

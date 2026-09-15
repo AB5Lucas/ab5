@@ -22,8 +22,17 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { addDays, checkRequirements, fetchScheduleContext, formatBR, todayISO } from "@/lib/scheduling";
-import type { ScheduleContext } from "@/lib/scheduling";
+import {
+  addDays,
+  checkIntegration,
+  checkRequirements,
+  fetchScheduleContext,
+  formatBR,
+  formatDateBR,
+  todayISO,
+  INTEGRATION_LABEL,
+} from "@/lib/scheduling";
+import type { IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -34,18 +43,27 @@ const STATUS_LABEL: Record<string, string> = {
 
 type Level = "ok" | "warn" | "block" | "busy";
 
-type Evaluation = { level: Level; reasons: string[] };
+type Evaluation = {
+  level: Level;
+  reasons: string[];
+  integration: IntegrationStatus | null;
+  reqIssues: number;
+  reqBlocked: boolean;
+  fit: boolean;
+};
 
 type DragPayload = { collaboratorId: string; allocationId: string | null };
 
 const FILTERS = [
   { key: "available", label: "Disponíveis" },
-  { key: "unavailable", label: "Indisponíveis" },
+  { key: "unavailable", label: "Não disponíveis" },
   { key: "allocated", label: "Já alocados" },
   { key: "unallocated", label: "Não alocados" },
-  { key: "req_ok", label: "Requisitos ok" },
-  { key: "req_warn", label: "Com pendência" },
-  { key: "req_block", label: "Sem requisito / bloqueado" },
+  { key: "int_ok", label: "Integração válida" },
+  { key: "int_bad", label: "Integração vencida" },
+  { key: "req_ok", label: "Requisitos atendidos" },
+  { key: "req_warn", label: "Requisitos pendentes" },
+  { key: "fit", label: "Aptos para esta obra" },
 ] as const;
 
 type FilterKey = (typeof FILTERS)[number]["key"];
@@ -139,30 +157,79 @@ export function SchedulePlannerBoard({
     return m;
   }, [rows]);
 
-  /** Valida colaborador → obra → requisitos/integração. */
+  const base = (over: Partial<Evaluation>): Evaluation => ({
+    level: "ok",
+    reasons: [],
+    integration: null,
+    reqIssues: 0,
+    reqBlocked: false,
+    fit: false,
+    ...over,
+  });
+
+  /** Valida colaborador → disponibilidade → integração com o cliente → requisitos → conflitos. */
   function evaluate(collaboratorId: string, workId: string | null): Evaluation {
-    const reasons: string[] = [];
     const absence = c?.absences.get(collaboratorId);
-    if (absence) return { level: "block", reasons: [`Indisponível: ${absence.toLowerCase()}`] };
+    const current = allocByCollaborator.get(collaboratorId);
+    const currentLabel = () => {
+      const w = works.find((x) => x.id === current?.work_id);
+      return w ? workLabel(w) : "outra obra";
+    };
+
+    if (absence) return base({ level: "block", reasons: [`Indisponível: ${absence.toLowerCase()}`] });
+
     if (!workId) {
-      const current = allocByCollaborator.get(collaboratorId);
-      if (current) {
-        const w = works.find((x) => x.id === current.work_id);
-        return { level: "busy", reasons: [`Alocado em ${w ? workLabel(w) : "outra obra"}`] };
-      }
-      return { level: "ok", reasons: [] };
+      if (current) return base({ level: "busy", reasons: [`Alocado em ${currentLabel()}`] });
+      return base({ level: "ok" });
     }
+
+    const work = works.find((x) => x.id === workId);
+    const clientName = work?.clients?.name ?? "cliente";
+    const integ = checkIntegration(c as ScheduleContext, workId, collaboratorId, date);
+
+    if (integ.status === "expired")
+      return base({
+        level: "block",
+        integration: integ.status,
+        reasons: [`Integração com ${clientName} vencida em ${formatDateBR(integ.expiresAt)}`],
+      });
+    if (integ.status === "missing")
+      return base({
+        level: "block",
+        integration: integ.status,
+        reasons: [`Não possui integração com ${clientName}`],
+      });
+
     const issues = checkRequirements(c as ScheduleContext, workId, collaboratorId, date);
     const blocking = issues.filter((i) => i.blocking);
-    if (blocking.length > 0) return { level: "block", reasons: blocking.map((i) => i.label) };
-    if (issues.length > 0) return { level: "warn", reasons: issues.map((i) => i.label) };
-    const current = allocByCollaborator.get(collaboratorId);
-    if (current && current.work_id !== workId) {
-      const w = works.find((x) => x.id === current.work_id);
-      reasons.push(`Já alocado em ${w ? workLabel(w) : "outra obra"}`);
-      return { level: "busy", reasons };
-    }
-    return { level: "ok", reasons: [] };
+    const reqIssues = issues.length;
+
+    if (blocking.length > 0)
+      return base({
+        level: "block",
+        integration: integ.status,
+        reqIssues,
+        reqBlocked: true,
+        reasons: blocking.map((i) => i.label),
+      });
+
+    const warnings: string[] = issues.map((i) => i.label);
+    if (integ.status === "expiring")
+      warnings.unshift(`Integração com ${clientName} vence em ${formatDateBR(integ.expiresAt)}`);
+    if (integ.status === "no_client") warnings.unshift("Serviço sem cliente vinculado");
+
+    if (current && current.work_id !== workId)
+      return base({
+        level: "busy",
+        integration: integ.status,
+        reqIssues,
+        reasons: [`Já alocado em ${currentLabel()}`, ...warnings],
+      });
+
+    if (warnings.length > 0)
+      return base({ level: "warn", integration: integ.status, reqIssues, reasons: warnings });
+
+    return base({ level: "ok", integration: integ.status, fit: true });
   }
 
   const filtered = useMemo(() => {
@@ -179,9 +246,11 @@ export function SchedulePlannerBoard({
         if (f === "unavailable" && !absent) return false;
         if (f === "allocated" && !alloc) return false;
         if (f === "unallocated" && alloc) return false;
-        if (f === "req_ok" && !(ev.level === "ok" || ev.level === "busy")) return false;
-        if (f === "req_warn" && ev.level !== "warn") return false;
-        if (f === "req_block" && ev.level !== "block") return false;
+        if (f === "int_ok" && !(ev.integration === "valid" || ev.integration === "expiring")) return false;
+        if (f === "int_bad" && !(ev.integration === "expired" || ev.integration === "missing")) return false;
+        if (f === "req_ok" && (ev.reqIssues > 0 || ev.reqBlocked)) return false;
+        if (f === "req_warn" && ev.reqIssues === 0) return false;
+        if (f === "fit" && !(ev.fit && !alloc)) return false;
       }
       return true;
     });
@@ -701,8 +770,36 @@ export function SchedulePlannerBoard({
                     {p.position_id ? positionById.get(p.position_id) ?? "Sem função" : "Sem função"}
                     {p.is_driver ? " · motorista" : ""}
                   </p>
+                  {selectedWork && (
+                    <div className="flex flex-wrap gap-1 pl-4 pt-1">
+                      <Badge
+                        variant={
+                          ev.integration === "valid"
+                            ? "outline"
+                            : ev.integration === "expiring"
+                              ? "secondary"
+                              : "destructive"
+                        }
+                        className="text-[10px]"
+                      >
+                        {ev.integration ? INTEGRATION_LABEL[ev.integration] : "Integração"}
+                      </Badge>
+                      <Badge
+                        variant={ev.reqBlocked ? "destructive" : ev.reqIssues > 0 ? "secondary" : "outline"}
+                        className="text-[10px]"
+                      >
+                        {ev.reqBlocked
+                          ? "Requisito bloqueante"
+                          : ev.reqIssues > 0
+                            ? `${ev.reqIssues} requisito(s) pendente(s)`
+                            : "Requisitos OK"}
+                      </Badge>
+                    </div>
+                  )}
                   {ev.reasons.length > 0 && (
-                    <p className="pl-4 text-xs text-muted-foreground">{ev.reasons.join(" · ")}</p>
+                    <p className="pl-4 text-xs text-muted-foreground" title={ev.reasons.join(" · ")}>
+                      {ev.reasons.join(" · ")}
+                    </p>
                   )}
                 </li>
               );

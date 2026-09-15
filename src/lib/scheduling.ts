@@ -44,6 +44,26 @@ export type Requirement = {
 
 export type Absence = { collaborator_id: string; reason: string };
 
+export type Integration = {
+  collaborator_id: string;
+  client_id: string;
+  integration_date: string;
+  expires_at: string | null;
+};
+
+/** Dias de antecedência para considerar a integração "próxima do vencimento". */
+export const INTEGRATION_WARN_DAYS = 30;
+
+export type IntegrationStatus = "valid" | "expiring" | "expired" | "missing" | "no_client";
+
+export const INTEGRATION_LABEL: Record<IntegrationStatus, string> = {
+  valid: "Integração válida",
+  expiring: "Integração próxima do vencimento",
+  expired: "Integração vencida",
+  missing: "Sem integração com o cliente",
+  no_client: "Serviço sem cliente vinculado",
+};
+
 /** Data needed to build a schedule for a given date. */
 export async function fetchScheduleContext(date: string) {
   const [
@@ -59,8 +79,9 @@ export async function fetchScheduleContext(date: string) {
     leaves,
     daysOff,
     holidays,
+    integrations,
   ] = await Promise.all([
-    supabase.from("works").select("id, name, entry_time, exit_time, exit_time_weekend, status, clients(name, city, distance_km)").eq("active", true).order("name"),
+    supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, clients(name, city, distance_km)").eq("active", true).order("name"),
     supabase
       .from("collaborators")
       .select("id, full_name, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry")
@@ -76,6 +97,7 @@ export async function fetchScheduleContext(date: string) {
     supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
     supabase.from("days_off").select("collaborator_id").eq("date", date),
     supabase.from("holidays").select("name").eq("date", date),
+    supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at"),
   ]);
 
   const absences = new Map<string, string>();
@@ -94,7 +116,27 @@ export async function fetchScheduleContext(date: string) {
     collabTrainings: collabTrainings.data ?? [],
     absences,
     holiday: holidays.data?.[0]?.name ?? null,
+    integrations: (integrations.data ?? []) as Integration[],
   };
+}
+
+/** Status da integração de um colaborador com o cliente de uma obra. */
+export function checkIntegration(
+  ctx: ScheduleContext,
+  workId: string,
+  collaboratorId: string,
+  date: string,
+): { status: IntegrationStatus; expiresAt: string | null } {
+  const work = ctx.works.find((w) => w.id === workId);
+  const clientId = work?.client_id ?? null;
+  if (!clientId) return { status: "no_client", expiresAt: null };
+  const rec = ctx.integrations.find((i) => i.collaborator_id === collaboratorId && i.client_id === clientId);
+  if (!rec) return { status: "missing", expiresAt: null };
+  if (!rec.expires_at) return { status: "valid", expiresAt: null };
+  if (rec.expires_at < date) return { status: "expired", expiresAt: rec.expires_at };
+  if (rec.expires_at <= addDays(date, INTEGRATION_WARN_DAYS))
+    return { status: "expiring", expiresAt: rec.expires_at };
+  return { status: "valid", expiresAt: rec.expires_at };
 }
 
 export type ScheduleContext = Awaited<ReturnType<typeof fetchScheduleContext>>;
