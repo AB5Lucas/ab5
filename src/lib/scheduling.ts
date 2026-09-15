@@ -54,7 +54,13 @@ export type Integration = {
 /** Dias de antecedência para considerar a integração "próxima do vencimento". */
 export const INTEGRATION_WARN_DAYS = 30;
 
-export type IntegrationStatus = "valid" | "expiring" | "expired" | "missing" | "no_client";
+export type IntegrationStatus =
+  | "valid"
+  | "expiring"
+  | "expired"
+  | "missing"
+  | "no_client"
+  | "not_required";
 
 export const INTEGRATION_LABEL: Record<IntegrationStatus, string> = {
   valid: "Integração válida",
@@ -62,6 +68,7 @@ export const INTEGRATION_LABEL: Record<IntegrationStatus, string> = {
   expired: "Integração vencida",
   missing: "Sem integração com o cliente",
   no_client: "Serviço sem cliente vinculado",
+  not_required: "Integração não exigida",
 };
 
 /** Data needed to build a schedule for a given date. */
@@ -81,7 +88,7 @@ export async function fetchScheduleContext(date: string) {
     holidays,
     integrations,
   ] = await Promise.all([
-    supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, clients(name, city, distance_km)").eq("active", true).order("name"),
+    supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, clients(name, city, distance_km, requires_integration)").eq("active", true).order("name"),
     supabase
       .from("collaborators")
       .select("id, full_name, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry")
@@ -130,6 +137,7 @@ export function checkIntegration(
   const work = ctx.works.find((w) => w.id === workId);
   const clientId = work?.client_id ?? null;
   if (!clientId) return { status: "no_client", expiresAt: null };
+  if (work?.clients?.requires_integration === false) return { status: "not_required", expiresAt: null };
   const rec = ctx.integrations.find((i) => i.collaborator_id === collaboratorId && i.client_id === clientId);
   if (!rec) return { status: "missing", expiresAt: null };
   if (!rec.expires_at) return { status: "valid", expiresAt: null };

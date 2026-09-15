@@ -107,6 +107,7 @@ export type Database = {
           neighborhood: string | null
           notes: string | null
           number: string | null
+          requires_integration: boolean
           state: string | null
           updated_at: string
           zip_code: string | null
@@ -122,6 +123,7 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           number?: string | null
+          requires_integration?: boolean
           state?: string | null
           updated_at?: string
           zip_code?: string | null
@@ -137,6 +139,7 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           number?: string | null
+          requires_integration?: boolean
           state?: string | null
           updated_at?: string
           zip_code?: string | null

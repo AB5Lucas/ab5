@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +33,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
+import { emptyToNull, insertSequentially, parseBool, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 type Client = Tables<"clients">;
 
@@ -44,6 +46,7 @@ const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "uf", hint: "2 letras.", example: "SP" },
   { key: "cep", example: "13000-000" },
   { key: "distancia_km", hint: "Número, use vírgula ou ponto.", example: "85,5" },
+  { key: "exige_integracao", hint: "sim ou nao. Em branco = sim.", example: "sim" },
   { key: "observacoes" },
 ];
 
@@ -76,6 +79,7 @@ type FormState = {
   zip_code: string;
   distance_km: string;
   notes: string;
+  requires_integration: boolean;
 };
 
 const emptyForm: FormState = {
@@ -88,6 +92,7 @@ const emptyForm: FormState = {
   zip_code: "",
   distance_km: "",
   notes: "",
+  requires_integration: true,
 };
 
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
@@ -134,6 +139,7 @@ function ClientsPage() {
         zip_code: nn(form.zip_code),
         distance_km: form.distance_km.trim() === "" ? null : Number(form.distance_km),
         notes: nn(form.notes),
+        requires_integration: form.requires_integration,
       };
       if (editing) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editing.id);
@@ -184,6 +190,7 @@ function ClientsPage() {
       zip_code: c.zip_code ?? "",
       distance_km: c.distance_km != null ? String(c.distance_km) : "",
       notes: c.notes ?? "",
+      requires_integration: c.requires_integration ?? true,
     });
     setOpen(true);
   }
@@ -209,6 +216,7 @@ function ClientsPage() {
           zip_code: emptyToNull(r["cep"] ?? ""),
           distance_km: parseNum(r["distancia_km"] ?? ""),
           notes: emptyToNull(r["observacoes"] ?? ""),
+          requires_integration: (r["exige_integracao"] ?? "").trim() === "" ? true : parseBool(r["exige_integracao"]!),
         },
       });
     });
@@ -266,20 +274,21 @@ function ClientsPage() {
               <TableHead className="hidden md:table-cell">Endereço</TableHead>
               <TableHead className="hidden lg:table-cell">Cidade</TableHead>
               <TableHead className="hidden lg:table-cell">Distância</TableHead>
+              <TableHead>Integração</TableHead>
               <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {clients.isLoading && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!clients.isLoading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                   Nenhum cliente encontrado.
                 </TableCell>
               </TableRow>
@@ -295,6 +304,11 @@ function ClientsPage() {
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
                   {c.distance_km != null ? `${c.distance_km} km` : "—"}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={c.requires_integration ? "outline" : "secondary"} className="text-[10px]">
+                    {c.requires_integration ? "Exige integração" : "Não exige"}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
@@ -358,6 +372,19 @@ function ClientsPage() {
                 step="0.1"
                 value={form.distance_km}
                 onChange={(e) => set("distance_km", e.target.value)}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 sm:col-span-2">
+              <div>
+                <Label htmlFor="requires-integration">Exige integração</Label>
+                <p className="text-xs text-muted-foreground">
+                  Desligue para clientes em que o colaborador pode ser escalado sem integração (ex.: Indústria).
+                </p>
+              </div>
+              <Switch
+                id="requires-integration"
+                checked={form.requires_integration}
+                onCheckedChange={(v) => set("requires_integration", v)}
               />
             </div>
             <div className="space-y-1 sm:col-span-2">
