@@ -1,0 +1,10 @@
+DELETE FROM public.daily_allocations WHERE collaborator_id IS NOT NULL;
+DELETE FROM public.transport_allocations WHERE driver_id IS NOT NULL;
+DELETE FROM public.work_base_teams WHERE collaborator_id IS NOT NULL;
+DELETE FROM public.collaborator_trainings WHERE collaborator_id IS NOT NULL;
+DELETE FROM public.vacations WHERE collaborator_id IS NOT NULL;
+DELETE FROM public.medical_leaves WHERE collaborator_id IS NOT NULL;
+DELETE FROM public.days_off WHERE collaborator_id IS NOT NULL;
+UPDATE public.works SET supervisor_id = NULL, manager_id = NULL WHERE supervisor_id IS NOT NULL OR manager_id IS NOT NULL;
+UPDATE public.collaborators SET supervisor_id = NULL WHERE supervisor_id IS NOT NULL;
+DELETE FROM public.collaborators WHERE id IS NOT NULL;
