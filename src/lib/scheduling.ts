@@ -44,6 +44,26 @@ export type Requirement = {
 
 export type Absence = { collaborator_id: string; reason: string };
 
+export type Integration = {
+  collaborator_id: string;
+  client_id: string;
+  integration_date: string;
+  expires_at: string | null;
+};
+
+/** Dias de antecedência para considerar a integração "próxima do vencimento". */
+export const INTEGRATION_WARN_DAYS = 30;
+
+export type IntegrationStatus = "valid" | "expiring" | "expired" | "missing" | "no_client";
+
+export const INTEGRATION_LABEL: Record<IntegrationStatus, string> = {
+  valid: "Integração válida",
+  expiring: "Integração próxima do vencimento",
+  expired: "Integração vencida",
+  missing: "Sem integração com o cliente",
+  no_client: "Serviço sem cliente vinculado",
+};
+
 /** Data needed to build a schedule for a given date. */
 export async function fetchScheduleContext(date: string) {
   const [
