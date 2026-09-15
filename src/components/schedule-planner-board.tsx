@@ -991,7 +991,7 @@ export function SchedulePlannerBoard({
             </div>
           </div>
 
-          <ul className="mt-3 flex-1 space-y-1 overflow-y-auto pr-1">
+          <ul className="mt-3 flex-1 divide-y divide-border overflow-y-auto pr-1">
             {filtered.length === 0 && (
               <li className="py-6 text-center text-xs text-muted-foreground">Nenhum colaborador encontrado.</li>
             )}
@@ -999,6 +999,7 @@ export function SchedulePlannerBoard({
               const ev = evaluate(p.id, selectedWork);
               const alloc = allocByCollaborator.get(p.id);
               const canDrag = editable && ev.level !== "block";
+              const open = expanded.has(p.id);
               return (
                 <li
                   key={p.id}
@@ -1006,51 +1007,63 @@ export function SchedulePlannerBoard({
                   onDragStart={(e) => startDrag(e, { collaboratorId: p.id, allocationId: alloc?.id ?? null })}
                   onDragEnd={() => setDragging(null)}
                   className={cn(
-                    "rounded-md border border-border px-2 py-1.5 text-sm",
+                    "text-sm",
                     canDrag ? "cursor-grab active:cursor-grabbing hover:bg-secondary" : "opacity-70",
                   )}
                 >
-                  <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(p.id)}
+                    aria-expanded={open}
+                    className="flex w-full items-center gap-2 px-1 py-1 text-left"
+                  >
                     <span className={cn("h-2 w-2 shrink-0 rounded-full", LEVEL_DOT[ev.level])} aria-hidden />
                     <span className="min-w-0 flex-1 truncate font-medium">{p.full_name}</span>
                     <Badge variant={ev.level === "block" ? "destructive" : "outline"} className="shrink-0 text-[10px]">
                       {LEVEL_TEXT[ev.level]}
                     </Badge>
-                  </div>
-                  <p className="truncate pl-4 text-xs text-muted-foreground">
-                    {p.position_id ? positionById.get(p.position_id) ?? "Sem função" : "Sem função"}
-                    {p.is_driver ? " · motorista" : ""}
-                  </p>
-                  {selectedWork && (
-                    <div className="flex flex-wrap gap-1 pl-4 pt-1">
-                      <Badge
-                        variant={
-                          ev.integration === "valid" || ev.integration === "not_required"
-                            ? "outline"
-                            : ev.integration === "expiring"
-                              ? "secondary"
-                              : "destructive"
-                        }
-                        className="text-[10px]"
-                      >
-                        {ev.integration ? INTEGRATION_LABEL[ev.integration] : "Integração"}
-                      </Badge>
-                      <Badge
-                        variant={ev.reqBlocked ? "destructive" : ev.reqIssues > 0 ? "secondary" : "outline"}
-                        className="text-[10px]"
-                      >
-                        {ev.reqBlocked
-                          ? "Requisito bloqueante"
-                          : ev.reqIssues > 0
-                            ? `${ev.reqIssues} requisito(s) pendente(s)`
-                            : "Requisitos OK"}
-                      </Badge>
+                    <ChevronDown
+                      className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition", open && "rotate-180")}
+                      aria-hidden
+                    />
+                  </button>
+                  {open && (
+                    <div className="pb-2 pl-5 pr-1">
+                      <p className="truncate text-xs text-muted-foreground">
+                        {p.position_id ? positionById.get(p.position_id) ?? "Sem função" : "Sem função"}
+                        {p.is_driver ? " · motorista" : ""}
+                        {p.contract_type ? ` · ${p.contract_type}` : ""}
+                      </p>
+                      {selectedWork && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          <Badge
+                            variant={
+                              ev.integration === "valid" || ev.integration === "not_required"
+                                ? "outline"
+                                : ev.integration === "expiring"
+                                  ? "secondary"
+                                  : "destructive"
+                            }
+                            className="text-[10px]"
+                          >
+                            {ev.integration ? INTEGRATION_LABEL[ev.integration] : "Integração"}
+                          </Badge>
+                          <Badge
+                            variant={ev.reqBlocked ? "destructive" : ev.reqIssues > 0 ? "secondary" : "outline"}
+                            className="text-[10px]"
+                          >
+                            {ev.reqBlocked
+                              ? "Requisito bloqueante"
+                              : ev.reqIssues > 0
+                                ? `${ev.reqIssues} requisito(s) pendente(s)`
+                                : "Requisitos OK"}
+                          </Badge>
+                        </div>
+                      )}
+                      {ev.reasons.length > 0 && (
+                        <p className="pt-1 text-xs text-muted-foreground">{ev.reasons.join(" · ")}</p>
+                      )}
                     </div>
-                  )}
-                  {ev.reasons.length > 0 && (
-                    <p className="pl-4 text-xs text-muted-foreground" title={ev.reasons.join(" · ")}>
-                      {ev.reasons.join(" · ")}
-                    </p>
                   )}
                 </li>
               );
