@@ -69,7 +69,7 @@ const groups: Group[] = [
       { title: "Transporte", url: "/veiculos/transporte" },
     ],
   },
-  { label: "Treinamentos", icon: GraduationCap, items: [{ title: "Treinamentos", url: "/treinamentos" }] },
+  
   {
     label: "Ausências",
     icon: CalendarOff,
