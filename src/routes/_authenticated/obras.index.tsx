@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Pencil, Plus, Search, Trash2, Users, ClipboardList } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, Users, ClipboardList, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -33,46 +33,16 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
-import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
-
-const IMPORT_COLUMNS: ImportColumn[] = [
-  { key: "codigo", required: true, example: "OB-001" },
-  { key: "nome", required: true, example: "Subestação Norte" },
-  { key: "cliente", example: "Enel" },
-  { key: "endereco", example: "Rua das Palmeiras" },
-  { key: "numero", example: "150" },
-  { key: "bairro" },
-  { key: "cidade", example: "Campinas" },
-  { key: "uf", hint: "2 letras.", example: "SP" },
-  { key: "cep", example: "13000-000" },
-  { key: "distancia_km", hint: "Número, use vírgula ou ponto.", example: "85,5" },
-  { key: "tempo_viagem_min", hint: "Minutos.", example: "90" },
-  { key: "data_inicio", hint: "AAAA-MM-DD ou DD/MM/AAAA." },
-  { key: "data_fim_prevista", hint: "AAAA-MM-DD ou DD/MM/AAAA." },
-  { key: "hora_entrada", hint: "HH:MM.", example: "07:00" },
-  { key: "hora_saida", hint: "HH:MM.", example: "17:00" },
-  { key: "situacao", hint: "Planejada, Ativa, Pausada, Concluída ou Cancelada.", example: "Ativa" },
-  { key: "observacoes" },
-];
-
-const WORK_STATUS_FROM_TEXT: Record<string, WorkStatusValue> = {
-  planejada: "planned",
-  ativa: "active",
-  pausada: "paused",
-  concluida: "completed",
-  cancelada: "cancelled",
-};
 
 type WorkStatusValue = Tables<"works">["status"];
 
 export const Route = createFileRoute("/_authenticated/obras/")({
   head: () => ({
     meta: [
-      { title: "Obras | Programação Operacional" },
-      { name: "description", content: "Cadastro de obras: endereço, distância, horários, status e responsáveis." },
-      { property: "og:title", content: "Obras | Programação Operacional" },
-      { property: "og:description", content: "Cadastro de obras, endereços, distâncias e responsáveis." },
+      { title: "Serviços | Programação Operacional" },
+      { name: "description", content: "Cadastro de serviços por cliente, com horários de entrada e saída e responsáveis." },
+      { property: "og:title", content: "Serviços | Programação Operacional" },
+      { property: "og:description", content: "Cadastro de serviços por cliente e responsáveis." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -85,6 +55,11 @@ type WorkStatus = Work["status"];
 
 const NONE = "__none__";
 
+/** Horário padrão de todos os serviços. */
+export const DEFAULT_ENTRY = "07:00";
+export const DEFAULT_EXIT = "17:00";
+export const DEFAULT_EXIT_WEEKEND = "16:00";
+
 export const WORK_STATUS_LABEL: Record<WorkStatus, string> = {
   planned: "Planejada",
   active: "Ativa",
@@ -94,31 +69,17 @@ export const WORK_STATUS_LABEL: Record<WorkStatus, string> = {
 };
 
 const schema = z.object({
-  code: z.string().trim().min(1, "Informe o código").max(30),
-  name: z.string().trim().min(3, "Informe o nome da obra").max(150),
-  client: z.string().trim().max(150).optional().or(z.literal("")),
-  city: z.string().trim().max(100).optional().or(z.literal("")),
-  state: z.string().trim().max(2, "UF com 2 letras").optional().or(z.literal("")),
-  notes: z.string().trim().max(1000).optional().or(z.literal("")),
+  name: z.string().trim().min(3, "Informe o nome do serviço").max(150),
+  client_id: z.string().min(1, "Selecione o cliente"),
 });
 
 type FormState = {
-  code: string;
+  client_id: string;
   name: string;
-  client: string;
-  address: string;
-  number: string;
-  neighborhood: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  distance_km: string;
-  estimated_travel_time: string;
-  start_date: string;
-  expected_end_date: string;
   entry_time: string;
   exit_time: string;
-  status: WorkStatus;
+  exit_time_weekend: string;
+  status: WorkStatusValue;
   supervisor_id: string;
   manager_id: string;
   active: boolean;
@@ -126,22 +87,12 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
-  code: "",
+  client_id: "",
   name: "",
-  client: "",
-  address: "",
-  number: "",
-  neighborhood: "",
-  city: "",
-  state: "",
-  zip_code: "",
-  distance_km: "",
-  estimated_travel_time: "",
-  start_date: "",
-  expected_end_date: "",
-  entry_time: "",
-  exit_time: "",
-  status: "planned",
+  entry_time: DEFAULT_ENTRY,
+  exit_time: DEFAULT_EXIT,
+  exit_time_weekend: DEFAULT_EXIT_WEEKEND,
+  status: "active",
   supervisor_id: NONE,
   manager_id: NONE,
   active: true,
@@ -150,21 +101,11 @@ const emptyForm: FormState = {
 
 function toForm(w: Work): FormState {
   return {
-    code: w.code ?? "",
+    client_id: w.client_id ?? "",
     name: w.name ?? "",
-    client: w.client ?? "",
-    address: w.address ?? "",
-    number: w.number ?? "",
-    neighborhood: w.neighborhood ?? "",
-    city: w.city ?? "",
-    state: w.state ?? "",
-    zip_code: w.zip_code ?? "",
-    distance_km: w.distance_km != null ? String(w.distance_km) : "",
-    estimated_travel_time: w.estimated_travel_time != null ? String(w.estimated_travel_time) : "",
-    start_date: w.start_date ?? "",
-    expected_end_date: w.expected_end_date ?? "",
-    entry_time: w.entry_time ? String(w.entry_time).slice(0, 5) : "",
-    exit_time: w.exit_time ? String(w.exit_time).slice(0, 5) : "",
+    entry_time: w.entry_time ? String(w.entry_time).slice(0, 5) : DEFAULT_ENTRY,
+    exit_time: w.exit_time ? String(w.exit_time).slice(0, 5) : DEFAULT_EXIT,
+    exit_time_weekend: w.exit_time_weekend ? String(w.exit_time_weekend).slice(0, 5) : DEFAULT_EXIT_WEEKEND,
     status: w.status,
     supervisor_id: w.supervisor_id ?? NONE,
     manager_id: w.manager_id ?? NONE,
@@ -175,7 +116,6 @@ function toForm(w: Work): FormState {
 
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
 const ref = (v: string) => (v === NONE ? null : v);
-const num = (v: string) => (v.trim() === "" ? null : Number(v));
 
 function statusVariant(s: WorkStatus) {
   if (s === "active") return "default" as const;
@@ -198,7 +138,16 @@ function WorksPage() {
   const works = useQuery({
     queryKey: ["works"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("works").select("*").order("code");
+      const { data, error } = await supabase.from("works").select("*").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const clients = useQuery({
+    queryKey: ["clients-min"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("clients").select("id, name, city, state").order("name");
       if (error) throw error;
       return data;
     },
@@ -223,14 +172,21 @@ function WorksPage() {
     return map;
   }, [people.data]);
 
+  const clientById = useMemo(() => {
+    const map = new Map<string, { name: string; city: string | null; state: string | null }>();
+    (clients.data ?? []).forEach((c) => map.set(c.id, { name: c.name, city: c.city, state: c.state }));
+    return map;
+  }, [clients.data]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (works.data ?? []).filter((w) => {
       if (statusFilter !== "all" && w.status !== statusFilter) return false;
       if (!q) return true;
-      return [w.code, w.name, w.client, w.city].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
+      const clientName = w.client_id ? (clientById.get(w.client_id)?.name ?? "") : "";
+      return [w.name, clientName].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [works.data, search, statusFilter]);
+  }, [works.data, search, statusFilter, clientById]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -238,21 +194,12 @@ function WorksPage() {
       if (!parsed.success) throw new Error(parsed.error.issues[0]!.message);
 
       const payload = {
-        code: form.code.trim(),
+        client_id: form.client_id,
         name: form.name.trim(),
-        client: nn(form.client),
-        address: nn(form.address),
-        number: nn(form.number),
-        neighborhood: nn(form.neighborhood),
-        city: nn(form.city),
-        state: nn(form.state)?.toUpperCase() ?? null,
-        zip_code: nn(form.zip_code),
-        distance_km: num(form.distance_km),
-        estimated_travel_time: num(form.estimated_travel_time),
-        start_date: nn(form.start_date),
-        expected_end_date: nn(form.expected_end_date),
-        entry_time: nn(form.entry_time),
-        exit_time: nn(form.exit_time),
+        client: clientById.get(form.client_id)?.name ?? null,
+        entry_time: form.entry_time || DEFAULT_ENTRY,
+        exit_time: form.exit_time || DEFAULT_EXIT,
+        exit_time_weekend: form.exit_time_weekend || DEFAULT_EXIT_WEEKEND,
         status: form.status,
         supervisor_id: ref(form.supervisor_id),
         manager_id: ref(form.manager_id),
@@ -269,7 +216,7 @@ function WorksPage() {
       }
     },
     onSuccess: () => {
-      toast.success(editing ? "Obra atualizada" : "Obra cadastrada");
+      toast.success(editing ? "Serviço atualizado" : "Serviço cadastrado");
       setOpen(false);
       setEditing(null);
       setForm(emptyForm);
@@ -284,7 +231,7 @@ function WorksPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Obra excluída");
+      toast.success("Serviço excluído");
       setDeleting(null);
       queryClient.invalidateQueries({ queryKey: ["works"] });
     },
@@ -303,79 +250,34 @@ function WorksPage() {
     setOpen(true);
   }
 
-  async function importWorks(rows: ImportRow[]) {
-    const errors: string[] = [];
-    const recs: { line: number; values: Record<string, unknown> }[] = [];
-    rows.forEach((r, i) => {
-      const line = i + 2;
-      if (!r["codigo"] || !r["nome"]) {
-        errors.push(`Linha ${line}: código e nome são obrigatórios.`);
-        return;
-      }
-      recs.push({
-        line,
-        values: {
-          code: r["codigo"]!.trim(),
-          name: titleCase(r["nome"]!),
-          client: titleCaseOrNull(r["cliente"] ?? ""),
-          address: titleCaseOrNull(r["endereco"] ?? ""),
-          number: emptyToNull(r["numero"] ?? ""),
-          neighborhood: titleCaseOrNull(r["bairro"] ?? ""),
-          city: titleCaseOrNull(r["cidade"] ?? ""),
-          state: emptyToNull((r["uf"] ?? "").toUpperCase()),
-          zip_code: emptyToNull(r["cep"] ?? ""),
-          distance_km: parseNum(r["distancia_km"] ?? ""),
-          estimated_travel_time: parseNum(r["tempo_viagem_min"] ?? ""),
-          start_date: parseDate(r["data_inicio"] ?? ""),
-          expected_end_date: parseDate(r["data_fim_prevista"] ?? ""),
-          entry_time: emptyToNull(r["hora_entrada"] ?? ""),
-          exit_time: emptyToNull(r["hora_saida"] ?? ""),
-          status: WORK_STATUS_FROM_TEXT[normText(r["situacao"] ?? "")] ?? "planned",
-          notes: emptyToNull(r["observacoes"] ?? ""),
-        },
-      });
-    });
-    const result = await insertSequentially(
-      recs,
-      async (values) => {
-        const { error } = await supabase.from("works").insert(values as never);
-        return { error };
-      },
-      errors,
-    );
-    await queryClient.invalidateQueries({ queryKey: ["works"] });
-    return result;
-  }
-
   return (
     <div className="space-y-4">
-      <PageHeader title="Obras" description="Cadastro de obras, endereços, distâncias e responsáveis."
+      <PageHeader
+        title="Serviços"
+        description="Cadastro de serviços por cliente, com horários de entrada e saída."
         actions={
-      <div className="flex flex-wrap gap-2">
-        {canWrite && (
-          <ImportDialog
-            entity="obras"
-            description="Importe várias obras de uma vez a partir de um arquivo .xlsx ou .csv."
-            columns={IMPORT_COLUMNS}
-            onImport={importWorks}
-          />
-        )}
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/obras/equipes-base">
-            <Users className="h-4 w-4" /> Equipes Base
-          </Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/obras/requisitos">
-            <ClipboardList className="h-4 w-4" /> Requisitos
-          </Link>
-        </Button>
-        {canWrite && (
-          <Button size="sm" onClick={openNew}>
-            <Plus className="h-4 w-4" /> Nova obra
-          </Button>
-        )}
-      </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/clientes">
+                <Building2 className="h-4 w-4" /> Clientes
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/obras/equipes-base">
+                <Users className="h-4 w-4" /> Equipes Base
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/obras/requisitos">
+                <ClipboardList className="h-4 w-4" /> Requisitos
+              </Link>
+            </Button>
+            {canWrite && (
+              <Button size="sm" onClick={openNew}>
+                <Plus className="h-4 w-4" /> Novo serviço
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -384,7 +286,7 @@ function WorksPage() {
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-8"
-            placeholder="Buscar por código, nome, cliente ou cidade"
+            placeholder="Buscar por serviço ou cliente"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -408,12 +310,11 @@ function WorksPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>Obra</TableHead>
+              <TableHead>Serviço</TableHead>
               <TableHead className="hidden md:table-cell">Cliente</TableHead>
               <TableHead className="hidden lg:table-cell">Cidade</TableHead>
-              <TableHead className="hidden lg:table-cell">Distância</TableHead>
-              <TableHead className="hidden xl:table-cell">Horário</TableHead>
+              <TableHead className="hidden xl:table-cell">Seg–Qui</TableHead>
+              <TableHead className="hidden xl:table-cell">Sex–Dom</TableHead>
               <TableHead className="hidden xl:table-cell">Encarregado</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-24" />
@@ -422,56 +323,56 @@ function WorksPage() {
           <TableBody>
             {works.isLoading && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!works.isLoading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
-                  Nenhuma obra encontrada.
+                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                  Nenhum serviço encontrado.
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((w) => (
-              <TableRow key={w.id}>
-                <TableCell className="font-mono text-xs">{w.code}</TableCell>
-                <TableCell className="font-medium">{w.name}</TableCell>
-                <TableCell className="hidden md:table-cell">{w.client ?? "—"}</TableCell>
-                <TableCell className="hidden lg:table-cell">
-                  {[w.city, w.state].filter(Boolean).join("/") || "—"}
-                </TableCell>
-                <TableCell className="hidden lg:table-cell">
-                  {w.distance_km != null ? `${w.distance_km} km` : "—"}
-                </TableCell>
-                <TableCell className="hidden xl:table-cell">
-                  {w.entry_time || w.exit_time
-                    ? `${String(w.entry_time ?? "--:--").slice(0, 5)} - ${String(w.exit_time ?? "--:--").slice(0, 5)}`
-                    : "—"}
-                </TableCell>
-                <TableCell className="hidden xl:table-cell">
-                  {w.supervisor_id ? (nameById.get(w.supervisor_id) ?? "—") : "—"}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={statusVariant(w.status)}>{WORK_STATUS_LABEL[w.status]}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-1">
-                    {canWrite && (
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(w)} aria-label="Editar obra">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {isAdmin && (
-                      <Button variant="ghost" size="icon" onClick={() => setDeleting(w)} aria-label="Excluir obra">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {filtered.map((w) => {
+              const c = w.client_id ? clientById.get(w.client_id) : null;
+              return (
+                <TableRow key={w.id}>
+                  <TableCell className="font-medium">{w.name}</TableCell>
+                  <TableCell className="hidden md:table-cell">{c?.name ?? w.client ?? "—"}</TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {[c?.city, c?.state].filter(Boolean).join("/") || "—"}
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    {`${String(w.entry_time ?? DEFAULT_ENTRY).slice(0, 5)} - ${String(w.exit_time ?? DEFAULT_EXIT).slice(0, 5)}`}
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    {`${String(w.entry_time ?? DEFAULT_ENTRY).slice(0, 5)} - ${String(w.exit_time_weekend ?? DEFAULT_EXIT_WEEKEND).slice(0, 5)}`}
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    {w.supervisor_id ? (nameById.get(w.supervisor_id) ?? "—") : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant(w.status)}>{WORK_STATUS_LABEL[w.status]}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end gap-1">
+                      {canWrite && (
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(w)} aria-label="Editar serviço">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" onClick={() => setDeleting(w)} aria-label="Excluir serviço">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -479,61 +380,49 @@ function WorksPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editing ? "Editar obra" : "Nova obra"}</DialogTitle>
+            <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Código *</Label>
-              <Input value={form.code} onChange={(e) => set("code", e.target.value)} />
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Cliente *</Label>
+              <Select value={form.client_id} onValueChange={(v) => set("client_id", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(clients.data ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                      {c.city ? ` · ${c.city}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(clients.data ?? []).length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum cliente cadastrado ainda — cadastre em Clientes.
+                </p>
+              )}
             </div>
-            <div className="space-y-1">
-              <Label>Nome da obra *</Label>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Nome do serviço *</Label>
               <Input value={form.name} onChange={(e) => set("name", e.target.value)} />
             </div>
-            <div className="space-y-1 sm:col-span-2">
-              <Label>Cliente</Label>
-              <Input value={form.client} onChange={(e) => set("client", e.target.value)} />
-            </div>
-            <div className="space-y-1 sm:col-span-2">
-              <Label>Endereço</Label>
-              <Input value={form.address} onChange={(e) => set("address", e.target.value)} />
+            <div className="space-y-1">
+              <Label>Entrada</Label>
+              <Input type="time" value={form.entry_time} onChange={(e) => set("entry_time", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Número</Label>
-              <Input value={form.number} onChange={(e) => set("number", e.target.value)} />
+              <Label>Saída (seg a qui)</Label>
+              <Input type="time" value={form.exit_time} onChange={(e) => set("exit_time", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Bairro</Label>
-              <Input value={form.neighborhood} onChange={(e) => set("neighborhood", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Cidade</Label>
-              <Input value={form.city} onChange={(e) => set("city", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>UF</Label>
-              <Input maxLength={2} value={form.state} onChange={(e) => set("state", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>CEP</Label>
-              <Input value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Distância (km)</Label>
+              <Label>Saída (sex a dom)</Label>
               <Input
-                type="number"
-                step="0.1"
-                value={form.distance_km}
-                onChange={(e) => set("distance_km", e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Tempo de deslocamento (min)</Label>
-              <Input
-                type="number"
-                value={form.estimated_travel_time}
-                onChange={(e) => set("estimated_travel_time", e.target.value)}
+                type="time"
+                value={form.exit_time_weekend}
+                onChange={(e) => set("exit_time_weekend", e.target.value)}
               />
             </div>
             <div className="space-y-1">
@@ -550,26 +439,6 @@ function WorksPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Início</Label>
-              <Input type="date" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Previsão de término</Label>
-              <Input
-                type="date"
-                value={form.expected_end_date}
-                onChange={(e) => set("expected_end_date", e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Horário de entrada</Label>
-              <Input type="time" value={form.entry_time} onChange={(e) => set("entry_time", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Horário de saída</Label>
-              <Input type="time" value={form.exit_time} onChange={(e) => set("exit_time", e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>Encarregado</Label>
@@ -605,7 +474,7 @@ function WorksPage() {
             </div>
             <div className="flex items-center gap-2 sm:col-span-2">
               <Switch checked={form.active} onCheckedChange={(v) => set("active", v)} id="work-active" />
-              <Label htmlFor="work-active">Obra disponível para programação</Label>
+              <Label htmlFor="work-active">Serviço disponível para programação</Label>
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Observações</Label>
@@ -627,9 +496,9 @@ function WorksPage() {
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir obra?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir serviço?</AlertDialogTitle>
             <AlertDialogDescription>
-              A obra "{deleting?.name}" será removida permanentemente. Registros vinculados podem impedir a exclusão.
+              O serviço "{deleting?.name}" será removido permanentemente. Registros vinculados podem impedir a exclusão.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
