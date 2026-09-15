@@ -231,18 +231,103 @@ function StructurePage() {
     );
   }
 
+  async function importSimple(table: "positions" | "departments", rows: ImportRow[]) {
+    const errors: string[] = [];
+    const recs: { line: number; values: Record<string, unknown> }[] = [];
+    rows.forEach((r, i) => {
+      const line = i + 2;
+      const name = (r["nome"] ?? "").trim();
+      if (!name) {
+        errors.push(`Linha ${line}: nome é obrigatório.`);
+        return;
+      }
+      const values: Record<string, unknown> = {
+        name,
+        active: !normText(r["ativo"] ?? "").startsWith("n"),
+      };
+      if (table === "positions") values["description"] = emptyToNull(r["descricao"] ?? "");
+      recs.push({ line, values });
+    });
+    const result = await insertSequentially(
+      recs,
+      async (values) => {
+        const { error } = await supabase.from(table).insert(values as never);
+        return { error };
+      },
+      errors,
+    );
+    await invalidate(table);
+    return result;
+  }
+
+  async function importSectors(rows: ImportRow[]) {
+    const errors: string[] = [];
+    const deptByName = new Map((departments.data ?? []).map((d) => [normText(d.name), d.id]));
+    const recs: { line: number; values: Record<string, unknown> }[] = [];
+    rows.forEach((r, i) => {
+      const line = i + 2;
+      const name = (r["nome"] ?? "").trim();
+      if (!name) {
+        errors.push(`Linha ${line}: nome é obrigatório.`);
+        return;
+      }
+      const dept = (r["departamento"] ?? "").trim();
+      const deptId = dept ? deptByName.get(normText(dept)) ?? null : null;
+      if (dept && !deptId) errors.push(`Linha ${line}: departamento "${dept}" não cadastrado.`);
+      recs.push({
+        line,
+        values: {
+          name,
+          department_id: deptId,
+          active: !normText(r["ativo"] ?? "").startsWith("n"),
+        },
+      });
+    });
+    const result = await insertSequentially(
+      recs,
+      async (values) => {
+        const { error } = await supabase.from("sectors").insert(values as never);
+        return { error };
+      },
+      errors,
+    );
+    await invalidate("sectors");
+    return result;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Cargos e Setores"
         description="Estrutura organizacional usada no cadastro de colaboradores."
         actions={
-          <Button variant="outline" asChild>
-            <Link to="/colaboradores">
-              <ArrowLeft className="h-4 w-4" />
-              Colaboradores
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {canWrite && (
+              <>
+                <ImportDialog
+                  entity="cargos"
+                  columns={SIMPLE_COLUMNS}
+                  onImport={(rows) => importSimple("positions", rows)}
+                />
+                <ImportDialog
+                  entity="setores"
+                  columns={SECTOR_COLUMNS}
+                  onImport={importSectors}
+                />
+                <ImportDialog
+                  entity="departamentos"
+                  columns={SIMPLE_COLUMNS.filter((c) => c.key !== "descricao")}
+                  onImport={(rows) => importSimple("departments", rows)}
+                />
+              </>
+            )}
+            <Button variant="outline" asChild>
+              <Link to="/colaboradores">
+                <ArrowLeft className="h-4 w-4" />
+                Colaboradores
+              </Link>
+            </Button>
+          </div>
         }
       />
 
