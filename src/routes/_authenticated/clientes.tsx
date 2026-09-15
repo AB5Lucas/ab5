@@ -90,6 +90,7 @@ const emptyForm: FormState = {
   zip_code: "",
   distance_km: "",
   notes: "",
+  requires_integration: true,
 };
 
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
