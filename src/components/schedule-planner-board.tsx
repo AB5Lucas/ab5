@@ -79,6 +79,13 @@ const STATUS_BOXES = [
 ] as const;
 
 const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
+
+/** Ausências cadastradas → caixa correspondente (alimentada automaticamente). */
+const ABSENCE_BOX: Record<string, string> = {
+  "Férias": "ferias",
+  "Atestado": "atestado",
+  "Folga": "folga",
+};
 const BOXES_STORAGE_KEY = "planner-status-boxes";
 
 const FILTERS = [
