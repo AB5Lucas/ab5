@@ -295,10 +295,8 @@ function CollaboratorsPage() {
   }
 
   async function importCollaborators(rows: ImportRow[]) {
-    const byName = (list: { id: string; name: string }[]) =>
-      new Map(list.map((x) => [normText(x.name), x.id]));
-    const positions = byName(lookups.data?.positions ?? []);
-    const departments = byName(lookups.data?.departments ?? []);
+    const positions = createNameMatcher(lookups.data?.positions ?? []);
+    const departments = createNameMatcher(lookups.data?.departments ?? []);
     const errors: string[] = [];
     const records: { line: number; values: Record<string, unknown> }[] = [];
 
