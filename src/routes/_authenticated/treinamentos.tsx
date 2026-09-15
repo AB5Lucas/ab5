@@ -210,44 +210,24 @@ function TrainingsPage() {
 
   const filtered = (records.data ?? []).filter((r) => filter === "all" || statusOf(r.expires_at) === filter);
 
-  async function importCatalog(rows: ImportRow[]) {
-    const errors: string[] = [];
-    const recs: { line: number; values: Record<string, unknown> }[] = [];
-    rows.forEach((r, i) => {
-      const line = i + 2;
-      const name = titleCase(r["nome"] ?? "");
-      if (!name) {
-        errors.push(`Linha ${line}: nome é obrigatório.`);
-        return;
-      }
-      recs.push({
-        line,
-        values: {
-          name,
-          description: titleCaseOrNull(r["descricao"] ?? ""),
-          validity_months: parseNum(r["validade_meses"] ?? "") ?? 12,
-          active: normText(r["ativo"] ?? "").startsWith("n") ? false : true,
-        },
-      });
-    });
-    const result = await insertSequentially(
-      recs,
-      async (values) => {
-        const { error } = await supabase.from("trainings").insert(values as never);
-        return { error };
-      },
-      errors,
-    );
-    await qc.invalidateQueries({ queryKey: ["trainings"] });
-    return result;
-  }
-
   async function importRecords(rows: ImportRow[]) {
     const errors: string[] = [];
     const { data: allPeople } = await supabase.from("collaborators").select("id, full_name, registration_number");
     const byReg = new Map((allPeople ?? []).map((p) => [normText(p.registration_number ?? ""), p.id]));
     const matchPerson = createNameMatcher((allPeople ?? []).map((p) => ({ id: p.id, name: p.full_name })));
-    const matchTraining = createNameMatcher(trainings.data ?? []);
+    const catalog = trainings.data ?? [];
+    /** Quando há vários treinamentos com o mesmo nome (ex.: NR18), a descrição decide qual é. */
+    const findTraining = (name: string, desc: string) => {
+      const sameName = catalog.filter((t) => createNameMatcher([t])(name));
+      if (sameName.length <= 1) return sameName[0] ?? createNameMatcher(catalog)(name) ?? null;
+      const d = normText(desc ?? "");
+      if (!d) return null;
+      return (
+        sameName.find((t) => normText(t.description ?? "") === d) ??
+        sameName.find((t) => normText(t.description ?? "").includes(d) || d.includes(normText(t.description ?? ""))) ??
+        null
+      );
+    };
 
     const recs: { line: number; values: Record<string, unknown> }[] = [];
     rows.forEach((r, i) => {
