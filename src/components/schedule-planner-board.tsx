@@ -229,7 +229,11 @@ export function SchedulePlannerBoard({
   });
 
   /** Valida colaborador → disponibilidade → integração com o cliente → requisitos → conflitos. */
-  function evaluate(collaboratorId: string, workId: string | null): Evaluation {
+  function evaluate(
+    collaboratorId: string,
+    workId: string | null,
+    opts?: { ignoreEntry?: boolean },
+  ): Evaluation {
     const absence = c?.absences.get(collaboratorId);
     const current = allocByCollaborator.get(collaboratorId);
     const currentLabel = () => {
