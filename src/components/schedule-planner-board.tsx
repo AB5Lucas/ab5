@@ -928,8 +928,9 @@ export function SchedulePlannerBoard({
             setHoverPanel(false);
             const p = readPayload(e);
             setDragging(null);
-            if (!p?.allocationId || !editable) return;
-            removeRow.mutate(p.allocationId);
+            if (!p || !editable) return;
+            if (p.entryId) removeEntry.mutate(p.entryId);
+            else if (p.allocationId) removeRow.mutate(p.allocationId);
           }}
           className={cn(
             "panel sticky top-4 flex max-h-[calc(100vh-6rem)] flex-col p-3",
