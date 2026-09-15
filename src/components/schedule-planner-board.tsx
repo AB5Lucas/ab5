@@ -30,6 +30,7 @@ import {
   formatBR,
   formatDateBR,
   todayISO,
+  INTEGRATION_LABEL,
 } from "@/lib/scheduling";
 import type { IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
