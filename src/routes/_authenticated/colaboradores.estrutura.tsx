@@ -37,10 +37,6 @@ const POSITION_COLUMNS: ImportColumn[] = [
   { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
 ];
 
-const DEPARTMENT_COLUMNS: ImportColumn[] = [
-  { key: "nome", required: true, example: "Serviços" },
-  { key: "ativo", hint: "Sim ou Não (padrão Sim).", example: "Sim" },
-];
 
 type Row = { id: string; name: string; active: boolean; description?: string | null };
 
@@ -231,18 +227,11 @@ function StructurePage() {
         actions={
           <div className="flex flex-wrap gap-2">
             {canWrite && (
-              <>
-                <ImportDialog
-                  entity="funções"
-                  columns={POSITION_COLUMNS}
-                  onImport={(rows) => importSimple("positions", rows)}
-                />
-                <ImportDialog
-                  entity="departamentos"
-                  columns={DEPARTMENT_COLUMNS}
-                  onImport={(rows) => importSimple("departments", rows)}
-                />
-              </>
+              <ImportDialog
+                entity="funções"
+                columns={POSITION_COLUMNS}
+                onImport={(rows) => importSimple("positions", rows)}
+              />
             )}
             <Button variant="outline" asChild>
               <Link to="/colaboradores">
