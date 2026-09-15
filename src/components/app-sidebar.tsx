@@ -45,7 +45,7 @@ const groups: Group[] = [
     icon: Users,
     items: [
       { title: "Colaboradores", url: "/colaboradores" },
-      { title: "Funções e Departamentos", url: "/colaboradores/estrutura" },
+      { title: "Funções", url: "/colaboradores/estrutura" },
       { title: "Treinamentos", url: "/treinamentos" },
     ],
   },
