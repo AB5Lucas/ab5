@@ -33,7 +33,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
+import { emptyToNull, insertSequentially, parseBool, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 type Client = Tables<"clients">;
 
