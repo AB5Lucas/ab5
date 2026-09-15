@@ -244,7 +244,7 @@ export function SchedulePlannerBoard({
     if (absence) return base({ level: "block", reasons: [`Indisponível: ${absence.toLowerCase()}`] });
 
     const entry = entryByCollaborator.get(collaboratorId);
-    if (entry)
+    if (entry && !opts?.ignoreEntry)
       return base({
         level: "block",
         reasons: [`Registrado em ${BOX_LABEL[entry.box_key] ?? entry.box_key}`],
