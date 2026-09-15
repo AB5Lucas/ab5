@@ -1107,10 +1107,15 @@ export function SchedulePlannerBoard({
                     type="button"
                     onClick={() => toggleExpanded(p.id)}
                     aria-expanded={open}
-                    className="flex w-full items-center gap-1.5 px-1 py-0.5 text-left"
+                    className="flex w-full items-center gap-1.5 px-2 py-1 text-left"
                   >
                     <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", LEVEL_DOT[ev.level])} aria-hidden />
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-tight">{p.full_name}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium leading-tight">{p.full_name}</p>
+                      <p className="truncate text-[10px] leading-tight text-muted-foreground">
+                        {p.position_id ? positionById.get(p.position_id) ?? "Sem função" : "Sem função"}
+                      </p>
+                    </div>
                     <Badge
                       variant={ev.level === "block" ? "destructive" : "outline"}
                       className="shrink-0 px-1 py-0 text-[9px]"
