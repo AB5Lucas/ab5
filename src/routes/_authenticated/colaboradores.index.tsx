@@ -167,6 +167,9 @@ function toForm(c: Collaborator): FormState {
     is_driver: c.is_driver,
     driver_license_category: c.driver_license_category ?? "",
     driver_license_expiry: c.driver_license_expiry ?? "",
+    salary: c.salary == null ? "" : String(c.salary),
+    contract_type: c.contract_type ?? NONE,
+    rg: c.rg ?? "",
     notes: c.notes ?? "",
   };
 }
