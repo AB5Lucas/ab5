@@ -281,14 +281,14 @@ function ClientsPage() {
           <TableBody>
             {clients.isLoading && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!clients.isLoading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                   Nenhum cliente encontrado.
                 </TableCell>
               </TableRow>
