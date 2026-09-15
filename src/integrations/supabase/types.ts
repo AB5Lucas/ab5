@@ -98,6 +98,7 @@ export type Database = {
       collaborators: {
         Row: {
           birth_date: string | null
+          contract_type: Database["public"]["Enums"]["contract_type"] | null
           cpf: string | null
           created_at: string
           department_id: string | null
@@ -113,6 +114,8 @@ export type Database = {
           photo_url: string | null
           position_id: string | null
           registration_number: string
+          rg: string | null
+          salary: number | null
           sector_id: string | null
           social_name: string | null
           status: Database["public"]["Enums"]["collaborator_status"]
@@ -121,6 +124,7 @@ export type Database = {
         }
         Insert: {
           birth_date?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"] | null
           cpf?: string | null
           created_at?: string
           department_id?: string | null
@@ -136,6 +140,8 @@ export type Database = {
           photo_url?: string | null
           position_id?: string | null
           registration_number: string
+          rg?: string | null
+          salary?: number | null
           sector_id?: string | null
           social_name?: string | null
           status?: Database["public"]["Enums"]["collaborator_status"]
@@ -144,6 +150,7 @@ export type Database = {
         }
         Update: {
           birth_date?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"] | null
           cpf?: string | null
           created_at?: string
           department_id?: string | null
@@ -159,6 +166,8 @@ export type Database = {
           photo_url?: string | null
           position_id?: string | null
           registration_number?: string
+          rg?: string | null
+          salary?: number | null
           sector_id?: string | null
           social_name?: string | null
           status?: Database["public"]["Enums"]["collaborator_status"]
@@ -1033,6 +1042,7 @@ export type Database = {
       bonus_calculation_type: "daily" | "trip" | "round_trip" | "overnight"
       collaborator_status: "active" | "inactive"
       confirmation_status: "confirmed" | "pending"
+      contract_type: "efetivo" | "pj" | "intermitente"
       requirement_type:
         | "training"
         | "certification"
@@ -1176,6 +1186,7 @@ export const Constants = {
       bonus_calculation_type: ["daily", "trip", "round_trip", "overnight"],
       collaborator_status: ["active", "inactive"],
       confirmation_status: ["confirmed", "pending"],
+      contract_type: ["efetivo", "pj", "intermitente"],
       requirement_type: [
         "training",
         "certification",

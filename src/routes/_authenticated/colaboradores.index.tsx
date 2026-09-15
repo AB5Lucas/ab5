@@ -35,13 +35,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
-import { emptyToNull, insertSequentially, normText, parseBool, parseDate } from "@/lib/import-helpers";
+import { emptyToNull, insertSequentially, normText, parseBool, parseDate, parseNum } from "@/lib/import-helpers";
+
+const CONTRACT_LABELS: Record<string, string> = {
+  efetivo: "Efetivo",
+  pj: "PJ",
+  intermitente: "Intermitente",
+};
+
+const contractFromText = (v: string): "efetivo" | "pj" | "intermitente" | null => {
+  const t = normText(v);
+  if (!t) return null;
+  if (t.startsWith("efet") || t.startsWith("clt")) return "efetivo";
+  if (t.startsWith("pj") || t.includes("juridic")) return "pj";
+  if (t.startsWith("interm")) return "intermitente";
+  return null;
+};
 
 const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "matricula", required: true, hint: "Código/matrícula única.", example: "1024" },
   { key: "nome_completo", required: true, example: "Maria Aparecida Souza" },
   { key: "nome_social" },
   { key: "cpf", hint: "Somente números ou com pontuação.", example: "123.456.789-00" },
+  { key: "rg", hint: "Número do RG.", example: "12.345.678-9" },
   { key: "telefone", example: "(11) 99999-0000" },
   { key: "email", example: "maria@empresa.com" },
   { key: "data_nascimento", hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "1990-05-12" },
@@ -53,6 +69,8 @@ const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "motorista", hint: "Sim ou Não.", example: "Não" },
   { key: "cnh_categoria", example: "D" },
   { key: "cnh_validade", hint: "AAAA-MM-DD ou DD/MM/AAAA." },
+  { key: "salario", hint: "Valor em reais, ex.: 3500,00.", example: "3500,00" },
+  { key: "tipo_contrato", hint: "Efetivo, PJ ou Intermitente.", example: "Efetivo" },
   { key: "observacoes" },
 ];
 
@@ -79,6 +97,7 @@ const schema = z.object({
   full_name: z.string().trim().min(3, "Informe o nome completo").max(150),
   social_name: z.string().trim().max(150).optional().or(z.literal("")),
   cpf: z.string().trim().max(20).optional().or(z.literal("")),
+  rg: z.string().trim().max(20).optional().or(z.literal("")),
   phone: z.string().trim().max(30).optional().or(z.literal("")),
   email: z.string().trim().email("E-mail inválido").max(255).optional().or(z.literal("")),
   birth_date: z.string().optional().or(z.literal("")),
@@ -105,6 +124,9 @@ type FormState = {
   is_driver: boolean;
   driver_license_category: string;
   driver_license_expiry: string;
+  salary: string;
+  contract_type: string;
+  rg: string;
   notes: string;
 };
 
@@ -125,6 +147,9 @@ const emptyForm: FormState = {
   is_driver: false,
   driver_license_category: "",
   driver_license_expiry: "",
+  salary: "",
+  contract_type: NONE,
+  rg: "",
   notes: "",
 };
 
@@ -146,6 +171,9 @@ function toForm(c: Collaborator): FormState {
     is_driver: c.is_driver,
     driver_license_category: c.driver_license_category ?? "",
     driver_license_expiry: c.driver_license_expiry ?? "",
+    salary: c.salary == null ? "" : String(c.salary),
+    contract_type: c.contract_type ?? NONE,
+    rg: c.rg ?? "",
     notes: c.notes ?? "",
   };
 }
@@ -225,6 +253,9 @@ function CollaboratorsPage() {
         full_name: form.full_name.trim(),
         social_name: nn(form.social_name),
         cpf: nn(form.cpf),
+        rg: nn(form.rg),
+        salary: form.salary.trim() === "" ? null : Number(form.salary.replace(",", ".")),
+        contract_type: form.contract_type === NONE ? null : (form.contract_type as "efetivo" | "pj" | "intermitente"),
         phone: nn(form.phone),
         email: nn(form.email),
         birth_date: nn(form.birth_date),
@@ -317,6 +348,9 @@ function CollaboratorsPage() {
           is_driver: parseBool(r["motorista"] ?? ""),
           driver_license_category: emptyToNull(r["cnh_categoria"] ?? ""),
           driver_license_expiry: parseDate(r["cnh_validade"] ?? ""),
+          rg: emptyToNull(r["rg"] ?? ""),
+          salary: parseNum(r["salario"] ?? ""),
+          contract_type: contractFromText(r["tipo_contrato"] ?? ""),
           notes: emptyToNull(r["observacoes"] ?? ""),
         },
       });
@@ -422,6 +456,11 @@ function CollaboratorsPage() {
                     {c.is_driver && (
                       <Badge variant="outline" className="mt-1">
                         Motorista {c.driver_license_category ? `· ${c.driver_license_category}` : ""}
+                      </Badge>
+                    )}
+                    {c.contract_type && (
+                      <Badge variant="secondary" className="mt-1 ml-1">
+                        {CONTRACT_LABELS[c.contract_type] ?? c.contract_type}
                       </Badge>
                     )}
                   </TableCell>
@@ -576,6 +615,36 @@ function CollaboratorsPage() {
                 </div>
               </>
             )}
+
+            <div className="space-y-2">
+              <Label htmlFor="rg">RG</Label>
+              <Input id="rg" value={form.rg} onChange={(e) => set("rg", e.target.value)} placeholder="12.345.678-9" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="salary">Salário (R$)</Label>
+              <Input
+                id="salary"
+                inputMode="decimal"
+                value={form.salary}
+                onChange={(e) => set("salary", e.target.value.replace(/[^\d.,]/g, ""))}
+                placeholder="3500,00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de contrato</Label>
+              <Select value={form.contract_type} onValueChange={(v) => set("contract_type", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Não definido</SelectItem>
+                  <SelectItem value="efetivo">Efetivo</SelectItem>
+                  <SelectItem value="pj">PJ</SelectItem>
+                  <SelectItem value="intermitente">Intermitente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
 
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="notes">Observações</Label>
