@@ -638,6 +638,32 @@ export function SchedulePlannerBoard({
         </div>
 
         <div className="ml-auto flex flex-wrap gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">
+                <LayoutGrid className="h-4 w-4" /> Caixas
+                {visibleBoxes.size > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {visibleBoxes.size}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Exibir caixas</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {STATUS_BOXES.map((b) => (
+                <DropdownMenuCheckboxItem
+                  key={b.key}
+                  checked={visibleBoxes.has(b.key)}
+                  onCheckedChange={() => toggleBox(b.key)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {b.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {editable && (
             <>
               <Button size="sm" variant="outline" onClick={() => generateFromBase.mutate()} disabled={generateFromBase.isPending}>
