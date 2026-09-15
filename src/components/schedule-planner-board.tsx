@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Copy,
   GripVertical,
+  LayoutGrid,
   Lock,
   LockOpen,
   MapPin,
@@ -22,6 +23,14 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   addDays,
   checkIntegration,
@@ -52,7 +61,22 @@ type Evaluation = {
   fit: boolean;
 };
 
-type DragPayload = { collaboratorId: string; allocationId: string | null };
+type DragPayload = { collaboratorId: string; allocationId: string | null; entryId?: string | null };
+
+/** Caixas de situação que podem ser exibidas junto aos cards de obra. */
+const STATUS_BOXES = [
+  { key: "folga", label: "FOLGAS" },
+  { key: "aso", label: "ASO" },
+  { key: "medico", label: "MÉDICO" },
+  { key: "atestado", label: "ATESTADO" },
+  { key: "afastado", label: "AFASTADO" },
+  { key: "falta", label: "FALTA" },
+  { key: "interjornada", label: "INTERJORNADA" },
+  { key: "treinamento", label: "TREINAMENTO" },
+] as const;
+
+const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
+const BOXES_STORAGE_KEY = "planner-status-boxes";
 
 const FILTERS = [
   { key: "available", label: "Disponíveis" },
@@ -97,6 +121,30 @@ export function SchedulePlannerBoard({
   const [dragging, setDragging] = useState<DragPayload | null>(null);
   const [hoverWork, setHoverWork] = useState<string | null>(null);
   const [hoverPanel, setHoverPanel] = useState(false);
+  const [hoverBox, setHoverBox] = useState<string | null>(null);
+  const [visibleBoxes, setVisibleBoxes] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = window.localStorage.getItem(BOXES_STORAGE_KEY);
+      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  function toggleBox(key: string) {
+    setVisibleBoxes((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try {
+        window.localStorage.setItem(BOXES_STORAGE_KEY, JSON.stringify([...next]));
+      } catch {
+        /* ignora */
+      }
+      return next;
+    });
+  }
 
   const ctx = useQuery({ queryKey: ["schedule-ctx", date], queryFn: () => fetchScheduleContext(date) });
 
@@ -130,6 +178,28 @@ export function SchedulePlannerBoard({
       return data;
     },
   });
+
+  const statusEntries = useQuery({
+    queryKey: ["status-entries", scheduleId],
+    enabled: !!scheduleId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_status_entries")
+        .select("*")
+        .eq("schedule_id", scheduleId!)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const entries = statusEntries.data ?? [];
+
+  const entryByCollaborator = useMemo(() => {
+    const m = new Map<string, (typeof entries)[number]>();
+    entries.forEach((e) => m.set(e.collaborator_id, e));
+    return m;
+  }, [entries]);
 
   const rows = allocations.data ?? [];
   const c = ctx.data;
@@ -168,7 +238,11 @@ export function SchedulePlannerBoard({
   });
 
   /** Valida colaborador → disponibilidade → integração com o cliente → requisitos → conflitos. */
-  function evaluate(collaboratorId: string, workId: string | null): Evaluation {
+  function evaluate(
+    collaboratorId: string,
+    workId: string | null,
+    opts?: { ignoreEntry?: boolean },
+  ): Evaluation {
     const absence = c?.absences.get(collaboratorId);
     const current = allocByCollaborator.get(collaboratorId);
     const currentLabel = () => {
@@ -177,6 +251,13 @@ export function SchedulePlannerBoard({
     };
 
     if (absence) return base({ level: "block", reasons: [`Indisponível: ${absence.toLowerCase()}`] });
+
+    const entry = entryByCollaborator.get(collaboratorId);
+    if (entry && !opts?.ignoreEntry)
+      return base({
+        level: "block",
+        reasons: [`Registrado em ${BOX_LABEL[entry.box_key] ?? entry.box_key}`],
+      });
 
     if (!workId) {
       if (current) return base({ level: "busy", reasons: [`Alocado em ${currentLabel()}`] });
@@ -276,8 +357,50 @@ export function SchedulePlannerBoard({
   function invalidate(id?: string | null) {
     qc.invalidateQueries({ queryKey: ["schedule", date] });
     qc.invalidateQueries({ queryKey: ["allocations", id ?? scheduleId] });
+    qc.invalidateQueries({ queryKey: ["status-entries", id ?? scheduleId] });
     qc.invalidateQueries({ queryKey: ["dashboard"] });
   }
+
+  /** Move o colaborador para uma caixa de situação (folga, atestado, etc.). */
+  const dropBox = useMutation({
+    mutationFn: async ({ collaboratorId, allocationId, boxKey }: DragPayload & { boxKey: string }) => {
+      const person = personById.get(collaboratorId);
+      const name = person?.full_name ?? "Colaborador";
+      const id = await ensureSchedule();
+      const alloc = allocationId ?? allocByCollaborator.get(collaboratorId)?.id ?? null;
+      if (alloc) {
+        const { error } = await supabase.from("daily_allocations").delete().eq("id", alloc);
+        if (error) throw error;
+      }
+      const boxRows = entries.filter((e) => e.box_key === boxKey);
+      const sort = boxRows.length ? Math.max(...boxRows.map((e) => e.sort_order)) + 1 : 0;
+      const { error } = await supabase
+        .from("daily_status_entries")
+        .upsert(
+          { schedule_id: id, collaborator_id: collaboratorId, box_key: boxKey, sort_order: sort },
+          { onConflict: "schedule_id,collaborator_id" },
+        );
+      if (error) throw error;
+      return { id, name, boxKey };
+    },
+    onSuccess: (r) => {
+      toast.success(`${r.name} registrado em ${BOX_LABEL[r.boxKey] ?? r.boxKey}`);
+      invalidate(r.id);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeEntry = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("daily_status_entries").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Registro removido da caixa");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const drop = useMutation({
     mutationFn: async ({
@@ -289,11 +412,16 @@ export function SchedulePlannerBoard({
       if (!c) throw new Error("Carregando dados");
       const person = personById.get(collaboratorId);
       const name = person?.full_name ?? "Colaborador";
-      const ev = evaluate(collaboratorId, workId);
+      const fromBox = entryByCollaborator.get(collaboratorId) ?? null;
+      const ev = evaluate(collaboratorId, workId, { ignoreEntry: true });
       if (ev.level === "block") throw new Error(`${name} não pode ser alocado nesta obra: ${ev.reasons.join(", ")}`);
 
       const issues = checkRequirements(c, workId, collaboratorId, date);
       const id = await ensureSchedule();
+      if (fromBox) {
+        const { error } = await supabase.from("daily_status_entries").delete().eq("id", fromBox.id);
+        if (error) throw error;
+      }
       const targetRows = rows.filter((r) => r.work_id === workId && r.collaborator_id !== collaboratorId);
       const sort = beforeSort ?? (targetRows.length ? Math.max(...targetRows.map((r) => r.sort_order)) + 1 : 0);
 
@@ -519,6 +647,32 @@ export function SchedulePlannerBoard({
         </div>
 
         <div className="ml-auto flex flex-wrap gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">
+                <LayoutGrid className="h-4 w-4" /> Caixas
+                {visibleBoxes.size > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {visibleBoxes.size}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Exibir caixas</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {STATUS_BOXES.map((b) => (
+                <DropdownMenuCheckboxItem
+                  key={b.key}
+                  checked={visibleBoxes.has(b.key)}
+                  onCheckedChange={() => toggleBox(b.key)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {b.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {editable && (
             <>
               <Button size="sm" variant="outline" onClick={() => generateFromBase.mutate()} disabled={generateFromBase.isPending}>
@@ -560,7 +714,7 @@ export function SchedulePlannerBoard({
           {works.map((w) => {
             const workRows = rows.filter((r) => r.work_id === w.id);
             const blockedTarget =
-              !!dragging && evaluate(dragging.collaboratorId, w.id).level === "block";
+              !!dragging && evaluate(dragging.collaboratorId, w.id, { ignoreEntry: true }).level === "block";
             const isHover = hoverWork === w.id;
             return (
               <section
@@ -673,6 +827,92 @@ export function SchedulePlannerBoard({
               </section>
             );
           })}
+
+          {/* Caixas de situação */}
+          {STATUS_BOXES.filter((b) => visibleBoxes.has(b.key) || entries.some((e) => e.box_key === b.key)).map((b) => {
+            const boxRows = entries.filter((e) => e.box_key === b.key);
+            const isHover = hoverBox === b.key;
+            return (
+              <section
+                key={b.key}
+                onDragOver={(e) => {
+                  if (!editable) return;
+                  e.preventDefault();
+                  setHoverBox(b.key);
+                }}
+                onDragLeave={() => setHoverBox((h) => (h === b.key ? null : h))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setHoverBox(null);
+                  const p = readPayload(e);
+                  setDragging(null);
+                  if (!p || !editable) return;
+                  dropBox.mutate({ ...p, boxKey: b.key });
+                }}
+                className={cn(
+                  "panel flex h-fit flex-col overflow-hidden border-dashed transition",
+                  isHover && "ring-2 ring-primary",
+                )}
+              >
+                <header className="border-b border-border bg-muted/60 px-3 py-2">
+                  <div className="flex items-start gap-2">
+                    <h2 className="font-display flex-1 text-sm font-semibold uppercase leading-tight tracking-wide">
+                      {b.label}
+                    </h2>
+                    <Badge variant="outline" className="shrink-0">
+                      <Users className="mr-1 h-3 w-3" />
+                      {boxRows.length}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Caixa de situação do dia</p>
+                </header>
+                <ul className="max-h-64 flex-1 divide-y divide-border overflow-y-auto">
+                  {boxRows.length === 0 && (
+                    <li className="px-3 py-6 text-center text-xs text-muted-foreground">
+                      Arraste colaboradores para cá
+                    </li>
+                  )}
+                  {boxRows.map((entry) => {
+                    const p = personById.get(entry.collaborator_id);
+                    return (
+                      <li
+                        key={entry.id}
+                        draggable={editable}
+                        onDragStart={(e) =>
+                          startDrag(e, {
+                            collaboratorId: entry.collaborator_id,
+                            allocationId: null,
+                            entryId: entry.id,
+                          })
+                        }
+                        onDragEnd={() => setDragging(null)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm"
+                      >
+                        {editable && <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{p?.full_name ?? "—"}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
+                          </p>
+                        </div>
+                        {editable && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            aria-label="Remover da caixa"
+                            onClick={() => removeEntry.mutate(entry.id)}
+                          >
+                            <X className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
         </div>
 
         {/* Painel lateral de colaboradores */}
@@ -688,8 +928,9 @@ export function SchedulePlannerBoard({
             setHoverPanel(false);
             const p = readPayload(e);
             setDragging(null);
-            if (!p?.allocationId || !editable) return;
-            removeRow.mutate(p.allocationId);
+            if (!p || !editable) return;
+            if (p.entryId) removeEntry.mutate(p.entryId);
+            else if (p.allocationId) removeRow.mutate(p.allocationId);
           }}
           className={cn(
             "panel sticky top-4 flex max-h-[calc(100vh-6rem)] flex-col p-3",

@@ -444,6 +444,54 @@ export type Database = {
           },
         ]
       }
+      daily_status_entries: {
+        Row: {
+          box_key: string
+          collaborator_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          schedule_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          box_key: string
+          collaborator_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          schedule_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          box_key?: string
+          collaborator_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          schedule_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_status_entries_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_status_entries_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "daily_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       days_off: {
         Row: {
           collaborator_id: string
