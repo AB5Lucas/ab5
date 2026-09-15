@@ -114,6 +114,7 @@ export type Database = {
           photo_url: string | null
           position_id: string | null
           registration_number: string
+          rg: string | null
           salary: number | null
           sector_id: string | null
           social_name: string | null
@@ -139,6 +140,7 @@ export type Database = {
           photo_url?: string | null
           position_id?: string | null
           registration_number: string
+          rg?: string | null
           salary?: number | null
           sector_id?: string | null
           social_name?: string | null
@@ -164,6 +166,7 @@ export type Database = {
           photo_url?: string | null
           position_id?: string | null
           registration_number?: string
+          rg?: string | null
           salary?: number | null
           sector_id?: string | null
           social_name?: string | null
