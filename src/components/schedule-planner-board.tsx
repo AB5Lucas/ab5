@@ -1063,7 +1063,8 @@ export function SchedulePlannerBoard({
             (b) =>
               visibleBoxes.has(b.key) ||
               entries.some((e) => e.box_key === b.key) ||
-              (absenceMembers.get(b.key)?.length ?? 0) > 0,
+              (absenceMembers.get(b.key)?.length ?? 0) > 0 ||
+              (appointmentsByBox.get(b.key)?.length ?? 0) > 0,
           ).map((b) => {
             const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
             const byName = (a: string, c: string) => nameOf(a).localeCompare(nameOf(c), "pt-BR");
