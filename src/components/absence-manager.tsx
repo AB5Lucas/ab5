@@ -201,7 +201,10 @@ export function AbsenceManager({
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}</TableCell>
                   {mode === "single" ? (
-                    <TableCell>{formatDateBR(r.date)}</TableCell>
+                    <>
+                      <TableCell>{formatDateBR(r.date)}</TableCell>
+                      <TableCell>{r.end_date ? formatDateBR(r.end_date) : "—"}</TableCell>
+                    </>
                   ) : (
                     <>
                       <TableCell>{formatDateBR(r.start_date)}</TableCell>
