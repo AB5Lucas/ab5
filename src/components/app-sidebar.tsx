@@ -47,6 +47,7 @@ const groups: Group[] = [
       { title: "Colaboradores", url: "/colaboradores" },
       { title: "Funções", url: "/colaboradores/estrutura" },
       { title: "Treinamentos", url: "/treinamentos" },
+      { title: "ASOs", url: "/colaboradores/asos" },
     ],
   },
   {

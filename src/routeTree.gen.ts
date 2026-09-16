@@ -26,6 +26,7 @@ import { Route as AuthenticatedAusenciasFolgasRouteImport } from './routes/_auth
 import { Route as AuthenticatedBeneficiosPremioViagemRouteImport } from './routes/_authenticated/beneficios.premio-viagem'
 import { Route as AuthenticatedBeneficiosValeTransporteRouteImport } from './routes/_authenticated/beneficios.vale-transporte'
 import { Route as AuthenticatedColaboradoresIndexRouteImport } from './routes/_authenticated/colaboradores.index'
+import { Route as AuthenticatedColaboradoresAsosRouteImport } from './routes/_authenticated/colaboradores.asos'
 import { Route as AuthenticatedColaboradoresEstruturaRouteImport } from './routes/_authenticated/colaboradores.estrutura'
 import { Route as AuthenticatedObrasIndexRouteImport } from './routes/_authenticated/obras.index'
 import { Route as AuthenticatedObrasEquipesBaseRouteImport } from './routes/_authenticated/obras.equipes-base'
@@ -133,6 +134,12 @@ const AuthenticatedColaboradoresIndexRoute =
     path: '/colaboradores/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedColaboradoresAsosRoute =
+  AuthenticatedColaboradoresAsosRouteImport.update({
+    id: '/colaboradores/asos',
+    path: '/colaboradores/asos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedColaboradoresEstruturaRoute =
   AuthenticatedColaboradoresEstruturaRouteImport.update({
     id: '/colaboradores/estrutura',
@@ -221,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
   '/beneficios/premio-viagem': typeof AuthenticatedBeneficiosPremioViagemRoute
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
+  '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/obras/equipes-base': typeof AuthenticatedObrasEquipesBaseRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
@@ -251,6 +259,7 @@ export interface FileRoutesByTo {
   '/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
   '/beneficios/premio-viagem': typeof AuthenticatedBeneficiosPremioViagemRoute
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
+  '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/obras/equipes-base': typeof AuthenticatedObrasEquipesBaseRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
@@ -283,6 +292,7 @@ export interface FileRoutesById {
   '/_authenticated/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
   '/_authenticated/beneficios/premio-viagem': typeof AuthenticatedBeneficiosPremioViagemRoute
   '/_authenticated/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
+  '/_authenticated/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/_authenticated/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/_authenticated/obras/equipes-base': typeof AuthenticatedObrasEquipesBaseRoute
   '/_authenticated/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/ausencias/folgas'
     | '/beneficios/premio-viagem'
     | '/beneficios/vale-transporte'
+    | '/colaboradores/asos'
     | '/colaboradores/estrutura'
     | '/obras/equipes-base'
     | '/obras/integracoes'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/ausencias/folgas'
     | '/beneficios/premio-viagem'
     | '/beneficios/vale-transporte'
+    | '/colaboradores/asos'
     | '/colaboradores/estrutura'
     | '/obras/equipes-base'
     | '/obras/integracoes'
@@ -376,6 +388,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ausencias/folgas'
     | '/_authenticated/beneficios/premio-viagem'
     | '/_authenticated/beneficios/vale-transporte'
+    | '/_authenticated/colaboradores/asos'
     | '/_authenticated/colaboradores/estrutura'
     | '/_authenticated/obras/equipes-base'
     | '/_authenticated/obras/integracoes'
@@ -519,6 +532,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedColaboradoresIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/colaboradores/asos': {
+      id: '/_authenticated/colaboradores/asos'
+      path: '/colaboradores/asos'
+      fullPath: '/colaboradores/asos'
+      preLoaderRoute: typeof AuthenticatedColaboradoresAsosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/colaboradores/estrutura': {
       id: '/_authenticated/colaboradores/estrutura'
       path: '/colaboradores/estrutura'
@@ -619,6 +639,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAusenciasFolgasRoute: typeof AuthenticatedAusenciasFolgasRoute
   AuthenticatedBeneficiosPremioViagemRoute: typeof AuthenticatedBeneficiosPremioViagemRoute
   AuthenticatedBeneficiosValeTransporteRoute: typeof AuthenticatedBeneficiosValeTransporteRoute
+  AuthenticatedColaboradoresAsosRoute: typeof AuthenticatedColaboradoresAsosRoute
   AuthenticatedColaboradoresEstruturaRoute: typeof AuthenticatedColaboradoresEstruturaRoute
   AuthenticatedObrasEquipesBaseRoute: typeof AuthenticatedObrasEquipesBaseRoute
   AuthenticatedObrasIntegracoesRoute: typeof AuthenticatedObrasIntegracoesRoute
@@ -649,6 +670,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedBeneficiosPremioViagemRoute,
   AuthenticatedBeneficiosValeTransporteRoute:
     AuthenticatedBeneficiosValeTransporteRoute,
+  AuthenticatedColaboradoresAsosRoute: AuthenticatedColaboradoresAsosRoute,
   AuthenticatedColaboradoresEstruturaRoute:
     AuthenticatedColaboradoresEstruturaRoute,
   AuthenticatedObrasEquipesBaseRoute: AuthenticatedObrasEquipesBaseRoute,
