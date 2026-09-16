@@ -955,12 +955,14 @@ export function SchedulePlannerBoard({
       <div className="grid gap-2 lg:grid-cols-[1fr_209px]">
         {/* Obras */}
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {works.length === 0 && !ctx.isLoading && (
+          {shownWorks.length === 0 && !ctx.isLoading && (
             <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground sm:col-span-2">
-              Nenhum serviço ativo cadastrado.
+              {works.length === 0
+                ? "Nenhum serviço ativo cadastrado."
+                : "Nenhum serviço selecionado para este dia. Use o botão \u201cServiços\u201d."}
             </p>
           )}
-          {works.map((w) => {
+          {shownWorks.map((w) => {
             const workRows = rows
               .filter((r) => r.work_id === w.id)
               .slice()
