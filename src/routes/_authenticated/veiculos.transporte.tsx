@@ -50,6 +50,7 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
+  client_id: "",
   work_id: "",
   vehicle_id: NONE,
   driver_id: NONE,
