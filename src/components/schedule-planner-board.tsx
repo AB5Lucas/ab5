@@ -222,7 +222,8 @@ export function SchedulePlannerBoard({
     if (typeof window === "undefined") return new Set();
     try {
       const raw = window.localStorage.getItem(BOXES_STORAGE_KEY);
-      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+      const saved = raw ? (JSON.parse(raw) as string[]) : [];
+      return new Set(saved.filter((k) => !AUTO_BOX_KEYS.includes(k)));
     } catch {
       return new Set();
     }
@@ -925,7 +926,15 @@ export function SchedulePlannerBoard({
             </p>
           )}
           {works.map((w) => {
-            const workRows = rows.filter((r) => r.work_id === w.id);
+            const workRows = rows
+              .filter((r) => r.work_id === w.id)
+              .slice()
+              .sort((a, b) =>
+                (personById.get(a.collaborator_id)?.full_name ?? "").localeCompare(
+                  personById.get(b.collaborator_id)?.full_name ?? "",
+                  "pt-BR",
+                ),
+              );
             const blockedTarget =
               !!dragging && evaluate(dragging.collaboratorId, w.id, { ignoreEntry: true }).level === "block";
             const isHover = hoverWork === w.id;
