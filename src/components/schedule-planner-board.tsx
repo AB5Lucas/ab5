@@ -401,7 +401,7 @@ export function SchedulePlannerBoard({
   const appointmentsByBox = useMemo(() => {
     const m = new Map<string, AppointmentRow[]>();
     (appointments.data ?? []).forEach((a) => {
-      const key = APPOINTMENT_BOX[a.type];
+      const key = appointmentBoxKey(a as AppointmentRow);
       if (!key) return;
       const list = m.get(key) ?? [];
       list.push(a as AppointmentRow);
