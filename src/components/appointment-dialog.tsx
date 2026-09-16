@@ -199,6 +199,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
         type,
         collaborator_id: form.collaborator_id,
         scheduled_date: form.scheduled_date,
+        scheduled_time: form.scheduled_time,
         training_id: type === "treinamento" ? form.training_id : null,
         work_id: type === "integracao" ? form.work_id : null,
         notes: form.notes.trim() || null,
