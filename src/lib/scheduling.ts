@@ -150,7 +150,27 @@ export async function fetchScheduleContext(date: string) {
     absences,
     holiday: holidays.data?.[0]?.name ?? null,
     integrations: (integrations.data ?? []) as Integration[],
+    asos: (asos.data ?? []) as Aso[],
   };
+}
+
+/** ASO mais recente do colaborador e seu status na data informada. */
+export function checkAso(
+  ctx: ScheduleContext,
+  collaboratorId: string,
+  date: string,
+): { status: AsoStatus; expiresAt: string | null } {
+  const recs = (ctx.asos ?? []).filter((a) => a.collaborator_id === collaboratorId);
+  if (recs.length === 0) return { status: "missing", expiresAt: null };
+  const latest = recs.reduce((a, b) => (b.expires_at > a.expires_at ? b : a));
+  return { status: asoStatusOf(latest.expires_at, date), expiresAt: latest.expires_at };
+}
+
+/** A obra exige integração (e, portanto, ASO válido)? */
+export function workRequiresIntegration(ctx: ScheduleContext, workId: string): boolean {
+  const work = ctx.works.find((w) => w.id === workId);
+  if (!work?.client_id) return false;
+  return work.clients?.requires_integration !== false;
 }
 
 /** Status da integração de um colaborador com o cliente de uma obra. */
