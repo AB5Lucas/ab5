@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   CalendarDays,
+  CalendarClock,
   Users,
   Building2,
   Truck,
@@ -40,6 +41,7 @@ const groups: Group[] = [
       { title: "Histórico", url: "/programacao/historico" },
     ],
   },
+  { label: "Agendamentos", icon: CalendarClock, items: [{ title: "Agendamentos", url: "/agendamentos" }] },
   {
     label: "Colaboradores",
     icon: Users,
