@@ -94,6 +94,7 @@ export function AbsenceManager({
     setPerson("");
     setStart(today());
     setEnd(today());
+    setSingleEnd("");
     setExtra("");
     setNotes("");
   };
@@ -255,9 +256,16 @@ export function AbsenceManager({
               </Select>
             </div>
             {mode === "single" ? (
-              <div className="space-y-1">
-                <Label>Data *</Label>
-                <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Data *</Label>
+                  <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Fim (opcional)</Label>
+                  <Input type="date" value={singleEnd} min={start} onChange={(e) => setSingleEnd(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Deixe em branco para lançar apenas um dia.</p>
+                </div>
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
