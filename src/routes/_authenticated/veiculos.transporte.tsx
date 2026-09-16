@@ -345,18 +345,18 @@ function TransportPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <Label>Obra</Label>
-              <Select value={form.work_id} onValueChange={onWorkChange}>
-                <SelectTrigger><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
+              <Label>Cliente</Label>
+              <Select value={form.client_id} onValueChange={onClientChange}>
+                <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                 <SelectContent>
-                  {base.data?.works.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                  {clientOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {form.work_id && (
+              {form.client_id && (
                 <p className="text-xs text-muted-foreground">
-                  {day.data?.allocationsByWork[form.work_id] ?? 0} colaboradores programados nesta obra.
+                  {passengersOfClient(form.client_id)} colaboradores programados neste cliente.
                 </p>
               )}
             </div>
