@@ -1135,9 +1135,6 @@ export function SchedulePlannerBoard({
                             <AlertTriangle className="mr-0.5 h-2.5 w-2.5" /> Pendência
                           </Badge>
                         )}
-                        {r.confirmation_status === "confirmed" && (
-                          <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                        )}
                         {editable && (
                           <Button
                             variant="ghost"

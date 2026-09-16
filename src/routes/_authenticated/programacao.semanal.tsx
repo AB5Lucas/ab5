@@ -127,10 +127,6 @@ function Page() {
           <p className="font-display text-2xl font-semibold">{weekTotal}</p>
         </div>
         <div className="panel p-4">
-          <p className="text-xs uppercase text-muted-foreground">Confirmadas</p>
-          <p className="font-display text-2xl font-semibold">{weekConfirmed}</p>
-        </div>
-        <div className="panel p-4">
           <p className="text-xs uppercase text-muted-foreground">Dias programados</p>
           <p className="font-display text-2xl font-semibold">{perDay.filter((d) => d.schedule).length} / 7</p>
         </div>
@@ -167,10 +163,6 @@ function Page() {
                   <div>
                     <p className="text-xs text-muted-foreground">Programados</p>
                     <p className="font-semibold">{d.total}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Confirmados</p>
-                    <p className="font-semibold">{d.confirmed}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Obras</p>

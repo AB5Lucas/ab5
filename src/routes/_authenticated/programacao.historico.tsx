@@ -114,8 +114,7 @@ function Page() {
                   <div>
                     <p className="font-display text-sm font-semibold uppercase">{formatBR(s.schedule_date)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {allocs.length} alocações · {byWork.size} obras ·{" "}
-                      {allocs.filter((a) => a.confirmation_status === "confirmed").length} confirmadas
+                      {allocs.length} alocações · {byWork.size} obras
                     </p>
                   </div>
                   <Badge variant={s.status === "finalized" ? "default" : "secondary"}>
@@ -147,11 +146,6 @@ function Page() {
                                     {a.has_pending_requirement && (
                                       <Badge variant="destructive">Pendência</Badge>
                                     )}
-                                    <Badge
-                                      variant={a.confirmation_status === "confirmed" ? "default" : "outline"}
-                                    >
-                                      {a.confirmation_status === "confirmed" ? "Confirmado" : "Pendente"}
-                                    </Badge>
                                   </span>
                                 </li>
                               );

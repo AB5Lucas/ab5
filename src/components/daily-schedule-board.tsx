@@ -380,9 +380,6 @@ export function DailyScheduleBoard({
           <Badge variant="outline">
             <Users className="mr-1 h-3 w-3" /> {rows.length} alocados
           </Badge>
-          <Badge variant="outline">
-            <Check className="mr-1 h-3 w-3" /> {confirmedCount} confirmados
-          </Badge>
           {pendingReq > 0 && (
             <Badge variant="destructive">
               <AlertTriangle className="mr-1 h-3 w-3" /> {pendingReq} com pendência
@@ -494,27 +491,6 @@ export function DailyScheduleBoard({
                       onClick={() => updateRow.mutate({ id: r.id, patch: { overnight: !r.overnight } })}
                     >
                       {r.overnight ? "Pernoite ✓" : "Pernoite"}
-                    </Button>
-                    <Button
-                      variant={r.confirmation_status === "confirmed" ? "default" : "outline"}
-                      size="sm"
-                      disabled={!editable}
-                      onClick={() =>
-                        updateRow.mutate({
-                          id: r.id,
-                          patch:
-                            r.confirmation_status === "confirmed"
-                              ? { confirmation_status: "pending", confirmed_by: null, confirmed_at: null }
-                              : {
-                                  confirmation_status: "confirmed",
-                                  confirmed_by: user?.id ?? null,
-                                  confirmed_at: new Date().toISOString(),
-                                },
-                        })
-                      }
-                    >
-                      <Check className="h-4 w-4" />
-                      {r.confirmation_status === "confirmed" ? "Confirmado" : "Confirmar"}
                     </Button>
                     {editable && (
                       <Button
