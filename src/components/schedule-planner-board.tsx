@@ -159,19 +159,13 @@ function appointmentLabel(a: AppointmentRow): string {
 }
 
 const FILTERS = [
-  { key: "available", label: "Disponíveis" },
-  { key: "unavailable", label: "Não disponíveis" },
   { key: "allocated", label: "Já alocados" },
   { key: "unallocated", label: "Não alocados" },
-  { key: "int_ok", label: "Integração válida" },
-  { key: "int_bad", label: "Integração vencida" },
-  { key: "aso_ok", label: "ASO válido" },
-  { key: "aso_bad", label: "ASO vencido/ausente" },
-  { key: "req_ok", label: "Requisitos atendidos" },
-  { key: "req_warn", label: "Requisitos pendentes" },
-  { key: "fit", label: "Aptos para esta obra" },
+  { key: "warn", label: "Com pendência" },
+  { key: "blocked", label: "Bloqueados" },
   { key: "pj_int", label: "Intermitentes/PJs" },
 ] as const;
+
 
 /** Contratos ocultos por padrão na lista lateral. */
 const HIDDEN_CONTRACTS = ["pj", "intermitente"];
