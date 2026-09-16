@@ -375,16 +375,17 @@ function AppointmentsPage() {
   const reschedule = useMutation({
     mutationFn: async ({ row, date, time }: { row: Row; date: string; time: string }) => {
       if (!date) throw new Error("Informe a nova data");
-      const history = Array.isArray(row.reschedules) ? (row.reschedules as unknown[]) : [];
+      const history = (Array.isArray(row.reschedules) ? row.reschedules : []) as Record<string, string | null>[];
+      const nextHistory: Record<string, string | null>[] = [
+        ...history,
+        { from_date: row.scheduled_date, from_time: row.scheduled_time, at: new Date().toISOString() },
+      ];
       const { error } = await supabase
         .from("appointments")
         .update({
           scheduled_date: date,
           scheduled_time: time || row.scheduled_time,
-          reschedules: [
-            ...history,
-            { from_date: row.scheduled_date, from_time: row.scheduled_time, at: new Date().toISOString() },
-          ],
+          reschedules: nextHistory,
         })
         .eq("id", row.id);
       if (error) throw error;
