@@ -1023,7 +1023,12 @@ export function SchedulePlannerBoard({
           )}
           {shownWorks.map((w) => {
             const workRows = rows
-              .filter((r) => r.work_id === w.id && !appointmentByCollaborator.has(r.collaborator_id))
+              .filter(
+                (r) =>
+                  r.work_id === w.id &&
+                  !appointmentByCollaborator.has(r.collaborator_id) &&
+                  !c?.absences.has(r.collaborator_id),
+              )
               .slice()
               .sort((a, b) =>
                 (personById.get(a.collaborator_id)?.full_name ?? "").localeCompare(
