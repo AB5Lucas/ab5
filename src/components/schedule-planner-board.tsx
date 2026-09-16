@@ -893,10 +893,16 @@ export function SchedulePlannerBoard({
               entries.some((e) => e.box_key === b.key) ||
               (absenceMembers.get(b.key)?.length ?? 0) > 0,
           ).map((b) => {
-            const boxRows = entries.filter((e) => e.box_key === b.key);
-            const autoRows = (absenceMembers.get(b.key) ?? []).filter(
-              (id) => !boxRows.some((r) => r.collaborator_id === id),
-            );
+            const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
+            const byName = (a: string, c: string) => nameOf(a).localeCompare(nameOf(c), "pt-BR");
+            const boxRows = entries
+              .filter((e) => e.box_key === b.key)
+              .slice()
+              .sort((x, y) => byName(x.collaborator_id, y.collaborator_id));
+            const autoRows = (absenceMembers.get(b.key) ?? [])
+              .filter((id) => !boxRows.some((r) => r.collaborator_id === id))
+              .slice()
+              .sort(byName);
             const isHover = hoverBox === b.key;
             const handleDrop = (e: React.DragEvent) => {
               e.preventDefault();
