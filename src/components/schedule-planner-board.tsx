@@ -809,6 +809,7 @@ export function SchedulePlannerBoard({
       const existing = new Set(rows.map((r) => r.collaborator_id));
       const inserts = prevRows
         .filter((r) => !c.absences.has(r.collaborator_id))
+        .filter((r) => !appointmentByCollaborator.has(r.collaborator_id))
         .filter((r) => !existing.has(r.collaborator_id))
         .map((r, i) => ({
           schedule_id: id,
