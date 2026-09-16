@@ -92,7 +92,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select("id, type, collaborator_id, scheduled_date, training_id, work_id, status, notes")
+        .select("id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, status, notes")
         .eq("type", type)
         .order("scheduled_date", { ascending: false });
       if (error) throw error;
