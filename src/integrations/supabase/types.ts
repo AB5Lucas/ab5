@@ -21,6 +21,7 @@ export type Database = {
           id: string
           notes: string | null
           scheduled_date: string
+          scheduled_time: string | null
           status: string
           training_id: string | null
           type: string
@@ -33,6 +34,7 @@ export type Database = {
           id?: string
           notes?: string | null
           scheduled_date: string
+          scheduled_time?: string | null
           status?: string
           training_id?: string | null
           type: string
@@ -45,6 +47,7 @@ export type Database = {
           id?: string
           notes?: string | null
           scheduled_date?: string
+          scheduled_time?: string | null
           status?: string
           training_id?: string | null
           type?: string
