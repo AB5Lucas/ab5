@@ -222,7 +222,8 @@ export function SchedulePlannerBoard({
     if (typeof window === "undefined") return new Set();
     try {
       const raw = window.localStorage.getItem(BOXES_STORAGE_KEY);
-      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+      const saved = raw ? (JSON.parse(raw) as string[]) : [];
+      return new Set(saved.filter((k) => !AUTO_BOX_KEYS.includes(k)));
     } catch {
       return new Set();
     }
