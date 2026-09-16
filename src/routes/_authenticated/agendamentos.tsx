@@ -212,6 +212,16 @@ function AppointmentsPage() {
     return m;
   }, [works.data]);
 
+  const clientOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    (works.data ?? []).forEach((w) => {
+      if (w.client_id && w.clients?.name) m.set(w.client_id, w.clients.name);
+    });
+    return [...m.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [works.data]);
+
   const currentValidity = (collaboratorId: string, trainingId: string | null) => {
     if (!trainingId) return null;
     const recs = (collabTrainings.data ?? []).filter(
@@ -237,7 +247,10 @@ function AppointmentsPage() {
       const pending = r.status === "agendado";
       if (showHistory ? pending : !pending) return false;
       if (fType !== "all" && r.type !== fType) return false;
-      if (fWork !== "all" && r.work_id !== fWork) return false;
+      if (fWork !== "all") {
+        const clientId = r.work_id ? workById.get(r.work_id)?.client_id ?? null : null;
+        if (clientId !== fWork) return false;
+      }
       if (!showHistory) {
         if (fPeriod === "today" && r.scheduled_date !== today) return false;
         if (fPeriod === "tomorrow" && r.scheduled_date !== addDays(today, 1)) return false;
@@ -252,7 +265,7 @@ function AppointmentsPage() {
       }
       return true;
     });
-  }, [appointments.data, fPeriod, fType, fWork, personById, search, showHistory, today]);
+  }, [appointments.data, fPeriod, fType, fWork, personById, workById, search, showHistory, today]);
 
   const pendingCount = (appointments.data ?? []).filter((r) => r.status === "agendado").length;
   const lateCount = (appointments.data ?? []).filter(
@@ -483,16 +496,16 @@ function AppointmentsPage() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Obra / cliente</Label>
+            <Label className="text-xs">Cliente</Label>
             <Select value={fWork} onValueChange={setFWork}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {(works.data ?? []).map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}
+                <SelectItem value="all">Todos</SelectItem>
+                {clientOptions.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
                   </SelectItem>
                 ))}
               </SelectContent>
