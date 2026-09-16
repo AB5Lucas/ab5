@@ -341,6 +341,47 @@ export function SchedulePlannerBoard({
     return m;
   }, [appointments.data]);
 
+  /** Mensagem pronta (WhatsApp) para uma caixa de situação. */
+  const buildBoxMessage = (boxKey: string, boxLabel: string, names: string[]) => {
+    const list = names.join("\n");
+    const appts = appointmentsByBox.get(boxKey) ?? [];
+    const first = appts[0];
+    const hour = hourLabel(first?.scheduled_time);
+    if (boxKey === "aso") {
+      return [
+        "*EXAME ASO*",
+        ASO_ADDRESS,
+        `${dayLine(date)}${hour ? ` as ${hour}` : ""}`,
+        "",
+        list,
+        "",
+        ASO_FOOTER,
+      ].join("\n");
+    }
+    if (boxKey === "treinamento") {
+      const nr = first?.trainings?.name ?? "";
+      return [
+        `*TREINAMENTO ${nr}*`.replace(" *", "*"),
+        `${dayLine(date)}${hour ? ` as ${hour}` : ""}`,
+        "Local: Sala de Treinamentos AB5",
+        "",
+        list,
+      ].join("\n");
+    }
+    if (boxKey === "integracao") {
+      const client = first?.works?.clients?.name ?? first?.works?.name ?? "";
+      const obs = first?.notes?.trim();
+      return [
+        `*${client} - INTEGRAÇÃO*`,
+        `${dayLine(date)}${hour ? ` as ${hour}` : ""}`,
+        ...(obs ? [`*${obs}*`] : []),
+        "",
+        list,
+      ].join("\n");
+    }
+    return [`*${boxLabel}*`, dayLine(date), "", list].join("\n");
+  };
+
   const entryByCollaborator = useMemo(() => {
     const m = new Map<string, (typeof entries)[number]>();
     entries.forEach((e) => m.set(e.collaborator_id, e));
