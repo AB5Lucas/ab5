@@ -121,14 +121,10 @@ function Page() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="panel p-4">
           <p className="text-xs uppercase text-muted-foreground">Alocações na semana</p>
           <p className="font-display text-2xl font-semibold">{weekTotal}</p>
-        </div>
-        <div className="panel p-4">
-          <p className="text-xs uppercase text-muted-foreground">Confirmadas</p>
-          <p className="font-display text-2xl font-semibold">{weekConfirmed}</p>
         </div>
         <div className="panel p-4">
           <p className="text-xs uppercase text-muted-foreground">Dias programados</p>
@@ -167,10 +163,6 @@ function Page() {
                   <div>
                     <p className="text-xs text-muted-foreground">Programados</p>
                     <p className="font-semibold">{d.total}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Confirmados</p>
-                    <p className="font-semibold">{d.confirmed}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Obras</p>

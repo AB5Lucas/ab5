@@ -150,8 +150,6 @@ function DashboardPage() {
           <Stat label="Obras ativas" value={d?.works ?? 0} icon={Building2} />
           <Stat label="Colaboradores ativos" value={d?.collaborators ?? 0} icon={Users} />
           <Stat label="Programados hoje" value={d?.scheduled ?? 0} icon={CalendarCheck} />
-          <Stat label="Confirmados" value={d?.confirmed ?? 0} icon={ClipboardCheck} tone="success" />
-          <Stat label="Pendentes de confirmação" value={d?.pending ?? 0} icon={ClipboardCheck} tone="warning" />
           <Stat label="Férias hoje" value={d?.vacations ?? 0} icon={CalendarOff} tone="warning" />
           <Stat label="Atestados hoje" value={d?.leaves ?? 0} icon={Stethoscope} tone="destructive" />
           <Stat label="Folgas hoje" value={d?.off ?? 0} icon={Coffee} />
