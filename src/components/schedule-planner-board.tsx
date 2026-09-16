@@ -159,19 +159,13 @@ function appointmentLabel(a: AppointmentRow): string {
 }
 
 const FILTERS = [
-  { key: "available", label: "Disponíveis" },
-  { key: "unavailable", label: "Não disponíveis" },
   { key: "allocated", label: "Já alocados" },
   { key: "unallocated", label: "Não alocados" },
-  { key: "int_ok", label: "Integração válida" },
-  { key: "int_bad", label: "Integração vencida" },
-  { key: "aso_ok", label: "ASO válido" },
-  { key: "aso_bad", label: "ASO vencido/ausente" },
-  { key: "req_ok", label: "Requisitos atendidos" },
-  { key: "req_warn", label: "Requisitos pendentes" },
-  { key: "fit", label: "Aptos para esta obra" },
+  { key: "warn", label: "Com pendência" },
+  { key: "blocked", label: "Bloqueados" },
   { key: "pj_int", label: "Intermitentes/PJs" },
 ] as const;
+
 
 /** Contratos ocultos por padrão na lista lateral. */
 const HIDDEN_CONTRACTS = ["pj", "intermitente"];
@@ -203,7 +197,9 @@ export function SchedulePlannerBoard({
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Set<FilterKey>>(new Set());
+  const [showAll, setShowAll] = useState(false);
   const [selectedWork, setSelectedWork] = useState<string | null>(null);
+
   const [dragging, setDragging] = useState<DragPayload | null>(null);
   const [hoverWork, setHoverWork] = useState<string | null>(null);
   const [hoverPanel, setHoverPanel] = useState(false);
@@ -530,31 +526,22 @@ export function SchedulePlannerBoard({
         return false;
       if (!filters.has("pj_int") && HIDDEN_CONTRACTS.includes((p.contract_type ?? "").toLowerCase()))
         return false;
-      if (filters.size === 0) return true;
-      const absent = !!c?.absences.get(p.id);
       const alloc = allocByCollaborator.get(p.id);
       const ev = evaluate(p.id, selectedWork);
+      // Com uma obra selecionada, mostra somente quem está apto para ela
+      // (alocado ou não), a menos que o usuário peça para ver todos.
+      if (selectedWork && !showAll && ev.level === "block") return false;
       for (const f of filters) {
-        if (f === "available" && absent) return false;
-        if (f === "unavailable" && !absent) return false;
         if (f === "allocated" && !alloc) return false;
         if (f === "unallocated" && alloc) return false;
-        if (
-          f === "int_ok" &&
-          !(ev.integration === "valid" || ev.integration === "expiring" || ev.integration === "not_required")
-        )
-          return false;
-        if (f === "int_bad" && !(ev.integration === "expired" || ev.integration === "missing")) return false;
-        if (f === "aso_ok" && !(ev.aso === "valid" || ev.aso === "expiring")) return false;
-        if (f === "aso_bad" && !(ev.aso === "expired" || ev.aso === "missing")) return false;
-        if (f === "req_ok" && (ev.reqIssues > 0 || ev.reqBlocked)) return false;
-        if (f === "req_warn" && ev.reqIssues === 0) return false;
-        if (f === "fit" && !(ev.fit && !alloc)) return false;
+        if (f === "warn" && ev.level !== "warn") return false;
+        if (f === "blocked" && ev.level !== "block") return false;
       }
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [people, search, filters, selectedWork, c, allocByCollaborator]);
+  }, [people, search, filters, selectedWork, showAll, c, allocByCollaborator]);
+
 
   async function ensureSchedule() {
     if (scheduleId) return scheduleId;
@@ -1256,14 +1243,23 @@ export function SchedulePlannerBoard({
             <h3 className="font-display text-[11px] font-semibold uppercase tracking-wide">Colaboradores</h3>
             {selectedWork && (
               <p className="text-[10px] text-muted-foreground">
-                Filtrando para{" "}
+                {showAll ? "Mostrando todos para" : "Aptos para"}{" "}
                 <span className="font-medium text-foreground">
                   {(() => {
                     const w = works.find((x) => x.id === selectedWork);
                     return w ? workLabel(w) : "";
                   })()}
                 </span>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={() => setShowAll((v) => !v)}
+                  className="underline"
+                >
+                  {showAll ? "ver só aptos" : "ver todos"}
+                </button>
               </p>
+
             )}
             <div className="relative">
               <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
