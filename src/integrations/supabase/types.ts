@@ -14,6 +14,67 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointments: {
+        Row: {
+          collaborator_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          scheduled_date: string
+          status: string
+          training_id: string | null
+          type: string
+          updated_at: string
+          work_id: string | null
+        }
+        Insert: {
+          collaborator_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_date: string
+          status?: string
+          training_id?: string | null
+          type: string
+          updated_at?: string
+          work_id?: string | null
+        }
+        Update: {
+          collaborator_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_date?: string
+          status?: string
+          training_id?: string | null
+          type?: string
+          updated_at?: string
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asos: {
         Row: {
           collaborator_id: string
