@@ -213,14 +213,17 @@ function TransportPage() {
   });
 
   function openNew() {
-    const firstWork = base.data?.works[0];
+    const first = clientOptions[0];
+    const firstWorkId = first?.workIds[0] ?? "";
+    const w = base.data?.works.find((x) => x.id === firstWorkId);
     setEditingId(null);
     setForm({
       ...emptyForm,
-      work_id: firstWork?.id ?? "",
-      departure_time: firstWork?.entry_time?.slice(0, 5) ?? "",
-      return_time: firstWork?.exit_time?.slice(0, 5) ?? "",
-      passenger_count: String(firstWork ? day.data?.allocationsByWork[firstWork.id] ?? 0 : 0),
+      client_id: first?.id ?? "",
+      work_id: firstWorkId,
+      departure_time: w?.entry_time?.slice(0, 5) ?? "",
+      return_time: w?.exit_time?.slice(0, 5) ?? "",
+      passenger_count: String(first ? passengersOfClient(first.id) : 0),
     });
     setOpen(true);
   }
@@ -228,6 +231,7 @@ function TransportPage() {
   function openEdit(t: Tables<"transport_allocations">) {
     setEditingId(t.id);
     setForm({
+      client_id: clientIdOfWork.get(t.work_id) ?? "",
       work_id: t.work_id,
       vehicle_id: t.vehicle_id ?? NONE,
       driver_id: t.driver_id ?? NONE,
@@ -239,14 +243,17 @@ function TransportPage() {
     setOpen(true);
   }
 
-  function onWorkChange(workId: string) {
+  function onClientChange(clientId: string) {
+    const option = clientOptions.find((c) => c.id === clientId);
+    const workId = option?.workIds[0] ?? "";
     const w = base.data?.works.find((x) => x.id === workId);
     setForm((f) => ({
       ...f,
+      client_id: clientId,
       work_id: workId,
       departure_time: f.departure_time || w?.entry_time?.slice(0, 5) || "",
       return_time: f.return_time || w?.exit_time?.slice(0, 5) || "",
-      passenger_count: String(day.data?.allocationsByWork[workId] ?? f.passenger_count),
+      passenger_count: String(passengersOfClient(clientId)),
     }));
   }
 
