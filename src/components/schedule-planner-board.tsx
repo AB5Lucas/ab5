@@ -99,6 +99,8 @@ const FILTERS = [
   { key: "unallocated", label: "Não alocados" },
   { key: "int_ok", label: "Integração válida" },
   { key: "int_bad", label: "Integração vencida" },
+  { key: "aso_ok", label: "ASO válido" },
+  { key: "aso_bad", label: "ASO vencido/ausente" },
   { key: "req_ok", label: "Requisitos atendidos" },
   { key: "req_warn", label: "Requisitos pendentes" },
   { key: "fit", label: "Aptos para esta obra" },
