@@ -77,7 +77,11 @@ function TransportPage() {
     queryKey: ["transport-base"],
     queryFn: async () => {
       const [works, vehicles, drivers] = await Promise.all([
-        supabase.from("works").select("id, name, entry_time, exit_time, status").eq("active", true).order("name"),
+        supabase
+          .from("works")
+          .select("id, name, entry_time, exit_time, status, client_id, clients(name)")
+          .eq("active", true)
+          .order("name"),
         supabase.from("vehicles").select("id, plate, model, passenger_capacity, status").order("plate"),
         supabase
           .from("collaborators")
