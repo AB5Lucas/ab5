@@ -304,19 +304,25 @@ export function SchedulePlannerBoard({
     const work = works.find((x) => x.id === workId);
     const clientName = work?.clients?.name ?? "cliente";
     const integ = checkIntegration(c as ScheduleContext, workId, collaboratorId, date);
+    const requiresInt = workRequiresIntegration(c as ScheduleContext, workId);
+    const aso = checkAso(c as ScheduleContext, collaboratorId, date);
 
-    if (integ.status === "expired")
-      return base({
-        level: "block",
-        integration: integ.status,
-        reasons: [`Integração com ${clientName} vencida em ${formatDateBR(integ.expiresAt)}`],
-      });
-    if (integ.status === "missing")
-      return base({
-        level: "block",
-        integration: integ.status,
-        reasons: [`Não possui integração com ${clientName}`],
-      });
+    const intBad = integ.status === "expired" || integ.status === "missing";
+    const asoBad = requiresInt && (aso.status === "expired" || aso.status === "missing");
+
+    if (intBad || asoBad) {
+      const blockers: string[] = [];
+      if (integ.status === "expired")
+        blockers.push(`Integração com ${clientName} vencida em ${formatDateBR(integ.expiresAt)}`);
+      if (integ.status === "missing") blockers.push(`Não possui integração válida com ${clientName}`);
+      if (asoBad)
+        blockers.push(
+          aso.status === "expired"
+            ? `ASO vencido em ${formatDateBR(aso.expiresAt)}`
+            : "Não possui ASO válido",
+        );
+      return base({ level: "block", integration: integ.status, aso: aso.status, reasons: blockers });
+    }
 
     const issues = checkRequirements(c as ScheduleContext, workId, collaboratorId, date);
     const blocking = issues.filter((i) => i.blocking);
