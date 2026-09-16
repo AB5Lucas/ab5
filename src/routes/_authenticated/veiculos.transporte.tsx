@@ -290,7 +290,7 @@ function TransportPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Obra</TableHead>
+              <TableHead>Cliente</TableHead>
               <TableHead>Veículo</TableHead>
               <TableHead>Motorista</TableHead>
               <TableHead>Saída</TableHead>
