@@ -85,6 +85,12 @@ const STATUS_BOXES = [
 
 const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
 
+/** Caixas alimentadas automaticamente (ausências e agendamentos) — não aparecem no menu. */
+const AUTO_BOX_KEYS = ["aso", "treinamento", "integracao", "folga", "ferias"];
+
+/** Caixas que o usuário liga manualmente pelo botão "Caixas". */
+const MANUAL_BOXES = STATUS_BOXES.filter((b) => !AUTO_BOX_KEYS.includes(b.key));
+
 /** Ausências cadastradas → caixa correspondente (alimentada automaticamente). */
 const ABSENCE_BOX: Record<string, string> = {
   "Férias": "ferias",
@@ -868,7 +874,7 @@ export function SchedulePlannerBoard({
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Exibir caixas</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {STATUS_BOXES.map((b) => (
+              {MANUAL_BOXES.map((b) => (
                 <DropdownMenuCheckboxItem
                   key={b.key}
                   checked={visibleBoxes.has(b.key)}
@@ -1063,7 +1069,8 @@ export function SchedulePlannerBoard({
             (b) =>
               visibleBoxes.has(b.key) ||
               entries.some((e) => e.box_key === b.key) ||
-              (absenceMembers.get(b.key)?.length ?? 0) > 0,
+              (absenceMembers.get(b.key)?.length ?? 0) > 0 ||
+              (appointmentsByBox.get(b.key)?.length ?? 0) > 0,
           ).map((b) => {
             const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
             const byName = (a: string, c: string) => nameOf(a).localeCompare(nameOf(c), "pt-BR");
