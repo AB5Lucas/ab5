@@ -127,7 +127,7 @@ function IntegrationsPage() {
 
   const [search, setSearch] = useState("");
   const [clientFilter, setClientFilter] = useState("all");
-  const [workFilter, setWorkFilter] = useState("all");
+  
   const [statusFilter, setStatusFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
@@ -171,14 +171,6 @@ function IntegrationsPage() {
     },
   });
 
-  const works = useQuery({
-    queryKey: ["works-min"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("works").select("id, name, client_id").order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
 
   const positions = useQuery({
     queryKey: ["positions"],
@@ -210,24 +202,13 @@ function IntegrationsPage() {
     return m;
   }, [positions.data]);
 
-  const worksByClient = useMemo(() => {
-    const m = new Map<string, string[]>();
-    (works.data ?? []).forEach((w) => {
-      if (!w.client_id) return;
-      m.set(w.client_id, [...(m.get(w.client_id) ?? []), w.name]);
-    });
-    return m;
-  }, [works.data]);
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const qDigits = onlyDigits(search);
-    const workClient = workFilter === "all" ? null : (works.data ?? []).find((w) => w.id === workFilter)?.client_id;
     return (integrations.data ?? []).filter((r) => {
       const p = personById.get(r.collaborator_id);
       const clientName = clientById.get(r.client_id) ?? "";
       if (clientFilter !== "all" && r.client_id !== clientFilter) return false;
-      if (workFilter !== "all" && r.client_id !== workClient) return false;
       if (statusFilter !== "all" && statusOf(r.expires_at, today) !== statusFilter) return false;
       if (q) {
         const hit =
@@ -238,7 +219,7 @@ function IntegrationsPage() {
       }
       return true;
     });
-  }, [integrations.data, search, clientFilter, workFilter, statusFilter, personById, clientById, works.data, today]);
+  }, [integrations.data, search, clientFilter, statusFilter, personById, clientById, today]);
 
   const summary = useMemo(() => {
     const s = { total: filtered.length, valid: 0, expiring: 0, expired: 0 };
@@ -434,7 +415,7 @@ function IntegrationsPage() {
         <Badge variant="destructive">Vencidas: {summary.expired}</Badge>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <div className="relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -453,19 +434,6 @@ function IntegrationsPage() {
             {(clients.data ?? []).map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={workFilter} onValueChange={setWorkFilter}>
-          <SelectTrigger>
-            <SelectValue placeholder="Obra" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as obras</SelectItem>
-            {(works.data ?? []).map((w) => (
-              <SelectItem key={w.id} value={w.id}>
-                {(w.client_id ? `${clientById.get(w.client_id) ?? ""} - ` : "") + w.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -491,7 +459,7 @@ function IntegrationsPage() {
               <TableHead className="hidden lg:table-cell">CPF</TableHead>
               <TableHead className="hidden lg:table-cell">Função</TableHead>
               <TableHead>Cliente</TableHead>
-              <TableHead className="hidden xl:table-cell">Obras</TableHead>
+              
               <TableHead className="hidden md:table-cell">Integração</TableHead>
               <TableHead className="hidden md:table-cell">Validade</TableHead>
               <TableHead>Status</TableHead>
@@ -501,14 +469,14 @@ function IntegrationsPage() {
           <TableBody>
             {integrations.isLoading && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!integrations.isLoading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                   Nenhuma integração encontrada.
                 </TableCell>
               </TableRow>
@@ -516,7 +484,7 @@ function IntegrationsPage() {
             {filtered.map((r) => {
               const p = personById.get(r.collaborator_id);
               const st = statusOf(r.expires_at, today);
-              const workNames = worksByClient.get(r.client_id) ?? [];
+              
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{p?.full_name ?? "—"}</TableCell>
@@ -525,9 +493,6 @@ function IntegrationsPage() {
                     {p?.position_id ? positionById.get(p.position_id) ?? "—" : "—"}
                   </TableCell>
                   <TableCell>{clientById.get(r.client_id) ?? "—"}</TableCell>
-                  <TableCell className="hidden max-w-56 truncate xl:table-cell">
-                    {workNames.join(", ") || "—"}
-                  </TableCell>
                   <TableCell className="hidden md:table-cell">{formatDateBR(r.integration_date)}</TableCell>
                   <TableCell className="hidden md:table-cell">{formatDateBR(r.expires_at)}</TableCell>
                   <TableCell>
@@ -654,10 +619,6 @@ function IntegrationsPage() {
               <p>
                 <span className="text-muted-foreground">Cliente: </span>
                 {clientById.get(viewing.client_id) ?? "—"}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Obras: </span>
-                {(worksByClient.get(viewing.client_id) ?? []).join(", ") || "—"}
               </p>
               <p>
                 <span className="text-muted-foreground">Integração: </span>
