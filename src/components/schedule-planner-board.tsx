@@ -103,9 +103,47 @@ const APPOINTMENT_BOX: Record<string, string> = {
 type AppointmentRow = {
   type: string;
   collaborator_id: string;
+  scheduled_time?: string | null;
+  notes?: string | null;
   trainings: { name: string } | null;
   works: { name: string; clients: { name: string } | null } | null;
 };
+
+const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+/** "2026-09-16" → "Dia 16/09 - Quarta" */
+function dayLine(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const wd = WEEKDAYS[new Date(y, (m ?? 1) - 1, d).getDay()];
+  return `Dia ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")} - ${wd}`;
+}
+
+/** "07:00:00" → "07h"; "07:30" → "07h30" */
+function hourLabel(time?: string | null): string {
+  if (!time) return "";
+  const [h, min] = time.split(":");
+  return min && min !== "00" ? `${h}h${min}` : `${h}h`;
+}
+
+const ASO_FOOTER = `👉ATENÇÃO👈
+
+👉Lembre-se de fazer jejum de 12 horas para não alterar os resultados dos exames.
+
+👉Solicitamos que após realização de exame periódico peçam à recepção da clínica uma declaração de comparecimento, constando data e o horário de chegada e saída, para fins de abono de horas.
+
+👉Após o exame retornar a INDUSTRIA.`;
+
+const ASO_ADDRESS =
+  "Av. Bandeirantes, 1.645, no piso superior do Boulevard Bandeiras, no Parque Cidade Nova.";
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success("Mensagem copiada!");
+  } catch {
+    toast.error("Não foi possível copiar a mensagem");
+  }
+}
 
 /** Texto do box do compromisso agendado. */
 function appointmentLabel(a: AppointmentRow): string {
