@@ -132,6 +132,41 @@ function TransportPage() {
     return map;
   }, [base.data]);
 
+  const clientOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; workIds: string[] }>();
+    (base.data?.works ?? []).forEach((w) => {
+      if (!w.client_id) return;
+      const entry = map.get(w.client_id) ?? {
+        id: w.client_id,
+        name: w.clients?.name ?? "Cliente",
+        workIds: [],
+      };
+      entry.workIds.push(w.id);
+      map.set(w.client_id, entry);
+    });
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [base.data]);
+
+  const clientNameOfWork = useMemo(() => {
+    const map = new Map<string, string>();
+    (base.data?.works ?? []).forEach((w) => map.set(w.id, w.clients?.name ?? w.name));
+    return map;
+  }, [base.data]);
+
+  const clientIdOfWork = useMemo(() => {
+    const map = new Map<string, string>();
+    (base.data?.works ?? []).forEach((w) => {
+      if (w.client_id) map.set(w.id, w.client_id);
+    });
+    return map;
+  }, [base.data]);
+
+  const passengersOfClient = (clientId: string) => {
+    const option = clientOptions.find((c) => c.id === clientId);
+    if (!option) return 0;
+    return option.workIds.reduce((sum, id) => sum + (day.data?.allocationsByWork[id] ?? 0), 0);
+  };
+
   const save = useMutation({
     mutationFn: async () => {
       const scheduleId = day.data?.schedule?.id;
