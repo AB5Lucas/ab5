@@ -17,9 +17,15 @@ export type Database = {
       appointments: {
         Row: {
           collaborator_id: string
+          completed_at: string | null
+          completed_date: string | null
+          completed_time: string | null
           created_at: string
           id: string
           notes: string | null
+          original_date: string | null
+          original_time: string | null
+          reschedules: Json
           scheduled_date: string
           scheduled_time: string | null
           status: string
@@ -30,9 +36,15 @@ export type Database = {
         }
         Insert: {
           collaborator_id: string
+          completed_at?: string | null
+          completed_date?: string | null
+          completed_time?: string | null
           created_at?: string
           id?: string
           notes?: string | null
+          original_date?: string | null
+          original_time?: string | null
+          reschedules?: Json
           scheduled_date: string
           scheduled_time?: string | null
           status?: string
@@ -43,9 +55,15 @@ export type Database = {
         }
         Update: {
           collaborator_id?: string
+          completed_at?: string | null
+          completed_date?: string | null
+          completed_time?: string | null
           created_at?: string
           id?: string
           notes?: string | null
+          original_date?: string | null
+          original_time?: string | null
+          reschedules?: Json
           scheduled_date?: string
           scheduled_time?: string | null
           status?: string
