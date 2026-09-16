@@ -99,6 +99,33 @@ const ABSENCE_BOX: Record<string, string> = {
 };
 const BOXES_STORAGE_KEY = "planner-status-boxes";
 
+/** Serviços ocultos por dia (o usuário escolhe no botão "Serviços"). */
+const HIDDEN_WORKS_STORAGE_KEY = "planner-hidden-works";
+
+function loadHiddenWorks(date: string): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(HIDDEN_WORKS_STORAGE_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
+    return new Set(map[date] ?? []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveHiddenWorks(date: string, ids: Set<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(HIDDEN_WORKS_STORAGE_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
+    if (ids.size === 0) delete map[date];
+    else map[date] = [...ids];
+    window.localStorage.setItem(HIDDEN_WORKS_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    /* ignora */
+  }
+}
+
 /** Tipo de agendamento → caixa correspondente na programação. */
 const APPOINTMENT_BOX: Record<string, string> = {
   aso: "aso",
@@ -235,6 +262,23 @@ export function SchedulePlannerBoard({
       } catch {
         /* ignora */
       }
+      return next;
+    });
+  }
+
+  const [hiddenWorks, setHiddenWorks] = useState<Set<string>>(() => loadHiddenWorks(date));
+  const [hiddenWorksDate, setHiddenWorksDate] = useState(date);
+  if (hiddenWorksDate !== date) {
+    setHiddenWorksDate(date);
+    setHiddenWorks(loadHiddenWorks(date));
+  }
+
+  function toggleWorkVisible(id: string) {
+    setHiddenWorks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveHiddenWorks(date, next);
       return next;
     });
   }
@@ -394,6 +438,10 @@ export function SchedulePlannerBoard({
   const rows = allocations.data ?? [];
   const c = ctx.data;
   const works = c?.works ?? [];
+  /** Serviços exibidos no dia: os escolhidos pelo usuário + os que já têm alguém alocado. */
+  const shownWorks = works.filter(
+    (w) => !hiddenWorks.has(w.id) || rows.some((r) => r.work_id === w.id),
+  );
   const people = c?.collaborators ?? [];
 
   const positionById = useMemo(() => {
@@ -874,6 +922,33 @@ export function SchedulePlannerBoard({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">
+                <MapPin className="h-4 w-4" /> Serviços
+                <Badge variant="secondary" className="ml-1">
+                  {shownWorks.length}/{works.length}
+                </Badge>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-80 w-72 overflow-y-auto">
+              <DropdownMenuLabel>Serviços do dia</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {works.map((w) => (
+                <DropdownMenuCheckboxItem
+                  key={w.id}
+                  checked={!hiddenWorks.has(w.id)}
+                  onCheckedChange={() => toggleWorkVisible(w.id)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {workLabel(w)}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {works.length === 0 && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum serviço cadastrado.</p>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {editable && (
             <>
               <Button size="sm" variant="outline" onClick={() => generateFromBase.mutate()} disabled={generateFromBase.isPending}>
@@ -907,12 +982,14 @@ export function SchedulePlannerBoard({
       <div className="grid gap-2 lg:grid-cols-[1fr_209px]">
         {/* Obras */}
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {works.length === 0 && !ctx.isLoading && (
+          {shownWorks.length === 0 && !ctx.isLoading && (
             <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground sm:col-span-2">
-              Nenhum serviço ativo cadastrado.
+              {works.length === 0
+                ? "Nenhum serviço ativo cadastrado."
+                : "Nenhum serviço selecionado para este dia. Use o botão \u201cServiços\u201d."}
             </p>
           )}
-          {works.map((w) => {
+          {shownWorks.map((w) => {
             const workRows = rows
               .filter((r) => r.work_id === w.id)
               .slice()
