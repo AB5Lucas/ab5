@@ -266,6 +266,23 @@ export function SchedulePlannerBoard({
     });
   }
 
+  const [hiddenWorks, setHiddenWorks] = useState<Set<string>>(() => loadHiddenWorks(date));
+  const [hiddenWorksDate, setHiddenWorksDate] = useState(date);
+  if (hiddenWorksDate !== date) {
+    setHiddenWorksDate(date);
+    setHiddenWorks(loadHiddenWorks(date));
+  }
+
+  function toggleWorkVisible(id: string) {
+    setHiddenWorks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveHiddenWorks(date, next);
+      return next;
+    });
+  }
+
   const ctx = useQuery({ queryKey: ["schedule-ctx", date], queryFn: () => fetchScheduleContext(date) });
 
   const schedule = useQuery({
