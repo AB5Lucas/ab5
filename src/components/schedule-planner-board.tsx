@@ -367,7 +367,7 @@ export function SchedulePlannerBoard({
           "id, type, collaborator_id, scheduled_time, notes, training_id, work_id, trainings(name), works(name, clients(name))",
         )
         .eq("scheduled_date", date)
-        .eq("status", "agendado");
+        .in("status", ["agendado", "realizado"]);
       if (error) throw error;
       return data;
     },
