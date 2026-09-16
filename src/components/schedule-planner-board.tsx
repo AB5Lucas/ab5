@@ -389,6 +389,8 @@ export function SchedulePlannerBoard({
         )
           return false;
         if (f === "int_bad" && !(ev.integration === "expired" || ev.integration === "missing")) return false;
+        if (f === "aso_ok" && !(ev.aso === "valid" || ev.aso === "expiring")) return false;
+        if (f === "aso_bad" && !(ev.aso === "expired" || ev.aso === "missing")) return false;
         if (f === "req_ok" && (ev.reqIssues > 0 || ev.reqBlocked)) return false;
         if (f === "req_warn" && ev.reqIssues === 0) return false;
         if (f === "fit" && !(ev.fit && !alloc)) return false;
