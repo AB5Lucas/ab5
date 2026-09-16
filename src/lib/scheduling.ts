@@ -52,8 +52,31 @@ export type Integration = {
   expires_at: string | null;
 };
 
+export type Aso = {
+  collaborator_id: string;
+  exam_date: string;
+  expires_at: string;
+};
+
 /** Dias de antecedência para considerar a integração "próxima do vencimento". */
 export const INTEGRATION_WARN_DAYS = 30;
+
+export type AsoStatus = "valid" | "expiring" | "expired" | "missing";
+
+export const ASO_LABEL: Record<AsoStatus, string> = {
+  valid: "ASO válido",
+  expiring: "ASO próximo do vencimento",
+  expired: "ASO vencido",
+  missing: "Sem ASO cadastrado",
+};
+
+/** Status do ASO mais recente do colaborador (não depende da obra). */
+export function asoStatusOf(expires: string | null | undefined, date: string): AsoStatus {
+  if (!expires) return "missing";
+  if (expires < date) return "expired";
+  if (expires <= addDays(date, INTEGRATION_WARN_DAYS)) return "expiring";
+  return "valid";
+}
 
 export type IntegrationStatus =
   | "valid"
