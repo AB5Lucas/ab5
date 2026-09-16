@@ -868,7 +868,7 @@ export function SchedulePlannerBoard({
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Exibir caixas</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {STATUS_BOXES.map((b) => (
+              {MANUAL_BOXES.map((b) => (
                 <DropdownMenuCheckboxItem
                   key={b.key}
                   checked={visibleBoxes.has(b.key)}
