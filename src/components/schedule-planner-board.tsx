@@ -113,8 +113,8 @@ const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "
 
 /** "2026-09-16" → "Dia 16/09 - Quarta" */
 function dayLine(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const wd = WEEKDAYS[new Date(y, (m ?? 1) - 1, d).getDay()];
+  const [y = 1970, m = 1, d = 1] = iso.split("-").map(Number);
+  const wd = WEEKDAYS[new Date(y, m - 1, d).getDay()];
   return `Dia ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")} - ${wd}`;
 }
 
