@@ -1161,13 +1161,28 @@ export function SchedulePlannerBoard({
           })}
 
           {/* Caixas de situação */}
-          {STATUS_BOXES.filter(
-            (b) =>
-              visibleBoxes.has(b.key) ||
-              entries.some((e) => e.box_key === b.key) ||
-              (absenceMembers.get(b.key)?.length ?? 0) > 0 ||
-              (appointmentsByBox.get(b.key)?.length ?? 0) > 0,
-          ).map((b) => {
+          {[
+            ...STATUS_BOXES.filter((b) => b.key !== "integracao").map((b) => ({
+              key: b.key as string,
+              label: b.label as string,
+            })),
+            ...[
+              ...new Set([
+                ...[...appointmentsByBox.keys()].filter((k) => k.startsWith(INTEGRATION_PREFIX)),
+                ...entries.map((e) => e.box_key).filter((k) => k.startsWith(INTEGRATION_PREFIX)),
+              ]),
+            ]
+              .sort((a, b) => a.localeCompare(b, "pt-BR"))
+              .map((key) => ({ key, label: boxLabelOf(key) })),
+          ]
+            .filter(
+              (b) =>
+                visibleBoxes.has(b.key) ||
+                entries.some((e) => e.box_key === b.key) ||
+                (absenceMembers.get(b.key)?.length ?? 0) > 0 ||
+                (appointmentsByBox.get(b.key)?.length ?? 0) > 0,
+            )
+            .map((b) => {
             const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
             const byName = (a: string, c: string) => nameOf(a).localeCompare(nameOf(c), "pt-BR");
             const boxRows = entries
