@@ -66,6 +66,8 @@ type Evaluation = {
   reqIssues: number;
   reqBlocked: boolean;
   fit: boolean;
+  /** Indisponível por ausência/compromisso/caixa: aparece como ocupado, mas não pode ser alocado. */
+  hardBlock?: boolean;
 };
 
 type DragPayload = { collaboratorId: string; allocationId: string | null; entryId?: string | null };
