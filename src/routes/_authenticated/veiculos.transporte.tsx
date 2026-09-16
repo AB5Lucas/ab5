@@ -377,20 +377,30 @@ function TransportPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <Label>Cliente</Label>
-              <Select value={form.client_id} onValueChange={onClientChange}>
-                <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
+              <Label>Cliente / finalidade</Label>
+              <Select
+                value={isSpecial(form.purpose) ? form.purpose : form.client_id}
+                onValueChange={onClientChange}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione o cliente ou a finalidade" /></SelectTrigger>
                 <SelectContent>
                   {clientOptions.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
+                  {PURPOSES.map((p) => (
+                    <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              {form.client_id && (
+              {isSpecial(form.purpose) ? (
+                <p className="text-xs text-muted-foreground">
+                  Veículo em {PURPOSE_LABEL[form.purpose]} — motorista opcional.
+                </p>
+              ) : form.client_id ? (
                 <p className="text-xs text-muted-foreground">
                   {passengersOfClient(form.client_id)} colaboradores programados neste cliente.
                 </p>
-              )}
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label>Veículo</Label>
