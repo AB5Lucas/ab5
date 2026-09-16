@@ -46,6 +46,7 @@ type Row = {
   type: AppointmentType;
   collaborator_id: string;
   scheduled_date: string;
+  scheduled_time: string | null;
   training_id: string | null;
   work_id: string | null;
   status: string;
@@ -55,6 +56,7 @@ type Row = {
 type FormState = {
   collaborator_id: string;
   scheduled_date: string;
+  scheduled_time: string;
   training_id: string;
   work_id: string;
   notes: string;
@@ -63,6 +65,7 @@ type FormState = {
 const emptyForm = (): FormState => ({
   collaborator_id: "",
   scheduled_date: todayISO(),
+  scheduled_time: "07:00",
   training_id: "",
   work_id: "",
   notes: "",
@@ -89,7 +92,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select("id, type, collaborator_id, scheduled_date, training_id, work_id, status, notes")
+        .select("id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, status, notes")
         .eq("type", type)
         .order("scheduled_date", { ascending: false });
       if (error) throw error;
@@ -189,12 +192,14 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     mutationFn: async () => {
       if (!form.collaborator_id) throw new Error("Selecione o colaborador");
       if (!form.scheduled_date) throw new Error("Informe a data do agendamento");
+      if (!form.scheduled_time) throw new Error("Informe o horário do agendamento");
       if (type === "treinamento" && !form.training_id) throw new Error("Selecione o treinamento (NR)");
       if (type === "integracao" && !form.work_id) throw new Error("Selecione a obra/serviço");
       const payload = {
         type,
         collaborator_id: form.collaborator_id,
         scheduled_date: form.scheduled_date,
+        scheduled_time: form.scheduled_time,
         training_id: type === "treinamento" ? form.training_id : null,
         work_id: type === "integracao" ? form.work_id : null,
         notes: form.notes.trim() || null,
@@ -247,6 +252,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     setForm({
       collaborator_id: r.collaborator_id,
       scheduled_date: r.scheduled_date,
+      scheduled_time: r.scheduled_time?.slice(0, 5) ?? "07:00",
       training_id: r.training_id ?? "",
       work_id: r.work_id ?? "",
       notes: r.notes ?? "",
@@ -305,6 +311,18 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
                     type="date"
                     value={form.scheduled_date}
                     onChange={(e) => set("scheduled_date", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="appt-time">
+                    {type === "treinamento" ? "Horário de início *" : "Horário *"}
+                  </Label>
+                  <Input
+                    id="appt-time"
+                    type="time"
+                    value={form.scheduled_time}
+                    onChange={(e) => set("scheduled_time", e.target.value)}
                   />
                 </div>
 

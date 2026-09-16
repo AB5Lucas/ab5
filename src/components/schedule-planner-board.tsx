@@ -103,9 +103,47 @@ const APPOINTMENT_BOX: Record<string, string> = {
 type AppointmentRow = {
   type: string;
   collaborator_id: string;
+  scheduled_time?: string | null;
+  notes?: string | null;
   trainings: { name: string } | null;
   works: { name: string; clients: { name: string } | null } | null;
 };
+
+const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+/** "2026-09-16" → "Dia 16/09 - Quarta" */
+function dayLine(iso: string): string {
+  const [y = 1970, m = 1, d = 1] = iso.split("-").map(Number);
+  const wd = WEEKDAYS[new Date(y, m - 1, d).getDay()];
+  return `Dia ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")} - ${wd}`;
+}
+
+/** "07:00:00" → "07h"; "07:30" → "07h30" */
+function hourLabel(time?: string | null): string {
+  if (!time) return "";
+  const [h, min] = time.split(":");
+  return min && min !== "00" ? `${h}h${min}` : `${h}h`;
+}
+
+const ASO_FOOTER = `👉ATENÇÃO👈
+
+👉Lembre-se de fazer jejum de 12 horas para não alterar os resultados dos exames.
+
+👉Solicitamos que após realização de exame periódico peçam à recepção da clínica uma declaração de comparecimento, constando data e o horário de chegada e saída, para fins de abono de horas.
+
+👉Após o exame retornar a INDUSTRIA.`;
+
+const ASO_ADDRESS =
+  "Av. Bandeirantes, 1.645, no piso superior do Boulevard Bandeiras, no Parque Cidade Nova.";
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success("Mensagem copiada!");
+  } catch {
+    toast.error("Não foi possível copiar a mensagem");
+  }
+}
 
 /** Texto do box do compromisso agendado. */
 function appointmentLabel(a: AppointmentRow): string {
@@ -253,7 +291,9 @@ export function SchedulePlannerBoard({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select("id, type, collaborator_id, training_id, work_id, trainings(name), works(name, clients(name))")
+        .select(
+          "id, type, collaborator_id, scheduled_time, notes, training_id, work_id, trainings(name), works(name, clients(name))",
+        )
         .eq("scheduled_date", date)
         .eq("status", "agendado");
       if (error) throw error;
@@ -287,6 +327,60 @@ export function SchedulePlannerBoard({
     (appointments.data ?? []).forEach((a) => m.set(a.collaborator_id, appointmentLabel(a)));
     return m;
   }, [appointments.data]);
+
+  /** Caixa → agendamentos do dia (usados para montar a mensagem do card). */
+  const appointmentsByBox = useMemo(() => {
+    const m = new Map<string, AppointmentRow[]>();
+    (appointments.data ?? []).forEach((a) => {
+      const key = APPOINTMENT_BOX[a.type];
+      if (!key) return;
+      const list = m.get(key) ?? [];
+      list.push(a as AppointmentRow);
+      m.set(key, list);
+    });
+    return m;
+  }, [appointments.data]);
+
+  /** Mensagem pronta (WhatsApp) para uma caixa de situação. */
+  const buildBoxMessage = (boxKey: string, boxLabel: string, names: string[]) => {
+    const list = names.join("\n");
+    const appts = appointmentsByBox.get(boxKey) ?? [];
+    const first = appts[0];
+    const hour = hourLabel(first?.scheduled_time);
+    if (boxKey === "aso") {
+      return [
+        "*EXAME ASO*",
+        ASO_ADDRESS,
+        `${dayLine(date)}${hour ? ` as ${hour}` : ""}`,
+        "",
+        list,
+        "",
+        ASO_FOOTER,
+      ].join("\n");
+    }
+    if (boxKey === "treinamento") {
+      const nr = first?.trainings?.name ?? "";
+      return [
+        `*TREINAMENTO ${nr}*`.replace(" *", "*"),
+        `${dayLine(date)}${hour ? ` as ${hour}` : ""}`,
+        "Local: Sala de Treinamentos AB5",
+        "",
+        list,
+      ].join("\n");
+    }
+    if (boxKey === "integracao") {
+      const client = first?.works?.clients?.name ?? first?.works?.name ?? "";
+      const obs = first?.notes?.trim();
+      return [
+        `*${client} - INTEGRAÇÃO*`,
+        `${dayLine(date)}${hour ? ` as ${hour}` : ""}`,
+        ...(obs ? [`*${obs}*`] : []),
+        "",
+        list,
+      ].join("\n");
+    }
+    return [`*${boxLabel}*`, dayLine(date), "", list].join("\n");
+  };
 
   const entryByCollaborator = useMemo(() => {
     const m = new Map<string, (typeof entries)[number]>();
@@ -859,6 +953,24 @@ export function SchedulePlannerBoard({
                     <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
                       {workLabel(w)}
                     </h2>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 shrink-0"
+                      title="Copiar mensagem"
+                      aria-label="Copiar mensagem"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const names = workRows
+                          .map((r) => personById.get(r.collaborator_id)?.full_name ?? "")
+                          .filter(Boolean);
+                        void copyToClipboard(
+                          [`*${workLabel(w)}*`, dayLine(date), "", names.join("\n")].join("\n"),
+                        );
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
                     <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
                       <Users className="mr-0.5 h-2.5 w-2.5" />
                       {workRows.length}
@@ -990,6 +1102,23 @@ export function SchedulePlannerBoard({
                     <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
                       {b.label}
                     </h2>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 shrink-0"
+                      title="Copiar mensagem"
+                      aria-label="Copiar mensagem"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const names = [
+                          ...autoRows.map((a) => nameOf(a.id)),
+                          ...boxRows.map((r) => nameOf(r.collaborator_id)),
+                        ].filter(Boolean);
+                        void copyToClipboard(buildBoxMessage(b.key, b.label, names));
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
                     <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
                       <Users className="mr-0.5 h-2.5 w-2.5" />
                       {boxRows.length + autoRows.length}
