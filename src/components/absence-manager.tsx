@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { addDays, formatDateBR } from "@/lib/scheduling";
+import { formatDateBR } from "@/lib/scheduling";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -111,18 +111,10 @@ export function AbsenceManager({
       if (table === "vacations") base["status"] = "scheduled";
       base["notes"] = notes.trim() || null;
 
-      let payload: Record<string, unknown>[];
-      if (mode === "single") {
-        const last = singleEnd || start;
-        const dates: string[] = [];
-        for (let d = start; d <= last; d = addDays(d, 1)) {
-          dates.push(d);
-          if (dates.length > 366) break;
-        }
-        payload = dates.map((date) => ({ ...base, collaborator_id: person, date }));
-      } else {
-        payload = [{ ...base, collaborator_id: person, start_date: start, end_date: end }];
-      }
+      const payload: Record<string, unknown> =
+        mode === "single"
+          ? { ...base, collaborator_id: person, date: start, end_date: singleEnd || null }
+          : { ...base, collaborator_id: person, start_date: start, end_date: end };
 
       const { error } = await supabase.from(table).insert(payload as never);
       if (error) throw error;
@@ -150,13 +142,13 @@ export function AbsenceManager({
 
   const isCurrent = (r: Row) => {
     const t = today();
-    if (mode === "single") return r.date === t;
+    if (mode === "single") return (r.date ?? "") <= t && (r.end_date || r.date || "") >= t;
     return !!r.start_date && !!r.end_date && r.start_date <= t && r.end_date >= t;
   };
 
   const isPast = (r: Row) => {
     const t = today();
-    return mode === "single" ? (r.date ?? "") < t : (r.end_date ?? "") < t;
+    return mode === "single" ? (r.end_date || r.date || "") < t : (r.end_date ?? "") < t;
   };
 
   return (
@@ -179,7 +171,10 @@ export function AbsenceManager({
             <TableRow>
               <TableHead>Colaborador</TableHead>
               {mode === "single" ? (
-                <TableHead>Data</TableHead>
+                <>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Fim</TableHead>
+                </>
               ) : (
                 <>
                   <TableHead>Início</TableHead>
@@ -206,7 +201,10 @@ export function AbsenceManager({
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}</TableCell>
                   {mode === "single" ? (
-                    <TableCell>{formatDateBR(r.date)}</TableCell>
+                    <>
+                      <TableCell>{formatDateBR(r.date)}</TableCell>
+                      <TableCell>{r.end_date ? formatDateBR(r.end_date) : "—"}</TableCell>
+                    </>
                   ) : (
                     <>
                       <TableCell>{formatDateBR(r.start_date)}</TableCell>

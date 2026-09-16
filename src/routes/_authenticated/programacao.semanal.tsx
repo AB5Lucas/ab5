@@ -46,7 +46,11 @@ function Page() {
         supabase.from("daily_schedules").select("id, schedule_date, status").gte("schedule_date", start).lte("schedule_date", end),
         supabase.from("vacations").select("collaborator_id, start_date, end_date").lte("start_date", end).gte("end_date", start),
         supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").lte("start_date", end).gte("end_date", start),
-        supabase.from("days_off").select("collaborator_id, date").gte("date", start).lte("date", end),
+        supabase
+          .from("days_off")
+          .select("collaborator_id, date, end_date")
+          .lte("date", end)
+          .or(`end_date.gte.${start},and(end_date.is.null,date.gte.${start})`),
         supabase.from("holidays").select("date, name").gte("date", start).lte("date", end),
         supabase.from("works").select("id, code, name").eq("active", true).order("code"),
       ]);
@@ -80,7 +84,7 @@ function Page() {
     const absences =
       (data?.vacations ?? []).filter((v) => v.start_date <= date && v.end_date >= date).length +
       (data?.leaves ?? []).filter((v) => v.start_date <= date && v.end_date >= date).length +
-      (data?.daysOff ?? []).filter((v) => v.date === date).length;
+      (data?.daysOff ?? []).filter((v) => v.date <= date && (v.end_date || v.date) >= date).length;
     return {
       date,
       schedule,

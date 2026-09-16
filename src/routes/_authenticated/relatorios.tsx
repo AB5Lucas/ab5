@@ -103,9 +103,9 @@ function Page() {
           .gte("end_date", from),
         supabase
           .from("days_off")
-          .select("id, date, collaborators(full_name)")
-          .gte("date", from)
-          .lte("date", to),
+          .select("id, date, end_date, collaborators(full_name)")
+          .lte("date", to)
+          .or(`end_date.gte.${from},and(end_date.is.null,date.gte.${from})`),
       ]);
       const rows: { id: string; tipo: string; nome: string; inicio: string; fim: string }[] = [];
       for (const v of vac.data ?? [])
@@ -130,7 +130,7 @@ function Page() {
           tipo: "Folga",
           nome: (d as any).collaborators?.full_name ?? "—",
           inicio: d.date,
-          fim: d.date,
+          fim: d.end_date || d.date,
         });
       return rows.sort((a, b) => a.inicio.localeCompare(b.inicio));
     },

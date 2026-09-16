@@ -44,7 +44,13 @@ function useDashboard() {
         count(() => supabase.from("vehicles").select("id", { count: "exact", head: true }).eq("status", "available")),
         count(() => supabase.from("vacations").select("id", { count: "exact", head: true }).lte("start_date", d).gte("end_date", d)),
         count(() => supabase.from("medical_leaves").select("id", { count: "exact", head: true }).lte("start_date", d).gte("end_date", d)),
-        count(() => supabase.from("days_off").select("id", { count: "exact", head: true }).eq("date", d)),
+        count(() =>
+          supabase
+            .from("days_off")
+            .select("id", { count: "exact", head: true })
+            .lte("date", d)
+            .or(`end_date.gte.${d},and(end_date.is.null,date.eq.${d})`),
+        ),
       ]);
 
       const { data: schedule } = await supabase

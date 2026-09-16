@@ -127,7 +127,11 @@ export async function fetchScheduleContext(date: string) {
     supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at"),
     supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date),
     supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
-    supabase.from("days_off").select("collaborator_id").eq("date", date),
+    supabase
+      .from("days_off")
+      .select("collaborator_id")
+      .lte("date", date)
+      .or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`),
     supabase.from("holidays").select("name").eq("date", date),
     supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at"),
     supabase.from("asos").select("collaborator_id, exam_date, expires_at"),
