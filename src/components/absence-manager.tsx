@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { formatDateBR } from "@/lib/scheduling";
+import { addDays, formatDateBR } from "@/lib/scheduling";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -55,6 +55,7 @@ export function AbsenceManager({
   const [person, setPerson] = useState("");
   const [start, setStart] = useState(today());
   const [end, setEnd] = useState(today());
+  const [singleEnd, setSingleEnd] = useState("");
   const [extra, setExtra] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -100,16 +101,27 @@ export function AbsenceManager({
   const add = useMutation({
     mutationFn: async () => {
       if (!person) throw new Error("Selecione o colaborador");
-      if (mode === "period" && end < start) throw new Error("A data final deve ser posterior à inicial");
+      const hasEnd = mode === "period" || (mode === "single" && !!singleEnd);
+      if (hasEnd && (mode === "period" ? end : singleEnd) < start)
+        throw new Error("A data final deve ser posterior à inicial");
 
-      const payload: Record<string, unknown> =
-        mode === "single"
-          ? { collaborator_id: person, date: start }
-          : { collaborator_id: person, start_date: start, end_date: end };
+      const base: Record<string, unknown> = {};
+      if (extraFieldName) base[extraFieldName] = extra.trim() || null;
+      if (table === "vacations") base["status"] = "scheduled";
+      base["notes"] = notes.trim() || null;
 
-      if (extraFieldName) payload[extraFieldName] = extra.trim() || null;
-      if (table === "vacations") payload["status"] = "scheduled";
-      payload["notes"] = notes.trim() || null;
+      let payload: Record<string, unknown>[];
+      if (mode === "single") {
+        const last = singleEnd || start;
+        const dates: string[] = [];
+        for (let d = start; d <= last; d = addDays(d, 1)) {
+          dates.push(d);
+          if (dates.length > 366) break;
+        }
+        payload = dates.map((date) => ({ ...base, collaborator_id: person, date }));
+      } else {
+        payload = [{ ...base, collaborator_id: person, start_date: start, end_date: end }];
+      }
 
       const { error } = await supabase.from(table).insert(payload as never);
       if (error) throw error;
