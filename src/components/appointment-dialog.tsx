@@ -314,6 +314,18 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
                   />
                 </div>
 
+                <div className="space-y-1.5">
+                  <Label htmlFor="appt-time">
+                    {type === "treinamento" ? "Horário de início *" : "Horário *"}
+                  </Label>
+                  <Input
+                    id="appt-time"
+                    type="time"
+                    value={form.scheduled_time}
+                    onChange={(e) => set("scheduled_time", e.target.value)}
+                  />
+                </div>
+
                 {type === "treinamento" && (
                   <div className="space-y-1.5">
                     <Label>Treinamento (NR) *</Label>
