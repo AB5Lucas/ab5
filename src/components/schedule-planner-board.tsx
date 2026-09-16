@@ -882,8 +882,9 @@ export function SchedulePlannerBoard({
     });
   }
 
-  const allocatedCount = rows.length;
-  const pendingCount = rows.filter((r) => r.has_pending_requirement).length;
+  const effectiveRows = rows.filter((r) => !appointmentByCollaborator.has(r.collaborator_id));
+  const allocatedCount = effectiveRows.length;
+  const pendingCount = effectiveRows.filter((r) => r.has_pending_requirement).length;
   const unavailableCount = c?.absences.size ?? 0;
 
   return (
