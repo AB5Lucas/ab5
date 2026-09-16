@@ -1243,14 +1243,23 @@ export function SchedulePlannerBoard({
             <h3 className="font-display text-[11px] font-semibold uppercase tracking-wide">Colaboradores</h3>
             {selectedWork && (
               <p className="text-[10px] text-muted-foreground">
-                Filtrando para{" "}
+                {showAll ? "Mostrando todos para" : "Aptos para"}{" "}
                 <span className="font-medium text-foreground">
                   {(() => {
                     const w = works.find((x) => x.id === selectedWork);
                     return w ? workLabel(w) : "";
                   })()}
                 </span>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={() => setShowAll((v) => !v)}
+                  className="underline"
+                >
+                  {showAll ? "ver só aptos" : "ver todos"}
+                </button>
               </p>
+
             )}
             <div className="relative">
               <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
