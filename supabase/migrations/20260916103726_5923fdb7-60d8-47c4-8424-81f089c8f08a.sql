@@ -1,0 +1,1 @@
+ALTER TABLE public.days_off ADD COLUMN IF NOT EXISTS end_date date;

@@ -535,6 +535,7 @@ export type Database = {
           collaborator_id: string
           created_at: string
           date: string
+          end_date: string | null
           id: string
           notes: string | null
           reason: string | null
@@ -543,6 +544,7 @@ export type Database = {
           collaborator_id: string
           created_at?: string
           date: string
+          end_date?: string | null
           id?: string
           notes?: string | null
           reason?: string | null
@@ -551,6 +553,7 @@ export type Database = {
           collaborator_id?: string
           created_at?: string
           date?: string
+          end_date?: string | null
           id?: string
           notes?: string | null
           reason?: string | null
