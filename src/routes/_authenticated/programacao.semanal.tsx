@@ -177,7 +177,9 @@ function Page() {
                   <p className="text-xs text-destructive">{d.pending} alocação(ões) com pendência</p>
                 )}
                 <Button asChild variant="outline" size="sm" className="w-full">
-                  <Link to="/programacao/diaria">Abrir programação</Link>
+                  <Link to="/programacao/diaria" search={{ date: d.date }}>
+                    Abrir programação
+                  </Link>
                 </Button>
               </div>
             );

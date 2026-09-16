@@ -1,10 +1,16 @@
-import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { PageHeader } from "@/components/page-header";
 import { SchedulePlannerBoard } from "@/components/schedule-planner-board";
 import { todayISO } from "@/lib/scheduling";
 
+const searchSchema = z.object({
+  date: fallback(z.string(), "").default(""),
+});
+
 export const Route = createFileRoute("/_authenticated/programacao/diaria")({
+  validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
       { title: "Programação Diária | Programação Operacional" },
@@ -19,7 +25,9 @@ export const Route = createFileRoute("/_authenticated/programacao/diaria")({
 });
 
 function DailySchedulePage() {
-  const [date, setDate] = useState(todayISO());
+  const { date } = Route.useSearch();
+  const navigate = useNavigate({ from: "/programacao/diaria" });
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayISO();
 
   return (
     <div className="space-y-4">
@@ -27,7 +35,10 @@ function DailySchedulePage() {
         title="Programação Diária"
         description="Arraste os colaboradores da lista lateral para os cards de obra. O sistema valida disponibilidade, conflitos e requisitos."
       />
-      <SchedulePlannerBoard date={date} onDateChange={setDate} />
+      <SchedulePlannerBoard
+        date={valid}
+        onDateChange={(d) => navigate({ search: { date: d } })}
+      />
     </div>
   );
 }
