@@ -291,7 +291,9 @@ export function SchedulePlannerBoard({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select("id, type, collaborator_id, training_id, work_id, trainings(name), works(name, clients(name))")
+        .select(
+          "id, type, collaborator_id, scheduled_time, notes, training_id, work_id, trainings(name), works(name, clients(name))",
+        )
         .eq("scheduled_date", date)
         .eq("status", "agendado");
       if (error) throw error;
