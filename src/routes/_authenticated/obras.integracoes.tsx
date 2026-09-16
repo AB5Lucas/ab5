@@ -40,7 +40,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { AppointmentDialog } from "@/components/appointment-dialog";
-import { createNameMatcher, emptyToNull, parseDate } from "@/lib/import-helpers";
+import { createNameMatcher, emptyToNull, normText, parseDate } from "@/lib/import-helpers";
 import { addDays, formatDateBR, todayISO, INTEGRATION_WARN_DAYS } from "@/lib/scheduling";
 
 export const Route = createFileRoute("/_authenticated/obras/integracoes")({
@@ -91,7 +91,7 @@ function statusOf(expires: string | null, today: string): Status {
 }
 
 const IMPORT_COLUMNS: ImportColumn[] = [
-  { key: "cpf", required: true, hint: "Identifica o colaborador já cadastrado.", example: "123.456.789-00" },
+  { key: "matricula", required: true, hint: "Identifica o colaborador já cadastrado.", example: "1024" },
   { key: "cliente", required: true, hint: "Nome do cliente já cadastrado.", example: "Cristália" },
   { key: "data_integracao", required: true, hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2026-01-15" },
   { key: "validade", hint: "Data de vencimento. Em branco = sem vencimento.", example: "2027-01-15" },
@@ -155,7 +155,7 @@ function IntegrationsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("collaborators")
-        .select("id, full_name, cpf, position_id")
+        .select("id, full_name, cpf, registration_number, position_id")
         .order("full_name");
       if (error) throw error;
       return data;
@@ -190,7 +190,10 @@ function IntegrationsPage() {
   });
 
   const personById = useMemo(() => {
-    const m = new Map<string, { id: string; full_name: string; cpf: string | null; position_id: string | null }>();
+    const m = new Map<
+      string,
+      { id: string; full_name: string; cpf: string | null; registration_number: string | null; position_id: string | null }
+    >();
     (collaborators.data ?? []).forEach((p) => m.set(p.id, p));
     return m;
   }, [collaborators.data]);
@@ -337,10 +340,10 @@ function IntegrationsPage() {
     const errors: string[] = [];
     let inserted = 0;
 
-    const byCpf = new Map<string, string>();
+    const byReg = new Map<string, string>();
     (collaborators.data ?? []).forEach((p) => {
-      const d = onlyDigits(p.cpf ?? "");
-      if (d) byCpf.set(d, p.id);
+      const k = normText(p.registration_number ?? "");
+      if (k) byReg.set(k, p.id);
     });
     const matchClient = createNameMatcher(clients.data ?? []);
     const existing = new Map<string, string>(
@@ -351,10 +354,10 @@ function IntegrationsPage() {
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i]!;
       const line = i + 2;
-      const cpf = onlyDigits(r["cpf"] ?? "");
-      const personId = cpf ? byCpf.get(cpf) : undefined;
+      const reg = normText(r["matricula"] ?? "");
+      const personId = reg ? byReg.get(reg) : undefined;
       if (!personId) {
-        errors.push(`Linha ${line}: colaborador não encontrado pelo CPF "${r["cpf"] ?? ""}".`);
+        errors.push(`Linha ${line}: matrícula "${r["matricula"] ?? ""}" não encontrada no cadastro.`);
         continue;
       }
       const client = matchClient(r["cliente"] ?? "");
@@ -410,7 +413,7 @@ function IntegrationsPage() {
             {canWrite && (
               <ImportDialog
                 entity="integrações"
-                description="Importe as integrações em massa. O colaborador é identificado pelo CPF e o cliente pelo nome já cadastrado."
+                description="Importe as integrações em massa. O colaborador é identificado pela matrícula e o cliente pelo nome já cadastrado."
                 columns={IMPORT_COLUMNS}
                 onImport={importRows}
               />
