@@ -111,18 +111,10 @@ export function AbsenceManager({
       if (table === "vacations") base["status"] = "scheduled";
       base["notes"] = notes.trim() || null;
 
-      let payload: Record<string, unknown>[];
-      if (mode === "single") {
-        const last = singleEnd || start;
-        const dates: string[] = [];
-        for (let d = start; d <= last; d = addDays(d, 1)) {
-          dates.push(d);
-          if (dates.length > 366) break;
-        }
-        payload = dates.map((date) => ({ ...base, collaborator_id: person, date }));
-      } else {
-        payload = [{ ...base, collaborator_id: person, start_date: start, end_date: end }];
-      }
+      const payload: Record<string, unknown> =
+        mode === "single"
+          ? { ...base, collaborator_id: person, date: start, end_date: singleEnd || null }
+          : { ...base, collaborator_id: person, start_date: start, end_date: end };
 
       const { error } = await supabase.from(table).insert(payload as never);
       if (error) throw error;
