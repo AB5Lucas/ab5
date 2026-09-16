@@ -523,7 +523,7 @@ export function SchedulePlannerBoard({
     if (entry && !opts?.ignoreEntry)
       return base({
         level: "block",
-        reasons: [`Registrado em ${BOX_LABEL[entry.box_key] ?? entry.box_key}`],
+        reasons: [`Registrado em ${boxLabelOf(entry.box_key)}`],
       });
 
     if (!workId) {
