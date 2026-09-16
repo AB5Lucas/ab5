@@ -84,7 +84,7 @@ function Page() {
     const absences =
       (data?.vacations ?? []).filter((v) => v.start_date <= date && v.end_date >= date).length +
       (data?.leaves ?? []).filter((v) => v.start_date <= date && v.end_date >= date).length +
-      (data?.daysOff ?? []).filter((v) => v.date === date).length;
+      (data?.daysOff ?? []).filter((v) => v.date <= date && (v.end_date || v.date) >= date).length;
     return {
       date,
       schedule,

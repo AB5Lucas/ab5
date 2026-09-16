@@ -130,7 +130,7 @@ function Page() {
           tipo: "Folga",
           nome: (d as any).collaborators?.full_name ?? "—",
           inicio: d.date,
-          fim: d.date,
+          fim: d.end_date || d.date,
         });
       return rows.sort((a, b) => a.inicio.localeCompare(b.inicio));
     },
