@@ -167,7 +167,7 @@ function toForm(c: Collaborator): FormState {
     is_driver: c.is_driver,
     driver_license_category: c.driver_license_category ?? "",
     driver_license_expiry: c.driver_license_expiry ?? "",
-    salary: c.salary == null ? "" : String(c.salary),
+    salary: c.salary == null ? "" : Number(c.salary).toFixed(2).replace(".", ","),
     contract_type: c.contract_type ?? NONE,
     rg: c.rg ?? "",
     notes: c.notes ?? "",
@@ -582,13 +582,13 @@ function CollaboratorsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="salary">Salário (R$)</Label>
+              <Label htmlFor="salary">Valor hora (R$)</Label>
               <Input
                 id="salary"
                 inputMode="decimal"
                 value={form.salary}
                 onChange={(e) => set("salary", e.target.value.replace(/[^\d.,]/g, ""))}
-                placeholder="3500,00"
+                placeholder="11,22"
               />
             </div>
 
