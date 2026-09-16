@@ -821,11 +821,12 @@ export type Database = {
           id: string
           notes: string | null
           passenger_count: number
+          purpose: string
           return_time: string | null
           schedule_id: string
           updated_at: string
           vehicle_id: string | null
-          work_id: string
+          work_id: string | null
         }
         Insert: {
           created_at?: string
@@ -834,11 +835,12 @@ export type Database = {
           id?: string
           notes?: string | null
           passenger_count?: number
+          purpose?: string
           return_time?: string | null
           schedule_id: string
           updated_at?: string
           vehicle_id?: string | null
-          work_id: string
+          work_id?: string | null
         }
         Update: {
           created_at?: string
@@ -847,11 +849,12 @@ export type Database = {
           id?: string
           notes?: string | null
           passenger_count?: number
+          purpose?: string
           return_time?: string | null
           schedule_id?: string
           updated_at?: string
           vehicle_id?: string | null
-          work_id?: string
+          work_id?: string | null
         }
         Relationships: [
           {

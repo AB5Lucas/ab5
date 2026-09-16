@@ -78,7 +78,7 @@ function DriversPage() {
       const workName = new Map((works ?? []).map((w) => [w.id, w.name]));
       const map: Record<string, string> = {};
       (transports ?? []).forEach((t) => {
-        if (t.driver_id) map[t.driver_id] = workName.get(t.work_id) ?? "Obra";
+        if (t.driver_id) map[t.driver_id] = (t.work_id ? workName.get(t.work_id) : null) ?? "Obra";
       });
       return map;
     },
