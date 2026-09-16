@@ -272,6 +272,7 @@ export function SchedulePlannerBoard({
     level: "ok",
     reasons: [],
     integration: null,
+    aso: null,
     reqIssues: 0,
     reqBlocked: false,
     fit: false,
