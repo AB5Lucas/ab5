@@ -171,7 +171,10 @@ export function AbsenceManager({
             <TableRow>
               <TableHead>Colaborador</TableHead>
               {mode === "single" ? (
-                <TableHead>Data</TableHead>
+                <>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Fim</TableHead>
+                </>
               ) : (
                 <>
                   <TableHead>Início</TableHead>
