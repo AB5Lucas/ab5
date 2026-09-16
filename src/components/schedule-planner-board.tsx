@@ -950,9 +950,9 @@ export function SchedulePlannerBoard({
               .slice()
               .sort((x, y) => byName(x.collaborator_id, y.collaborator_id));
             const autoRows = (absenceMembers.get(b.key) ?? [])
-              .filter((id) => !boxRows.some((r) => r.collaborator_id === id))
+              .filter((a) => !boxRows.some((r) => r.collaborator_id === a.id))
               .slice()
-              .sort(byName);
+              .sort((x, y) => byName(x.id, y.id));
             const isHover = hoverBox === b.key;
             const handleDrop = (e: React.DragEvent) => {
               e.preventDefault();
@@ -1006,11 +1006,11 @@ export function SchedulePlannerBoard({
                       Arraste colaboradores para cá
                     </li>
                   )}
-                  {autoRows.map((id) => {
-                    const p = personById.get(id);
+                  {autoRows.map((a) => {
+                    const p = personById.get(a.id);
                     return (
                       <li
-                        key={`auto-${id}`}
+                        key={`auto-${a.id}`}
                         onDragOver={handleOver}
                         onDrop={handleDrop}
                         className="flex items-center gap-1.5 px-2 py-1 text-xs"
@@ -1021,8 +1021,11 @@ export function SchedulePlannerBoard({
                             {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
                           </p>
                         </div>
-                        <Badge variant="secondary" className="shrink-0 px-1 py-0 text-[9px]">
-                          Cadastrado
+                        <Badge
+                          variant={a.note === "Cadastrado" ? "secondary" : "default"}
+                          className="shrink-0 px-1 py-0 text-[9px]"
+                        >
+                          {a.note}
                         </Badge>
                       </li>
                     );
