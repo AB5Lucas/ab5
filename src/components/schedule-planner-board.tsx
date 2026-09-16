@@ -346,6 +346,11 @@ export function SchedulePlannerBoard({
 
     if (absence) return base({ level: "block", reasons: [`Indisponível: ${absence.toLowerCase()}`] });
 
+    const appointment = appointmentByCollaborator.get(collaboratorId);
+    if (appointment)
+      return base({ level: "block", reasons: [`Compromisso agendado: ${appointment}`] });
+
+
     const entry = entryByCollaborator.get(collaboratorId);
     if (entry && !opts?.ignoreEntry)
       return base({
