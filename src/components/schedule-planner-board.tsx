@@ -882,7 +882,9 @@ export function SchedulePlannerBoard({
     });
   }
 
-  const effectiveRows = rows.filter((r) => !appointmentByCollaborator.has(r.collaborator_id));
+  const effectiveRows = rows.filter(
+    (r) => !appointmentByCollaborator.has(r.collaborator_id) && !c?.absences.has(r.collaborator_id),
+  );
   const allocatedCount = effectiveRows.length;
   const pendingCount = effectiveRows.filter((r) => r.has_pending_requirement).length;
   const unavailableCount = c?.absences.size ?? 0;
@@ -1021,7 +1023,12 @@ export function SchedulePlannerBoard({
           )}
           {shownWorks.map((w) => {
             const workRows = rows
-              .filter((r) => r.work_id === w.id && !appointmentByCollaborator.has(r.collaborator_id))
+              .filter(
+                (r) =>
+                  r.work_id === w.id &&
+                  !appointmentByCollaborator.has(r.collaborator_id) &&
+                  !c?.absences.has(r.collaborator_id),
+              )
               .slice()
               .sort((a, b) =>
                 (personById.get(a.collaborator_id)?.full_name ?? "").localeCompare(
