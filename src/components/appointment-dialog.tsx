@@ -192,6 +192,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     mutationFn: async () => {
       if (!form.collaborator_id) throw new Error("Selecione o colaborador");
       if (!form.scheduled_date) throw new Error("Informe a data do agendamento");
+      if (!form.scheduled_time) throw new Error("Informe o horário do agendamento");
       if (type === "treinamento" && !form.training_id) throw new Error("Selecione o treinamento (NR)");
       if (type === "integracao" && !form.work_id) throw new Error("Selecione a obra/serviço");
       const payload = {
