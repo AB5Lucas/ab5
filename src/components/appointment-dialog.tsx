@@ -252,6 +252,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     setForm({
       collaborator_id: r.collaborator_id,
       scheduled_date: r.scheduled_date,
+      scheduled_time: r.scheduled_time?.slice(0, 5) ?? "07:00",
       training_id: r.training_id ?? "",
       work_id: r.work_id ?? "",
       notes: r.notes ?? "",
