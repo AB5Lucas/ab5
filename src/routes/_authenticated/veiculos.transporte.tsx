@@ -39,6 +39,7 @@ export const Route = createFileRoute("/_authenticated/veiculos/transporte")({
 const NONE = "__none__";
 
 type FormState = {
+  client_id: string;
   work_id: string;
   vehicle_id: string;
   driver_id: string;
@@ -49,6 +50,7 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
+  client_id: "",
   work_id: "",
   vehicle_id: NONE,
   driver_id: NONE,
@@ -75,7 +77,11 @@ function TransportPage() {
     queryKey: ["transport-base"],
     queryFn: async () => {
       const [works, vehicles, drivers] = await Promise.all([
-        supabase.from("works").select("id, name, entry_time, exit_time, status").eq("active", true).order("name"),
+        supabase
+          .from("works")
+          .select("id, name, entry_time, exit_time, status, client_id, clients(name)")
+          .eq("active", true)
+          .order("name"),
         supabase.from("vehicles").select("id, plate, model, passenger_capacity, status").order("plate"),
         supabase
           .from("collaborators")
@@ -126,11 +132,46 @@ function TransportPage() {
     return map;
   }, [base.data]);
 
+  const clientOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; workIds: string[] }>();
+    (base.data?.works ?? []).forEach((w) => {
+      if (!w.client_id) return;
+      const entry = map.get(w.client_id) ?? {
+        id: w.client_id,
+        name: w.clients?.name ?? "Cliente",
+        workIds: [],
+      };
+      entry.workIds.push(w.id);
+      map.set(w.client_id, entry);
+    });
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [base.data]);
+
+  const clientNameOfWork = useMemo(() => {
+    const map = new Map<string, string>();
+    (base.data?.works ?? []).forEach((w) => map.set(w.id, w.clients?.name ?? w.name));
+    return map;
+  }, [base.data]);
+
+  const clientIdOfWork = useMemo(() => {
+    const map = new Map<string, string>();
+    (base.data?.works ?? []).forEach((w) => {
+      if (w.client_id) map.set(w.id, w.client_id);
+    });
+    return map;
+  }, [base.data]);
+
+  const passengersOfClient = (clientId: string) => {
+    const option = clientOptions.find((c) => c.id === clientId);
+    if (!option) return 0;
+    return option.workIds.reduce((sum, id) => sum + (day.data?.allocationsByWork[id] ?? 0), 0);
+  };
+
   const save = useMutation({
     mutationFn: async () => {
       const scheduleId = day.data?.schedule?.id;
       if (!scheduleId) throw new Error("Crie a programação do dia antes de planejar o transporte.");
-      if (!form.work_id) throw new Error("Selecione a obra.");
+      if (!form.client_id || !form.work_id) throw new Error("Selecione o cliente.");
       const passengers = Number(form.passenger_count || 0);
       const capacity = form.vehicle_id === NONE ? null : capacityOf.get(form.vehicle_id) ?? 0;
       if (capacity !== null && capacity > 0 && passengers > capacity) {
@@ -172,14 +213,17 @@ function TransportPage() {
   });
 
   function openNew() {
-    const firstWork = base.data?.works[0];
+    const first = clientOptions[0];
+    const firstWorkId = first?.workIds[0] ?? "";
+    const w = base.data?.works.find((x) => x.id === firstWorkId);
     setEditingId(null);
     setForm({
       ...emptyForm,
-      work_id: firstWork?.id ?? "",
-      departure_time: firstWork?.entry_time?.slice(0, 5) ?? "",
-      return_time: firstWork?.exit_time?.slice(0, 5) ?? "",
-      passenger_count: String(firstWork ? day.data?.allocationsByWork[firstWork.id] ?? 0 : 0),
+      client_id: first?.id ?? "",
+      work_id: firstWorkId,
+      departure_time: w?.entry_time?.slice(0, 5) ?? "",
+      return_time: w?.exit_time?.slice(0, 5) ?? "",
+      passenger_count: String(first ? passengersOfClient(first.id) : 0),
     });
     setOpen(true);
   }
@@ -187,6 +231,7 @@ function TransportPage() {
   function openEdit(t: Tables<"transport_allocations">) {
     setEditingId(t.id);
     setForm({
+      client_id: clientIdOfWork.get(t.work_id) ?? "",
       work_id: t.work_id,
       vehicle_id: t.vehicle_id ?? NONE,
       driver_id: t.driver_id ?? NONE,
@@ -198,14 +243,17 @@ function TransportPage() {
     setOpen(true);
   }
 
-  function onWorkChange(workId: string) {
+  function onClientChange(clientId: string) {
+    const option = clientOptions.find((c) => c.id === clientId);
+    const workId = option?.workIds[0] ?? "";
     const w = base.data?.works.find((x) => x.id === workId);
     setForm((f) => ({
       ...f,
+      client_id: clientId,
       work_id: workId,
       departure_time: f.departure_time || w?.entry_time?.slice(0, 5) || "",
       return_time: f.return_time || w?.exit_time?.slice(0, 5) || "",
-      passenger_count: String(day.data?.allocationsByWork[workId] ?? f.passenger_count),
+      passenger_count: String(passengersOfClient(clientId)),
     }));
   }
 
@@ -242,7 +290,7 @@ function TransportPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Obra</TableHead>
+              <TableHead>Cliente</TableHead>
               <TableHead>Veículo</TableHead>
               <TableHead>Motorista</TableHead>
               <TableHead>Saída</TableHead>
@@ -262,7 +310,7 @@ function TransportPage() {
                 const over = capacity > 0 && t.passenger_count > capacity;
                 return (
                   <TableRow key={t.id}>
-                    <TableCell className="font-medium">{nameOf.get(t.work_id) ?? "—"}</TableCell>
+                    <TableCell className="font-medium">{clientNameOfWork.get(t.work_id) ?? nameOf.get(t.work_id) ?? "—"}</TableCell>
                     <TableCell>{t.vehicle_id ? nameOf.get(t.vehicle_id) ?? "—" : "Sem veículo"}</TableCell>
                     <TableCell>{t.driver_id ? nameOf.get(t.driver_id) ?? "—" : "Sem motorista"}</TableCell>
                     <TableCell>{t.departure_time?.slice(0, 5) ?? "—"}</TableCell>
@@ -297,18 +345,18 @@ function TransportPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <Label>Obra</Label>
-              <Select value={form.work_id} onValueChange={onWorkChange}>
-                <SelectTrigger><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
+              <Label>Cliente</Label>
+              <Select value={form.client_id} onValueChange={onClientChange}>
+                <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                 <SelectContent>
-                  {base.data?.works.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                  {clientOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {form.work_id && (
+              {form.client_id && (
                 <p className="text-xs text-muted-foreground">
-                  {day.data?.allocationsByWork[form.work_id] ?? 0} colaboradores programados nesta obra.
+                  {passengersOfClient(form.client_id)} colaboradores programados neste cliente.
                 </p>
               )}
             </div>
