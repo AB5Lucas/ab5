@@ -61,6 +61,7 @@ type Evaluation = {
   level: Level;
   reasons: string[];
   integration: IntegrationStatus | null;
+  aso: AsoStatus | null;
   reqIssues: number;
   reqBlocked: boolean;
   fit: boolean;
