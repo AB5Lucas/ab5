@@ -66,6 +66,8 @@ type Evaluation = {
   reqIssues: number;
   reqBlocked: boolean;
   fit: boolean;
+  /** Indisponível por ausência/compromisso/caixa: aparece como ocupado, mas não pode ser alocado. */
+  hardBlock?: boolean;
 };
 
 type DragPayload = { collaboratorId: string; allocationId: string | null; entryId?: string | null };
@@ -511,17 +513,19 @@ export function SchedulePlannerBoard({
       return w ? workLabel(w) : "outra obra";
     };
 
-    if (absence) return base({ level: "block", reasons: [`Indisponível: ${absence.toLowerCase()}`] });
+    if (absence)
+      return base({ level: "busy", hardBlock: true, reasons: [`Indisponível: ${absence.toLowerCase()}`] });
 
     const appointment = appointmentByCollaborator.get(collaboratorId);
     if (appointment)
-      return base({ level: "block", reasons: [`Compromisso agendado: ${appointment}`] });
+      return base({ level: "busy", hardBlock: true, reasons: [`Compromisso agendado: ${appointment}`] });
 
 
     const entry = entryByCollaborator.get(collaboratorId);
     if (entry && !opts?.ignoreEntry)
       return base({
-        level: "block",
+        level: "busy",
+        hardBlock: true,
         reasons: [`Registrado em ${boxLabelOf(entry.box_key)}`],
       });
 
@@ -600,7 +604,7 @@ export function SchedulePlannerBoard({
       const ev = evaluate(p.id, selectedWork);
       // Com uma obra selecionada, mostra somente quem está apto para ela
       // (alocado ou não), a menos que o usuário peça para ver todos.
-      if (selectedWork && !showAll && ev.level === "block") return false;
+      if (selectedWork && !showAll && (ev.level === "block" || ev.hardBlock)) return false;
       for (const f of filters) {
         if (f === "allocated" && !alloc) return false;
         if (f === "unallocated" && alloc) return false;
@@ -685,7 +689,8 @@ export function SchedulePlannerBoard({
       const name = person?.full_name ?? "Colaborador";
       const fromBox = entryByCollaborator.get(collaboratorId) ?? null;
       const ev = evaluate(collaboratorId, workId, { ignoreEntry: true });
-      if (ev.level === "block") throw new Error(`${name} não pode ser alocado nesta obra: ${ev.reasons.join(", ")}`);
+      if (ev.level === "block" || ev.hardBlock)
+        throw new Error(`${name} não pode ser alocado nesta obra: ${ev.reasons.join(", ")}`);
 
       const issues = checkRequirements(c, workId, collaboratorId, date);
       const id = await ensureSchedule();
@@ -1022,7 +1027,11 @@ export function SchedulePlannerBoard({
                 ),
               );
             const blockedTarget =
-              !!dragging && evaluate(dragging.collaboratorId, w.id, { ignoreEntry: true }).level === "block";
+              !!dragging &&
+              (() => {
+                const e = evaluate(dragging.collaboratorId, w.id, { ignoreEntry: true });
+                return e.level === "block" || !!e.hardBlock;
+              })();
             const isHover = hoverWork === w.id;
             return (
               <section
@@ -1430,7 +1439,7 @@ export function SchedulePlannerBoard({
             {filtered.map((p) => {
               const ev = evaluate(p.id, selectedWork);
               const alloc = allocByCollaborator.get(p.id);
-              const canDrag = editable && ev.level !== "block";
+              const canDrag = editable && ev.level !== "block" && !ev.hardBlock;
               const open = expanded.has(p.id);
               return (
                 <li
