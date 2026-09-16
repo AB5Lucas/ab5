@@ -328,6 +328,19 @@ export function SchedulePlannerBoard({
     return m;
   }, [appointments.data]);
 
+  /** Caixa → agendamentos do dia (usados para montar a mensagem do card). */
+  const appointmentsByBox = useMemo(() => {
+    const m = new Map<string, AppointmentRow[]>();
+    (appointments.data ?? []).forEach((a) => {
+      const key = APPOINTMENT_BOX[a.type];
+      if (!key) return;
+      const list = m.get(key) ?? [];
+      list.push(a as AppointmentRow);
+      m.set(key, list);
+    });
+    return m;
+  }, [appointments.data]);
+
   const entryByCollaborator = useMemo(() => {
     const m = new Map<string, (typeof entries)[number]>();
     entries.forEach((e) => m.set(e.collaborator_id, e));
