@@ -35,15 +35,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   addDays,
+  checkAso,
   checkIntegration,
   checkRequirements,
   fetchScheduleContext,
   formatBR,
   formatDateBR,
   todayISO,
+  workRequiresIntegration,
+  ASO_LABEL,
   INTEGRATION_LABEL,
 } from "@/lib/scheduling";
-import type { IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
+import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<string, string> = {
