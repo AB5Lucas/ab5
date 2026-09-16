@@ -133,6 +133,21 @@ const APPOINTMENT_BOX: Record<string, string> = {
   integracao: "integracao",
 };
 
+/** Prefixo das caixas de integração (uma por cliente). */
+const INTEGRATION_PREFIX = "integracao:";
+
+/** Nome do cliente da caixa de integração. */
+function integrationClientOf(boxKey: string) {
+  return boxKey.slice(INTEGRATION_PREFIX.length);
+}
+
+/** Rótulo de uma caixa (inclui as dinâmicas de integração por cliente). */
+function boxLabelOf(boxKey: string): string {
+  if (boxKey.startsWith(INTEGRATION_PREFIX))
+    return `INTEGRAÇÃO - ${integrationClientOf(boxKey).toUpperCase()}`;
+  return BOX_LABEL[boxKey] ?? boxKey;
+}
+
 type AppointmentRow = {
   type: string;
   collaborator_id: string;
