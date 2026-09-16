@@ -39,6 +39,7 @@ export const Route = createFileRoute("/_authenticated/veiculos/transporte")({
 const NONE = "__none__";
 
 type FormState = {
+  client_id: string;
   work_id: string;
   vehicle_id: string;
   driver_id: string;
