@@ -200,6 +200,13 @@ function appointmentLabel(a: AppointmentRow): string {
   return `Integração - ${a.works?.clients?.name ?? a.works?.name ?? "—"}`;
 }
 
+/** Caixa do agendamento — integrações são separadas por cliente. */
+function appointmentBoxKey(a: AppointmentRow): string | null {
+  if (a.type === "integracao")
+    return `${INTEGRATION_PREFIX}${a.works?.clients?.name ?? a.works?.name ?? "—"}`;
+  return APPOINTMENT_BOX[a.type] ?? null;
+}
+
 const FILTERS = [
   { key: "allocated", label: "Já alocados" },
   { key: "unallocated", label: "Não alocados" },
