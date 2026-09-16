@@ -437,8 +437,9 @@ export function SchedulePlannerBoard({
         list,
       ].join("\n");
     }
-    if (boxKey === "integracao") {
-      const client = first?.works?.clients?.name ?? first?.works?.name ?? "";
+    if (boxKey.startsWith(INTEGRATION_PREFIX) || boxKey === "integracao") {
+      const client =
+        first?.works?.clients?.name ?? first?.works?.name ?? integrationClientOf(boxKey);
       const obs = first?.notes?.trim();
       return [
         `*${client} - INTEGRAÇÃO*`,
