@@ -197,7 +197,9 @@ export function SchedulePlannerBoard({
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Set<FilterKey>>(new Set());
+  const [showAll, setShowAll] = useState(false);
   const [selectedWork, setSelectedWork] = useState<string | null>(null);
+
   const [dragging, setDragging] = useState<DragPayload | null>(null);
   const [hoverWork, setHoverWork] = useState<string | null>(null);
   const [hoverPanel, setHoverPanel] = useState(false);
