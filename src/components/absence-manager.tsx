@@ -142,13 +142,13 @@ export function AbsenceManager({
 
   const isCurrent = (r: Row) => {
     const t = today();
-    if (mode === "single") return r.date === t;
+    if (mode === "single") return (r.date ?? "") <= t && (r.end_date || r.date || "") >= t;
     return !!r.start_date && !!r.end_date && r.start_date <= t && r.end_date >= t;
   };
 
   const isPast = (r: Row) => {
     const t = today();
-    return mode === "single" ? (r.date ?? "") < t : (r.end_date ?? "") < t;
+    return mode === "single" ? (r.end_date || r.date || "") < t : (r.end_date ?? "") < t;
   };
 
   return (
