@@ -310,7 +310,7 @@ function TransportPage() {
                 const over = capacity > 0 && t.passenger_count > capacity;
                 return (
                   <TableRow key={t.id}>
-                    <TableCell className="font-medium">{nameOf.get(t.work_id) ?? "—"}</TableCell>
+                    <TableCell className="font-medium">{clientNameOfWork.get(t.work_id) ?? nameOf.get(t.work_id) ?? "—"}</TableCell>
                     <TableCell>{t.vehicle_id ? nameOf.get(t.vehicle_id) ?? "—" : "Sem veículo"}</TableCell>
                     <TableCell>{t.driver_id ? nameOf.get(t.driver_id) ?? "—" : "Sem motorista"}</TableCell>
                     <TableCell>{t.departure_time?.slice(0, 5) ?? "—"}</TableCell>
