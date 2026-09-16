@@ -38,7 +38,23 @@ export const Route = createFileRoute("/_authenticated/veiculos/transporte")({
 
 const NONE = "__none__";
 
+const PURPOSES = [
+  { key: "backup", label: "BACKUP" },
+  { key: "pessoal", label: "PESSOAL" },
+  { key: "vendedor", label: "VENDEDOR" },
+] as const;
+
+const PURPOSE_LABEL: Record<string, string> = {
+  obra: "Em obra",
+  backup: "BACKUP",
+  pessoal: "PESSOAL",
+  vendedor: "VENDEDOR",
+};
+
+const isSpecial = (p: string) => p !== "obra";
+
 type FormState = {
+  purpose: string;
   client_id: string;
   work_id: string;
   vehicle_id: string;
@@ -50,6 +66,7 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
+  purpose: "obra",
   client_id: "",
   work_id: "",
   vehicle_id: NONE,
