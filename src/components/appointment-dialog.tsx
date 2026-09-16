@@ -211,6 +211,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
       toast.success(editing ? "Agendamento atualizado" : "Agendamento criado");
       reset();
       qc.invalidateQueries({ queryKey: ["appointments"] });
+      qc.invalidateQueries({ queryKey: ["appointments-day"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -223,6 +224,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     onSuccess: () => {
       toast.success("Situação atualizada");
       qc.invalidateQueries({ queryKey: ["appointments"] });
+      qc.invalidateQueries({ queryKey: ["appointments-day"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -235,6 +237,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     onSuccess: () => {
       toast.success("Agendamento excluído");
       qc.invalidateQueries({ queryKey: ["appointments"] });
+      qc.invalidateQueries({ queryKey: ["appointments-day"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
