@@ -381,7 +381,7 @@ export function SchedulePlannerBoard({
       m.set(key, list);
     });
     (appointments.data ?? []).forEach((a) => {
-      const key = APPOINTMENT_BOX[a.type] ?? null;
+      const key = appointmentBoxKey(a as AppointmentRow);
       if (!key) return;
       const list = m.get(key) ?? [];
       list.push({ id: a.collaborator_id, note: appointmentLabel(a) });
