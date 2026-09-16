@@ -922,6 +922,33 @@ export function SchedulePlannerBoard({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">
+                <MapPin className="h-4 w-4" /> Serviços
+                <Badge variant="secondary" className="ml-1">
+                  {shownWorks.length}/{works.length}
+                </Badge>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-80 w-72 overflow-y-auto">
+              <DropdownMenuLabel>Serviços do dia</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {works.map((w) => (
+                <DropdownMenuCheckboxItem
+                  key={w.id}
+                  checked={!hiddenWorks.has(w.id)}
+                  onCheckedChange={() => toggleWorkVisible(w.id)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {workLabel(w)}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {works.length === 0 && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum serviço cadastrado.</p>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {editable && (
             <>
               <Button size="sm" variant="outline" onClick={() => generateFromBase.mutate()} disabled={generateFromBase.isPending}>
