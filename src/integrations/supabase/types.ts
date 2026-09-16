@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      asos: {
+        Row: {
+          collaborator_id: string
+          created_at: string
+          exam_date: string
+          expires_at: string
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          collaborator_id: string
+          created_at?: string
+          exam_date: string
+          expires_at?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          collaborator_id?: string
+          created_at?: string
+          exam_date?: string
+          expires_at?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asos_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string

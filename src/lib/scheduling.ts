@@ -52,8 +52,31 @@ export type Integration = {
   expires_at: string | null;
 };
 
+export type Aso = {
+  collaborator_id: string;
+  exam_date: string;
+  expires_at: string;
+};
+
 /** Dias de antecedência para considerar a integração "próxima do vencimento". */
 export const INTEGRATION_WARN_DAYS = 30;
+
+export type AsoStatus = "valid" | "expiring" | "expired" | "missing";
+
+export const ASO_LABEL: Record<AsoStatus, string> = {
+  valid: "ASO válido",
+  expiring: "ASO próximo do vencimento",
+  expired: "ASO vencido",
+  missing: "Sem ASO cadastrado",
+};
+
+/** Status do ASO mais recente do colaborador (não depende da obra). */
+export function asoStatusOf(expires: string | null | undefined, date: string): AsoStatus {
+  if (!expires) return "missing";
+  if (expires < date) return "expired";
+  if (expires <= addDays(date, INTEGRATION_WARN_DAYS)) return "expiring";
+  return "valid";
+}
 
 export type IntegrationStatus =
   | "valid"
@@ -88,6 +111,7 @@ export async function fetchScheduleContext(date: string) {
     daysOff,
     holidays,
     integrations,
+    asos,
   ] = await Promise.all([
     supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, clients(name, city, distance_km, requires_integration)").eq("active", true).order("name"),
     supabase
@@ -106,6 +130,7 @@ export async function fetchScheduleContext(date: string) {
     supabase.from("days_off").select("collaborator_id").eq("date", date),
     supabase.from("holidays").select("name").eq("date", date),
     supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at"),
+    supabase.from("asos").select("collaborator_id, exam_date, expires_at"),
   ]);
 
   const absences = new Map<string, string>();
@@ -125,7 +150,27 @@ export async function fetchScheduleContext(date: string) {
     absences,
     holiday: holidays.data?.[0]?.name ?? null,
     integrations: (integrations.data ?? []) as Integration[],
+    asos: (asos.data ?? []) as Aso[],
   };
+}
+
+/** ASO mais recente do colaborador e seu status na data informada. */
+export function checkAso(
+  ctx: ScheduleContext,
+  collaboratorId: string,
+  date: string,
+): { status: AsoStatus; expiresAt: string | null } {
+  const recs = (ctx.asos ?? []).filter((a) => a.collaborator_id === collaboratorId);
+  if (recs.length === 0) return { status: "missing", expiresAt: null };
+  const latest = recs.reduce((a, b) => (b.expires_at > a.expires_at ? b : a));
+  return { status: asoStatusOf(latest.expires_at, date), expiresAt: latest.expires_at };
+}
+
+/** A obra exige integração (e, portanto, ASO válido)? */
+export function workRequiresIntegration(ctx: ScheduleContext, workId: string): boolean {
+  const work = ctx.works.find((w) => w.id === workId);
+  if (!work?.client_id) return false;
+  return work.clients?.requires_integration !== false;
 }
 
 /** Status da integração de um colaborador com o cliente de uma obra. */

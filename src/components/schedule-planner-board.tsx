@@ -35,15 +35,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   addDays,
+  checkAso,
   checkIntegration,
   checkRequirements,
   fetchScheduleContext,
   formatBR,
   formatDateBR,
   todayISO,
+  workRequiresIntegration,
+  ASO_LABEL,
   INTEGRATION_LABEL,
 } from "@/lib/scheduling";
-import type { IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
+import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -58,6 +61,7 @@ type Evaluation = {
   level: Level;
   reasons: string[];
   integration: IntegrationStatus | null;
+  aso: AsoStatus | null;
   reqIssues: number;
   reqBlocked: boolean;
   fit: boolean;
@@ -95,6 +99,8 @@ const FILTERS = [
   { key: "unallocated", label: "Não alocados" },
   { key: "int_ok", label: "Integração válida" },
   { key: "int_bad", label: "Integração vencida" },
+  { key: "aso_ok", label: "ASO válido" },
+  { key: "aso_bad", label: "ASO vencido/ausente" },
   { key: "req_ok", label: "Requisitos atendidos" },
   { key: "req_warn", label: "Requisitos pendentes" },
   { key: "fit", label: "Aptos para esta obra" },
@@ -268,6 +274,7 @@ export function SchedulePlannerBoard({
     level: "ok",
     reasons: [],
     integration: null,
+    aso: null,
     reqIssues: 0,
     reqBlocked: false,
     fit: false,
@@ -304,19 +311,25 @@ export function SchedulePlannerBoard({
     const work = works.find((x) => x.id === workId);
     const clientName = work?.clients?.name ?? "cliente";
     const integ = checkIntegration(c as ScheduleContext, workId, collaboratorId, date);
+    const requiresInt = workRequiresIntegration(c as ScheduleContext, workId);
+    const aso = checkAso(c as ScheduleContext, collaboratorId, date);
 
-    if (integ.status === "expired")
-      return base({
-        level: "block",
-        integration: integ.status,
-        reasons: [`Integração com ${clientName} vencida em ${formatDateBR(integ.expiresAt)}`],
-      });
-    if (integ.status === "missing")
-      return base({
-        level: "block",
-        integration: integ.status,
-        reasons: [`Não possui integração com ${clientName}`],
-      });
+    const intBad = integ.status === "expired" || integ.status === "missing";
+    const asoBad = requiresInt && (aso.status === "expired" || aso.status === "missing");
+
+    if (intBad || asoBad) {
+      const blockers: string[] = [];
+      if (integ.status === "expired")
+        blockers.push(`Integração com ${clientName} vencida em ${formatDateBR(integ.expiresAt)}`);
+      if (integ.status === "missing") blockers.push(`Não possui integração válida com ${clientName}`);
+      if (asoBad)
+        blockers.push(
+          aso.status === "expired"
+            ? `ASO vencido em ${formatDateBR(aso.expiresAt)}`
+            : "Não possui ASO válido",
+        );
+      return base({ level: "block", integration: integ.status, aso: aso.status, reasons: blockers });
+    }
 
     const issues = checkRequirements(c as ScheduleContext, workId, collaboratorId, date);
     const blocking = issues.filter((i) => i.blocking);
@@ -326,6 +339,7 @@ export function SchedulePlannerBoard({
       return base({
         level: "block",
         integration: integ.status,
+        aso: aso.status,
         reqIssues,
         reqBlocked: true,
         reasons: blocking.map((i) => i.label),
@@ -334,20 +348,23 @@ export function SchedulePlannerBoard({
     const warnings: string[] = issues.map((i) => i.label);
     if (integ.status === "expiring")
       warnings.unshift(`Integração com ${clientName} vence em ${formatDateBR(integ.expiresAt)}`);
+    if (requiresInt && aso.status === "expiring")
+      warnings.unshift(`ASO vence em ${formatDateBR(aso.expiresAt)}`);
     if (integ.status === "no_client") warnings.unshift("Serviço sem cliente vinculado");
 
     if (current && current.work_id !== workId)
       return base({
         level: "busy",
         integration: integ.status,
+        aso: aso.status,
         reqIssues,
         reasons: [`Já alocado em ${currentLabel()}`, ...warnings],
       });
 
     if (warnings.length > 0)
-      return base({ level: "warn", integration: integ.status, reqIssues, reasons: warnings });
+      return base({ level: "warn", integration: integ.status, aso: aso.status, reqIssues, reasons: warnings });
 
-    return base({ level: "ok", integration: integ.status, fit: true });
+    return base({ level: "ok", integration: integ.status, aso: aso.status, fit: true });
   }
 
   const filtered = useMemo(() => {
@@ -372,6 +389,8 @@ export function SchedulePlannerBoard({
         )
           return false;
         if (f === "int_bad" && !(ev.integration === "expired" || ev.integration === "missing")) return false;
+        if (f === "aso_ok" && !(ev.aso === "valid" || ev.aso === "expiring")) return false;
+        if (f === "aso_bad" && !(ev.aso === "expired" || ev.aso === "missing")) return false;
         if (f === "req_ok" && (ev.reqIssues > 0 || ev.reqBlocked)) return false;
         if (f === "req_warn" && ev.reqIssues === 0) return false;
         if (f === "fit" && !(ev.fit && !alloc)) return false;
@@ -1148,6 +1167,18 @@ export function SchedulePlannerBoard({
                             className="px-1 py-0 text-[9px]"
                           >
                             {ev.integration ? INTEGRATION_LABEL[ev.integration] : "Integração"}
+                          </Badge>
+                          <Badge
+                            variant={
+                              ev.aso === "valid"
+                                ? "outline"
+                                : ev.aso === "expiring"
+                                  ? "secondary"
+                                  : "destructive"
+                            }
+                            className="px-1 py-0 text-[9px]"
+                          >
+                            {ev.aso ? ASO_LABEL[ev.aso] : "ASO"}
                           </Badge>
                           <Badge
                             variant={ev.reqBlocked ? "destructive" : ev.reqIssues > 0 ? "secondary" : "outline"}
