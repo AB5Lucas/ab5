@@ -763,6 +763,7 @@ export function SchedulePlannerBoard({
       const existing = new Set(rows.map((r) => r.collaborator_id));
       const inserts = c.baseTeams
         .filter((b) => !c.absences.has(b.collaborator_id))
+        .filter((b) => !appointmentByCollaborator.has(b.collaborator_id))
         .filter((b) => !existing.has(b.collaborator_id))
         .filter((b) => c.collaborators.some((p) => p.id === b.collaborator_id))
         .map((b, i) => ({
