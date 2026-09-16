@@ -421,13 +421,14 @@ function AppointmentsPage() {
       <PageHeader
         title="Agendamentos"
         description="Pendências de ASO, treinamento e integração. Confirme a realização (✓) ou informe uma nova data (X)."
-      >
-        {canWrite && (
-          <Button size="sm" onClick={() => setOpenNew(true)}>
-            <Plus className="h-4 w-4" /> Novo Agendamento
-          </Button>
-        )}
-      </PageHeader>
+        actions={
+          canWrite ? (
+            <Button size="sm" onClick={() => setOpenNew(true)}>
+              <Plus className="h-4 w-4" /> Novo Agendamento
+            </Button>
+          ) : null
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Card>
