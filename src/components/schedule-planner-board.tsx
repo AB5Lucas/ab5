@@ -763,6 +763,7 @@ export function SchedulePlannerBoard({
       const existing = new Set(rows.map((r) => r.collaborator_id));
       const inserts = c.baseTeams
         .filter((b) => !c.absences.has(b.collaborator_id))
+        .filter((b) => !appointmentByCollaborator.has(b.collaborator_id))
         .filter((b) => !existing.has(b.collaborator_id))
         .filter((b) => c.collaborators.some((p) => p.id === b.collaborator_id))
         .map((b, i) => ({
@@ -808,6 +809,7 @@ export function SchedulePlannerBoard({
       const existing = new Set(rows.map((r) => r.collaborator_id));
       const inserts = prevRows
         .filter((r) => !c.absences.has(r.collaborator_id))
+        .filter((r) => !appointmentByCollaborator.has(r.collaborator_id))
         .filter((r) => !existing.has(r.collaborator_id))
         .map((r, i) => ({
           schedule_id: id,
@@ -880,8 +882,9 @@ export function SchedulePlannerBoard({
     });
   }
 
-  const allocatedCount = rows.length;
-  const pendingCount = rows.filter((r) => r.has_pending_requirement).length;
+  const effectiveRows = rows.filter((r) => !appointmentByCollaborator.has(r.collaborator_id));
+  const allocatedCount = effectiveRows.length;
+  const pendingCount = effectiveRows.filter((r) => r.has_pending_requirement).length;
   const unavailableCount = c?.absences.size ?? 0;
 
   return (
@@ -1018,7 +1021,7 @@ export function SchedulePlannerBoard({
           )}
           {shownWorks.map((w) => {
             const workRows = rows
-              .filter((r) => r.work_id === w.id)
+              .filter((r) => r.work_id === w.id && !appointmentByCollaborator.has(r.collaborator_id))
               .slice()
               .sort((a, b) =>
                 (personById.get(a.collaborator_id)?.full_name ?? "").localeCompare(
