@@ -36,6 +36,7 @@ import {
   fetchScheduleContext,
   formatBR,
   todayISO,
+  previousScheduleDay,
 } from "@/lib/scheduling";
 
 const NONE = "__none__";
@@ -213,7 +214,7 @@ export function DailyScheduleBoard({
   const copyPrevious = useMutation({
     mutationFn: async () => {
       if (!c) throw new Error("Carregando dados");
-      const prev = addDays(date, -1);
+      const prev = previousScheduleDay(date);
       const { data: prevSchedule } = await supabase
         .from("daily_schedules")
         .select("id")

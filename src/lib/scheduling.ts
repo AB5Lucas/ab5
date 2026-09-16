@@ -12,6 +12,12 @@ export const addDays = (iso: string, days: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+/** Dia anterior de programação: numa segunda-feira, volta para a sexta. */
+export const previousScheduleDay = (iso: string) => {
+  const weekday = new Date(iso + "T12:00:00").getDay();
+  return addDays(iso, weekday === 1 ? -3 : -1);
+};
+
 export const formatBR = (iso: string) =>
   new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", {
     weekday: "long",
