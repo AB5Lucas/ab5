@@ -46,6 +46,7 @@ type Row = {
   type: AppointmentType;
   collaborator_id: string;
   scheduled_date: string;
+  scheduled_time: string | null;
   training_id: string | null;
   work_id: string | null;
   status: string;
@@ -55,6 +56,7 @@ type Row = {
 type FormState = {
   collaborator_id: string;
   scheduled_date: string;
+  scheduled_time: string;
   training_id: string;
   work_id: string;
   notes: string;
@@ -63,6 +65,7 @@ type FormState = {
 const emptyForm = (): FormState => ({
   collaborator_id: "",
   scheduled_date: todayISO(),
+  scheduled_time: "07:00",
   training_id: "",
   work_id: "",
   notes: "",
