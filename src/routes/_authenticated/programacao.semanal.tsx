@@ -121,7 +121,7 @@ function Page() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="panel p-4">
           <p className="text-xs uppercase text-muted-foreground">Alocações na semana</p>
           <p className="font-display text-2xl font-semibold">{weekTotal}</p>
