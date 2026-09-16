@@ -188,7 +188,9 @@ function TransportPage() {
     mutationFn: async () => {
       const scheduleId = day.data?.schedule?.id;
       if (!scheduleId) throw new Error("Crie a programação do dia antes de planejar o transporte.");
-      if (!form.client_id || !form.work_id) throw new Error("Selecione o cliente.");
+      if (!isSpecial(form.purpose) && (!form.client_id || !form.work_id)) {
+        throw new Error("Selecione o cliente.");
+      }
       const passengers = Number(form.passenger_count || 0);
       const capacity = form.vehicle_id === NONE ? null : capacityOf.get(form.vehicle_id) ?? 0;
       if (capacity !== null && capacity > 0 && passengers > capacity) {
@@ -196,7 +198,8 @@ function TransportPage() {
       }
       const payload = {
         schedule_id: scheduleId,
-        work_id: form.work_id,
+        work_id: isSpecial(form.purpose) ? null : form.work_id,
+        purpose: form.purpose,
         vehicle_id: ref(form.vehicle_id),
         driver_id: ref(form.driver_id),
         departure_time: nn(form.departure_time),
@@ -248,8 +251,9 @@ function TransportPage() {
   function openEdit(t: Tables<"transport_allocations">) {
     setEditingId(t.id);
     setForm({
-      client_id: clientIdOfWork.get(t.work_id) ?? "",
-      work_id: t.work_id,
+      purpose: t.purpose ?? "obra",
+      client_id: t.work_id ? clientIdOfWork.get(t.work_id) ?? "" : "",
+      work_id: t.work_id ?? "",
       vehicle_id: t.vehicle_id ?? NONE,
       driver_id: t.driver_id ?? NONE,
       departure_time: (t.departure_time ?? "").slice(0, 5),
@@ -261,11 +265,16 @@ function TransportPage() {
   }
 
   function onClientChange(clientId: string) {
+    if (isSpecial(clientId) && PURPOSES.some((p) => p.key === clientId)) {
+      setForm((f) => ({ ...f, purpose: clientId, client_id: "", work_id: "", passenger_count: "0" }));
+      return;
+    }
     const option = clientOptions.find((c) => c.id === clientId);
     const workId = option?.workIds[0] ?? "";
     const w = base.data?.works.find((x) => x.id === workId);
     setForm((f) => ({
       ...f,
+      purpose: "obra",
       client_id: clientId,
       work_id: workId,
       departure_time: f.departure_time || w?.entry_time?.slice(0, 5) || "",
@@ -327,7 +336,13 @@ function TransportPage() {
                 const over = capacity > 0 && t.passenger_count > capacity;
                 return (
                   <TableRow key={t.id}>
-                    <TableCell className="font-medium">{clientNameOfWork.get(t.work_id) ?? nameOf.get(t.work_id) ?? "—"}</TableCell>
+                    <TableCell className="font-medium">
+                      {t.purpose && t.purpose !== "obra"
+                        ? PURPOSE_LABEL[t.purpose] ?? t.purpose
+                        : t.work_id
+                          ? clientNameOfWork.get(t.work_id) ?? nameOf.get(t.work_id) ?? "—"
+                          : "—"}
+                    </TableCell>
                     <TableCell>{t.vehicle_id ? nameOf.get(t.vehicle_id) ?? "—" : "Sem veículo"}</TableCell>
                     <TableCell>{t.driver_id ? nameOf.get(t.driver_id) ?? "—" : "Sem motorista"}</TableCell>
                     <TableCell>{t.departure_time?.slice(0, 5) ?? "—"}</TableCell>
