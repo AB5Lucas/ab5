@@ -80,6 +80,7 @@ const STATUS_BOXES = [
   { key: "interjornada", label: "INTERJORNADA" },
   { key: "treinamento", label: "TREINAMENTO" },
   { key: "ferias", label: "FÉRIAS" },
+  { key: "integracao", label: "INTEGRAÇÃO" },
 ] as const;
 
 const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
@@ -91,6 +92,27 @@ const ABSENCE_BOX: Record<string, string> = {
   "Folga": "folga",
 };
 const BOXES_STORAGE_KEY = "planner-status-boxes";
+
+/** Tipo de agendamento → caixa correspondente na programação. */
+const APPOINTMENT_BOX: Record<string, string> = {
+  aso: "aso",
+  treinamento: "treinamento",
+  integracao: "integracao",
+};
+
+type AppointmentRow = {
+  type: string;
+  collaborator_id: string;
+  trainings: { name: string } | null;
+  works: { name: string; clients: { name: string } | null } | null;
+};
+
+/** Texto do box do compromisso agendado. */
+function appointmentLabel(a: AppointmentRow): string {
+  if (a.type === "aso") return "Exame ASO";
+  if (a.type === "treinamento") return `Treinamento - ${a.trainings?.name ?? "—"}`;
+  return `Integração - ${a.works?.clients?.name ?? a.works?.name ?? "—"}`;
+}
 
 const FILTERS = [
   { key: "available", label: "Disponíveis" },
@@ -225,18 +247,46 @@ export function SchedulePlannerBoard({
 
   const entries = statusEntries.data ?? [];
 
+  /** Agendamentos (ASO, treinamento, integração) marcados para esta data. */
+  const appointments = useQuery({
+    queryKey: ["appointments-day", date],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("id, type, collaborator_id, training_id, work_id, trainings(name), works(name, clients(name))")
+        .eq("scheduled_date", date)
+        .eq("status", "agendado");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   /** Ausências cadastradas (férias, atestado, folga) alimentam automaticamente as caixas. */
   const absenceMembers = useMemo(() => {
-    const m = new Map<string, string[]>();
+    const m = new Map<string, { id: string; note: string }[]>();
     (ctx.data?.absences ?? new Map<string, string>()).forEach((reason, collaboratorId) => {
       const key = ABSENCE_BOX[reason] ?? null;
       if (!key) return;
       const list = m.get(key) ?? [];
-      list.push(collaboratorId);
+      list.push({ id: collaboratorId, note: "Cadastrado" });
+      m.set(key, list);
+    });
+    (appointments.data ?? []).forEach((a) => {
+      const key = APPOINTMENT_BOX[a.type] ?? null;
+      if (!key) return;
+      const list = m.get(key) ?? [];
+      list.push({ id: a.collaborator_id, note: appointmentLabel(a) });
       m.set(key, list);
     });
     return m;
-  }, [ctx.data]);
+  }, [ctx.data, appointments.data]);
+
+  /** Colaborador → compromisso agendado do dia (bloqueia alocação). */
+  const appointmentByCollaborator = useMemo(() => {
+    const m = new Map<string, string>();
+    (appointments.data ?? []).forEach((a) => m.set(a.collaborator_id, appointmentLabel(a)));
+    return m;
+  }, [appointments.data]);
 
   const entryByCollaborator = useMemo(() => {
     const m = new Map<string, (typeof entries)[number]>();
@@ -295,6 +345,11 @@ export function SchedulePlannerBoard({
     };
 
     if (absence) return base({ level: "block", reasons: [`Indisponível: ${absence.toLowerCase()}`] });
+
+    const appointment = appointmentByCollaborator.get(collaboratorId);
+    if (appointment)
+      return base({ level: "block", reasons: [`Compromisso agendado: ${appointment}`] });
+
 
     const entry = entryByCollaborator.get(collaboratorId);
     if (entry && !opts?.ignoreEntry)
@@ -900,9 +955,9 @@ export function SchedulePlannerBoard({
               .slice()
               .sort((x, y) => byName(x.collaborator_id, y.collaborator_id));
             const autoRows = (absenceMembers.get(b.key) ?? [])
-              .filter((id) => !boxRows.some((r) => r.collaborator_id === id))
+              .filter((a) => !boxRows.some((r) => r.collaborator_id === a.id))
               .slice()
-              .sort(byName);
+              .sort((x, y) => byName(x.id, y.id));
             const isHover = hoverBox === b.key;
             const handleDrop = (e: React.DragEvent) => {
               e.preventDefault();
@@ -956,11 +1011,11 @@ export function SchedulePlannerBoard({
                       Arraste colaboradores para cá
                     </li>
                   )}
-                  {autoRows.map((id) => {
-                    const p = personById.get(id);
+                  {autoRows.map((a) => {
+                    const p = personById.get(a.id);
                     return (
                       <li
-                        key={`auto-${id}`}
+                        key={`auto-${a.id}`}
                         onDragOver={handleOver}
                         onDrop={handleDrop}
                         className="flex items-center gap-1.5 px-2 py-1 text-xs"
@@ -971,8 +1026,11 @@ export function SchedulePlannerBoard({
                             {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
                           </p>
                         </div>
-                        <Badge variant="secondary" className="shrink-0 px-1 py-0 text-[9px]">
-                          Cadastrado
+                        <Badge
+                          variant={a.note === "Cadastrado" ? "secondary" : "default"}
+                          className="shrink-0 px-1 py-0 text-[9px]"
+                        >
+                          {a.note}
                         </Badge>
                       </li>
                     );
