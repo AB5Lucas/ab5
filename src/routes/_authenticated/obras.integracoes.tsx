@@ -469,14 +469,14 @@ function IntegrationsPage() {
           <TableBody>
             {integrations.isLoading && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!integrations.isLoading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                   Nenhuma integração encontrada.
                 </TableCell>
               </TableRow>
