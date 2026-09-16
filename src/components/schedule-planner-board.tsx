@@ -965,7 +965,12 @@ export function SchedulePlannerBoard({
                           .map((r) => personById.get(r.collaborator_id)?.full_name ?? "")
                           .filter(Boolean);
                         void copyToClipboard(
-                          [`*${workLabel(w)}*`, dayLine(date), "", names.join("\n")].join("\n"),
+                          [
+                            `*${w.clients?.name ?? w.name}*`,
+                            dayLine(date),
+                            "",
+                            names.join("\n"),
+                          ].join("\n"),
                         );
                       }}
                     >
