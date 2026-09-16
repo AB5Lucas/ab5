@@ -513,17 +513,19 @@ export function SchedulePlannerBoard({
       return w ? workLabel(w) : "outra obra";
     };
 
-    if (absence) return base({ level: "block", reasons: [`Indisponível: ${absence.toLowerCase()}`] });
+    if (absence)
+      return base({ level: "busy", hardBlock: true, reasons: [`Indisponível: ${absence.toLowerCase()}`] });
 
     const appointment = appointmentByCollaborator.get(collaboratorId);
     if (appointment)
-      return base({ level: "block", reasons: [`Compromisso agendado: ${appointment}`] });
+      return base({ level: "busy", hardBlock: true, reasons: [`Compromisso agendado: ${appointment}`] });
 
 
     const entry = entryByCollaborator.get(collaboratorId);
     if (entry && !opts?.ignoreEntry)
       return base({
-        level: "block",
+        level: "busy",
+        hardBlock: true,
         reasons: [`Registrado em ${boxLabelOf(entry.box_key)}`],
       });
 
