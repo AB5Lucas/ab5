@@ -340,10 +340,10 @@ function IntegrationsPage() {
     const errors: string[] = [];
     let inserted = 0;
 
-    const byCpf = new Map<string, string>();
+    const byReg = new Map<string, string>();
     (collaborators.data ?? []).forEach((p) => {
-      const d = onlyDigits(p.cpf ?? "");
-      if (d) byCpf.set(d, p.id);
+      const k = normText(p.registration_number ?? "");
+      if (k) byReg.set(k, p.id);
     });
     const matchClient = createNameMatcher(clients.data ?? []);
     const existing = new Map<string, string>(
@@ -354,10 +354,10 @@ function IntegrationsPage() {
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i]!;
       const line = i + 2;
-      const cpf = onlyDigits(r["cpf"] ?? "");
-      const personId = cpf ? byCpf.get(cpf) : undefined;
+      const reg = normText(r["matricula"] ?? "");
+      const personId = reg ? byReg.get(reg) : undefined;
       if (!personId) {
-        errors.push(`Linha ${line}: colaborador não encontrado pelo CPF "${r["cpf"] ?? ""}".`);
+        errors.push(`Linha ${line}: matrícula "${r["matricula"] ?? ""}" não encontrada no cadastro.`);
         continue;
       }
       const client = matchClient(r["cliente"] ?? "");
@@ -413,7 +413,7 @@ function IntegrationsPage() {
             {canWrite && (
               <ImportDialog
                 entity="integrações"
-                description="Importe as integrações em massa. O colaborador é identificado pelo CPF e o cliente pelo nome já cadastrado."
+                description="Importe as integrações em massa. O colaborador é identificado pela matrícula e o cliente pelo nome já cadastrado."
                 columns={IMPORT_COLUMNS}
                 onImport={importRows}
               />
