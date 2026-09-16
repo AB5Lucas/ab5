@@ -1169,6 +1169,18 @@ export function SchedulePlannerBoard({
                             {ev.integration ? INTEGRATION_LABEL[ev.integration] : "Integração"}
                           </Badge>
                           <Badge
+                            variant={
+                              ev.aso === "valid"
+                                ? "outline"
+                                : ev.aso === "expiring"
+                                  ? "secondary"
+                                  : "destructive"
+                            }
+                            className="px-1 py-0 text-[9px]"
+                          >
+                            {ev.aso ? ASO_LABEL[ev.aso] : "ASO"}
+                          </Badge>
+                          <Badge
                             variant={ev.reqBlocked ? "destructive" : ev.reqIssues > 0 ? "secondary" : "outline"}
                             className="px-1 py-0 text-[9px]"
                           >
