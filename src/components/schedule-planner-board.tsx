@@ -462,10 +462,8 @@ export function SchedulePlannerBoard({
   const rows = allocations.data ?? [];
   const c = ctx.data;
   const works = c?.works ?? [];
-  /** Serviços exibidos no dia: os escolhidos pelo usuário + os que já têm alguém alocado. */
-  const shownWorks = works.filter(
-    (w) => !hiddenWorks.has(w.id) || rows.some((r) => r.work_id === w.id),
-  );
+  /** Serviços exibidos no dia: apenas os marcados no botão "Serviços". */
+  const shownWorks = works.filter((w) => !hiddenWorks.has(w.id));
   const people = c?.collaborators ?? [];
 
   const positionById = useMemo(() => {
