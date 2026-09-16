@@ -656,7 +656,7 @@ export function SchedulePlannerBoard({
       return { id, name, boxKey };
     },
     onSuccess: (r) => {
-      toast.success(`${r.name} registrado em ${BOX_LABEL[r.boxKey] ?? r.boxKey}`);
+      toast.success(`${r.name} registrado em ${boxLabelOf(r.boxKey)}`);
       invalidate(r.id);
     },
     onError: (e: Error) => toast.error(e.message),
