@@ -953,6 +953,24 @@ export function SchedulePlannerBoard({
                     <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
                       {workLabel(w)}
                     </h2>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 shrink-0"
+                      title="Copiar mensagem"
+                      aria-label="Copiar mensagem"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const names = workRows
+                          .map((r) => personById.get(r.collaborator_id)?.full_name ?? "")
+                          .filter(Boolean);
+                        void copyToClipboard(
+                          [`*${workLabel(w)}*`, dayLine(date), "", names.join("\n")].join("\n"),
+                        );
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
                     <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
                       <Users className="mr-0.5 h-2.5 w-2.5" />
                       {workRows.length}
