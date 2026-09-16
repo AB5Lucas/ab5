@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { addDays, formatDateBR } from "@/lib/scheduling";
+import { formatDateBR } from "@/lib/scheduling";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
