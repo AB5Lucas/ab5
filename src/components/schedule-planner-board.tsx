@@ -133,6 +133,21 @@ const APPOINTMENT_BOX: Record<string, string> = {
   integracao: "integracao",
 };
 
+/** Prefixo das caixas de integração (uma por cliente). */
+const INTEGRATION_PREFIX = "integracao:";
+
+/** Nome do cliente da caixa de integração. */
+function integrationClientOf(boxKey: string) {
+  return boxKey.slice(INTEGRATION_PREFIX.length);
+}
+
+/** Rótulo de uma caixa (inclui as dinâmicas de integração por cliente). */
+function boxLabelOf(boxKey: string): string {
+  if (boxKey.startsWith(INTEGRATION_PREFIX))
+    return `INTEGRAÇÃO - ${integrationClientOf(boxKey).toUpperCase()}`;
+  return BOX_LABEL[boxKey] ?? boxKey;
+}
+
 type AppointmentRow = {
   type: string;
   collaborator_id: string;
@@ -183,6 +198,13 @@ function appointmentLabel(a: AppointmentRow): string {
   if (a.type === "aso") return "Exame ASO";
   if (a.type === "treinamento") return `Treinamento - ${a.trainings?.name ?? "—"}`;
   return `Integração - ${a.works?.clients?.name ?? a.works?.name ?? "—"}`;
+}
+
+/** Caixa do agendamento — integrações são separadas por cliente. */
+function appointmentBoxKey(a: AppointmentRow): string | null {
+  if (a.type === "integracao")
+    return `${INTEGRATION_PREFIX}${a.works?.clients?.name ?? a.works?.name ?? "—"}`;
+  return APPOINTMENT_BOX[a.type] ?? null;
 }
 
 const FILTERS = [
@@ -359,7 +381,7 @@ export function SchedulePlannerBoard({
       m.set(key, list);
     });
     (appointments.data ?? []).forEach((a) => {
-      const key = APPOINTMENT_BOX[a.type] ?? null;
+      const key = appointmentBoxKey(a as AppointmentRow);
       if (!key) return;
       const list = m.get(key) ?? [];
       list.push({ id: a.collaborator_id, note: appointmentLabel(a) });
@@ -379,7 +401,7 @@ export function SchedulePlannerBoard({
   const appointmentsByBox = useMemo(() => {
     const m = new Map<string, AppointmentRow[]>();
     (appointments.data ?? []).forEach((a) => {
-      const key = APPOINTMENT_BOX[a.type];
+      const key = appointmentBoxKey(a as AppointmentRow);
       if (!key) return;
       const list = m.get(key) ?? [];
       list.push(a as AppointmentRow);
@@ -415,8 +437,9 @@ export function SchedulePlannerBoard({
         list,
       ].join("\n");
     }
-    if (boxKey === "integracao") {
-      const client = first?.works?.clients?.name ?? first?.works?.name ?? "";
+    if (boxKey.startsWith(INTEGRATION_PREFIX) || boxKey === "integracao") {
+      const client =
+        first?.works?.clients?.name ?? first?.works?.name ?? integrationClientOf(boxKey);
       const obs = first?.notes?.trim();
       return [
         `*${client} - INTEGRAÇÃO*`,
@@ -500,7 +523,7 @@ export function SchedulePlannerBoard({
     if (entry && !opts?.ignoreEntry)
       return base({
         level: "block",
-        reasons: [`Registrado em ${BOX_LABEL[entry.box_key] ?? entry.box_key}`],
+        reasons: [`Registrado em ${boxLabelOf(entry.box_key)}`],
       });
 
     if (!workId) {
@@ -633,7 +656,7 @@ export function SchedulePlannerBoard({
       return { id, name, boxKey };
     },
     onSuccess: (r) => {
-      toast.success(`${r.name} registrado em ${BOX_LABEL[r.boxKey] ?? r.boxKey}`);
+      toast.success(`${r.name} registrado em ${boxLabelOf(r.boxKey)}`);
       invalidate(r.id);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1138,13 +1161,28 @@ export function SchedulePlannerBoard({
           })}
 
           {/* Caixas de situação */}
-          {STATUS_BOXES.filter(
-            (b) =>
-              visibleBoxes.has(b.key) ||
-              entries.some((e) => e.box_key === b.key) ||
-              (absenceMembers.get(b.key)?.length ?? 0) > 0 ||
-              (appointmentsByBox.get(b.key)?.length ?? 0) > 0,
-          ).map((b) => {
+          {[
+            ...STATUS_BOXES.filter((b) => b.key !== "integracao").map((b) => ({
+              key: b.key as string,
+              label: b.label as string,
+            })),
+            ...[
+              ...new Set([
+                ...[...appointmentsByBox.keys()].filter((k) => k.startsWith(INTEGRATION_PREFIX)),
+                ...entries.map((e) => e.box_key).filter((k) => k.startsWith(INTEGRATION_PREFIX)),
+              ]),
+            ]
+              .sort((a, b) => a.localeCompare(b, "pt-BR"))
+              .map((key) => ({ key, label: boxLabelOf(key) })),
+          ]
+            .filter(
+              (b) =>
+                visibleBoxes.has(b.key) ||
+                entries.some((e) => e.box_key === b.key) ||
+                (absenceMembers.get(b.key)?.length ?? 0) > 0 ||
+                (appointmentsByBox.get(b.key)?.length ?? 0) > 0,
+            )
+            .map((b) => {
             const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
             const byName = (a: string, c: string) => nameOf(a).localeCompare(nameOf(c), "pt-BR");
             const boxRows = entries
