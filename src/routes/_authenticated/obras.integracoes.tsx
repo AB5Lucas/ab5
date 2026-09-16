@@ -40,7 +40,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { AppointmentDialog } from "@/components/appointment-dialog";
-import { createNameMatcher, emptyToNull, parseDate } from "@/lib/import-helpers";
+import { createNameMatcher, emptyToNull, normText, parseDate } from "@/lib/import-helpers";
 import { addDays, formatDateBR, todayISO, INTEGRATION_WARN_DAYS } from "@/lib/scheduling";
 
 export const Route = createFileRoute("/_authenticated/obras/integracoes")({
@@ -91,7 +91,7 @@ function statusOf(expires: string | null, today: string): Status {
 }
 
 const IMPORT_COLUMNS: ImportColumn[] = [
-  { key: "cpf", required: true, hint: "Identifica o colaborador já cadastrado.", example: "123.456.789-00" },
+  { key: "matricula", required: true, hint: "Identifica o colaborador já cadastrado.", example: "1024" },
   { key: "cliente", required: true, hint: "Nome do cliente já cadastrado.", example: "Cristália" },
   { key: "data_integracao", required: true, hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2026-01-15" },
   { key: "validade", hint: "Data de vencimento. Em branco = sem vencimento.", example: "2027-01-15" },
@@ -155,7 +155,7 @@ function IntegrationsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("collaborators")
-        .select("id, full_name, cpf, position_id")
+        .select("id, full_name, cpf, registration_number, position_id")
         .order("full_name");
       if (error) throw error;
       return data;
@@ -190,7 +190,10 @@ function IntegrationsPage() {
   });
 
   const personById = useMemo(() => {
-    const m = new Map<string, { id: string; full_name: string; cpf: string | null; position_id: string | null }>();
+    const m = new Map<
+      string,
+      { id: string; full_name: string; cpf: string | null; registration_number: string | null; position_id: string | null }
+    >();
     (collaborators.data ?? []).forEach((p) => m.set(p.id, p));
     return m;
   }, [collaborators.data]);
