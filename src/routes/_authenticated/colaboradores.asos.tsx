@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { AppointmentDialog } from "@/components/appointment-dialog";
 import { emptyToNull, normText, parseDate } from "@/lib/import-helpers";
 import { asoStatusOf, formatDateBR, todayISO, ASO_LABEL, type AsoStatus } from "@/lib/scheduling";
 
@@ -324,6 +325,7 @@ function AsosPage() {
         description="Atestados de Saúde Ocupacional dos colaboradores. O vencimento é calculado automaticamente: 1 ano após a realização."
         actions={
           <div className="flex flex-wrap gap-2">
+            <AppointmentDialog type="aso" />
             {canWrite && (
               <ImportDialog
                 entity="ASOs"

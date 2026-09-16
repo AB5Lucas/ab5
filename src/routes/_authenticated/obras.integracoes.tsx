@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { AppointmentDialog } from "@/components/appointment-dialog";
 import { createNameMatcher, emptyToNull, parseDate } from "@/lib/import-helpers";
 import { addDays, formatDateBR, todayISO, INTEGRATION_WARN_DAYS } from "@/lib/scheduling";
 
@@ -405,6 +406,7 @@ function IntegrationsPage() {
         description="Aptidão dos colaboradores para trabalhar em cada cliente. Serviços do mesmo cliente aproveitam a mesma integração."
         actions={
           <div className="flex flex-wrap gap-2">
+            <AppointmentDialog type="integracao" />
             {canWrite && (
               <ImportDialog
                 entity="integrações"

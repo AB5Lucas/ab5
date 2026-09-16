@@ -31,6 +31,7 @@ export const Route = createFileRoute("/_authenticated/treinamentos")({
 });
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { AppointmentDialog } from "@/components/appointment-dialog";
 import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate } from "@/lib/import-helpers";
 
 const RECORD_COLUMNS: ImportColumn[] = [
@@ -282,6 +283,7 @@ function TrainingsPage() {
         actions={
           canWrite && (
             <div className="flex flex-wrap gap-2">
+              <AppointmentDialog type="treinamento" />
               <ImportDialog
                 entity="registros de treinamentos"
                 description="Importe treinamentos realizados e seus documentos (.xlsx ou .csv)."
