@@ -171,7 +171,7 @@ function TransportPage() {
     mutationFn: async () => {
       const scheduleId = day.data?.schedule?.id;
       if (!scheduleId) throw new Error("Crie a programação do dia antes de planejar o transporte.");
-      if (!form.work_id) throw new Error("Selecione a obra.");
+      if (!form.client_id || !form.work_id) throw new Error("Selecione o cliente.");
       const passengers = Number(form.passenger_count || 0);
       const capacity = form.vehicle_id === NONE ? null : capacityOf.get(form.vehicle_id) ?? 0;
       if (capacity !== null && capacity > 0 && passengers > capacity) {
