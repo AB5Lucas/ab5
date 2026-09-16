@@ -42,6 +42,7 @@ import {
   formatBR,
   formatDateBR,
   todayISO,
+  previousScheduleDay,
   workRequiresIntegration,
   ASO_LABEL,
   INTEGRATION_LABEL,

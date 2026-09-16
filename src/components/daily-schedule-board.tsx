@@ -36,6 +36,7 @@ import {
   fetchScheduleContext,
   formatBR,
   todayISO,
+  previousScheduleDay,
 } from "@/lib/scheduling";
 
 const NONE = "__none__";
