@@ -337,6 +337,7 @@ export function SchedulePlannerBoard({
       return base({
         level: "block",
         integration: integ.status,
+        aso: aso.status,
         reqIssues,
         reqBlocked: true,
         reasons: blocking.map((i) => i.label),
@@ -345,20 +346,23 @@ export function SchedulePlannerBoard({
     const warnings: string[] = issues.map((i) => i.label);
     if (integ.status === "expiring")
       warnings.unshift(`Integração com ${clientName} vence em ${formatDateBR(integ.expiresAt)}`);
+    if (requiresInt && aso.status === "expiring")
+      warnings.unshift(`ASO vence em ${formatDateBR(aso.expiresAt)}`);
     if (integ.status === "no_client") warnings.unshift("Serviço sem cliente vinculado");
 
     if (current && current.work_id !== workId)
       return base({
         level: "busy",
         integration: integ.status,
+        aso: aso.status,
         reqIssues,
         reasons: [`Já alocado em ${currentLabel()}`, ...warnings],
       });
 
     if (warnings.length > 0)
-      return base({ level: "warn", integration: integ.status, reqIssues, reasons: warnings });
+      return base({ level: "warn", integration: integ.status, aso: aso.status, reqIssues, reasons: warnings });
 
-    return base({ level: "ok", integration: integ.status, fit: true });
+    return base({ level: "ok", integration: integ.status, aso: aso.status, fit: true });
   }
 
   const filtered = useMemo(() => {
