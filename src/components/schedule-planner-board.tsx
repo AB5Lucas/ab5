@@ -85,6 +85,12 @@ const STATUS_BOXES = [
 
 const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
 
+/** Caixas alimentadas automaticamente (ausências e agendamentos) — não aparecem no menu. */
+const AUTO_BOX_KEYS = ["aso", "treinamento", "integracao", "folga", "ferias"];
+
+/** Caixas que o usuário liga manualmente pelo botão "Caixas". */
+const MANUAL_BOXES = STATUS_BOXES.filter((b) => !AUTO_BOX_KEYS.includes(b.key));
+
 /** Ausências cadastradas → caixa correspondente (alimentada automaticamente). */
 const ABSENCE_BOX: Record<string, string> = {
   "Férias": "ferias",
