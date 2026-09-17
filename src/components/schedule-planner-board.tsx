@@ -1069,6 +1069,7 @@ export function SchedulePlannerBoard({
               .filter(
                 (r) =>
                   r.work_id === w.id &&
+                  matchesRole(r.collaborator_id, r.position_id) &&
                   !appointmentByCollaborator.has(r.collaborator_id) &&
                   !c?.absences.has(r.collaborator_id),
               )
