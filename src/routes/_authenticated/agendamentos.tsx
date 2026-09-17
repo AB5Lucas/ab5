@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarClock, Check, Plus, X } from "lucide-react";
+import { CalendarClock, Check, Minus, Plus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/page-header";
@@ -20,6 +20,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { addDays, formatDateBR, todayISO } from "@/lib/scheduling";
@@ -114,6 +124,7 @@ function AppointmentsPage() {
   const [redoRow, setRedoRow] = useState<Row | null>(null);
   const [redoDate, setRedoDate] = useState(today);
   const [redoTime, setRedoTime] = useState("07:00");
+  const [deleteRow, setDeleteRow] = useState<Row | null>(null);
 
   const [fPeriod, setFPeriod] = useState("all");
   const [fType, setFType] = useState("all");
@@ -411,6 +422,19 @@ function AppointmentsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const remove = useMutation({
+    mutationFn: async (row: Row) => {
+      const { error } = await supabase.from("appointments").delete().eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Agendamento excluído");
+      setDeleteRow(null);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const detailOf = (r: Row) => {
     if (r.type === "treinamento") return r.training_id ? trainingById.get(r.training_id)?.label ?? "—" : "—";
     if (r.type === "integracao") return r.work_id ? workById.get(r.work_id)?.label ?? "—" : "—";
@@ -609,6 +633,15 @@ function AppointmentsPage() {
                             }}
                           >
                             <X className="h-4 w-4 text-destructive" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            aria-label="Excluir agendamento"
+                            onClick={() => setDeleteRow(r)}
+                          >
+                            <Minus className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
                       )}
@@ -816,6 +849,32 @@ function AppointmentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Excluir agendamento */}
+      <AlertDialog open={!!deleteRow} onOpenChange={(v) => !v && setDeleteRow(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir agendamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteRow
+                ? `${APPOINTMENT_TYPE_LABEL[deleteRow.type]} — ${personById.get(deleteRow.collaborator_id)?.full_name ?? ""} em ${formatDateBR(deleteRow.scheduled_date)}. Esta ação não pode ser desfeita.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={remove.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteRow) remove.mutate(deleteRow);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
