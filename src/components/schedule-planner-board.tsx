@@ -232,6 +232,7 @@ export function SchedulePlannerBoard({
   const { canWrite, isAdmin, user } = useCurrentUser();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [roleSearch, setRoleSearch] = useState("");
   const [filters, setFilters] = useState<Set<FilterKey>>(new Set());
   const [showAll, setShowAll] = useState(false);
   const [selectedWork, setSelectedWork] = useState<string | null>(null);
