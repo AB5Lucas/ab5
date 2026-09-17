@@ -172,13 +172,12 @@ function AppointmentsPage() {
     },
   });
 
-  const works = useQuery({
-    queryKey: ["works-min-clients"],
+  const clients = useQuery({
+    queryKey: ["clients-min"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("works")
-        .select("id, name, client_id, clients(name)")
-        .eq("active", true)
+        .from("clients")
+        .select("id, name, city, state")
         .order("name");
       if (error) throw error;
       return data;
