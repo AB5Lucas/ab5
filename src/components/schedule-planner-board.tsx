@@ -984,27 +984,27 @@ export function SchedulePlannerBoard({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline">
-                <MapPin className="h-4 w-4" /> Serviços
+                <MapPin className="h-4 w-4" /> Clientes
                 <Badge variant="secondary" className="ml-1">
-                  {shownWorks.length}/{works.length}
+                  {visibleClients.size}/{clientOptions.length}
                 </Badge>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="max-h-80 w-72 overflow-y-auto">
-              <DropdownMenuLabel>Serviços do dia</DropdownMenuLabel>
+              <DropdownMenuLabel>Clientes do dia</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {works.map((w) => (
+              {clientOptions.map((cl) => (
                 <DropdownMenuCheckboxItem
-                  key={w.id}
-                  checked={!hiddenWorks.has(w.id)}
-                  onCheckedChange={() => toggleWorkVisible(w.id)}
+                  key={cl.id}
+                  checked={visibleClients.has(cl.id)}
+                  onCheckedChange={() => canWrite && toggleClientVisible.mutate(cl.id)}
                   onSelect={(e) => e.preventDefault()}
                 >
-                  {workLabel(w)}
+                  {cl.name}
                 </DropdownMenuCheckboxItem>
               ))}
-              {works.length === 0 && (
-                <p className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum serviço cadastrado.</p>
+              {clientOptions.length === 0 && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum cliente cadastrado.</p>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
