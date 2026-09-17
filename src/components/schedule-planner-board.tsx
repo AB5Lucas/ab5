@@ -271,22 +271,39 @@ export function SchedulePlannerBoard({
     });
   }
 
-  const [hiddenWorks, setHiddenWorks] = useState<Set<string>>(() => loadHiddenWorks(date));
-  const [hiddenWorksDate, setHiddenWorksDate] = useState(date);
-  if (hiddenWorksDate !== date) {
-    setHiddenWorksDate(date);
-    setHiddenWorks(loadHiddenWorks(date));
-  }
+  /** Clientes visíveis no dia — salvo no banco; dias sem configuração herdam o dia anterior. */
+  const visibility = useQuery({
+    queryKey: ["client-visibility", date],
+    queryFn: async () => {
+      const own = await supabase
+        .from("schedule_client_visibility")
+        .select("client_id, visible")
+        .eq("schedule_date", date);
+      if (own.error) throw own.error;
+      if ((own.data ?? []).length > 0) return own.data ?? [];
+      if (isWeekendDate(date)) return [];
+      const prev = await supabase
+        .from("schedule_client_visibility")
+        .select("schedule_date")
+        .lt("schedule_date", date)
+        .order("schedule_date", { ascending: false })
+        .limit(1);
+      if (prev.error) throw prev.error;
+      const prevDate = prev.data?.[0]?.schedule_date;
+      if (!prevDate) return [];
+      const inherited = await supabase
+        .from("schedule_client_visibility")
+        .select("client_id, visible")
+        .eq("schedule_date", prevDate);
+      if (inherited.error) throw inherited.error;
+      return inherited.data ?? [];
+    },
+  });
 
-  function toggleWorkVisible(id: string) {
-    setHiddenWorks((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      saveHiddenWorks(date, next);
-      return next;
-    });
-  }
+  const visibleClients = useMemo(
+    () => new Set((visibility.data ?? []).filter((v) => v.visible).map((v) => v.client_id)),
+    [visibility.data],
+  );
 
   const ctx = useQuery({ queryKey: ["schedule-ctx", date], queryFn: () => fetchScheduleContext(date) });
 
