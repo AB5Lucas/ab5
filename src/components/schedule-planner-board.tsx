@@ -102,31 +102,11 @@ const ABSENCE_BOX: Record<string, string> = {
 };
 const BOXES_STORAGE_KEY = "planner-status-boxes";
 
-/** Serviços ocultos por dia (o usuário escolhe no botão "Serviços"). */
-const HIDDEN_WORKS_STORAGE_KEY = "planner-hidden-works";
-
-function loadHiddenWorks(date: string): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(HIDDEN_WORKS_STORAGE_KEY);
-    const map = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
-    return new Set(map[date] ?? []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveHiddenWorks(date: string, ids: Set<string>) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(HIDDEN_WORKS_STORAGE_KEY);
-    const map = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
-    if (ids.size === 0) delete map[date];
-    else map[date] = [...ids];
-    window.localStorage.setItem(HIDDEN_WORKS_STORAGE_KEY, JSON.stringify(map));
-  } catch {
-    /* ignora */
-  }
+/** Sábado ou domingo: o dia começa sem nenhum cliente marcado (sem herança da sexta). */
+function isWeekendDate(iso: string) {
+  const [y = 1970, m = 1, d = 1] = iso.split("-").map(Number);
+  const wd = new Date(y, m - 1, d).getDay();
+  return wd === 0 || wd === 6;
 }
 
 /** Tipo de agendamento → caixa correspondente na programação. */
