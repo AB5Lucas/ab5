@@ -1245,11 +1245,11 @@ export function SchedulePlannerBoard({
             const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
             const byName = (a: string, c: string) => nameOf(a).localeCompare(nameOf(c), "pt-BR");
             const boxRows = entries
-              .filter((e) => e.box_key === b.key)
+              .filter((e) => e.box_key === b.key && matchesRole(e.collaborator_id))
               .slice()
               .sort((x, y) => byName(x.collaborator_id, y.collaborator_id));
             const autoRows = (absenceMembers.get(b.key) ?? [])
-              .filter((a) => !boxRows.some((r) => r.collaborator_id === a.id))
+              .filter((a) => matchesRole(a.id) && !boxRows.some((r) => r.collaborator_id === a.id))
               .slice()
               .sort((x, y) => byName(x.id, y.id));
             const isHover = hoverBox === b.key;
