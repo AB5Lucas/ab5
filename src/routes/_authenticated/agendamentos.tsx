@@ -289,7 +289,7 @@ function AppointmentsPage() {
       if (!form.scheduled_date) throw new Error("Informe a data");
       if (!form.scheduled_time) throw new Error("Informe o horário");
       if (form.type === "treinamento" && !form.training_id) throw new Error("Selecione a NR");
-      if (form.type === "integracao" && !form.work_id) throw new Error("Selecione a obra/cliente");
+      if (form.type === "integracao" && !form.client_id) throw new Error("Selecione o cliente");
       const { error } = await supabase.from("appointments").insert({
         type: form.type,
         collaborator_id: form.collaborator_id,
@@ -298,7 +298,8 @@ function AppointmentsPage() {
         original_date: form.scheduled_date,
         original_time: form.scheduled_time,
         training_id: form.type === "treinamento" ? form.training_id : null,
-        work_id: form.type === "integracao" ? form.work_id : null,
+        client_id: form.type === "integracao" ? form.client_id : null,
+        work_id: null,
         notes: form.notes.trim() || null,
       });
       if (error) throw error;
@@ -346,9 +347,9 @@ function AppointmentsPage() {
         if (error) throw error;
       }
 
-      if (row.type === "integracao" && row.work_id) {
-        const clientId = workById.get(row.work_id)?.client_id ?? null;
-        if (!clientId) throw new Error("A obra do agendamento não tem cliente vinculado");
+      if (row.type === "integracao") {
+        const clientId = row.client_id;
+        if (!clientId) throw new Error("O agendamento não tem cliente vinculado");
         const { data: existing } = await supabase
           .from("client_integrations")
           .select("id")
@@ -427,7 +428,7 @@ function AppointmentsPage() {
 
   const detailOf = (r: Row) => {
     if (r.type === "treinamento") return r.training_id ? trainingById.get(r.training_id)?.label ?? "—" : "—";
-    if (r.type === "integracao") return r.work_id ? workById.get(r.work_id)?.label ?? "—" : "—";
+    if (r.type === "integracao") return r.client_id ? clientById.get(r.client_id) ?? "—" : "—";
     return "Exame ASO";
   };
 
