@@ -1043,9 +1043,9 @@ export function SchedulePlannerBoard({
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {shownWorks.length === 0 && !ctx.isLoading && (
             <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground sm:col-span-2">
-              {works.length === 0
-                ? "Nenhum serviço ativo cadastrado."
-                : "Nenhum serviço selecionado para este dia. Use o botão \u201cServiços\u201d."}
+              {clientOptions.length === 0
+                ? "Nenhum cliente com serviço ativo cadastrado."
+                : "Nenhum cliente selecionado para este dia. Use o botão \u201cClientes\u201d."}
             </p>
           )}
           {shownWorks.map((w) => {
