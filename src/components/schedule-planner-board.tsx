@@ -365,7 +365,7 @@ export function SchedulePlannerBoard({
       const { data, error } = await supabase
         .from("appointments")
         .select(
-          "id, type, collaborator_id, scheduled_time, notes, training_id, work_id, trainings(name), works(name, clients(name))",
+          "id, type, collaborator_id, scheduled_time, notes, training_id, client_id, trainings(name), clients(name)",
         )
         .eq("scheduled_date", date)
         .in("status", ["agendado", "realizado"]);
@@ -442,8 +442,7 @@ export function SchedulePlannerBoard({
       ].join("\n");
     }
     if (boxKey.startsWith(INTEGRATION_PREFIX) || boxKey === "integracao") {
-      const client =
-        first?.works?.clients?.name ?? first?.works?.name ?? integrationClientOf(boxKey);
+      const client = first?.clients?.name ?? integrationClientOf(boxKey);
       const obs = first?.notes?.trim();
       return [
         `*${client} - INTEGRAÇÃO*`,
