@@ -192,14 +192,15 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
       if (!form.scheduled_date) throw new Error("Informe a data do agendamento");
       if (!form.scheduled_time) throw new Error("Informe o horário do agendamento");
       if (type === "treinamento" && !form.training_id) throw new Error("Selecione o treinamento (NR)");
-      if (type === "integracao" && !form.work_id) throw new Error("Selecione a obra/serviço");
+      if (type === "integracao" && !form.client_id) throw new Error("Selecione o cliente");
       const payload = {
         type,
         collaborator_id: form.collaborator_id,
         scheduled_date: form.scheduled_date,
         scheduled_time: form.scheduled_time,
         training_id: type === "treinamento" ? form.training_id : null,
-        work_id: type === "integracao" ? form.work_id : null,
+        client_id: type === "integracao" ? form.client_id : null,
+        work_id: null,
         notes: form.notes.trim() || null,
       };
       if (editing) {
@@ -252,7 +253,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
       scheduled_date: r.scheduled_date,
       scheduled_time: r.scheduled_time?.slice(0, 5) ?? "07:00",
       training_id: r.training_id ?? "",
-      work_id: r.work_id ?? "",
+      client_id: r.client_id ?? "",
       notes: r.notes ?? "",
     });
   };
@@ -344,15 +345,15 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
 
                 {type === "integracao" && (
                   <div className="space-y-1.5">
-                    <Label>Obra / serviço *</Label>
-                    <Select value={form.work_id} onValueChange={(v) => set("work_id", v)}>
+                    <Label>Cliente *</Label>
+                    <Select value={form.client_id} onValueChange={(v) => set("client_id", v)}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione a obra" />
+                        <SelectValue placeholder="Selecione o cliente" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(works.data ?? []).map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}
+                        {(clients.data ?? []).map((cl) => (
+                          <SelectItem key={cl.id} value={cl.id}>
+                            {cl.city ? `${cl.name} · ${cl.city}` : cl.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -431,7 +432,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
                   <TableHead>Data</TableHead>
                   <TableHead>Matrícula</TableHead>
                   <TableHead>Colaborador</TableHead>
-                  <TableHead>{type === "treinamento" ? "Treinamento" : type === "integracao" ? "Obra" : "Tipo"}</TableHead>
+                  <TableHead>{type === "treinamento" ? "Treinamento" : type === "integracao" ? "Cliente" : "Tipo"}</TableHead>
                   <TableHead>Situação</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -455,7 +456,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
                         {type === "treinamento"
                           ? (r.training_id ? trainingById.get(r.training_id) : null) ?? "—"
                           : type === "integracao"
-                            ? (r.work_id ? workById.get(r.work_id) : null) ?? "—"
+                            ? (r.client_id ? clientById.get(r.client_id) : null) ?? "—"
                             : "Exame ASO"}
                       </TableCell>
                       <TableCell>
