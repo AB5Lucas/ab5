@@ -422,6 +422,19 @@ function AppointmentsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const remove = useMutation({
+    mutationFn: async (row: Row) => {
+      const { error } = await supabase.from("appointments").delete().eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Agendamento excluído");
+      setDeleteRow(null);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const detailOf = (r: Row) => {
     if (r.type === "treinamento") return r.training_id ? trainingById.get(r.training_id)?.label ?? "—" : "—";
     if (r.type === "integracao") return r.work_id ? workById.get(r.work_id)?.label ?? "—" : "—";
