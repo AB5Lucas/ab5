@@ -137,8 +137,13 @@ type AppointmentRow = {
   scheduled_time?: string | null;
   notes?: string | null;
   trainings: { name: string } | null;
-  works: { name: string; clients: { name: string } | null } | null;
+  clients: { name: string } | null;
 };
+
+/** Nome do cliente do agendamento de integração. */
+function appointmentClientName(a: AppointmentRow): string {
+  return a.clients?.name ?? "—";
+}
 
 const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -180,13 +185,12 @@ async function copyToClipboard(text: string) {
 function appointmentLabel(a: AppointmentRow): string {
   if (a.type === "aso") return "Exame ASO";
   if (a.type === "treinamento") return `Treinamento - ${a.trainings?.name ?? "—"}`;
-  return `Integração - ${a.works?.clients?.name ?? a.works?.name ?? "—"}`;
+  return `Integração - ${appointmentClientName(a)}`;
 }
 
 /** Caixa do agendamento — integrações são separadas por cliente. */
 function appointmentBoxKey(a: AppointmentRow): string | null {
-  if (a.type === "integracao")
-    return `${INTEGRATION_PREFIX}${a.works?.clients?.name ?? a.works?.name ?? "—"}`;
+  if (a.type === "integracao") return `${INTEGRATION_PREFIX}${appointmentClientName(a)}`;
   return APPOINTMENT_BOX[a.type] ?? null;
 }
 
