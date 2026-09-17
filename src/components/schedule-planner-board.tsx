@@ -1444,6 +1444,15 @@ export function SchedulePlannerBoard({
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            <div className="relative">
+              <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                className="h-7 pl-7 text-xs"
+                placeholder="Buscar função"
+                value={roleSearch}
+                onChange={(e) => setRoleSearch(e.target.value)}
+              />
+            </div>
             <div className="flex items-center gap-1.5">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
