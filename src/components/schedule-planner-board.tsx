@@ -102,31 +102,11 @@ const ABSENCE_BOX: Record<string, string> = {
 };
 const BOXES_STORAGE_KEY = "planner-status-boxes";
 
-/** Serviços ocultos por dia (o usuário escolhe no botão "Serviços"). */
-const HIDDEN_WORKS_STORAGE_KEY = "planner-hidden-works";
-
-function loadHiddenWorks(date: string): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(HIDDEN_WORKS_STORAGE_KEY);
-    const map = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
-    return new Set(map[date] ?? []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveHiddenWorks(date: string, ids: Set<string>) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(HIDDEN_WORKS_STORAGE_KEY);
-    const map = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
-    if (ids.size === 0) delete map[date];
-    else map[date] = [...ids];
-    window.localStorage.setItem(HIDDEN_WORKS_STORAGE_KEY, JSON.stringify(map));
-  } catch {
-    /* ignora */
-  }
+/** Sábado ou domingo: o dia começa sem nenhum cliente marcado (sem herança da sexta). */
+function isWeekendDate(iso: string) {
+  const [y = 1970, m = 1, d = 1] = iso.split("-").map(Number);
+  const wd = new Date(y, m - 1, d).getDay();
+  return wd === 0 || wd === 6;
 }
 
 /** Tipo de agendamento → caixa correspondente na programação. */
@@ -157,8 +137,13 @@ type AppointmentRow = {
   scheduled_time?: string | null;
   notes?: string | null;
   trainings: { name: string } | null;
-  works: { name: string; clients: { name: string } | null } | null;
+  clients: { name: string } | null;
 };
+
+/** Nome do cliente do agendamento de integração. */
+function appointmentClientName(a: AppointmentRow): string {
+  return a.clients?.name ?? "—";
+}
 
 const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -200,13 +185,12 @@ async function copyToClipboard(text: string) {
 function appointmentLabel(a: AppointmentRow): string {
   if (a.type === "aso") return "Exame ASO";
   if (a.type === "treinamento") return `Treinamento - ${a.trainings?.name ?? "—"}`;
-  return `Integração - ${a.works?.clients?.name ?? a.works?.name ?? "—"}`;
+  return `Integração - ${appointmentClientName(a)}`;
 }
 
 /** Caixa do agendamento — integrações são separadas por cliente. */
 function appointmentBoxKey(a: AppointmentRow): string | null {
-  if (a.type === "integracao")
-    return `${INTEGRATION_PREFIX}${a.works?.clients?.name ?? a.works?.name ?? "—"}`;
+  if (a.type === "integracao") return `${INTEGRATION_PREFIX}${appointmentClientName(a)}`;
   return APPOINTMENT_BOX[a.type] ?? null;
 }
 
@@ -291,22 +275,39 @@ export function SchedulePlannerBoard({
     });
   }
 
-  const [hiddenWorks, setHiddenWorks] = useState<Set<string>>(() => loadHiddenWorks(date));
-  const [hiddenWorksDate, setHiddenWorksDate] = useState(date);
-  if (hiddenWorksDate !== date) {
-    setHiddenWorksDate(date);
-    setHiddenWorks(loadHiddenWorks(date));
-  }
+  /** Clientes visíveis no dia — salvo no banco; dias sem configuração herdam o dia anterior. */
+  const visibility = useQuery({
+    queryKey: ["client-visibility", date],
+    queryFn: async () => {
+      const own = await supabase
+        .from("schedule_client_visibility")
+        .select("client_id, visible")
+        .eq("schedule_date", date);
+      if (own.error) throw own.error;
+      if ((own.data ?? []).length > 0) return own.data ?? [];
+      if (isWeekendDate(date)) return [];
+      const prev = await supabase
+        .from("schedule_client_visibility")
+        .select("schedule_date")
+        .lt("schedule_date", date)
+        .order("schedule_date", { ascending: false })
+        .limit(1);
+      if (prev.error) throw prev.error;
+      const prevDate = prev.data?.[0]?.schedule_date;
+      if (!prevDate) return [];
+      const inherited = await supabase
+        .from("schedule_client_visibility")
+        .select("client_id, visible")
+        .eq("schedule_date", prevDate);
+      if (inherited.error) throw inherited.error;
+      return inherited.data ?? [];
+    },
+  });
 
-  function toggleWorkVisible(id: string) {
-    setHiddenWorks((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      saveHiddenWorks(date, next);
-      return next;
-    });
-  }
+  const visibleClients = useMemo(
+    () => new Set((visibility.data ?? []).filter((v) => v.visible).map((v) => v.client_id)),
+    [visibility.data],
+  );
 
   const ctx = useQuery({ queryKey: ["schedule-ctx", date], queryFn: () => fetchScheduleContext(date) });
 
@@ -364,7 +365,7 @@ export function SchedulePlannerBoard({
       const { data, error } = await supabase
         .from("appointments")
         .select(
-          "id, type, collaborator_id, scheduled_time, notes, training_id, work_id, trainings(name), works(name, clients(name))",
+          "id, type, collaborator_id, scheduled_time, notes, training_id, client_id, trainings(name), clients(name)",
         )
         .eq("scheduled_date", date)
         .in("status", ["agendado", "realizado"]);
@@ -387,6 +388,7 @@ export function SchedulePlannerBoard({
       const key = appointmentBoxKey(a as AppointmentRow);
       if (!key) return;
       const list = m.get(key) ?? [];
+      if (list.some((x) => x.id === a.collaborator_id)) return;
       list.push({ id: a.collaborator_id, note: appointmentLabel(a) });
       m.set(key, list);
     });
@@ -441,8 +443,7 @@ export function SchedulePlannerBoard({
       ].join("\n");
     }
     if (boxKey.startsWith(INTEGRATION_PREFIX) || boxKey === "integracao") {
-      const client =
-        first?.works?.clients?.name ?? first?.works?.name ?? integrationClientOf(boxKey);
+      const client = first?.clients?.name ?? integrationClientOf(boxKey);
       const obs = first?.notes?.trim();
       return [
         `*${client} - INTEGRAÇÃO*`,
@@ -464,9 +465,39 @@ export function SchedulePlannerBoard({
   const rows = allocations.data ?? [];
   const c = ctx.data;
   const works = c?.works ?? [];
-  /** Serviços exibidos no dia: apenas os marcados no botão "Serviços". */
-  const shownWorks = works.filter((w) => !hiddenWorks.has(w.id));
+  /** Clientes com serviços ativos (lista do botão "Clientes"). */
+  const clientOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    works.forEach((w) => {
+      if (w.client_id && w.clients?.name) m.set(w.client_id, w.clients.name);
+    });
+    return [...m.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [works]);
+
+  /** Quadros exibidos no dia: só os serviços de clientes marcados. */
+  const shownWorks = works.filter((w) => !w.client_id || visibleClients.has(w.client_id));
   const people = c?.collaborators ?? [];
+
+  const toggleClientVisible = useMutation({
+    mutationFn: async (clientId: string) => {
+      const next = new Set(visibleClients);
+      if (next.has(clientId)) next.delete(clientId);
+      else next.add(clientId);
+      const payload = clientOptions.map((cl) => ({
+        schedule_date: date,
+        client_id: cl.id,
+        visible: next.has(cl.id),
+      }));
+      const { error } = await supabase
+        .from("schedule_client_visibility")
+        .upsert(payload, { onConflict: "schedule_date,client_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["client-visibility", date] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const positionById = useMemo(() => {
     const m = new Map<string, string>();
@@ -957,27 +988,27 @@ export function SchedulePlannerBoard({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline">
-                <MapPin className="h-4 w-4" /> Serviços
+                <MapPin className="h-4 w-4" /> Clientes
                 <Badge variant="secondary" className="ml-1">
-                  {shownWorks.length}/{works.length}
+                  {visibleClients.size}/{clientOptions.length}
                 </Badge>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="max-h-80 w-72 overflow-y-auto">
-              <DropdownMenuLabel>Serviços do dia</DropdownMenuLabel>
+              <DropdownMenuLabel>Clientes do dia</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {works.map((w) => (
+              {clientOptions.map((cl) => (
                 <DropdownMenuCheckboxItem
-                  key={w.id}
-                  checked={!hiddenWorks.has(w.id)}
-                  onCheckedChange={() => toggleWorkVisible(w.id)}
+                  key={cl.id}
+                  checked={visibleClients.has(cl.id)}
+                  onCheckedChange={() => canWrite && toggleClientVisible.mutate(cl.id)}
                   onSelect={(e) => e.preventDefault()}
                 >
-                  {workLabel(w)}
+                  {cl.name}
                 </DropdownMenuCheckboxItem>
               ))}
-              {works.length === 0 && (
-                <p className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum serviço cadastrado.</p>
+              {clientOptions.length === 0 && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum cliente cadastrado.</p>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1016,9 +1047,9 @@ export function SchedulePlannerBoard({
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {shownWorks.length === 0 && !ctx.isLoading && (
             <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground sm:col-span-2">
-              {works.length === 0
-                ? "Nenhum serviço ativo cadastrado."
-                : "Nenhum serviço selecionado para este dia. Use o botão \u201cServiços\u201d."}
+              {clientOptions.length === 0
+                ? "Nenhum cliente com serviço ativo cadastrado."
+                : "Nenhum cliente selecionado para este dia. Use o botão \u201cClientes\u201d."}
             </p>
           )}
           {shownWorks.map((w) => {
@@ -1062,7 +1093,7 @@ export function SchedulePlannerBoard({
                   drop.mutate({ ...p, workId: w.id });
                 }}
                 className={cn(
-                  "panel flex h-fit cursor-pointer flex-col overflow-hidden transition",
+                  "panel flex h-72 cursor-pointer flex-col overflow-hidden transition",
                   selectedWork === w.id && "ring-2 ring-primary",
                   isHover && !blockedTarget && "ring-2 ring-emerald-500",
                   isHover && blockedTarget && "ring-2 ring-destructive",
@@ -1113,7 +1144,7 @@ export function SchedulePlannerBoard({
                     </p>
                   )}
                 </header>
-                <ul className="max-h-56 flex-1 divide-y divide-border overflow-y-auto">
+                <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
                   {workRows.length === 0 && (
                     <li className="px-2 py-4 text-center text-[10px] text-muted-foreground">
                       Arraste colaboradores para cá
@@ -1231,7 +1262,7 @@ export function SchedulePlannerBoard({
                 onDragLeave={() => setHoverBox((h) => (h === b.key ? null : h))}
                 onDrop={handleDrop}
                 className={cn(
-                  "panel flex h-fit flex-col overflow-hidden border-dashed transition",
+                  "panel flex h-72 flex-col overflow-hidden border-dashed transition",
                   isHover && "ring-2 ring-primary",
                 )}
               >
@@ -1265,7 +1296,7 @@ export function SchedulePlannerBoard({
                   <p className="mt-0.5 text-[10px] text-muted-foreground">Caixa de situação do dia</p>
                 </header>
                 <ul
-                  className="max-h-56 flex-1 divide-y divide-border overflow-y-auto"
+                  className="min-h-0 flex-1 divide-y divide-border overflow-y-auto"
                   onDragOver={handleOver}
                   onDrop={handleDrop}
                 >

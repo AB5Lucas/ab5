@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       appointments: {
         Row: {
+          client_id: string | null
           collaborator_id: string
           completed_at: string | null
           completed_date: string | null
@@ -35,6 +36,7 @@ export type Database = {
           work_id: string | null
         }
         Insert: {
+          client_id?: string | null
           collaborator_id: string
           completed_at?: string | null
           completed_date?: string | null
@@ -54,6 +56,7 @@ export type Database = {
           work_id?: string | null
         }
         Update: {
+          client_id?: string | null
           collaborator_id?: string
           completed_at?: string | null
           completed_date?: string | null
@@ -73,6 +76,13 @@ export type Database = {
           work_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "appointments_collaborator_id_fkey"
             columns: ["collaborator_id"]
@@ -753,6 +763,41 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      schedule_client_visibility: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          schedule_date: string
+          updated_at: string
+          visible: boolean
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          schedule_date: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          schedule_date?: string
+          updated_at?: string
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_client_visibility_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sectors: {
         Row: {

@@ -66,6 +66,7 @@ type Row = {
   scheduled_time: string | null;
   training_id: string | null;
   work_id: string | null;
+  client_id: string | null;
   status: string;
   notes: string | null;
   completed_date: string | null;
@@ -76,7 +77,7 @@ type Row = {
 };
 
 const SELECT_COLS =
-  "id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, status, notes, completed_date, completed_time, original_date, original_time, reschedules";
+  "id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, client_id, status, notes, completed_date, completed_time, original_date, original_time, reschedules";
 
 const hourLabel = (t: string | null) => {
   if (!t) return "—";
@@ -96,7 +97,7 @@ type FormState = {
   scheduled_date: string;
   scheduled_time: string;
   training_id: string;
-  work_id: string;
+  client_id: string;
   notes: string;
 };
 
@@ -106,7 +107,7 @@ const emptyForm = (): FormState => ({
   scheduled_date: todayISO(),
   scheduled_time: "07:00",
   training_id: "",
-  work_id: "",
+  client_id: "",
   notes: "",
 });
 
@@ -171,13 +172,12 @@ function AppointmentsPage() {
     },
   });
 
-  const works = useQuery({
-    queryKey: ["works-min-clients"],
+  const clients = useQuery({
+    queryKey: ["clients-min"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("works")
-        .select("id, name, client_id, clients(name)")
-        .eq("active", true)
+        .from("clients")
+        .select("id, name, city, state")
         .order("name");
       if (error) throw error;
       return data;
@@ -212,26 +212,19 @@ function AppointmentsPage() {
     return m;
   }, [trainings.data]);
 
-  const workById = useMemo(() => {
-    const m = new Map<string, { label: string; client_id: string | null }>();
-    (works.data ?? []).forEach((w) =>
-      m.set(w.id, {
-        label: w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name,
-        client_id: w.client_id,
-      }),
-    );
-    return m;
-  }, [works.data]);
-
-  const clientOptions = useMemo(() => {
+  const clientById = useMemo(() => {
     const m = new Map<string, string>();
-    (works.data ?? []).forEach((w) => {
-      if (w.client_id && w.clients?.name) m.set(w.client_id, w.clients.name);
-    });
-    return [...m.entries()]
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [works.data]);
+    (clients.data ?? []).forEach((c) => m.set(c.id, c.name));
+    return m;
+  }, [clients.data]);
+
+  const clientOptions = useMemo(
+    () =>
+      (clients.data ?? [])
+        .map((c) => ({ id: c.id, name: c.city ? `${c.name} · ${c.city}` : c.name }))
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    [clients.data],
+  );
 
   const currentValidity = (collaboratorId: string, trainingId: string | null) => {
     if (!trainingId) return null;
@@ -258,10 +251,7 @@ function AppointmentsPage() {
       const pending = r.status === "agendado";
       if (showHistory ? pending : !pending) return false;
       if (fType !== "all" && r.type !== fType) return false;
-      if (fWork !== "all") {
-        const clientId = r.work_id ? workById.get(r.work_id)?.client_id ?? null : null;
-        if (clientId !== fWork) return false;
-      }
+      if (fWork !== "all" && r.client_id !== fWork) return false;
       if (!showHistory) {
         if (fPeriod === "today" && r.scheduled_date !== today) return false;
         if (fPeriod === "tomorrow" && r.scheduled_date !== addDays(today, 1)) return false;
@@ -276,7 +266,7 @@ function AppointmentsPage() {
       }
       return true;
     });
-  }, [appointments.data, fPeriod, fType, fWork, personById, workById, search, showHistory, today]);
+  }, [appointments.data, fPeriod, fType, fWork, personById, search, showHistory, today]);
 
   const pendingCount = (appointments.data ?? []).filter((r) => r.status === "agendado").length;
   const lateCount = (appointments.data ?? []).filter(
@@ -299,7 +289,7 @@ function AppointmentsPage() {
       if (!form.scheduled_date) throw new Error("Informe a data");
       if (!form.scheduled_time) throw new Error("Informe o horário");
       if (form.type === "treinamento" && !form.training_id) throw new Error("Selecione a NR");
-      if (form.type === "integracao" && !form.work_id) throw new Error("Selecione a obra/cliente");
+      if (form.type === "integracao" && !form.client_id) throw new Error("Selecione o cliente");
       const { error } = await supabase.from("appointments").insert({
         type: form.type,
         collaborator_id: form.collaborator_id,
@@ -308,7 +298,8 @@ function AppointmentsPage() {
         original_date: form.scheduled_date,
         original_time: form.scheduled_time,
         training_id: form.type === "treinamento" ? form.training_id : null,
-        work_id: form.type === "integracao" ? form.work_id : null,
+        client_id: form.type === "integracao" ? form.client_id : null,
+        work_id: null,
         notes: form.notes.trim() || null,
       });
       if (error) throw error;
@@ -356,9 +347,9 @@ function AppointmentsPage() {
         if (error) throw error;
       }
 
-      if (row.type === "integracao" && row.work_id) {
-        const clientId = workById.get(row.work_id)?.client_id ?? null;
-        if (!clientId) throw new Error("A obra do agendamento não tem cliente vinculado");
+      if (row.type === "integracao") {
+        const clientId = row.client_id;
+        if (!clientId) throw new Error("O agendamento não tem cliente vinculado");
         const { data: existing } = await supabase
           .from("client_integrations")
           .select("id")
@@ -437,7 +428,7 @@ function AppointmentsPage() {
 
   const detailOf = (r: Row) => {
     if (r.type === "treinamento") return r.training_id ? trainingById.get(r.training_id)?.label ?? "—" : "—";
-    if (r.type === "integracao") return r.work_id ? workById.get(r.work_id)?.label ?? "—" : "—";
+    if (r.type === "integracao") return r.client_id ? clientById.get(r.client_id) ?? "—" : "—";
     return "Exame ASO";
   };
 
@@ -744,15 +735,15 @@ function AppointmentsPage() {
             {form.type === "integracao" && (
               <>
                 <div className="space-y-1.5">
-                  <Label>Obra / cliente *</Label>
-                  <Select value={form.work_id} onValueChange={(v) => set("work_id", v)}>
+                  <Label>Cliente *</Label>
+                  <Select value={form.client_id} onValueChange={(v) => set("client_id", v)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione a obra" />
+                      <SelectValue placeholder="Selecione o cliente" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(works.data ?? []).map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
-                          {w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}
+                      {clientOptions.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
