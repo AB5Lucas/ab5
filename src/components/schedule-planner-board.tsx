@@ -512,6 +512,16 @@ export function SchedulePlannerBoard({
     return m;
   }, [people]);
 
+  const roleQuery = roleSearch.trim().toLowerCase();
+  /** O colaborador atende ao filtro de função digitado? */
+  const matchesRole = (collaboratorId: string, positionOverride?: string | null) => {
+    if (!roleQuery) return true;
+    const posId = positionOverride ?? personById.get(collaboratorId)?.position_id ?? null;
+    const name = posId ? positionById.get(posId) ?? "" : "";
+    return name.toLowerCase().includes(roleQuery);
+  };
+
+
   const workLabel = (w: (typeof works)[number]) =>
     w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name;
 
