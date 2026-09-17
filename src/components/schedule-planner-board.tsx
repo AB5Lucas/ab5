@@ -638,7 +638,7 @@ export function SchedulePlannerBoard({
       if (selectedWork && !showAll && (ev.level === "block" || ev.hardBlock)) return false;
       for (const f of filters) {
         if (f === "allocated" && !alloc) return false;
-        if (f === "unallocated" && alloc) return false;
+        if (f === "unallocated" && (alloc || ev.hardBlock)) return false;
         if (f === "warn" && ev.level !== "warn") return false;
         if (f === "blocked" && ev.level !== "block") return false;
       }
