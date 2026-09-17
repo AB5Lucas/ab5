@@ -461,9 +461,39 @@ export function SchedulePlannerBoard({
   const rows = allocations.data ?? [];
   const c = ctx.data;
   const works = c?.works ?? [];
-  /** Serviços exibidos no dia: apenas os marcados no botão "Serviços". */
-  const shownWorks = works.filter((w) => !hiddenWorks.has(w.id));
+  /** Clientes com serviços ativos (lista do botão "Clientes"). */
+  const clientOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    works.forEach((w) => {
+      if (w.client_id && w.clients?.name) m.set(w.client_id, w.clients.name);
+    });
+    return [...m.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [works]);
+
+  /** Quadros exibidos no dia: só os serviços de clientes marcados. */
+  const shownWorks = works.filter((w) => !w.client_id || visibleClients.has(w.client_id));
   const people = c?.collaborators ?? [];
+
+  const toggleClientVisible = useMutation({
+    mutationFn: async (clientId: string) => {
+      const next = new Set(visibleClients);
+      if (next.has(clientId)) next.delete(clientId);
+      else next.add(clientId);
+      const payload = clientOptions.map((cl) => ({
+        schedule_date: date,
+        client_id: cl.id,
+        visible: next.has(cl.id),
+      }));
+      const { error } = await supabase
+        .from("schedule_client_visibility")
+        .upsert(payload, { onConflict: "schedule_date,client_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["client-visibility", date] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const positionById = useMemo(() => {
     const m = new Map<string, string>();
