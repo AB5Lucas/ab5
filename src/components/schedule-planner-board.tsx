@@ -232,6 +232,7 @@ export function SchedulePlannerBoard({
   const { canWrite, isAdmin, user } = useCurrentUser();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [roleSearch, setRoleSearch] = useState("");
   const [filters, setFilters] = useState<Set<FilterKey>>(new Set());
   const [showAll, setShowAll] = useState(false);
   const [selectedWork, setSelectedWork] = useState<string | null>(null);
@@ -511,6 +512,16 @@ export function SchedulePlannerBoard({
     return m;
   }, [people]);
 
+  const roleQuery = roleSearch.trim().toLowerCase();
+  /** O colaborador atende ao filtro de função digitado? */
+  const matchesRole = (collaboratorId: string, positionOverride?: string | null) => {
+    if (!roleQuery) return true;
+    const posId = positionOverride ?? personById.get(collaboratorId)?.position_id ?? null;
+    const name = posId ? positionById.get(posId) ?? "" : "";
+    return name.toLowerCase().includes(roleQuery);
+  };
+
+
   const workLabel = (w: (typeof works)[number]) =>
     w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name;
 
@@ -629,6 +640,7 @@ export function SchedulePlannerBoard({
     return people.filter((p) => {
       if (q && !p.full_name.toLowerCase().includes(q) && !p.registration_number.toLowerCase().includes(q))
         return false;
+      if (!matchesRole(p.id)) return false;
       if (!filters.has("pj_int") && HIDDEN_CONTRACTS.includes((p.contract_type ?? "").toLowerCase()))
         return false;
       const alloc = allocByCollaborator.get(p.id);
@@ -645,7 +657,7 @@ export function SchedulePlannerBoard({
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [people, search, filters, selectedWork, showAll, c, allocByCollaborator]);
+  }, [people, search, roleQuery, filters, selectedWork, showAll, c, allocByCollaborator]);
 
 
   async function ensureSchedule() {
@@ -1057,6 +1069,7 @@ export function SchedulePlannerBoard({
               .filter(
                 (r) =>
                   r.work_id === w.id &&
+                  matchesRole(r.collaborator_id, r.position_id) &&
                   !appointmentByCollaborator.has(r.collaborator_id) &&
                   !c?.absences.has(r.collaborator_id),
               )
@@ -1232,11 +1245,11 @@ export function SchedulePlannerBoard({
             const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
             const byName = (a: string, c: string) => nameOf(a).localeCompare(nameOf(c), "pt-BR");
             const boxRows = entries
-              .filter((e) => e.box_key === b.key)
+              .filter((e) => e.box_key === b.key && matchesRole(e.collaborator_id))
               .slice()
               .sort((x, y) => byName(x.collaborator_id, y.collaborator_id));
             const autoRows = (absenceMembers.get(b.key) ?? [])
-              .filter((a) => !boxRows.some((r) => r.collaborator_id === a.id))
+              .filter((a) => matchesRole(a.id) && !boxRows.some((r) => r.collaborator_id === a.id))
               .slice()
               .sort((x, y) => byName(x.id, y.id));
             const isHover = hoverBox === b.key;
@@ -1429,6 +1442,15 @@ export function SchedulePlannerBoard({
                 placeholder="Buscar colaborador"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                className="h-7 pl-7 text-xs"
+                placeholder="Buscar função"
+                value={roleSearch}
+                onChange={(e) => setRoleSearch(e.target.value)}
               />
             </div>
             <div className="flex items-center gap-1.5">
