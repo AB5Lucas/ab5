@@ -251,10 +251,7 @@ function AppointmentsPage() {
       const pending = r.status === "agendado";
       if (showHistory ? pending : !pending) return false;
       if (fType !== "all" && r.type !== fType) return false;
-      if (fWork !== "all") {
-        const clientId = r.work_id ? workById.get(r.work_id)?.client_id ?? null : null;
-        if (clientId !== fWork) return false;
-      }
+      if (fWork !== "all" && r.client_id !== fWork) return false;
       if (!showHistory) {
         if (fPeriod === "today" && r.scheduled_date !== today) return false;
         if (fPeriod === "tomorrow" && r.scheduled_date !== addDays(today, 1)) return false;
@@ -269,7 +266,7 @@ function AppointmentsPage() {
       }
       return true;
     });
-  }, [appointments.data, fPeriod, fType, fWork, personById, workById, search, showHistory, today]);
+  }, [appointments.data, fPeriod, fType, fWork, personById, search, showHistory, today]);
 
   const pendingCount = (appointments.data ?? []).filter((r) => r.status === "agendado").length;
   const lateCount = (appointments.data ?? []).filter(
@@ -737,15 +734,15 @@ function AppointmentsPage() {
             {form.type === "integracao" && (
               <>
                 <div className="space-y-1.5">
-                  <Label>Obra / cliente *</Label>
-                  <Select value={form.work_id} onValueChange={(v) => set("work_id", v)}>
+                  <Label>Cliente *</Label>
+                  <Select value={form.client_id} onValueChange={(v) => set("client_id", v)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione a obra" />
+                      <SelectValue placeholder="Selecione o cliente" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(works.data ?? []).map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
-                          {w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}
+                      {clientOptions.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
