@@ -212,26 +212,19 @@ function AppointmentsPage() {
     return m;
   }, [trainings.data]);
 
-  const workById = useMemo(() => {
-    const m = new Map<string, { label: string; client_id: string | null }>();
-    (works.data ?? []).forEach((w) =>
-      m.set(w.id, {
-        label: w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name,
-        client_id: w.client_id,
-      }),
-    );
-    return m;
-  }, [works.data]);
-
-  const clientOptions = useMemo(() => {
+  const clientById = useMemo(() => {
     const m = new Map<string, string>();
-    (works.data ?? []).forEach((w) => {
-      if (w.client_id && w.clients?.name) m.set(w.client_id, w.clients.name);
-    });
-    return [...m.entries()]
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [works.data]);
+    (clients.data ?? []).forEach((c) => m.set(c.id, c.name));
+    return m;
+  }, [clients.data]);
+
+  const clientOptions = useMemo(
+    () =>
+      (clients.data ?? [])
+        .map((c) => ({ id: c.id, name: c.city ? `${c.name} · ${c.city}` : c.name }))
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    [clients.data],
+  );
 
   const currentValidity = (collaboratorId: string, trainingId: string | null) => {
     if (!trainingId) return null;
