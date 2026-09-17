@@ -1089,7 +1089,7 @@ export function SchedulePlannerBoard({
                   drop.mutate({ ...p, workId: w.id });
                 }}
                 className={cn(
-                  "panel flex h-fit cursor-pointer flex-col overflow-hidden transition",
+                  "panel flex h-72 cursor-pointer flex-col overflow-hidden transition",
                   selectedWork === w.id && "ring-2 ring-primary",
                   isHover && !blockedTarget && "ring-2 ring-emerald-500",
                   isHover && blockedTarget && "ring-2 ring-destructive",
@@ -1140,7 +1140,7 @@ export function SchedulePlannerBoard({
                     </p>
                   )}
                 </header>
-                <ul className="max-h-56 flex-1 divide-y divide-border overflow-y-auto">
+                <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
                   {workRows.length === 0 && (
                     <li className="px-2 py-4 text-center text-[10px] text-muted-foreground">
                       Arraste colaboradores para cá
@@ -1258,7 +1258,7 @@ export function SchedulePlannerBoard({
                 onDragLeave={() => setHoverBox((h) => (h === b.key ? null : h))}
                 onDrop={handleDrop}
                 className={cn(
-                  "panel flex h-fit flex-col overflow-hidden border-dashed transition",
+                  "panel flex h-72 flex-col overflow-hidden border-dashed transition",
                   isHover && "ring-2 ring-primary",
                 )}
               >
@@ -1292,7 +1292,7 @@ export function SchedulePlannerBoard({
                   <p className="mt-0.5 text-[10px] text-muted-foreground">Caixa de situação do dia</p>
                 </header>
                 <ul
-                  className="max-h-56 flex-1 divide-y divide-border overflow-y-auto"
+                  className="min-h-0 flex-1 divide-y divide-border overflow-y-auto"
                   onDragOver={handleOver}
                   onDrop={handleDrop}
                 >
