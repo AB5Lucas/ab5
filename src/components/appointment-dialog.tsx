@@ -93,7 +93,7 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select("id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, status, notes")
+        .select("id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, client_id, status, notes")
         .eq("type", type)
         .order("scheduled_date", { ascending: false });
       if (error) throw error;
@@ -127,14 +127,13 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     },
   });
 
-  const works = useQuery({
-    queryKey: ["works-min-clients"],
+  const clients = useQuery({
+    queryKey: ["clients-min"],
     enabled: type === "integracao",
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("works")
-        .select("id, name, clients(name)")
-        .eq("active", true)
+        .from("clients")
+        .select("id, name, city")
         .order("name");
       if (error) throw error;
       return data;
@@ -153,13 +152,11 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
     return m;
   }, [trainings.data]);
 
-  const workById = useMemo(() => {
+  const clientById = useMemo(() => {
     const m = new Map<string, string>();
-    (works.data ?? []).forEach((w) =>
-      m.set(w.id, w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name),
-    );
+    (clients.data ?? []).forEach((c) => m.set(c.id, c.name));
     return m;
-  }, [works.data]);
+  }, [clients.data]);
 
   const filteredPeople = useMemo(() => {
     const q = personQuery.trim().toLowerCase();
