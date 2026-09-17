@@ -124,6 +124,7 @@ function AppointmentsPage() {
   const [redoRow, setRedoRow] = useState<Row | null>(null);
   const [redoDate, setRedoDate] = useState(today);
   const [redoTime, setRedoTime] = useState("07:00");
+  const [deleteRow, setDeleteRow] = useState<Row | null>(null);
 
   const [fPeriod, setFPeriod] = useState("all");
   const [fType, setFType] = useState("all");
