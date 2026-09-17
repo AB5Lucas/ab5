@@ -66,6 +66,7 @@ type Row = {
   scheduled_time: string | null;
   training_id: string | null;
   work_id: string | null;
+  client_id: string | null;
   status: string;
   notes: string | null;
   completed_date: string | null;
@@ -76,7 +77,7 @@ type Row = {
 };
 
 const SELECT_COLS =
-  "id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, status, notes, completed_date, completed_time, original_date, original_time, reschedules";
+  "id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, client_id, status, notes, completed_date, completed_time, original_date, original_time, reschedules";
 
 const hourLabel = (t: string | null) => {
   if (!t) return "—";
@@ -96,7 +97,7 @@ type FormState = {
   scheduled_date: string;
   scheduled_time: string;
   training_id: string;
-  work_id: string;
+  client_id: string;
   notes: string;
 };
 
@@ -106,7 +107,7 @@ const emptyForm = (): FormState => ({
   scheduled_date: todayISO(),
   scheduled_time: "07:00",
   training_id: "",
-  work_id: "",
+  client_id: "",
   notes: "",
 });
 
