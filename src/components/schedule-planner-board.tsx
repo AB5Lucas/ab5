@@ -388,6 +388,7 @@ export function SchedulePlannerBoard({
       const key = appointmentBoxKey(a as AppointmentRow);
       if (!key) return;
       const list = m.get(key) ?? [];
+      if (list.some((x) => x.id === a.collaborator_id)) return;
       list.push({ id: a.collaborator_id, note: appointmentLabel(a) });
       m.set(key, list);
     });
