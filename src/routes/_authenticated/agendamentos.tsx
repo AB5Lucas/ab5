@@ -634,6 +634,15 @@ function AppointmentsPage() {
                           >
                             <X className="h-4 w-4 text-destructive" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            aria-label="Excluir agendamento"
+                            onClick={() => setDeleteRow(r)}
+                          >
+                            <Minus className="h-4 w-4 text-destructive" />
+                          </Button>
                         </div>
                       )}
                     </TableCell>
