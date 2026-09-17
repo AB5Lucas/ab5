@@ -640,6 +640,7 @@ export function SchedulePlannerBoard({
     return people.filter((p) => {
       if (q && !p.full_name.toLowerCase().includes(q) && !p.registration_number.toLowerCase().includes(q))
         return false;
+      if (!matchesRole(p.id)) return false;
       if (!filters.has("pj_int") && HIDDEN_CONTRACTS.includes((p.contract_type ?? "").toLowerCase()))
         return false;
       const alloc = allocByCollaborator.get(p.id);
