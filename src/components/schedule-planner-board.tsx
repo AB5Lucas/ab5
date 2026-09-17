@@ -657,7 +657,7 @@ export function SchedulePlannerBoard({
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [people, search, filters, selectedWork, showAll, c, allocByCollaborator]);
+  }, [people, search, roleQuery, filters, selectedWork, showAll, c, allocByCollaborator]);
 
 
   async function ensureSchedule() {
