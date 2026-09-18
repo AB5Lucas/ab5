@@ -123,7 +123,6 @@ export async function fetchScheduleContext(date: string) {
     supabase
       .from("collaborators")
       .select("id, full_name, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type")
-      .eq("status", "active")
       .order("full_name"),
     supabase.from("positions").select("id, name").order("name"),
     supabase.from("vehicles").select("id, plate, model, passenger_capacity, status").order("plate"),
@@ -148,9 +147,13 @@ export async function fetchScheduleContext(date: string) {
   (leaves.data ?? []).forEach((v) => absences.set(v.collaborator_id, "Atestado"));
   (daysOff.data ?? []).forEach((v) => absences.set(v.collaborator_id, "Folga"));
 
+  const allPeople = (collaborators.data ?? []) as Collaborator[];
+
   return {
     works: works.data ?? [],
-    collaborators: (collaborators.data ?? []) as Collaborator[],
+    collaborators: allPeople.filter((p) => p.status === "active"),
+    /** Inativos: só entram na tela quando já estavam escalados no dia. */
+    inactiveCollaborators: allPeople.filter((p) => p.status !== "active"),
     positions: positions.data ?? [],
     vehicles: vehicles.data ?? [],
     baseTeams: (baseTeams.data ?? []).filter((b) => !b.end_date || b.end_date >= date),
