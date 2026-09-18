@@ -147,9 +147,13 @@ export async function fetchScheduleContext(date: string) {
   (leaves.data ?? []).forEach((v) => absences.set(v.collaborator_id, "Atestado"));
   (daysOff.data ?? []).forEach((v) => absences.set(v.collaborator_id, "Folga"));
 
+  const allPeople = (collaborators.data ?? []) as Collaborator[];
+
   return {
     works: works.data ?? [],
-    collaborators: (collaborators.data ?? []) as Collaborator[],
+    collaborators: allPeople.filter((p) => p.status === "active"),
+    /** Inativos: só entram na tela quando já estavam escalados no dia. */
+    inactiveCollaborators: allPeople.filter((p) => p.status !== "active"),
     positions: positions.data ?? [],
     vehicles: vehicles.data ?? [],
     baseTeams: (baseTeams.data ?? []).filter((b) => !b.end_date || b.end_date >= date),
