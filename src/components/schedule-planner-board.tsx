@@ -479,7 +479,22 @@ export function SchedulePlannerBoard({
 
   /** Quadros exibidos no dia: só os serviços de clientes marcados. */
   const shownWorks = works.filter((w) => !w.client_id || visibleClients.has(w.client_id));
-  const people = c?.collaborators ?? [];
+  /**
+   * Colaboradores exibidos: os ativos e, além deles, os inativados que já
+   * estavam escalados (obra ou caixa) nesta data — some a partir do dia
+   * seguinte ao último em que foram escalados.
+   */
+  const people = useMemo(() => {
+    const active = c?.collaborators ?? [];
+    const inactive = c?.inactiveCollaborators ?? [];
+    if (inactive.length === 0) return active;
+    const scheduled = new Set<string>();
+    rows.forEach((r) => scheduled.add(r.collaborator_id));
+    entries.forEach((e) => scheduled.add(e.collaborator_id));
+    return [...active, ...inactive.filter((p) => scheduled.has(p.id))].sort((a, b) =>
+      a.full_name.localeCompare(b.full_name, "pt-BR"),
+    );
+  }, [c, rows, entries]);
 
   const toggleClientVisible = useMutation({
     mutationFn: async (clientId: string) => {
