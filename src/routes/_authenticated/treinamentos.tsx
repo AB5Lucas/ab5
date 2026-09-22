@@ -381,7 +381,7 @@ function TrainingsPage() {
                       {trainingIds.length === 0
                         ? "Todos os treinamentos"
                         : trainingIds.length === 1
-                          ? nameById.get(trainingIds[0]) ?? "1 selecionado"
+                          ? nameById.get(trainingIds[0] ?? "") ?? "1 selecionado"
                           : `${trainingIds.length} selecionados`}
                     </span>
                   </Button>
