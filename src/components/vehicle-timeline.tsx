@@ -125,7 +125,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, needs_company_transport, needs_transport_voucher")
+        .select("id, name, distance_km, needs_company_transport, needs_transport_voucher")
         .eq("active", true)
         .order("name");
       if (error) throw error;
@@ -184,6 +184,15 @@ export function VehicleTimeline() {
   const clientName = useMemo(() => {
     const map = new Map<string, string>();
     (clients.data ?? []).forEach((c) => map.set(c.id, c.name));
+    return map;
+  }, [clients.data]);
+
+  const clientKm = useMemo(() => {
+    const map = new Map<string, number>();
+    (clients.data ?? []).forEach((c) => {
+      const isIndustry = /ind[uú]stria/i.test(c.name ?? "");
+      map.set(c.id, isIndustry ? KM_WORK : Number(c.distance_km ?? 0) || 0);
+    });
     return map;
   }, [clients.data]);
 
