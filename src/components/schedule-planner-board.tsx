@@ -968,7 +968,7 @@ export function SchedulePlannerBoard({
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="order-3 flex basis-full flex-wrap items-center gap-2 text-xs">
           <Badge variant={finalized ? "default" : "secondary"}>
             {schedule.data ? STATUS_LABEL[schedule.data.status] : "Não iniciada"}
           </Badge>
