@@ -57,6 +57,10 @@ function weekdayOf(iso: string) {
   return WEEKDAYS[new Date(`${iso}T00:00:00`).getDay()]!;
 }
 
+function shortName(full: string) {
+  return full.trim().split(/\s+/).slice(0, 2).join(" ");
+}
+
 function isWeekend(iso: string) {
   const d = new Date(`${iso}T00:00:00`).getDay();
   return d === 0 || d === 6;
