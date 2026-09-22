@@ -60,8 +60,6 @@ const groups: Group[] = [
     items: [
       { title: "Colaboradores", url: "/colaboradores" },
       { title: "Funções", url: "/colaboradores/estrutura" },
-      { title: "Treinamentos", url: "/treinamentos" },
-      { title: "ASOs", url: "/colaboradores/asos" },
     ],
   },
   {
@@ -70,7 +68,6 @@ const groups: Group[] = [
     items: [
       { title: "Serviços", url: "/obras" },
       { title: "Clientes", url: "/clientes" },
-      { title: "Integrações", url: "/obras/integracoes" },
       { title: "Equipes Base", url: "/obras/equipes-base" },
       { title: "Requisitos", url: "/obras/requisitos" },
     ],
