@@ -57,6 +57,10 @@ function weekdayOf(iso: string) {
   return WEEKDAYS[new Date(`${iso}T00:00:00`).getDay()]!;
 }
 
+function shortName(full: string) {
+  return full.trim().split(/\s+/).slice(0, 2).join(" ");
+}
+
 function isWeekend(iso: string) {
   const d = new Date(`${iso}T00:00:00`).getDay();
   return d === 0 || d === 6;
@@ -431,16 +435,15 @@ export function VehicleTimeline() {
         <table className="w-max border-collapse text-xs">
           <thead>
             <tr>
-              <th className="sticky left-0 z-20 w-56 min-w-56 border-b border-r border-border bg-card p-2 text-left">
+              <th className="sticky left-0 z-20 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 text-left text-[11px]">
                 Veículo
               </th>
               {days.map((d) => (
                 <th
                   key={d}
-                  className={`min-w-28 border-b border-r border-border p-1 text-center font-medium ${isWeekend(d) ? "bg-muted/60" : "bg-card"}`}
+                  className={`w-24 min-w-24 border-b border-r border-border px-1 py-0.5 text-center text-[10px] font-medium leading-tight ${isWeekend(d) ? "bg-muted/60" : "bg-card"}`}
                 >
-                  <div>{d.slice(8)}</div>
-                  <div className="text-[10px] uppercase text-muted-foreground">{weekdayOf(d)}</div>
+                  {d.slice(8)} <span className="uppercase text-muted-foreground">{weekdayOf(d)}</span>
                 </th>
               ))}
             </tr>
@@ -455,17 +458,20 @@ export function VehicleTimeline() {
             )}
             {visibleVehicles.map((v) => (
               <tr key={v.id}>
-                <td className="sticky left-0 z-10 w-56 min-w-56 border-b border-r border-border bg-card p-2 align-top">
-                  <div className="font-medium">{[v.brand, v.model].filter(Boolean).join(" ") || "Veículo"}</div>
-                  <div className="font-mono text-[11px] uppercase text-muted-foreground">{v.plate}</div>
-                  <div className="text-[10px] text-muted-foreground">{v.passenger_capacity} lugares</div>
+                <td className="sticky left-0 z-10 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 align-middle leading-tight">
+                  <div className="truncate text-[11px] font-medium">
+                    {[v.brand, v.model].filter(Boolean).join(" ") || "Veículo"}
+                  </div>
+                  <div className="font-mono text-[10px] uppercase text-muted-foreground">
+                    {v.plate} · {v.passenger_capacity} lug.
+                  </div>
                 </td>
                 {days.map((d) => {
                   const row = byCell.get(`${v.id}|${d}`);
                   return (
                     <td
                       key={d}
-                      className={`min-w-28 border-b border-r border-border p-0 align-top ${isWeekend(d) ? "bg-muted/40" : ""}`}
+                      className={`w-24 min-w-24 border-b border-r border-border p-0 align-middle ${isWeekend(d) ? "bg-muted/40" : ""}`}
                       onDragOver={(e) => {
                         if (canWrite) e.preventDefault();
                       }}
@@ -479,26 +485,25 @@ export function VehicleTimeline() {
                         draggable={!!row && canWrite}
                         onDragStart={(e) => row && e.dataTransfer.setData("text/plain", JSON.stringify(row))}
                         onClick={() => openCell(v.id, d)}
-                        className="h-16 w-full cursor-pointer px-1 py-1 text-left hover:bg-accent/40"
+                        className="h-9 w-full cursor-pointer px-1 text-left leading-tight hover:bg-accent/40"
                       >
                         {row ? (
-                          <div className="space-y-0.5">
-                            <div className="truncate text-[11px] font-medium leading-tight">
-                              {row.driver_id ? driverName.get(row.driver_id) ?? "—" : "Sem motorista"}
-                            </div>
-                            <div className="truncate text-[10px] uppercase text-muted-foreground">
-                              {row.is_external ? "EXTERNO" : clientName.get(row.client_id ?? "") ?? "—"}
-                            </div>
+                          <>
                             <div className="flex items-center gap-1">
                               <span
-                                className={`h-2 w-2 rounded-full ${row.driver_bonus ? "bg-success" : "bg-muted-foreground/40"}`}
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${row.driver_bonus ? "bg-success" : "bg-muted-foreground/40"}`}
                                 title={row.driver_bonus ? "Com prêmio de motorista" : "Sem prêmio de motorista"}
                               />
-                              <span className="text-[10px] text-muted-foreground">{row.km} km</span>
+                              <span className="truncate text-[10px] font-medium">
+                                {row.driver_id ? shortName(driverName.get(row.driver_id) ?? "—") : "Sem motorista"}
+                              </span>
                             </div>
-                          </div>
+                            <div className="truncate text-[10px] uppercase text-muted-foreground">
+                              {row.km}km {row.is_external ? "EXTERNO" : clientName.get(row.client_id ?? "") ?? "—"}
+                            </div>
+                          </>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground/60">Sem programação</span>
+                          <span className="text-[10px] text-muted-foreground/60">—</span>
                         )}
                       </button>
                     </td>
