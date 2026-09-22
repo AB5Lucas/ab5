@@ -1,0 +1,1 @@
+ALTER TABLE public.vehicle_view_prefs ADD COLUMN IF NOT EXISTS vehicle_order uuid[] NOT NULL DEFAULT '{}';
