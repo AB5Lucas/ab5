@@ -46,13 +46,21 @@ export type VehicleScheduleRow = {
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
 export function monthKeyNow() {
-  return new Date().toISOString().slice(0, 7);
+  const now = new Date();
+  // Período de fechamento: dia 26 do mês anterior até o dia 25 do mês selecionado.
+  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth() + (now.getDate() >= 26 ? 1 : 0), 1));
+  return d.toISOString().slice(0, 7);
 }
 
 export function monthDays(month: string): string[] {
   const [y, m] = month.split("-").map(Number);
-  const last = new Date(Date.UTC(y!, m!, 0)).getUTCDate();
-  return Array.from({ length: last }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`);
+  const start = new Date(Date.UTC(y!, m! - 2, 26));
+  const end = new Date(Date.UTC(y!, m! - 1, 25));
+  const out: string[] = [];
+  for (let d = start; d <= end; d = new Date(d.getTime() + 86400000)) {
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
 }
 
 function shiftMonth(month: string, delta: number) {
