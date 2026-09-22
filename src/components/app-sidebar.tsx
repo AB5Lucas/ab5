@@ -12,6 +12,7 @@ import {
   FileBarChart,
   Shield,
   HardHat,
+  ClipboardList,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,11 +35,15 @@ const groups: Group[] = [
   {
     label: "Programação",
     icon: CalendarDays,
+    items: [{ title: "Programação", url: "/programacao/diaria" }],
+  },
+  {
+    label: "Controles",
+    icon: ClipboardList,
     items: [
-      { title: "Hoje", url: "/programacao/hoje" },
-      { title: "Programação Diária", url: "/programacao/diaria" },
-      { title: "Overview Semanal", url: "/programacao/semanal" },
-      { title: "Histórico", url: "/programacao/historico" },
+      { title: "Integrações", url: "/obras/integracoes" },
+      { title: "Treinamentos", url: "/treinamentos" },
+      { title: "ASOs", url: "/colaboradores/asos" },
     ],
   },
   {
@@ -55,8 +60,6 @@ const groups: Group[] = [
     items: [
       { title: "Colaboradores", url: "/colaboradores" },
       { title: "Funções", url: "/colaboradores/estrutura" },
-      { title: "Treinamentos", url: "/treinamentos" },
-      { title: "ASOs", url: "/colaboradores/asos" },
     ],
   },
   {
@@ -65,7 +68,6 @@ const groups: Group[] = [
     items: [
       { title: "Serviços", url: "/obras" },
       { title: "Clientes", url: "/clientes" },
-      { title: "Integrações", url: "/obras/integracoes" },
       { title: "Equipes Base", url: "/obras/equipes-base" },
       { title: "Requisitos", url: "/obras/requisitos" },
     ],
