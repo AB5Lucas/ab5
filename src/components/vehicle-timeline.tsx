@@ -241,7 +241,7 @@ export function VehicleTimeline() {
       client_id: f.is_external ? null : f.client_id,
       is_external: f.is_external,
       driver_bonus: f.is_external ? false : f.driver_bonus,
-      km: f.is_external ? KM_EXTERNAL : KM_WORK,
+      km: f.is_external ? KM_EXTERNAL : (f.client_id ? clientKm.get(f.client_id) ?? 0 : 0),
     };
   }
 
