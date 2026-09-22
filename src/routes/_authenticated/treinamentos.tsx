@@ -374,7 +374,37 @@ function TrainingsPage() {
             </div>
             <div className="space-y-1">
               <Label>Treinamento</Label>
-              <Input value={trainingSearch} onChange={(e) => setTrainingSearch(e.target.value)} placeholder="Buscar treinamento" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between font-normal">
+                    <span className="truncate">
+                      {trainingIds.length === 0
+                        ? "Todos os treinamentos"
+                        : trainingIds.length === 1
+                          ? nameById.get(trainingIds[0]) ?? "1 selecionado"
+                          : `${trainingIds.length} selecionados`}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="max-h-72 w-72 overflow-y-auto p-2">
+                  {(trainings.data ?? []).filter((t) => t.active).map((t) => (
+                    <label key={t.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                      <Checkbox
+                        checked={trainingIds.includes(t.id)}
+                        onCheckedChange={(c) =>
+                          setTrainingIds((prev) => (c ? [...prev, t.id] : prev.filter((x) => x !== t.id)))
+                        }
+                      />
+                      <span className="truncate">{t.name}{t.description ? ` · ${t.description}` : ""}</span>
+                    </label>
+                  ))}
+                  {trainingIds.length > 0 && (
+                    <Button variant="ghost" size="sm" className="mt-1 w-full" onClick={() => setTrainingIds([])}>
+                      Limpar seleção
+                    </Button>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-1">
               <Label>Situação</Label>
