@@ -458,7 +458,7 @@ export function VehicleTimeline() {
                       const next = new Set(hidden);
                       if (checked) next.delete(v.id);
                       else next.add(v.id);
-                      savePrefs.mutate([...next]);
+                      savePrefs.mutate({ hidden: [...next] });
                     }}
                   />
                   <span className="truncate">
