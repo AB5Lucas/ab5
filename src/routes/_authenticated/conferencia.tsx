@@ -421,27 +421,27 @@ function ConferencePage() {
                     ) : canWrite ? (
                       <div className="flex justify-end gap-1">
                         <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7"
-                          onClick={() => {
-                            setCheckItem(i);
-                            setEditOnly(false);
-                          }}
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          aria-label="Conferir documento"
+                          title="Conferir documento"
+                          onClick={() => setCheckItem(i)}
                         >
-                          Conferir
+                          <CalendarDays className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          aria-label="Editar data"
+                          aria-label="Editar data de realização"
+                          title="Editar data de realização"
                           onClick={() => {
-                            setCheckItem(i);
-                            setEditOnly(true);
+                            setDocItem(i);
+                            setDocDate(i.document_date);
                           }}
                         >
-                          <CalendarDays className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
