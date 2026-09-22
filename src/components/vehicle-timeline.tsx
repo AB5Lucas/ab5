@@ -136,19 +136,31 @@ export function VehicleTimeline() {
   const prefs = useQuery({
     queryKey: ["vehicle-view-prefs"],
     queryFn: async () => {
-      const { data } = await supabase.from("vehicle_view_prefs").select("hidden_vehicle_ids").maybeSingle();
-      return (data?.hidden_vehicle_ids ?? []) as string[];
+      const { data } = await supabase
+        .from("vehicle_view_prefs")
+        .select("hidden_vehicle_ids, vehicle_order")
+        .maybeSingle();
+      return {
+        hidden: (data?.hidden_vehicle_ids ?? []) as string[],
+        order: (data?.vehicle_order ?? []) as string[],
+      };
     },
   });
-  const hidden = useMemo(() => new Set(prefs.data ?? []), [prefs.data]);
+  const hidden = useMemo(() => new Set(prefs.data?.hidden ?? []), [prefs.data]);
+  const vehicleOrder = useMemo(() => prefs.data?.order ?? [], [prefs.data]);
 
   const savePrefs = useMutation({
-    mutationFn: async (ids: string[]) => {
+    mutationFn: async (patch: { hidden?: string[]; order?: string[] }) => {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("Sessão expirada.");
-      const { error } = await supabase
-        .from("vehicle_view_prefs")
-        .upsert({ user_id: auth.user.id, hidden_vehicle_ids: ids }, { onConflict: "user_id" });
+      const { error } = await supabase.from("vehicle_view_prefs").upsert(
+        {
+          user_id: auth.user.id,
+          hidden_vehicle_ids: patch.hidden ?? [...hidden],
+          vehicle_order: patch.order ?? vehicleOrder,
+        },
+        { onConflict: "user_id" },
+      );
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vehicle-view-prefs"] }),
