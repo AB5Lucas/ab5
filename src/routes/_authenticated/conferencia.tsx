@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, ClipboardCheck, CalendarDays, Trash2 } from "lucide-react";
+import { Check, ClipboardCheck, CalendarDays, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/page-header";
@@ -88,8 +88,9 @@ function ConferencePage() {
   const [fType, setFType] = useState("all");
   const [search, setSearch] = useState("");
   const [checkItem, setCheckItem] = useState<Item | null>(null);
-  const [editOnly, setEditOnly] = useState(false);
   const [deleteItem, setDeleteItem] = useState<Item | null>(null);
+  const [docItem, setDocItem] = useState<Item | null>(null);
+  const [docDate, setDocDate] = useState("");
   const [dateDraft, setDateDraft] = useState<Record<string, string>>({});
 
   const items = useQuery({
@@ -132,7 +133,10 @@ function ConferencePage() {
   const trainings = useQuery({
     queryKey: ["trainings-min"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("trainings").select("id, name, description").order("name");
+      const { data, error } = await supabase
+        .from("trainings")
+        .select("id, name, description, validity_months")
+        .order("name");
       if (error) throw error;
       return data;
     },
