@@ -280,11 +280,14 @@ export function VehicleTimeline() {
     return map;
   }, [clients.data]);
 
+  // A distância cadastrada é só de ida: o KM do dia é ida e volta, multiplicado pelas viagens do dia.
   const clientKm = useMemo(() => {
     const map = new Map<string, number>();
     (clients.data ?? []).forEach((c) => {
       const isIndustry = /ind[uú]stria/i.test(c.name ?? "");
-      map.set(c.id, isIndustry ? KM_WORK : Number(c.distance_km ?? 0) || 0);
+      const trips = Math.max(1, Number(c.trips_per_day ?? 1) || 1);
+      const oneWay = Number(c.distance_km ?? 0) || 0;
+      map.set(c.id, isIndustry ? KM_WORK : oneWay * 2 * trips);
     });
     return map;
   }, [clients.data]);
