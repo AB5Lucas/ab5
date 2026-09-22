@@ -12,8 +12,6 @@ import {
   Copy,
   GripVertical,
   LayoutGrid,
-  Lock,
-  LockOpen,
   MapPin,
   Search,
   SlidersHorizontal,
@@ -229,7 +227,7 @@ export function SchedulePlannerBoard({
   date: string;
   onDateChange: (d: string) => void;
 }) {
-  const { canWrite, isAdmin, user } = useCurrentUser();
+  const { canWrite, user } = useCurrentUser();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [roleSearch, setRoleSearch] = useState("");
