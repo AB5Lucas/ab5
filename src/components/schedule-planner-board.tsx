@@ -862,27 +862,6 @@ export function SchedulePlannerBoard({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const setStatus = useMutation({
-    mutationFn: async (status: "draft" | "in_progress" | "finalized") => {
-      if (!scheduleId) throw new Error("Nenhuma programação nesta data");
-      if (status === "finalized" && rows.length === 0)
-        throw new Error("Não é possível finalizar uma programação vazia");
-      const { error } = await supabase
-        .from("daily_schedules")
-        .update({
-          status,
-          finalized_at: status === "finalized" ? new Date().toISOString() : null,
-          updated_by: user?.id ?? null,
-        })
-        .eq("id", scheduleId);
-      if (error) throw error;
-    },
-    onSuccess: (_d, status) => {
-      toast.success(status === "finalized" ? "Programação finalizada" : "Programação reaberta");
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   function startDrag(e: React.DragEvent, payload: DragPayload) {
     e.dataTransfer.setData("text/plain", JSON.stringify(payload));
