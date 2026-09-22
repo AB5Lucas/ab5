@@ -347,17 +347,27 @@ function TrainingsPage() {
         </TabsList>
 
         <TabsContent value="records" className="space-y-4 pt-4">
-          <div className="max-w-xs space-y-1">
-            <Label>Situação</Label>
-            <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="valid">Válidos</SelectItem>
-                <SelectItem value="expiring">A vencer (30 dias)</SelectItem>
-                <SelectItem value="expired">Vencidos</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label>Colaborador</Label>
+              <Input value={personSearch} onChange={(e) => setPersonSearch(e.target.value)} placeholder="Buscar colaborador" />
+            </div>
+            <div className="space-y-1">
+              <Label>Treinamento</Label>
+              <Input value={trainingSearch} onChange={(e) => setTrainingSearch(e.target.value)} placeholder="Buscar treinamento" />
+            </div>
+            <div className="space-y-1">
+              <Label>Situação</Label>
+              <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="valid">Válidos</SelectItem>
+                  <SelectItem value="expiring">A vencer (30 dias)</SelectItem>
+                  <SelectItem value="expired">Vencidos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="panel overflow-x-auto">
