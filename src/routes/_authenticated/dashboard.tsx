@@ -138,7 +138,7 @@ function DashboardPage() {
         })}
         actions={
           <Button asChild>
-            <Link to="/programacao/hoje">Abrir programação de hoje</Link>
+            <Link to="/programacao/diaria">Abrir programação de hoje</Link>
           </Button>
         }
       />
