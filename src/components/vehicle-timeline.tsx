@@ -492,7 +492,13 @@ export function VehicleTimeline() {
       .map((c) => {
         const people = counts[c.id] ?? 0;
         const vehicleRows = (needs.data?.vehicleRows ?? []).filter((v) => v.client_id === c.id);
-        const seats = vehicleRows.reduce((s, v) => s + (capacityOf.get(v.vehicle_id) ?? 0), 0);
+        const trips = Math.max(1, Number(c.trips_per_day ?? 1) || 1);
+        // Em clientes com mais de uma viagem o mesmo motorista retorna: a 1ª viagem leva a lotação
+        // cheia e as seguintes uma pessoa a menos (ex.: Suzano, 6 e depois 5).
+        const seats = vehicleRows.reduce((s, v) => {
+          const cap = capacityOf.get(v.vehicle_id) ?? 0;
+          return s + cap + Math.max(0, cap - 1) * (trips - 1);
+        }, 0);
         return { id: c.id, name: c.name, people, vehicles: vehicleRows.length, seats };
       })
       .filter((r) => r.people > 0 || r.vehicles > 0);
