@@ -2,12 +2,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   Copy,
   Filter,
+  GripVertical,
   Search,
   Trash2,
 } from "lucide-react";
@@ -102,7 +101,38 @@ export function VehicleTimeline() {
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
   const [copyEnd, setCopyEnd] = useState("");
-  const [needsDate, setNeedsDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [rowDragId, setRowDragId] = useState<string | null>(null);
+  const [rowDragOver, setRowDragOver] = useState<string | null>(null);
+  const [needsDate, setNeedsDate] = useState(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    try {
+      const saved = JSON.parse(localStorage.getItem("vehicle-needs-date") ?? "null") as
+        | { day?: string; value?: string }
+        | null;
+      if (saved?.day === today && saved.value) return saved.value;
+    } catch {
+      /* ignora */
+    }
+    try {
+      localStorage.setItem("vehicle-needs-date", JSON.stringify({ day: today, value: tomorrow }));
+    } catch {
+      /* ignora */
+    }
+    return tomorrow;
+  });
+
+  function changeNeedsDate(value: string) {
+    setNeedsDate(value);
+    try {
+      localStorage.setItem(
+        "vehicle-needs-date",
+        JSON.stringify({ day: new Date().toISOString().slice(0, 10), value }),
+      );
+    } catch {
+      /* ignora */
+    }
+  }
 
   const days = useMemo(() => monthDays(month), [month]);
 
@@ -278,11 +308,12 @@ export function VehicleTimeline() {
     });
   }, [orderedVehicles, vehicleSearch, hidden]);
 
-  function moveVehicle(vehicleId: string, delta: number) {
+  function reorderVehicle(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
     const ids = orderedVehicles.map((v) => v.id);
-    const from = ids.indexOf(vehicleId);
-    const to = from + delta;
-    if (from < 0 || to < 0 || to >= ids.length) return;
+    const from = ids.indexOf(sourceId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
     const next = [...ids];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved!);
@@ -551,27 +582,41 @@ export function VehicleTimeline() {
             )}
             {visibleVehicles.map((v) => (
               <tr key={v.id}>
-                <td className="sticky left-0 z-10 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 align-middle leading-tight shadow-[inset_-1px_0_0_0_hsl(var(--border))]">
+                <td
+                  className={`sticky left-0 z-10 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 align-middle leading-tight shadow-[inset_-1px_0_0_0_hsl(var(--border))] ${
+                    rowDragOver === v.id ? "outline outline-1 outline-primary" : ""
+                  }`}
+                  onDragOver={(e) => {
+                    if (!canWrite || !rowDragId || rowDragId === v.id) return;
+                    e.preventDefault();
+                    setRowDragOver(v.id);
+                  }}
+                  onDragLeave={() => setRowDragOver((cur) => (cur === v.id ? null : cur))}
+                  onDrop={(e) => {
+                    if (!rowDragId) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    reorderVehicle(rowDragId, v.id);
+                    setRowDragId(null);
+                    setRowDragOver(null);
+                  }}
+                >
                   <div className="flex items-center gap-1">
-                    <div className="flex flex-col">
-                      <button
-                        type="button"
-                        title="Mover para cima"
-                        disabled={!canWrite}
-                        onClick={() => moveVehicle(v.id, -1)}
-                        className="rounded text-muted-foreground hover:text-foreground disabled:opacity-40"
-                      >
-                        <ChevronUp className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Mover para baixo"
-                        disabled={!canWrite}
-                        onClick={() => moveVehicle(v.id, 1)}
-                        className="rounded text-muted-foreground hover:text-foreground disabled:opacity-40"
-                      >
-                        <ChevronDown className="h-3 w-3" />
-                      </button>
+                    <div
+                      draggable={canWrite}
+                      title="Arraste para reordenar"
+                      onDragStart={(e) => {
+                        setRowDragId(v.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", "");
+                      }}
+                      onDragEnd={() => {
+                        setRowDragId(null);
+                        setRowDragOver(null);
+                      }}
+                      className="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
+                    >
+                      <GripVertical className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[11px] font-medium">
@@ -635,7 +680,7 @@ export function VehicleTimeline() {
       <div className="panel space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-display text-sm font-semibold uppercase tracking-wide">Necessidades de Transporte</h3>
-          <Input type="date" value={needsDate} onChange={(e) => setNeedsDate(e.target.value)} className="w-44" />
+          <Input type="date" value={needsDate} onChange={(e) => changeNeedsDate(e.target.value)} className="w-44" />
         </div>
         {needsRows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
