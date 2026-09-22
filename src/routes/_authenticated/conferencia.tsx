@@ -484,7 +484,7 @@ function ConferencePage() {
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editOnly ? "Editar datas de conferência" : "Conferir documento"}</DialogTitle>
+            <DialogTitle>Conferir documento</DialogTitle>
             <DialogDescription>
               {checkItem
                 ? `${personById.get(checkItem.collaborator_id)?.full_name ?? ""} — ${docLabel(checkItem)}`
@@ -527,7 +527,7 @@ function ConferencePage() {
                   >
                     Salvar data
                   </Button>
-                  {!editOnly && !c.approved && (
+                  {!c.approved && (
                     <Button size="sm" className="h-8" disabled={approve.isPending} onClick={() => approve.mutate(c)}>
                       <Check className="h-4 w-4" /> Documento aceito
                     </Button>
