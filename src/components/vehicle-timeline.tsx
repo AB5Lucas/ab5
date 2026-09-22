@@ -46,13 +46,21 @@ export type VehicleScheduleRow = {
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
 export function monthKeyNow() {
-  return new Date().toISOString().slice(0, 7);
+  const now = new Date();
+  // Período de fechamento: dia 26 do mês anterior até o dia 25 do mês selecionado.
+  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth() + (now.getDate() >= 26 ? 1 : 0), 1));
+  return d.toISOString().slice(0, 7);
 }
 
 export function monthDays(month: string): string[] {
   const [y, m] = month.split("-").map(Number);
-  const last = new Date(Date.UTC(y!, m!, 0)).getUTCDate();
-  return Array.from({ length: last }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`);
+  const start = new Date(Date.UTC(y!, m! - 2, 26));
+  const end = new Date(Date.UTC(y!, m! - 1, 25));
+  const out: string[] = [];
+  for (let d = start; d <= end; d = new Date(d.getTime() + 86400000)) {
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
 }
 
 function shiftMonth(month: string, delta: number) {
@@ -578,7 +586,7 @@ export function VehicleTimeline() {
                   key={d}
                   className={`w-24 min-w-24 border-b border-r border-border px-1 py-0.5 text-center text-[10px] font-medium leading-tight ${isWeekend(d) ? "bg-muted/60" : "bg-card"}`}
                 >
-                  {d.slice(8)} <span className="uppercase text-muted-foreground">{weekdayOf(d)}</span>
+                  {d.slice(8)}/{d.slice(5, 7)} <span className="uppercase text-muted-foreground">{weekdayOf(d)}</span>
                 </th>
               ))}
             </tr>
