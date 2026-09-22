@@ -64,6 +64,39 @@ function statusOf(expires: string | null): "valid" | "expiring" | "expired" {
 
 const STATUS_LABEL = { valid: "Válido", expiring: "A vencer", expired: "Vencido" } as const;
 
+/** Um colaborador tem apenas um registro por treinamento: se já existir, atualiza em vez de duplicar. */
+async function upsertTrainingRecord(values: {
+  collaborator_id: string;
+  training_id: string;
+  completed_at: string;
+  expires_at: string | null;
+  document_url: string | null;
+}) {
+  const { data: existing, error: findError } = await supabase
+    .from("collaborator_trainings")
+    .select("id")
+    .eq("collaborator_id", values.collaborator_id)
+    .eq("training_id", values.training_id)
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (findError) return { error: findError };
+
+  if (existing) {
+    const { error } = await supabase
+      .from("collaborator_trainings")
+      .update({
+        completed_at: values.completed_at,
+        expires_at: values.expires_at,
+        document_url: values.document_url,
+      })
+      .eq("id", existing.id);
+    return { error };
+  }
+  const { error } = await supabase.from("collaborator_trainings").insert(values);
+  return { error };
+}
+
 function TrainingsPage() {
   const { canWrite, isAdmin } = useCurrentUser();
   const qc = useQueryClient();
@@ -172,7 +205,7 @@ function TrainingsPage() {
       if (!rTraining) throw new Error("Selecione o treinamento");
       const training = (trainings.data ?? []).find((t) => t.id === rTraining);
       const expires = training?.validity_months ? addMonths(rDate, training.validity_months) : null;
-      const { error } = await supabase.from("collaborator_trainings").insert({
+      const { error } = await upsertTrainingRecord({
         collaborator_id: rPerson,
         training_id: rTraining,
         completed_at: rDate,
@@ -266,7 +299,7 @@ function TrainingsPage() {
     const result = await insertSequentially(
       recs,
       async (values) => {
-        const { error } = await supabase.from("collaborator_trainings").insert(values as never);
+        const { error } = await upsertTrainingRecord(values as Parameters<typeof upsertTrainingRecord>[0]);
         return { error };
       },
       errors,
