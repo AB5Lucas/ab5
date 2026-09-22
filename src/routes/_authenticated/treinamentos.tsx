@@ -201,7 +201,7 @@ function TrainingsPage() {
   const [rDoc, setRDoc] = useState("");
   const [filter, setFilter] = useState<"all" | "valid" | "expiring" | "expired">("all");
   const [personSearch, setPersonSearch] = useState("");
-  const [trainingSearch, setTrainingSearch] = useState("");
+  const [trainingIds, setTrainingIds] = useState<string[]>([]);
 
   const addRecord = useMutation({
     mutationFn: async () => {
