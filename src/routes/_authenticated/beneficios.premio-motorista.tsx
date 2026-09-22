@@ -40,7 +40,11 @@ const CALC_LABEL: Record<string, string> = {
 
 const money = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const kmFmt = (v: number) => `${v.toLocaleString("pt-BR")} km`;
-const monthKey = () => new Date().toISOString().slice(0, 7);
+const monthKey = () => {
+  const d = new Date();
+  if (d.getDate() >= 26) d.setMonth(d.getMonth() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 const num = (v: string) => Number(v.replace(",", ".")) || 0;
 
 type FormState = {
@@ -124,10 +128,15 @@ function DriverBonusPage() {
   const calc = useQuery({
     queryKey: ["driver-bonus-calc-v2", month],
     queryFn: async () => {
-      const start = `${month}-01`;
-      const endDate = new Date(`${month}-01T00:00:00`);
-      endDate.setMonth(endDate.getMonth() + 1);
-      const end = endDate.toISOString().slice(0, 10);
+      // Período de fechamento: dia 26 do mês anterior até 25 do mês selecionado
+      const y = Number(month.slice(0, 4));
+      const m = Number(month.slice(5, 7));
+      const startDate = new Date(y, m - 2, 26);
+      const endDate = new Date(y, m - 1, 26);
+      const fmt = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const start = fmt(startDate);
+      const end = fmt(endDate);
 
       const { data, error } = await supabase
         .from("vehicle_schedules")

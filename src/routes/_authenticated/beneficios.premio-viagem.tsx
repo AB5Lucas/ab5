@@ -51,7 +51,11 @@ const CALC_LABEL: Record<CalcType, string> = {
 };
 
 const money = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const monthKey = () => new Date().toISOString().slice(0, 7);
+const monthKey = () => {
+  const d = new Date();
+  if (d.getDate() >= 26) d.setMonth(d.getMonth() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 
 type FormState = {
   minimum_distance: string;
@@ -149,10 +153,13 @@ function BonusPage() {
   const allocations = useQuery({
     queryKey: ["tb-allocations", month],
     queryFn: async () => {
-      const start = `${month}-01`;
-      const endDate = new Date(`${month}-01T00:00:00`);
-      endDate.setMonth(endDate.getMonth() + 1);
-      const end = endDate.toISOString().slice(0, 10);
+      // Período de fechamento: dia 26 do mês anterior até 25 do mês selecionado
+      const y = Number(month.slice(0, 4));
+      const m = Number(month.slice(5, 7));
+      const fmt = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const start = fmt(new Date(y, m - 2, 26));
+      const end = fmt(new Date(y, m - 1, 26));
 
       const { data: schedules, error: se } = await supabase
         .from("daily_schedules")
