@@ -550,27 +550,41 @@ export function VehicleTimeline() {
             )}
             {visibleVehicles.map((v) => (
               <tr key={v.id}>
-                <td className="sticky left-0 z-10 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 align-middle leading-tight shadow-[inset_-1px_0_0_0_hsl(var(--border))]">
+                <td
+                  className={`sticky left-0 z-10 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 align-middle leading-tight shadow-[inset_-1px_0_0_0_hsl(var(--border))] ${
+                    rowDragOver === v.id ? "outline outline-1 outline-primary" : ""
+                  }`}
+                  onDragOver={(e) => {
+                    if (!canWrite || !rowDragId || rowDragId === v.id) return;
+                    e.preventDefault();
+                    setRowDragOver(v.id);
+                  }}
+                  onDragLeave={() => setRowDragOver((cur) => (cur === v.id ? null : cur))}
+                  onDrop={(e) => {
+                    if (!rowDragId) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    reorderVehicle(rowDragId, v.id);
+                    setRowDragId(null);
+                    setRowDragOver(null);
+                  }}
+                >
                   <div className="flex items-center gap-1">
-                    <div className="flex flex-col">
-                      <button
-                        type="button"
-                        title="Mover para cima"
-                        disabled={!canWrite}
-                        onClick={() => moveVehicle(v.id, -1)}
-                        className="rounded text-muted-foreground hover:text-foreground disabled:opacity-40"
-                      >
-                        <ChevronUp className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Mover para baixo"
-                        disabled={!canWrite}
-                        onClick={() => moveVehicle(v.id, 1)}
-                        className="rounded text-muted-foreground hover:text-foreground disabled:opacity-40"
-                      >
-                        <ChevronDown className="h-3 w-3" />
-                      </button>
+                    <div
+                      draggable={canWrite}
+                      title="Arraste para reordenar"
+                      onDragStart={(e) => {
+                        setRowDragId(v.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", "");
+                      }}
+                      onDragEnd={() => {
+                        setRowDragId(null);
+                        setRowDragOver(null);
+                      }}
+                      className="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
+                    >
+                      <GripVertical className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[11px] font-medium">
