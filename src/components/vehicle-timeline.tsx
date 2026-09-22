@@ -101,7 +101,38 @@ export function VehicleTimeline() {
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
   const [copyEnd, setCopyEnd] = useState("");
-  const [needsDate, setNeedsDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [rowDragId, setRowDragId] = useState<string | null>(null);
+  const [rowDragOver, setRowDragOver] = useState<string | null>(null);
+  const [needsDate, setNeedsDate] = useState(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    try {
+      const saved = JSON.parse(localStorage.getItem("vehicle-needs-date") ?? "null") as
+        | { day?: string; value?: string }
+        | null;
+      if (saved?.day === today && saved.value) return saved.value;
+    } catch {
+      /* ignora */
+    }
+    try {
+      localStorage.setItem("vehicle-needs-date", JSON.stringify({ day: today, value: tomorrow }));
+    } catch {
+      /* ignora */
+    }
+    return tomorrow;
+  });
+
+  function changeNeedsDate(value: string) {
+    setNeedsDate(value);
+    try {
+      localStorage.setItem(
+        "vehicle-needs-date",
+        JSON.stringify({ day: new Date().toISOString().slice(0, 10), value }),
+      );
+    } catch {
+      /* ignora */
+    }
+  }
 
   const days = useMemo(() => monthDays(month), [month]);
 
