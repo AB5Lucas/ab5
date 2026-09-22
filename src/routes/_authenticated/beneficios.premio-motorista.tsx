@@ -122,7 +122,7 @@ function DriverBonusPage() {
   });
 
   const calc = useQuery({
-    queryKey: ["driver-bonus-calc", month],
+    queryKey: ["driver-bonus-calc-v2", month],
     queryFn: async () => {
       const start = `${month}-01`;
       const endDate = new Date(`${month}-01T00:00:00`);
@@ -209,9 +209,10 @@ function DriverBonusPage() {
   const rows = useMemo(
     () =>
       (calc.data ?? []).map((r) => {
-        const km = r.days.reduce((s, d) => s + d.km, 0);
-        const toll = r.days.reduce((s, d) => s + d.toll, 0);
-        return { name: r.name, reg: r.reg, count: r.days.length, km, toll, amount: amountFor(r.days) };
+        const days = Array.isArray(r.days) ? r.days : [];
+        const km = days.reduce((s, d) => s + d.km, 0);
+        const toll = days.reduce((s, d) => s + d.toll, 0);
+        return { name: r.name, reg: r.reg, count: days.length, km, toll, amount: amountFor(days) };
       }),
     [calc.data, activeRules],
   );
