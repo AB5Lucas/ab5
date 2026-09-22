@@ -204,7 +204,9 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, distance_km, needs_company_transport, needs_transport_voucher")
+        .select(
+          "id, name, distance_km, needs_company_transport, needs_transport_voucher, has_toll, toll_amount, trips_per_day",
+        )
         .eq("active", true)
         .order("name");
       if (error) throw error;
