@@ -12,6 +12,7 @@ import {
   FileBarChart,
   Shield,
   HardHat,
+  ClipboardList,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,11 +35,15 @@ const groups: Group[] = [
   {
     label: "Programação",
     icon: CalendarDays,
+    items: [{ title: "Programação", url: "/programacao/diaria" }],
+  },
+  {
+    label: "Controles",
+    icon: ClipboardList,
     items: [
-      { title: "Hoje", url: "/programacao/hoje" },
-      { title: "Programação Diária", url: "/programacao/diaria" },
-      { title: "Overview Semanal", url: "/programacao/semanal" },
-      { title: "Histórico", url: "/programacao/historico" },
+      { title: "Integrações", url: "/obras/integracoes" },
+      { title: "Treinamentos", url: "/treinamentos" },
+      { title: "ASOs", url: "/colaboradores/asos" },
     ],
   },
   {
