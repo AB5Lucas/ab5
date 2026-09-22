@@ -277,11 +277,12 @@ export function VehicleTimeline() {
     });
   }, [orderedVehicles, vehicleSearch, hidden]);
 
-  function moveVehicle(vehicleId: string, delta: number) {
+  function reorderVehicle(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
     const ids = orderedVehicles.map((v) => v.id);
-    const from = ids.indexOf(vehicleId);
-    const to = from + delta;
-    if (from < 0 || to < 0 || to >= ids.length) return;
+    const from = ids.indexOf(sourceId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
     const next = [...ids];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved!);
