@@ -586,7 +586,7 @@ export function VehicleTimeline() {
                   key={d}
                   className={`w-24 min-w-24 border-b border-r border-border px-1 py-0.5 text-center text-[10px] font-medium leading-tight ${isWeekend(d) ? "bg-muted/60" : "bg-card"}`}
                 >
-                  {d.slice(8)} <span className="uppercase text-muted-foreground">{weekdayOf(d)}</span>
+                  {d.slice(8)}/{d.slice(5, 7)} <span className="uppercase text-muted-foreground">{weekdayOf(d)}</span>
                 </th>
               ))}
             </tr>
