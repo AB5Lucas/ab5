@@ -125,7 +125,8 @@ function DriverBonusPage() {
     queryKey: ["driver-bonus-calc-v2", month],
     queryFn: async () => {
       // Período de fechamento: dia 26 do mês anterior até 25 do mês selecionado
-      const [y, m] = month.split("-").map(Number);
+      const y = Number(month.slice(0, 4));
+      const m = Number(month.slice(5, 7));
       const startDate = new Date(y, m - 2, 26);
       const endDate = new Date(y, m - 1, 26);
       const fmt = (d: Date) =>
