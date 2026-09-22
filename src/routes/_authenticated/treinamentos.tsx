@@ -64,6 +64,39 @@ function statusOf(expires: string | null): "valid" | "expiring" | "expired" {
 
 const STATUS_LABEL = { valid: "Válido", expiring: "A vencer", expired: "Vencido" } as const;
 
+/** Um colaborador tem apenas um registro por treinamento: se já existir, atualiza em vez de duplicar. */
+async function upsertTrainingRecord(values: {
+  collaborator_id: string;
+  training_id: string;
+  completed_at: string;
+  expires_at: string | null;
+  document_url: string | null;
+}) {
+  const { data: existing, error: findError } = await supabase
+    .from("collaborator_trainings")
+    .select("id")
+    .eq("collaborator_id", values.collaborator_id)
+    .eq("training_id", values.training_id)
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (findError) return { error: findError };
+
+  if (existing) {
+    const { error } = await supabase
+      .from("collaborator_trainings")
+      .update({
+        completed_at: values.completed_at,
+        expires_at: values.expires_at,
+        document_url: values.document_url,
+      })
+      .eq("id", existing.id);
+    return { error };
+  }
+  const { error } = await supabase.from("collaborator_trainings").insert(values);
+  return { error };
+}
+
 function TrainingsPage() {
   const { canWrite, isAdmin } = useCurrentUser();
   const qc = useQueryClient();
