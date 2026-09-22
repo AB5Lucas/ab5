@@ -814,38 +814,6 @@ export function SchedulePlannerBoard({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const generateFromBase = useMutation({
-    mutationFn: async () => {
-      if (!c) throw new Error("Carregando dados");
-      const id = await ensureSchedule();
-      const existing = new Set(rows.map((r) => r.collaborator_id));
-      const inserts = c.baseTeams
-        .filter((b) => !c.absences.has(b.collaborator_id))
-        .filter((b) => !appointmentByCollaborator.has(b.collaborator_id))
-        .filter((b) => !existing.has(b.collaborator_id))
-        .filter((b) => c.collaborators.some((p) => p.id === b.collaborator_id))
-        .map((b, i) => ({
-          schedule_id: id,
-          work_id: b.work_id,
-          collaborator_id: b.collaborator_id,
-          position_id: b.position_id,
-          driver: false,
-          source: "base_team" as const,
-          confirmation_status: "pending" as const,
-          has_pending_requirement: checkRequirements(c, b.work_id, b.collaborator_id, date).length > 0,
-          sort_order: rows.length + i,
-        }));
-      if (inserts.length === 0) throw new Error("Nenhum colaborador novo das equipes base para incluir");
-      const { error } = await supabase.from("daily_allocations").insert(inserts);
-      if (error) throw error;
-      return { count: inserts.length, id };
-    },
-    onSuccess: (r) => {
-      toast.success(`${r.count} colaborador(es) incluídos das equipes base`);
-      invalidate(r.id);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const copyPrevious = useMutation({
     mutationFn: async () => {
