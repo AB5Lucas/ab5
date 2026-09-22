@@ -264,6 +264,10 @@ function ConferencePage() {
   const conclude = useMutation({
     mutationFn: async (item: Item) => {
       if (!allApproved(item.id)) throw new Error("Ainda há clientes com o documento pendente");
+
+      // Agora sim: atualiza o cadastro do colaborador com a data do documento
+      await applyToRecords(item, item.document_date);
+
       const { error } = await supabase
         .from("conference_items")
         .update({
@@ -275,11 +279,17 @@ function ConferencePage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Conferência concluída e enviada para o histórico");
+      toast.success("Conferência concluída e cadastro atualizado");
       invalidate();
+      qc.invalidateQueries({ queryKey: ["asos"] });
+      qc.invalidateQueries({ queryKey: ["collaborator-trainings"] });
+      qc.invalidateQueries({ queryKey: ["client-integrations"] });
+      qc.invalidateQueries({ queryKey: ["training-records"] });
+      qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   const remove = useMutation({
     mutationFn: async (item: Item) => {
