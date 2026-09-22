@@ -33,9 +33,12 @@ type Group = { label: string; icon: typeof Users; items: Item[] };
 const groups: Group[] = [
   { label: "Dashboard", icon: LayoutDashboard, items: [{ title: "Dashboard", url: "/dashboard" }] },
   {
-    label: "Programação",
+    label: "Planejamento",
     icon: CalendarDays,
-    items: [{ title: "Programação", url: "/programacao/diaria" }],
+    items: [
+      { title: "Programação", url: "/programacao/diaria" },
+      { title: "Transporte", url: "/veiculos/transporte" },
+    ],
   },
   {
     label: "Controles",
@@ -78,7 +81,6 @@ const groups: Group[] = [
     items: [
       { title: "Frota", url: "/veiculos" },
       { title: "Motoristas", url: "/veiculos/motoristas" },
-      { title: "Transporte", url: "/veiculos/transporte" },
     ],
   },
   
