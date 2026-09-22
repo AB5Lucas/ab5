@@ -208,14 +208,37 @@ export function VehicleTimeline() {
     return map;
   }, [clients.data]);
 
+  const orderedVehicles = useMemo(() => {
+    const list = [...(vehicles.data ?? [])];
+    const rank = new Map(vehicleOrder.map((id, i) => [id, i]));
+    list.sort((a, b) => {
+      const ra = rank.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const rb = rank.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      if (ra !== rb) return ra - rb;
+      return String(a.plate).localeCompare(String(b.plate), "pt-BR");
+    });
+    return list;
+  }, [vehicles.data, vehicleOrder]);
+
   const visibleVehicles = useMemo(() => {
     const q = vehicleSearch.trim().toLowerCase();
-    return (vehicles.data ?? []).filter((v) => {
+    return orderedVehicles.filter((v) => {
       if (hidden.has(v.id)) return false;
       if (!q) return true;
       return [v.plate, v.model, v.brand].filter(Boolean).some((x) => String(x).toLowerCase().includes(q));
     });
-  }, [vehicles.data, vehicleSearch, hidden]);
+  }, [orderedVehicles, vehicleSearch, hidden]);
+
+  function moveVehicle(vehicleId: string, delta: number) {
+    const ids = orderedVehicles.map((v) => v.id);
+    const from = ids.indexOf(vehicleId);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    const next = [...ids];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved!);
+    savePrefs.mutate({ order: next });
+  }
 
   const upsert = useMutation({
     mutationFn: async (rows: Omit<VehicleScheduleRow, "id">[]) => {
