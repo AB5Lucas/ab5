@@ -124,10 +124,14 @@ function DriverBonusPage() {
   const calc = useQuery({
     queryKey: ["driver-bonus-calc-v2", month],
     queryFn: async () => {
-      const start = `${month}-01`;
-      const endDate = new Date(`${month}-01T00:00:00`);
-      endDate.setMonth(endDate.getMonth() + 1);
-      const end = endDate.toISOString().slice(0, 10);
+      // Período de fechamento: dia 26 do mês anterior até 25 do mês selecionado
+      const [y, m] = month.split("-").map(Number);
+      const startDate = new Date(y, m - 2, 26);
+      const endDate = new Date(y, m - 1, 26);
+      const fmt = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const start = fmt(startDate);
+      const end = fmt(endDate);
 
       const { data, error } = await supabase
         .from("vehicle_schedules")
