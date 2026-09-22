@@ -502,12 +502,36 @@ export function VehicleTimeline() {
             )}
             {visibleVehicles.map((v) => (
               <tr key={v.id}>
-                <td className="sticky left-0 z-10 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 align-middle leading-tight">
-                  <div className="truncate text-[11px] font-medium">
-                    {[v.brand, v.model].filter(Boolean).join(" ") || "Veículo"}
-                  </div>
-                  <div className="font-mono text-[10px] uppercase text-muted-foreground">
-                    {v.plate} · {v.passenger_capacity} lug.
+                <td className="sticky left-0 z-10 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 align-middle leading-tight shadow-[inset_-1px_0_0_0_hsl(var(--border))]">
+                  <div className="flex items-center gap-1">
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        title="Mover para cima"
+                        disabled={!canWrite}
+                        onClick={() => moveVehicle(v.id, -1)}
+                        className="rounded text-muted-foreground hover:text-foreground disabled:opacity-40"
+                      >
+                        <ChevronUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Mover para baixo"
+                        disabled={!canWrite}
+                        onClick={() => moveVehicle(v.id, 1)}
+                        className="rounded text-muted-foreground hover:text-foreground disabled:opacity-40"
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[11px] font-medium">
+                        {[v.brand, v.model].filter(Boolean).join(" ") || "Veículo"}
+                      </div>
+                      <div className="font-mono text-[10px] uppercase text-muted-foreground">
+                        {v.plate} · {v.passenger_capacity} lug.
+                      </div>
+                    </div>
                   </div>
                 </td>
                 {days.map((d) => {
