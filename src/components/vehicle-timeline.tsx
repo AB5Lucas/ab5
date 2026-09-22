@@ -680,7 +680,7 @@ export function VehicleTimeline() {
       <div className="panel space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-display text-sm font-semibold uppercase tracking-wide">Necessidades de Transporte</h3>
-          <Input type="date" value={needsDate} onChange={(e) => setNeedsDate(e.target.value)} className="w-44" />
+          <Input type="date" value={needsDate} onChange={(e) => changeNeedsDate(e.target.value)} className="w-44" />
         </div>
         {needsRows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
