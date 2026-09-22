@@ -40,7 +40,11 @@ const CALC_LABEL: Record<string, string> = {
 
 const money = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const kmFmt = (v: number) => `${v.toLocaleString("pt-BR")} km`;
-const monthKey = () => new Date().toISOString().slice(0, 7);
+const monthKey = () => {
+  const d = new Date();
+  if (d.getDate() >= 26) d.setMonth(d.getMonth() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 const num = (v: string) => Number(v.replace(",", ".")) || 0;
 
 type FormState = {
