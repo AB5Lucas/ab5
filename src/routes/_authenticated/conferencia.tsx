@@ -261,9 +261,65 @@ function ConferencePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Atualiza o cadastro do colaborador com a data do documento conferido
+  const applyToRecords = async (item: Item, date: string) => {
+    if (item.type === "aso") {
+      const { data: existing } = await supabase
+        .from("asos")
+        .select("id")
+        .eq("collaborator_id", item.collaborator_id)
+        .maybeSingle();
+      const payload = { collaborator_id: item.collaborator_id, exam_date: date };
+      const { error } = existing
+        ? await supabase.from("asos").update(payload).eq("id", existing.id)
+        : await supabase.from("asos").insert(payload);
+      if (error) throw error;
+    } else if (item.type === "treinamento" && item.training_id) {
+      const months = validityById.get(item.training_id) ?? 12;
+      const payload = {
+        collaborator_id: item.collaborator_id,
+        training_id: item.training_id,
+        completed_at: date,
+        expires_at: months ? addMonths(date, months) : null,
+      };
+      const { data: existing } = await supabase
+        .from("collaborator_trainings")
+        .select("id")
+        .eq("collaborator_id", item.collaborator_id)
+        .eq("training_id", item.training_id)
+        .maybeSingle();
+      const { error } = existing
+        ? await supabase.from("collaborator_trainings").update(payload).eq("id", existing.id)
+        : await supabase.from("collaborator_trainings").insert(payload);
+      if (error) throw error;
+    } else if (item.type === "integracao" && item.client_id) {
+      const payload = {
+        collaborator_id: item.collaborator_id,
+        client_id: item.client_id,
+        integration_date: date,
+        expires_at: addMonths(date, 12),
+      };
+      const { data: existing } = await supabase
+        .from("client_integrations")
+        .select("id")
+        .eq("collaborator_id", item.collaborator_id)
+        .eq("client_id", item.client_id)
+        .maybeSingle();
+      const { error } = existing
+        ? await supabase.from("client_integrations").update(payload).eq("id", existing.id)
+        : await supabase.from("client_integrations").insert(payload);
+      if (error) throw error;
+    }
+  };
+
   const conclude = useMutation({
+
     mutationFn: async (item: Item) => {
       if (!allApproved(item.id)) throw new Error("Ainda há clientes com o documento pendente");
+
+      // Agora sim: atualiza o cadastro do colaborador com a data do documento
+      await applyToRecords(item, item.document_date);
+
       const { error } = await supabase
         .from("conference_items")
         .update({
@@ -275,11 +331,17 @@ function ConferencePage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Conferência concluída e enviada para o histórico");
+      toast.success("Conferência concluída e cadastro atualizado");
       invalidate();
+      qc.invalidateQueries({ queryKey: ["asos"] });
+      qc.invalidateQueries({ queryKey: ["collaborator-trainings"] });
+      qc.invalidateQueries({ queryKey: ["client-integrations"] });
+      qc.invalidateQueries({ queryKey: ["training-records"] });
+      qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   const remove = useMutation({
     mutationFn: async (item: Item) => {
@@ -315,21 +377,11 @@ function ConferencePage() {
         .eq("id", item.id);
       if (error) throw error;
 
-      if (item.type === "aso") {
-        await supabase.from("asos").update({ exam_date: date }).eq("collaborator_id", item.collaborator_id);
-      } else if (item.type === "treinamento" && item.training_id) {
-        await supabase
-          .from("collaborator_trainings")
-          .update({ completed_at: date, expires_at: addMonths(date, validityById.get(item.training_id) ?? 12) })
-          .eq("collaborator_id", item.collaborator_id)
-          .eq("training_id", item.training_id);
-      } else if (item.type === "integracao" && item.client_id) {
-        await supabase
-          .from("client_integrations")
-          .update({ integration_date: date, expires_at: addMonths(date, 12) })
-          .eq("collaborator_id", item.collaborator_id)
-          .eq("client_id", item.client_id);
+      // O cadastro só é alterado depois que o item já foi concluído na conferência
+      if (item.status === "concluido") {
+        await applyToRecords(item, date);
       }
+
     },
     onSuccess: () => {
       toast.success("Data de realização atualizada");

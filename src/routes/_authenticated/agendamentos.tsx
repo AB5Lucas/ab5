@@ -318,56 +318,11 @@ function AppointmentsPage() {
   const complete = useMutation({
     mutationFn: async ({ row, date }: { row: Row; date: string }) => {
       if (!date) throw new Error("Informe a data real de realização");
+      if (row.type === "integracao" && !row.client_id)
+        throw new Error("O agendamento não tem cliente vinculado");
 
-      if (row.type === "aso") {
-        const { data: existing } = await supabase
-          .from("asos")
-          .select("id")
-          .eq("collaborator_id", row.collaborator_id)
-          .maybeSingle();
-        const payload = { collaborator_id: row.collaborator_id, exam_date: date };
-        const { error } = existing
-          ? await supabase.from("asos").update(payload).eq("id", existing.id)
-          : await supabase.from("asos").insert(payload);
-        if (error) throw error;
-      }
-
-      if (row.type === "treinamento" && row.training_id) {
-        const months = trainingById.get(row.training_id)?.validity_months ?? 0;
-        const expires = months ? addMonths(date, months) : null;
-        const current = currentValidity(row.collaborator_id, row.training_id);
-        const payload = {
-          collaborator_id: row.collaborator_id,
-          training_id: row.training_id,
-          completed_at: date,
-          expires_at: expires,
-        };
-        const { error } = current
-          ? await supabase.from("collaborator_trainings").update(payload).eq("id", current.id)
-          : await supabase.from("collaborator_trainings").insert(payload);
-        if (error) throw error;
-      }
-
-      if (row.type === "integracao") {
-        const clientId = row.client_id;
-        if (!clientId) throw new Error("O agendamento não tem cliente vinculado");
-        const { data: existing } = await supabase
-          .from("client_integrations")
-          .select("id")
-          .eq("collaborator_id", row.collaborator_id)
-          .eq("client_id", clientId)
-          .maybeSingle();
-        const payload = {
-          collaborator_id: row.collaborator_id,
-          client_id: clientId,
-          integration_date: date,
-          expires_at: addMonths(date, 12),
-        };
-        const { error } = existing
-          ? await supabase.from("client_integrations").update(payload).eq("id", existing.id)
-          : await supabase.from("client_integrations").insert(payload);
-        if (error) throw error;
-      }
+      // O cadastro do colaborador (ASO, treinamento, integração) só é atualizado
+      // quando o documento for aprovado e concluído na aba Conferência.
 
       const { error } = await supabase
         .from("appointments")
@@ -379,6 +334,7 @@ function AppointmentsPage() {
         })
         .eq("id", row.id);
       if (error) throw error;
+
 
       // Envia o item para a Conferência
       const { data: item, error: itemError } = await supabase
@@ -396,18 +352,24 @@ function AppointmentsPage() {
         .single();
       if (itemError) throw itemError;
 
-      const { data: integrations } = await supabase
-        .from("client_integrations")
-        .select("client_id")
-        .eq("collaborator_id", row.collaborator_id);
-      const clientIds = new Set<string>((integrations ?? []).map((i) => i.client_id));
-      if (row.client_id) clientIds.add(row.client_id);
-      if (clientIds.size > 0) {
+      let clientIds: string[] = [];
+      if (row.type === "integracao") {
+        // Integração: confere somente o cliente do agendamento
+        clientIds = row.client_id ? [row.client_id] : [];
+      } else {
+        const { data: integrations } = await supabase
+          .from("client_integrations")
+          .select("client_id")
+          .eq("collaborator_id", row.collaborator_id);
+        clientIds = [...new Set<string>((integrations ?? []).map((i) => i.client_id))];
+      }
+      if (clientIds.length > 0) {
         const { error: checksError } = await supabase
           .from("conference_checks")
-          .insert([...clientIds].map((client_id) => ({ item_id: item.id, client_id })));
+          .insert(clientIds.map((client_id) => ({ item_id: item.id, client_id })));
         if (checksError) throw checksError;
       }
+
     },
     onSuccess: () => {
       toast.success("Realização confirmada e enviada para a Conferência");
