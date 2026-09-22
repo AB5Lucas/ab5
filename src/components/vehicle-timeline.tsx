@@ -588,8 +588,10 @@ export function VehicleTimeline() {
               </Select>
               <p className="text-xs text-muted-foreground">
                 {form.client_id === EXTERNAL_KEY
-                  ? "Externo: 200 km no dia, sem prêmio de motorista e sem prêmio de viagem."
-                  : "Obra: 100 km no dia."}
+                  ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
+                  : form.client_id && form.client_id !== NONE
+                    ? `${clientKm.get(form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
+                    : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
             </div>
             <div className="flex items-center justify-between rounded-md border border-border p-3">
