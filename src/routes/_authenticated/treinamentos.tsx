@@ -242,12 +242,30 @@ function TrainingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Colaboradores que possuem TODOS os treinamentos selecionados. */
+  const peopleWithAll = useMemo(() => {
+    if (trainingIds.length === 0) return null;
+    const byPerson = new Map<string, Set<string>>();
+    for (const r of records.data ?? []) {
+      const set = byPerson.get(r.collaborator_id) ?? new Set<string>();
+      set.add(r.training_id);
+      byPerson.set(r.collaborator_id, set);
+    }
+    const ok = new Set<string>();
+    byPerson.forEach((set, person) => {
+      if (trainingIds.every((id) => set.has(id))) ok.add(person);
+    });
+    return ok;
+  }, [records.data, trainingIds]);
+
   const filtered = (records.data ?? []).filter((r) => {
     if (filter !== "all" && statusOf(r.expires_at) !== filter) return false;
     const p = normText(personSearch);
     if (p && !normText(nameById.get(r.collaborator_id) ?? "").includes(p)) return false;
-    const t = normText(trainingSearch);
-    if (t && !normText(nameById.get(r.training_id) ?? "").includes(t)) return false;
+    if (peopleWithAll) {
+      if (!peopleWithAll.has(r.collaborator_id)) return false;
+      if (!trainingIds.includes(r.training_id)) return false;
+    }
     return true;
   });
 
