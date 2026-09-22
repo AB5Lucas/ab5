@@ -15,6 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/_authenticated/treinamentos")({
   head: () => ({
@@ -199,7 +201,7 @@ function TrainingsPage() {
   const [rDoc, setRDoc] = useState("");
   const [filter, setFilter] = useState<"all" | "valid" | "expiring" | "expired">("all");
   const [personSearch, setPersonSearch] = useState("");
-  const [trainingSearch, setTrainingSearch] = useState("");
+  const [trainingIds, setTrainingIds] = useState<string[]>([]);
 
   const addRecord = useMutation({
     mutationFn: async () => {
@@ -240,12 +242,30 @@ function TrainingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Colaboradores que possuem TODOS os treinamentos selecionados. */
+  const peopleWithAll = useMemo(() => {
+    if (trainingIds.length === 0) return null;
+    const byPerson = new Map<string, Set<string>>();
+    for (const r of records.data ?? []) {
+      const set = byPerson.get(r.collaborator_id) ?? new Set<string>();
+      set.add(r.training_id);
+      byPerson.set(r.collaborator_id, set);
+    }
+    const ok = new Set<string>();
+    byPerson.forEach((set, person) => {
+      if (trainingIds.every((id) => set.has(id))) ok.add(person);
+    });
+    return ok;
+  }, [records.data, trainingIds]);
+
   const filtered = (records.data ?? []).filter((r) => {
     if (filter !== "all" && statusOf(r.expires_at) !== filter) return false;
     const p = normText(personSearch);
     if (p && !normText(nameById.get(r.collaborator_id) ?? "").includes(p)) return false;
-    const t = normText(trainingSearch);
-    if (t && !normText(nameById.get(r.training_id) ?? "").includes(t)) return false;
+    if (peopleWithAll) {
+      if (!peopleWithAll.has(r.collaborator_id)) return false;
+      if (!trainingIds.includes(r.training_id)) return false;
+    }
     return true;
   });
 
@@ -354,7 +374,37 @@ function TrainingsPage() {
             </div>
             <div className="space-y-1">
               <Label>Treinamento</Label>
-              <Input value={trainingSearch} onChange={(e) => setTrainingSearch(e.target.value)} placeholder="Buscar treinamento" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between font-normal">
+                    <span className="truncate">
+                      {trainingIds.length === 0
+                        ? "Todos os treinamentos"
+                        : trainingIds.length === 1
+                          ? nameById.get(trainingIds[0] ?? "") ?? "1 selecionado"
+                          : `${trainingIds.length} selecionados`}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="max-h-72 w-72 overflow-y-auto p-2">
+                  {(trainings.data ?? []).filter((t) => t.active).map((t) => (
+                    <label key={t.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                      <Checkbox
+                        checked={trainingIds.includes(t.id)}
+                        onCheckedChange={(c) =>
+                          setTrainingIds((prev) => (c ? [...prev, t.id] : prev.filter((x) => x !== t.id)))
+                        }
+                      />
+                      <span className="truncate">{t.name}{t.description ? ` · ${t.description}` : ""}</span>
+                    </label>
+                  ))}
+                  {trainingIds.length > 0 && (
+                    <Button variant="ghost" size="sm" className="mt-1 w-full" onClick={() => setTrainingIds([])}>
+                      Limpar seleção
+                    </Button>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-1">
               <Label>Situação</Label>
