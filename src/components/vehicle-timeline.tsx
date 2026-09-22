@@ -125,7 +125,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, needs_company_transport, needs_transport_voucher")
+        .select("id, name, distance_km, needs_company_transport, needs_transport_voucher")
         .eq("active", true)
         .order("name");
       if (error) throw error;
@@ -187,6 +187,15 @@ export function VehicleTimeline() {
     return map;
   }, [clients.data]);
 
+  const clientKm = useMemo(() => {
+    const map = new Map<string, number>();
+    (clients.data ?? []).forEach((c) => {
+      const isIndustry = /ind[uú]stria/i.test(c.name ?? "");
+      map.set(c.id, isIndustry ? KM_WORK : Number(c.distance_km ?? 0) || 0);
+    });
+    return map;
+  }, [clients.data]);
+
   const visibleVehicles = useMemo(() => {
     const q = vehicleSearch.trim().toLowerCase();
     return (vehicles.data ?? []).filter((v) => {
@@ -232,7 +241,7 @@ export function VehicleTimeline() {
       client_id: f.is_external ? null : f.client_id,
       is_external: f.is_external,
       driver_bonus: f.is_external ? false : f.driver_bonus,
-      km: f.is_external ? KM_EXTERNAL : KM_WORK,
+      km: f.is_external ? KM_EXTERNAL : (f.client_id ? clientKm.get(f.client_id) ?? 0 : 0),
     };
   }
 
@@ -579,8 +588,10 @@ export function VehicleTimeline() {
               </Select>
               <p className="text-xs text-muted-foreground">
                 {form.client_id === EXTERNAL_KEY
-                  ? "Externo: 200 km no dia, sem prêmio de motorista e sem prêmio de viagem."
-                  : "Obra: 100 km no dia."}
+                  ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
+                  : form.client_id && form.client_id !== NONE
+                    ? `${clientKm.get(form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
+                    : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
             </div>
             <div className="flex items-center justify-between rounded-md border border-border p-3">
