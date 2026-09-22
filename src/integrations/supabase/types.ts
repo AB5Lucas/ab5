@@ -434,6 +434,131 @@ export type Database = {
           },
         ]
       }
+      conference_checks: {
+        Row: {
+          approved: boolean
+          approved_at: string | null
+          client_id: string
+          created_at: string
+          id: string
+          item_id: string
+          next_check_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved?: boolean
+          approved_at?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          item_id: string
+          next_check_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved?: boolean
+          approved_at?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          next_check_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conference_checks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conference_checks_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "conference_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conference_items: {
+        Row: {
+          appointment_id: string | null
+          client_id: string | null
+          collaborator_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          document_date: string
+          id: string
+          notes: string | null
+          status: string
+          training_id: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          client_id?: string | null
+          collaborator_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          document_date: string
+          id?: string
+          notes?: string | null
+          status?: string
+          training_id?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          client_id?: string | null
+          collaborator_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          document_date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          training_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conference_items_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conference_items_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conference_items_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conference_items_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_allocations: {
         Row: {
           collaborator_id: string
