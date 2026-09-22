@@ -204,7 +204,9 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, distance_km, needs_company_transport, needs_transport_voucher")
+        .select(
+          "id, name, distance_km, needs_company_transport, needs_transport_voucher, has_toll, toll_amount, trips_per_day",
+        )
         .eq("active", true)
         .order("name");
       if (error) throw error;
@@ -278,11 +280,14 @@ export function VehicleTimeline() {
     return map;
   }, [clients.data]);
 
+  // A distância cadastrada é só de ida: o KM do dia é ida e volta, multiplicado pelas viagens do dia.
   const clientKm = useMemo(() => {
     const map = new Map<string, number>();
     (clients.data ?? []).forEach((c) => {
       const isIndustry = /ind[uú]stria/i.test(c.name ?? "");
-      map.set(c.id, isIndustry ? KM_WORK : Number(c.distance_km ?? 0) || 0);
+      const trips = Math.max(1, Number(c.trips_per_day ?? 1) || 1);
+      const oneWay = Number(c.distance_km ?? 0) || 0;
+      map.set(c.id, isIndustry ? KM_WORK : oneWay * 2 * trips);
     });
     return map;
   }, [clients.data]);
@@ -487,7 +492,13 @@ export function VehicleTimeline() {
       .map((c) => {
         const people = counts[c.id] ?? 0;
         const vehicleRows = (needs.data?.vehicleRows ?? []).filter((v) => v.client_id === c.id);
-        const seats = vehicleRows.reduce((s, v) => s + (capacityOf.get(v.vehicle_id) ?? 0), 0);
+        const trips = Math.max(1, Number(c.trips_per_day ?? 1) || 1);
+        // Em clientes com mais de uma viagem o mesmo motorista retorna: a 1ª viagem leva a lotação
+        // cheia e as seguintes uma pessoa a menos (ex.: Suzano, 6 e depois 5).
+        const seats = vehicleRows.reduce((s, v) => {
+          const cap = capacityOf.get(v.vehicle_id) ?? 0;
+          return s + cap + Math.max(0, cap - 1) * (trips - 1);
+        }, 0);
         return { id: c.id, name: c.name, people, vehicles: vehicleRows.length, seats };
       })
       .filter((r) => r.people > 0 || r.vehicles > 0);

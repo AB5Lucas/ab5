@@ -82,6 +82,9 @@ type FormState = {
   requires_integration: boolean;
   needs_company_transport: boolean;
   needs_transport_voucher: boolean;
+  has_toll: boolean;
+  toll_amount: string;
+  trips_per_day: string;
 };
 
 const emptyForm: FormState = {
@@ -97,6 +100,9 @@ const emptyForm: FormState = {
   requires_integration: true,
   needs_company_transport: false,
   needs_transport_voucher: false,
+  has_toll: false,
+  toll_amount: "",
+  trips_per_day: "1",
 };
 
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
@@ -146,6 +152,9 @@ function ClientsPage() {
         requires_integration: form.requires_integration,
         needs_company_transport: form.needs_company_transport,
         needs_transport_voucher: form.needs_transport_voucher,
+        has_toll: form.has_toll,
+        toll_amount: form.has_toll ? Number(form.toll_amount.replace(",", ".")) || 0 : 0,
+        trips_per_day: Math.max(1, Number(form.trips_per_day) || 1),
       };
       if (editing) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editing.id);
@@ -199,6 +208,9 @@ function ClientsPage() {
       requires_integration: c.requires_integration ?? true,
       needs_company_transport: c.needs_company_transport ?? false,
       needs_transport_voucher: c.needs_transport_voucher ?? false,
+      has_toll: c.has_toll ?? false,
+      toll_amount: c.toll_amount != null ? String(c.toll_amount) : "",
+      trips_per_day: String(c.trips_per_day ?? 1),
     });
     setOpen(true);
   }
@@ -382,14 +394,41 @@ function ClientsPage() {
               <Input value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Distância (km)</Label>
+              <Label>Distância de ida (km)</Label>
               <Input
                 type="number"
                 step="0.1"
                 value={form.distance_km}
                 onChange={(e) => set("distance_km", e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">Somente a ida; o sistema considera o dobro (ida e volta).</p>
             </div>
+            <div className="space-y-1">
+              <Label>Viagens por dia</Label>
+              <Input
+                type="number"
+                min={1}
+                step="1"
+                value={form.trips_per_day}
+                onChange={(e) => set("trips_per_day", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Ex.: Suzano = 2 viagens com o mesmo motorista (6 pessoas na 1ª e 5 na 2ª).
+              </p>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 sm:col-span-2">
+              <div>
+                <Label htmlFor="has-toll">Tem pedágio?</Label>
+                <p className="text-xs text-muted-foreground">Informe o valor da ida; o sistema dobra para ida e volta.</p>
+              </div>
+              <Switch id="has-toll" checked={form.has_toll} onCheckedChange={(v) => set("has_toll", v)} />
+            </div>
+            {form.has_toll && (
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Valor do pedágio por ida (R$)</Label>
+                <Input value={form.toll_amount} onChange={(e) => set("toll_amount", e.target.value)} />
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 sm:col-span-2">
               <div>
                 <Label htmlFor="requires-integration">Exige integração</Label>

@@ -232,6 +232,7 @@ export type Database = {
           city: string | null
           created_at: string
           distance_km: number | null
+          has_toll: boolean
           id: string
           name: string
           needs_company_transport: boolean
@@ -241,6 +242,8 @@ export type Database = {
           number: string | null
           requires_integration: boolean
           state: string | null
+          toll_amount: number
+          trips_per_day: number
           updated_at: string
           zip_code: string | null
         }
@@ -250,6 +253,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           distance_km?: number | null
+          has_toll?: boolean
           id?: string
           name: string
           needs_company_transport?: boolean
@@ -259,6 +263,8 @@ export type Database = {
           number?: string | null
           requires_integration?: boolean
           state?: string | null
+          toll_amount?: number
+          trips_per_day?: number
           updated_at?: string
           zip_code?: string | null
         }
@@ -268,6 +274,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           distance_km?: number | null
+          has_toll?: boolean
           id?: string
           name?: string
           needs_company_transport?: boolean
@@ -277,6 +284,8 @@ export type Database = {
           number?: string | null
           requires_integration?: boolean
           state?: string | null
+          toll_amount?: number
+          trips_per_day?: number
           updated_at?: string
           zip_code?: string | null
         }
@@ -819,6 +828,8 @@ export type Database = {
           calculation_type: string
           created_at: string
           id: string
+          maximum_distance: number | null
+          minimum_distance: number
           name: string
           updated_at: string
         }
@@ -828,6 +839,8 @@ export type Database = {
           calculation_type?: string
           created_at?: string
           id?: string
+          maximum_distance?: number | null
+          minimum_distance?: number
           name: string
           updated_at?: string
         }
@@ -837,6 +850,8 @@ export type Database = {
           calculation_type?: string
           created_at?: string
           id?: string
+          maximum_distance?: number | null
+          minimum_distance?: number
           name?: string
           updated_at?: string
         }
