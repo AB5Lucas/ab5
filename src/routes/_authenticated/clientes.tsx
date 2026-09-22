@@ -152,6 +152,9 @@ function ClientsPage() {
         requires_integration: form.requires_integration,
         needs_company_transport: form.needs_company_transport,
         needs_transport_voucher: form.needs_transport_voucher,
+        has_toll: form.has_toll,
+        toll_amount: form.has_toll ? Number(form.toll_amount.replace(",", ".")) || 0 : 0,
+        trips_per_day: Math.max(1, Number(form.trips_per_day) || 1),
       };
       if (editing) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editing.id);
@@ -205,6 +208,9 @@ function ClientsPage() {
       requires_integration: c.requires_integration ?? true,
       needs_company_transport: c.needs_company_transport ?? false,
       needs_transport_voucher: c.needs_transport_voucher ?? false,
+      has_toll: c.has_toll ?? false,
+      toll_amount: c.toll_amount != null ? String(c.toll_amount) : "",
+      trips_per_day: String(c.trips_per_day ?? 1),
     });
     setOpen(true);
   }
