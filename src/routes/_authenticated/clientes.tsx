@@ -82,6 +82,9 @@ type FormState = {
   requires_integration: boolean;
   needs_company_transport: boolean;
   needs_transport_voucher: boolean;
+  has_toll: boolean;
+  toll_amount: string;
+  trips_per_day: string;
 };
 
 const emptyForm: FormState = {
@@ -97,6 +100,9 @@ const emptyForm: FormState = {
   requires_integration: true,
   needs_company_transport: false,
   needs_transport_voucher: false,
+  has_toll: false,
+  toll_amount: "",
+  trips_per_day: "1",
 };
 
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
