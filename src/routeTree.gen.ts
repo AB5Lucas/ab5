@@ -25,6 +25,7 @@ import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authen
 import { Route as AuthenticatedAusenciasAtestadosRouteImport } from './routes/_authenticated/ausencias.atestados'
 import { Route as AuthenticatedAusenciasFeriasRouteImport } from './routes/_authenticated/ausencias.ferias'
 import { Route as AuthenticatedAusenciasFolgasRouteImport } from './routes/_authenticated/ausencias.folgas'
+import { Route as AuthenticatedBeneficiosPremioMotoristaRouteImport } from './routes/_authenticated/beneficios.premio-motorista'
 import { Route as AuthenticatedBeneficiosPremioViagemRouteImport } from './routes/_authenticated/beneficios.premio-viagem'
 import { Route as AuthenticatedBeneficiosValeTransporteRouteImport } from './routes/_authenticated/beneficios.vale-transporte'
 import { Route as AuthenticatedColaboradoresIndexRouteImport } from './routes/_authenticated/colaboradores.index'
@@ -128,6 +129,12 @@ const AuthenticatedAusenciasFolgasRoute =
   AuthenticatedAusenciasFolgasRouteImport.update({
     id: '/ausencias/folgas',
     path: '/ausencias/folgas',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedBeneficiosPremioMotoristaRoute =
+  AuthenticatedBeneficiosPremioMotoristaRouteImport.update({
+    id: '/beneficios/premio-motorista',
+    path: '/beneficios/premio-motorista',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedBeneficiosPremioViagemRoute =
@@ -242,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
   '/ausencias/ferias': typeof AuthenticatedAusenciasFeriasRoute
   '/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
+  '/beneficios/premio-motorista': typeof AuthenticatedBeneficiosPremioMotoristaRoute
   '/beneficios/premio-viagem': typeof AuthenticatedBeneficiosPremioViagemRoute
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
@@ -275,6 +283,7 @@ export interface FileRoutesByTo {
   '/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
   '/ausencias/ferias': typeof AuthenticatedAusenciasFeriasRoute
   '/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
+  '/beneficios/premio-motorista': typeof AuthenticatedBeneficiosPremioMotoristaRoute
   '/beneficios/premio-viagem': typeof AuthenticatedBeneficiosPremioViagemRoute
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
@@ -310,6 +319,7 @@ export interface FileRoutesById {
   '/_authenticated/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
   '/_authenticated/ausencias/ferias': typeof AuthenticatedAusenciasFeriasRoute
   '/_authenticated/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
+  '/_authenticated/beneficios/premio-motorista': typeof AuthenticatedBeneficiosPremioMotoristaRoute
   '/_authenticated/beneficios/premio-viagem': typeof AuthenticatedBeneficiosPremioViagemRoute
   '/_authenticated/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/_authenticated/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
@@ -345,6 +355,7 @@ export interface FileRouteTypes {
     | '/ausencias/atestados'
     | '/ausencias/ferias'
     | '/ausencias/folgas'
+    | '/beneficios/premio-motorista'
     | '/beneficios/premio-viagem'
     | '/beneficios/vale-transporte'
     | '/colaboradores/asos'
@@ -378,6 +389,7 @@ export interface FileRouteTypes {
     | '/ausencias/atestados'
     | '/ausencias/ferias'
     | '/ausencias/folgas'
+    | '/beneficios/premio-motorista'
     | '/beneficios/premio-viagem'
     | '/beneficios/vale-transporte'
     | '/colaboradores/asos'
@@ -412,6 +424,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ausencias/atestados'
     | '/_authenticated/ausencias/ferias'
     | '/_authenticated/ausencias/folgas'
+    | '/_authenticated/beneficios/premio-motorista'
     | '/_authenticated/beneficios/premio-viagem'
     | '/_authenticated/beneficios/vale-transporte'
     | '/_authenticated/colaboradores/asos'
@@ -551,6 +564,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAusenciasFolgasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/beneficios/premio-motorista': {
+      id: '/_authenticated/beneficios/premio-motorista'
+      path: '/beneficios/premio-motorista'
+      fullPath: '/beneficios/premio-motorista'
+      preLoaderRoute: typeof AuthenticatedBeneficiosPremioMotoristaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/beneficios/premio-viagem': {
       id: '/_authenticated/beneficios/premio-viagem'
       path: '/beneficios/premio-viagem'
@@ -679,6 +699,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAusenciasAtestadosRoute: typeof AuthenticatedAusenciasAtestadosRoute
   AuthenticatedAusenciasFeriasRoute: typeof AuthenticatedAusenciasFeriasRoute
   AuthenticatedAusenciasFolgasRoute: typeof AuthenticatedAusenciasFolgasRoute
+  AuthenticatedBeneficiosPremioMotoristaRoute: typeof AuthenticatedBeneficiosPremioMotoristaRoute
   AuthenticatedBeneficiosPremioViagemRoute: typeof AuthenticatedBeneficiosPremioViagemRoute
   AuthenticatedBeneficiosValeTransporteRoute: typeof AuthenticatedBeneficiosValeTransporteRoute
   AuthenticatedColaboradoresAsosRoute: typeof AuthenticatedColaboradoresAsosRoute
@@ -710,6 +731,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAusenciasAtestadosRoute: AuthenticatedAusenciasAtestadosRoute,
   AuthenticatedAusenciasFeriasRoute: AuthenticatedAusenciasFeriasRoute,
   AuthenticatedAusenciasFolgasRoute: AuthenticatedAusenciasFolgasRoute,
+  AuthenticatedBeneficiosPremioMotoristaRoute:
+    AuthenticatedBeneficiosPremioMotoristaRoute,
   AuthenticatedBeneficiosPremioViagemRoute:
     AuthenticatedBeneficiosPremioViagemRoute,
   AuthenticatedBeneficiosValeTransporteRoute:

@@ -80,6 +80,8 @@ type FormState = {
   distance_km: string;
   notes: string;
   requires_integration: boolean;
+  needs_company_transport: boolean;
+  needs_transport_voucher: boolean;
 };
 
 const emptyForm: FormState = {
@@ -93,6 +95,8 @@ const emptyForm: FormState = {
   distance_km: "",
   notes: "",
   requires_integration: true,
+  needs_company_transport: false,
+  needs_transport_voucher: false,
 };
 
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
@@ -140,6 +144,8 @@ function ClientsPage() {
         distance_km: form.distance_km.trim() === "" ? null : Number(form.distance_km),
         notes: nn(form.notes),
         requires_integration: form.requires_integration,
+        needs_company_transport: form.needs_company_transport,
+        needs_transport_voucher: form.needs_transport_voucher,
       };
       if (editing) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editing.id);
@@ -191,6 +197,8 @@ function ClientsPage() {
       distance_km: c.distance_km != null ? String(c.distance_km) : "",
       notes: c.notes ?? "",
       requires_integration: c.requires_integration ?? true,
+      needs_company_transport: c.needs_company_transport ?? false,
+      needs_transport_voucher: c.needs_transport_voucher ?? false,
     });
     setOpen(true);
   }
