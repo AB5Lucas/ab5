@@ -985,7 +985,7 @@ export function SchedulePlannerBoard({
           {c?.holiday && <Badge variant="secondary">Feriado: {c.holiday}</Badge>}
         </div>
 
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div className="order-2 flex flex-wrap gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline">
