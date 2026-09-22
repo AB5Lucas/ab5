@@ -122,7 +122,7 @@ function DriverBonusPage() {
   });
 
   const calc = useQuery({
-    queryKey: ["driver-bonus-calc", month],
+    queryKey: ["driver-bonus-calc-v2", month],
     queryFn: async () => {
       const start = `${month}-01`;
       const endDate = new Date(`${month}-01T00:00:00`);
