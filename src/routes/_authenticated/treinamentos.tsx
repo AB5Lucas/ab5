@@ -172,7 +172,7 @@ function TrainingsPage() {
       if (!rTraining) throw new Error("Selecione o treinamento");
       const training = (trainings.data ?? []).find((t) => t.id === rTraining);
       const expires = training?.validity_months ? addMonths(rDate, training.validity_months) : null;
-      const { error } = await supabase.from("collaborator_trainings").insert({
+      const { error } = await upsertTrainingRecord({
         collaborator_id: rPerson,
         training_id: rTraining,
         completed_at: rDate,
