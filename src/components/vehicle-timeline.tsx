@@ -106,6 +106,46 @@ export function VehicleTimeline() {
 
   const days = useMemo(() => monthDays(month), [month]);
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const SCROLL_KEY = "vehicle-timeline-scroll";
+
+  function onTableScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    try {
+      sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ left: el.scrollLeft, top: el.scrollTop }));
+    } catch {
+      /* ignora */
+    }
+  }
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    try {
+      const saved = sessionStorage.getItem(SCROLL_KEY);
+      if (!saved) return;
+      const { left, top } = JSON.parse(saved) as { left?: number; top?: number };
+      el.scrollLeft = left ?? 0;
+      el.scrollTop = top ?? 0;
+    } catch {
+      /* ignora */
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const saved = sessionStorage.getItem(SCROLL_KEY);
+    if (!saved) return;
+    const { left, top } = JSON.parse(saved) as { left?: number; top?: number };
+    const t = setTimeout(() => {
+      el.scrollLeft = left ?? 0;
+      el.scrollTop = top ?? 0;
+    }, 100);
+    return () => clearTimeout(t);
+  }, [days.length]);
+
   const vehicles = useQuery({
     queryKey: ["vehicles"],
     queryFn: async () => {
