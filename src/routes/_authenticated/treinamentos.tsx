@@ -238,7 +238,14 @@ function TrainingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const filtered = (records.data ?? []).filter((r) => filter === "all" || statusOf(r.expires_at) === filter);
+  const filtered = (records.data ?? []).filter((r) => {
+    if (filter !== "all" && statusOf(r.expires_at) !== filter) return false;
+    const p = normText(personSearch);
+    if (p && !normText(nameById.get(r.collaborator_id) ?? "").includes(p)) return false;
+    const t = normText(trainingSearch);
+    if (t && !normText(nameById.get(r.training_id) ?? "").includes(t)) return false;
+    return true;
+  });
 
   async function importRecords(rows: ImportRow[]) {
     const errors: string[] = [];
