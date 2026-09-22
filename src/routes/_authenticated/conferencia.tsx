@@ -604,6 +604,35 @@ function ConferencePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Editar data de realização */}
+      <Dialog open={!!docItem} onOpenChange={(v) => !v && setDocItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar data de realização</DialogTitle>
+            <DialogDescription>
+              {docItem
+                ? `${personById.get(docItem.collaborator_id)?.full_name ?? ""} — ${docLabel(docItem)}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <Label className="text-xs">Realizado em</Label>
+            <Input type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDocItem(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={saveDocDate.isPending}
+              onClick={() => docItem && saveDocDate.mutate({ item: docItem, date: docDate })}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Excluir da conferência */}
       <AlertDialog open={!!deleteItem} onOpenChange={(v) => !v && setDeleteItem(null)}>
         <AlertDialogContent>
