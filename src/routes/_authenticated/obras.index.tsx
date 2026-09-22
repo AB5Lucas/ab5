@@ -263,11 +263,6 @@ function WorksPage() {
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/obras/equipes-base">
-                <Users className="h-4 w-4" /> Equipes Base
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
               <Link to="/obras/requisitos">
                 <ClipboardList className="h-4 w-4" /> Requisitos
               </Link>
