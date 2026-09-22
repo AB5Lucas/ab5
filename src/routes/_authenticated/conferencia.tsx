@@ -377,21 +377,11 @@ function ConferencePage() {
         .eq("id", item.id);
       if (error) throw error;
 
-      if (item.type === "aso") {
-        await supabase.from("asos").update({ exam_date: date }).eq("collaborator_id", item.collaborator_id);
-      } else if (item.type === "treinamento" && item.training_id) {
-        await supabase
-          .from("collaborator_trainings")
-          .update({ completed_at: date, expires_at: addMonths(date, validityById.get(item.training_id) ?? 12) })
-          .eq("collaborator_id", item.collaborator_id)
-          .eq("training_id", item.training_id);
-      } else if (item.type === "integracao" && item.client_id) {
-        await supabase
-          .from("client_integrations")
-          .update({ integration_date: date, expires_at: addMonths(date, 12) })
-          .eq("collaborator_id", item.collaborator_id)
-          .eq("client_id", item.client_id);
+      // O cadastro só é alterado depois que o item já foi concluído na conferência
+      if (item.status === "concluido") {
+        await applyToRecords(item, date);
       }
+
     },
     onSuccess: () => {
       toast.success("Data de realização atualizada");
