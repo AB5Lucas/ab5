@@ -299,7 +299,7 @@ function TrainingsPage() {
     const result = await insertSequentially(
       recs,
       async (values) => {
-        const { error } = await supabase.from("collaborator_trainings").insert(values as never);
+        const { error } = await upsertTrainingRecord(values as Parameters<typeof upsertTrainingRecord>[0]);
         return { error };
       },
       errors,
