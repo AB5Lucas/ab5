@@ -19,6 +19,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VehicleTimeline } from "@/components/vehicle-timeline";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -81,6 +83,27 @@ const nn = (v: string) => (v.trim() === "" ? null : v.trim());
 const ref = (v: string) => (v === NONE ? null : v);
 
 function TransportPage() {
+  return (
+    <Tabs defaultValue="timeline" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="timeline">Timeline mensal</TabsTrigger>
+        <TabsTrigger value="diario">Transporte diário</TabsTrigger>
+      </TabsList>
+      <TabsContent value="timeline" className="space-y-4">
+        <PageHeader
+          title="Transporte"
+          description="Programação mensal da frota: motorista, obra/cliente, prêmio de motorista e quilometragem automática."
+        />
+        <VehicleTimeline />
+      </TabsContent>
+      <TabsContent value="diario">
+        <DailyTransportSection />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function DailyTransportSection() {
   const { canWrite, isAdmin } = useCurrentUser();
   const queryClient = useQueryClient();
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
