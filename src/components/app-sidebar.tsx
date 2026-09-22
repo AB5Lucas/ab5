@@ -71,7 +71,6 @@ const groups: Group[] = [
     items: [
       { title: "Serviços", url: "/obras" },
       { title: "Clientes", url: "/clientes" },
-      { title: "Equipes Base", url: "/obras/equipes-base" },
       { title: "Requisitos", url: "/obras/requisitos" },
     ],
   },

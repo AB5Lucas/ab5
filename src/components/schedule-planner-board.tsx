@@ -12,8 +12,6 @@ import {
   Copy,
   GripVertical,
   LayoutGrid,
-  Lock,
-  LockOpen,
   MapPin,
   Search,
   SlidersHorizontal,
@@ -229,7 +227,7 @@ export function SchedulePlannerBoard({
   date: string;
   onDateChange: (d: string) => void;
 }) {
-  const { canWrite, isAdmin, user } = useCurrentUser();
+  const { canWrite, user } = useCurrentUser();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [roleSearch, setRoleSearch] = useState("");
@@ -814,38 +812,6 @@ export function SchedulePlannerBoard({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const generateFromBase = useMutation({
-    mutationFn: async () => {
-      if (!c) throw new Error("Carregando dados");
-      const id = await ensureSchedule();
-      const existing = new Set(rows.map((r) => r.collaborator_id));
-      const inserts = c.baseTeams
-        .filter((b) => !c.absences.has(b.collaborator_id))
-        .filter((b) => !appointmentByCollaborator.has(b.collaborator_id))
-        .filter((b) => !existing.has(b.collaborator_id))
-        .filter((b) => c.collaborators.some((p) => p.id === b.collaborator_id))
-        .map((b, i) => ({
-          schedule_id: id,
-          work_id: b.work_id,
-          collaborator_id: b.collaborator_id,
-          position_id: b.position_id,
-          driver: false,
-          source: "base_team" as const,
-          confirmation_status: "pending" as const,
-          has_pending_requirement: checkRequirements(c, b.work_id, b.collaborator_id, date).length > 0,
-          sort_order: rows.length + i,
-        }));
-      if (inserts.length === 0) throw new Error("Nenhum colaborador novo das equipes base para incluir");
-      const { error } = await supabase.from("daily_allocations").insert(inserts);
-      if (error) throw error;
-      return { count: inserts.length, id };
-    },
-    onSuccess: (r) => {
-      toast.success(`${r.count} colaborador(es) incluídos das equipes base`);
-      invalidate(r.id);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const copyPrevious = useMutation({
     mutationFn: async () => {
@@ -894,27 +860,6 @@ export function SchedulePlannerBoard({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const setStatus = useMutation({
-    mutationFn: async (status: "draft" | "in_progress" | "finalized") => {
-      if (!scheduleId) throw new Error("Nenhuma programação nesta data");
-      if (status === "finalized" && rows.length === 0)
-        throw new Error("Não é possível finalizar uma programação vazia");
-      const { error } = await supabase
-        .from("daily_schedules")
-        .update({
-          status,
-          finalized_at: status === "finalized" ? new Date().toISOString() : null,
-          updated_by: user?.id ?? null,
-        })
-        .eq("id", scheduleId);
-      if (error) throw error;
-    },
-    onSuccess: (_d, status) => {
-      toast.success(status === "finalized" ? "Programação finalizada" : "Programação reaberta");
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   function startDrag(e: React.DragEvent, payload: DragPayload) {
     e.dataTransfer.setData("text/plain", JSON.stringify(payload));
@@ -968,7 +913,7 @@ export function SchedulePlannerBoard({
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="order-3 flex basis-full flex-wrap items-center gap-2 text-xs">
           <Badge variant={finalized ? "default" : "secondary"}>
             {schedule.data ? STATUS_LABEL[schedule.data.status] : "Não iniciada"}
           </Badge>
@@ -985,7 +930,7 @@ export function SchedulePlannerBoard({
           {c?.holiday && <Badge variant="secondary">Feriado: {c.holiday}</Badge>}
         </div>
 
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div className="order-2 flex flex-wrap gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline">
@@ -1040,27 +985,9 @@ export function SchedulePlannerBoard({
             </DropdownMenuContent>
           </DropdownMenu>
           {editable && (
-            <>
-              <Button size="sm" variant="outline" onClick={() => generateFromBase.mutate()} disabled={generateFromBase.isPending}>
-                <Users className="h-4 w-4" /> Equipes base
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => copyPrevious.mutate()} disabled={copyPrevious.isPending}>
-                <Copy className="h-4 w-4" /> Copiar dia anterior
-              </Button>
-            </>
-          )}
-          {canWrite && schedule.data && (
-            finalized ? (
-              isAdmin && (
-                <Button size="sm" variant="outline" onClick={() => setStatus.mutate("in_progress")}>
-                  <LockOpen className="h-4 w-4" /> Reabrir
-                </Button>
-              )
-            ) : (
-              <Button size="sm" variant="secondary" onClick={() => setStatus.mutate("finalized")}>
-                <Lock className="h-4 w-4" /> Finalizar
-              </Button>
-            )
+            <Button size="sm" variant="outline" onClick={() => copyPrevious.mutate()} disabled={copyPrevious.isPending}>
+              <Copy className="h-4 w-4" /> Copiar dia anterior
+            </Button>
           )}
         </div>
       </div>

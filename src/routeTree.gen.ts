@@ -31,7 +31,6 @@ import { Route as AuthenticatedColaboradoresIndexRouteImport } from './routes/_a
 import { Route as AuthenticatedColaboradoresAsosRouteImport } from './routes/_authenticated/colaboradores.asos'
 import { Route as AuthenticatedColaboradoresEstruturaRouteImport } from './routes/_authenticated/colaboradores.estrutura'
 import { Route as AuthenticatedObrasIndexRouteImport } from './routes/_authenticated/obras.index'
-import { Route as AuthenticatedObrasEquipesBaseRouteImport } from './routes/_authenticated/obras.equipes-base'
 import { Route as AuthenticatedObrasIntegracoesRouteImport } from './routes/_authenticated/obras.integracoes'
 import { Route as AuthenticatedObrasRequisitosRouteImport } from './routes/_authenticated/obras.requisitos'
 import { Route as AuthenticatedProgramacaoDiariaRouteImport } from './routes/_authenticated/programacao.diaria'
@@ -165,12 +164,6 @@ const AuthenticatedObrasIndexRoute = AuthenticatedObrasIndexRouteImport.update({
   path: '/obras/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedObrasEquipesBaseRoute =
-  AuthenticatedObrasEquipesBaseRouteImport.update({
-    id: '/obras/equipes-base',
-    path: '/obras/equipes-base',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedObrasIntegracoesRoute =
   AuthenticatedObrasIntegracoesRouteImport.update({
     id: '/obras/integracoes',
@@ -246,7 +239,6 @@ export interface FileRoutesByFullPath {
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
-  '/obras/equipes-base': typeof AuthenticatedObrasEquipesBaseRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
   '/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
@@ -279,7 +271,6 @@ export interface FileRoutesByTo {
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
-  '/obras/equipes-base': typeof AuthenticatedObrasEquipesBaseRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
   '/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
@@ -314,7 +305,6 @@ export interface FileRoutesById {
   '/_authenticated/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/_authenticated/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/_authenticated/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
-  '/_authenticated/obras/equipes-base': typeof AuthenticatedObrasEquipesBaseRoute
   '/_authenticated/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/_authenticated/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
   '/_authenticated/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
@@ -349,7 +339,6 @@ export interface FileRouteTypes {
     | '/beneficios/vale-transporte'
     | '/colaboradores/asos'
     | '/colaboradores/estrutura'
-    | '/obras/equipes-base'
     | '/obras/integracoes'
     | '/obras/requisitos'
     | '/programacao/diaria'
@@ -382,7 +371,6 @@ export interface FileRouteTypes {
     | '/beneficios/vale-transporte'
     | '/colaboradores/asos'
     | '/colaboradores/estrutura'
-    | '/obras/equipes-base'
     | '/obras/integracoes'
     | '/obras/requisitos'
     | '/programacao/diaria'
@@ -416,7 +404,6 @@ export interface FileRouteTypes {
     | '/_authenticated/beneficios/vale-transporte'
     | '/_authenticated/colaboradores/asos'
     | '/_authenticated/colaboradores/estrutura'
-    | '/_authenticated/obras/equipes-base'
     | '/_authenticated/obras/integracoes'
     | '/_authenticated/obras/requisitos'
     | '/_authenticated/programacao/diaria'
@@ -593,13 +580,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedObrasIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/obras/equipes-base': {
-      id: '/_authenticated/obras/equipes-base'
-      path: '/obras/equipes-base'
-      fullPath: '/obras/equipes-base'
-      preLoaderRoute: typeof AuthenticatedObrasEquipesBaseRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/obras/integracoes': {
       id: '/_authenticated/obras/integracoes'
       path: '/obras/integracoes'
@@ -683,7 +663,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBeneficiosValeTransporteRoute: typeof AuthenticatedBeneficiosValeTransporteRoute
   AuthenticatedColaboradoresAsosRoute: typeof AuthenticatedColaboradoresAsosRoute
   AuthenticatedColaboradoresEstruturaRoute: typeof AuthenticatedColaboradoresEstruturaRoute
-  AuthenticatedObrasEquipesBaseRoute: typeof AuthenticatedObrasEquipesBaseRoute
   AuthenticatedObrasIntegracoesRoute: typeof AuthenticatedObrasIntegracoesRoute
   AuthenticatedObrasRequisitosRoute: typeof AuthenticatedObrasRequisitosRoute
   AuthenticatedProgramacaoDiariaRoute: typeof AuthenticatedProgramacaoDiariaRoute
@@ -717,7 +696,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedColaboradoresAsosRoute: AuthenticatedColaboradoresAsosRoute,
   AuthenticatedColaboradoresEstruturaRoute:
     AuthenticatedColaboradoresEstruturaRoute,
-  AuthenticatedObrasEquipesBaseRoute: AuthenticatedObrasEquipesBaseRoute,
   AuthenticatedObrasIntegracoesRoute: AuthenticatedObrasIntegracoesRoute,
   AuthenticatedObrasRequisitosRoute: AuthenticatedObrasRequisitosRoute,
   AuthenticatedProgramacaoDiariaRoute: AuthenticatedProgramacaoDiariaRoute,
