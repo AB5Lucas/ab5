@@ -198,6 +198,8 @@ function TrainingsPage() {
   const [rDate, setRDate] = useState(today());
   const [rDoc, setRDoc] = useState("");
   const [filter, setFilter] = useState<"all" | "valid" | "expiring" | "expired">("all");
+  const [personSearch, setPersonSearch] = useState("");
+  const [trainingSearch, setTrainingSearch] = useState("");
 
   const addRecord = useMutation({
     mutationFn: async () => {
@@ -238,7 +240,14 @@ function TrainingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const filtered = (records.data ?? []).filter((r) => filter === "all" || statusOf(r.expires_at) === filter);
+  const filtered = (records.data ?? []).filter((r) => {
+    if (filter !== "all" && statusOf(r.expires_at) !== filter) return false;
+    const p = normText(personSearch);
+    if (p && !normText(nameById.get(r.collaborator_id) ?? "").includes(p)) return false;
+    const t = normText(trainingSearch);
+    if (t && !normText(nameById.get(r.training_id) ?? "").includes(t)) return false;
+    return true;
+  });
 
   async function importRecords(rows: ImportRow[]) {
     const errors: string[] = [];
@@ -338,17 +347,27 @@ function TrainingsPage() {
         </TabsList>
 
         <TabsContent value="records" className="space-y-4 pt-4">
-          <div className="max-w-xs space-y-1">
-            <Label>Situação</Label>
-            <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="valid">Válidos</SelectItem>
-                <SelectItem value="expiring">A vencer (30 dias)</SelectItem>
-                <SelectItem value="expired">Vencidos</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label>Colaborador</Label>
+              <Input value={personSearch} onChange={(e) => setPersonSearch(e.target.value)} placeholder="Buscar colaborador" />
+            </div>
+            <div className="space-y-1">
+              <Label>Treinamento</Label>
+              <Input value={trainingSearch} onChange={(e) => setTrainingSearch(e.target.value)} placeholder="Buscar treinamento" />
+            </div>
+            <div className="space-y-1">
+              <Label>Situação</Label>
+              <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="valid">Válidos</SelectItem>
+                  <SelectItem value="expiring">A vencer (30 dias)</SelectItem>
+                  <SelectItem value="expired">Vencidos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="panel overflow-x-auto">
