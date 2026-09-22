@@ -1318,18 +1318,21 @@ export type Database = {
           hidden_vehicle_ids: string[]
           updated_at: string
           user_id: string
+          vehicle_order: string[]
         }
         Insert: {
           created_at?: string
           hidden_vehicle_ids?: string[]
           updated_at?: string
           user_id: string
+          vehicle_order?: string[]
         }
         Update: {
           created_at?: string
           hidden_vehicle_ids?: string[]
           updated_at?: string
           user_id?: string
+          vehicle_order?: string[]
         }
         Relationships: []
       }

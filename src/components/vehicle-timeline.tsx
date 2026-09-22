@@ -1,7 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Copy, Filter, Search, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Copy,
+  Filter,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -97,6 +106,46 @@ export function VehicleTimeline() {
 
   const days = useMemo(() => monthDays(month), [month]);
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const SCROLL_KEY = "vehicle-timeline-scroll";
+
+  function onTableScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    try {
+      sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ left: el.scrollLeft, top: el.scrollTop }));
+    } catch {
+      /* ignora */
+    }
+  }
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    try {
+      const saved = sessionStorage.getItem(SCROLL_KEY);
+      if (!saved) return;
+      const { left, top } = JSON.parse(saved) as { left?: number; top?: number };
+      el.scrollLeft = left ?? 0;
+      el.scrollTop = top ?? 0;
+    } catch {
+      /* ignora */
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const saved = sessionStorage.getItem(SCROLL_KEY);
+    if (!saved) return;
+    const { left, top } = JSON.parse(saved) as { left?: number; top?: number };
+    const t = setTimeout(() => {
+      el.scrollLeft = left ?? 0;
+      el.scrollTop = top ?? 0;
+    }, 100);
+    return () => clearTimeout(t);
+  }, [days.length]);
+
   const vehicles = useQuery({
     queryKey: ["vehicles"],
     queryFn: async () => {
@@ -136,19 +185,31 @@ export function VehicleTimeline() {
   const prefs = useQuery({
     queryKey: ["vehicle-view-prefs"],
     queryFn: async () => {
-      const { data } = await supabase.from("vehicle_view_prefs").select("hidden_vehicle_ids").maybeSingle();
-      return (data?.hidden_vehicle_ids ?? []) as string[];
+      const { data } = await supabase
+        .from("vehicle_view_prefs")
+        .select("hidden_vehicle_ids, vehicle_order")
+        .maybeSingle();
+      return {
+        hidden: (data?.hidden_vehicle_ids ?? []) as string[],
+        order: (data?.vehicle_order ?? []) as string[],
+      };
     },
   });
-  const hidden = useMemo(() => new Set(prefs.data ?? []), [prefs.data]);
+  const hidden = useMemo(() => new Set(prefs.data?.hidden ?? []), [prefs.data]);
+  const vehicleOrder = useMemo(() => prefs.data?.order ?? [], [prefs.data]);
 
   const savePrefs = useMutation({
-    mutationFn: async (ids: string[]) => {
+    mutationFn: async (patch: { hidden?: string[]; order?: string[] }) => {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("Sessão expirada.");
-      const { error } = await supabase
-        .from("vehicle_view_prefs")
-        .upsert({ user_id: auth.user.id, hidden_vehicle_ids: ids }, { onConflict: "user_id" });
+      const { error } = await supabase.from("vehicle_view_prefs").upsert(
+        {
+          user_id: auth.user.id,
+          hidden_vehicle_ids: patch.hidden ?? [...hidden],
+          vehicle_order: patch.order ?? vehicleOrder,
+        },
+        { onConflict: "user_id" },
+      );
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vehicle-view-prefs"] }),
@@ -196,14 +257,37 @@ export function VehicleTimeline() {
     return map;
   }, [clients.data]);
 
+  const orderedVehicles = useMemo(() => {
+    const list = [...(vehicles.data ?? [])];
+    const rank = new Map(vehicleOrder.map((id, i) => [id, i]));
+    list.sort((a, b) => {
+      const ra = rank.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const rb = rank.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      if (ra !== rb) return ra - rb;
+      return String(a.plate).localeCompare(String(b.plate), "pt-BR");
+    });
+    return list;
+  }, [vehicles.data, vehicleOrder]);
+
   const visibleVehicles = useMemo(() => {
     const q = vehicleSearch.trim().toLowerCase();
-    return (vehicles.data ?? []).filter((v) => {
+    return orderedVehicles.filter((v) => {
       if (hidden.has(v.id)) return false;
       if (!q) return true;
       return [v.plate, v.model, v.brand].filter(Boolean).some((x) => String(x).toLowerCase().includes(q));
     });
-  }, [vehicles.data, vehicleSearch, hidden]);
+  }, [orderedVehicles, vehicleSearch, hidden]);
+
+  function moveVehicle(vehicleId: string, delta: number) {
+    const ids = orderedVehicles.map((v) => v.id);
+    const from = ids.indexOf(vehicleId);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    const next = [...ids];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved!);
+    savePrefs.mutate({ order: next });
+  }
 
   const upsert = useMutation({
     mutationFn: async (rows: Omit<VehicleScheduleRow, "id">[]) => {
@@ -415,7 +499,7 @@ export function VehicleTimeline() {
           <PopoverContent className="max-h-80 w-72 overflow-y-auto">
             <p className="mb-2 text-xs text-muted-foreground">Marque os veículos exibidos na timeline.</p>
             <div className="space-y-2">
-              {(vehicles.data ?? []).map((v) => (
+              {orderedVehicles.map((v) => (
                 <label key={v.id} className="flex items-center gap-2 text-sm">
                   <Checkbox
                     checked={!hidden.has(v.id)}
@@ -423,7 +507,7 @@ export function VehicleTimeline() {
                       const next = new Set(hidden);
                       if (checked) next.delete(v.id);
                       else next.add(v.id);
-                      savePrefs.mutate([...next]);
+                      savePrefs.mutate({ hidden: [...next] });
                     }}
                   />
                   <span className="truncate">
@@ -440,11 +524,11 @@ export function VehicleTimeline() {
         </Button>
       </div>
 
-      <div className="panel overflow-x-auto">
+      <div className="panel overflow-auto" ref={scrollRef} onScroll={onTableScroll}>
         <table className="w-max border-collapse text-xs">
           <thead>
             <tr>
-              <th className="sticky left-0 z-20 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 text-left text-[11px]">
+              <th className="sticky left-0 z-20 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 text-left text-[11px] shadow-[inset_-1px_0_0_0_hsl(var(--border))]">
                 Veículo
               </th>
               {days.map((d) => (
@@ -467,12 +551,36 @@ export function VehicleTimeline() {
             )}
             {visibleVehicles.map((v) => (
               <tr key={v.id}>
-                <td className="sticky left-0 z-10 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 align-middle leading-tight">
-                  <div className="truncate text-[11px] font-medium">
-                    {[v.brand, v.model].filter(Boolean).join(" ") || "Veículo"}
-                  </div>
-                  <div className="font-mono text-[10px] uppercase text-muted-foreground">
-                    {v.plate} · {v.passenger_capacity} lug.
+                <td className="sticky left-0 z-10 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 align-middle leading-tight shadow-[inset_-1px_0_0_0_hsl(var(--border))]">
+                  <div className="flex items-center gap-1">
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        title="Mover para cima"
+                        disabled={!canWrite}
+                        onClick={() => moveVehicle(v.id, -1)}
+                        className="rounded text-muted-foreground hover:text-foreground disabled:opacity-40"
+                      >
+                        <ChevronUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Mover para baixo"
+                        disabled={!canWrite}
+                        onClick={() => moveVehicle(v.id, 1)}
+                        className="rounded text-muted-foreground hover:text-foreground disabled:opacity-40"
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[11px] font-medium">
+                        {[v.brand, v.model].filter(Boolean).join(" ") || "Veículo"}
+                      </div>
+                      <div className="font-mono text-[10px] uppercase text-muted-foreground">
+                        {v.plate} · {v.passenger_capacity} lug.
+                      </div>
+                    </div>
                   </div>
                 </td>
                 {days.map((d) => {
