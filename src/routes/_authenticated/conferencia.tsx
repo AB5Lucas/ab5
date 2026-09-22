@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, ClipboardCheck, CalendarDays, Trash2 } from "lucide-react";
+import { Check, ClipboardCheck, CalendarDays, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/page-header";
@@ -88,8 +88,9 @@ function ConferencePage() {
   const [fType, setFType] = useState("all");
   const [search, setSearch] = useState("");
   const [checkItem, setCheckItem] = useState<Item | null>(null);
-  const [editOnly, setEditOnly] = useState(false);
   const [deleteItem, setDeleteItem] = useState<Item | null>(null);
+  const [docItem, setDocItem] = useState<Item | null>(null);
+  const [docDate, setDocDate] = useState("");
   const [dateDraft, setDateDraft] = useState<Record<string, string>>({});
 
   const items = useQuery({
@@ -132,7 +133,10 @@ function ConferencePage() {
   const trainings = useQuery({
     queryKey: ["trainings-min"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("trainings").select("id, name, description").order("name");
+      const { data, error } = await supabase
+        .from("trainings")
+        .select("id, name, description, validity_months")
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -290,6 +294,54 @@ function ConferencePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const validityById = useMemo(() => {
+    const m = new Map<string, number>();
+    (trainings.data ?? []).forEach((t) => m.set(t.id, t.validity_months ?? 12));
+    return m;
+  }, [trainings.data]);
+
+  const addMonths = (iso: string, months: number) => {
+    const d = new Date(`${iso}T00:00:00`);
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const saveDocDate = useMutation({
+    mutationFn: async ({ item, date }: { item: Item; date: string }) => {
+      if (!date) throw new Error("Informe a data de realização");
+      const { error } = await supabase
+        .from("conference_items")
+        .update({ document_date: date })
+        .eq("id", item.id);
+      if (error) throw error;
+
+      if (item.type === "aso") {
+        await supabase.from("asos").update({ exam_date: date }).eq("collaborator_id", item.collaborator_id);
+      } else if (item.type === "treinamento" && item.training_id) {
+        await supabase
+          .from("collaborator_trainings")
+          .update({ completed_at: date, expires_at: addMonths(date, validityById.get(item.training_id) ?? 12) })
+          .eq("collaborator_id", item.collaborator_id)
+          .eq("training_id", item.training_id);
+      } else if (item.type === "integracao" && item.client_id) {
+        await supabase
+          .from("client_integrations")
+          .update({ integration_date: date, expires_at: addMonths(date, 12) })
+          .eq("collaborator_id", item.collaborator_id)
+          .eq("client_id", item.client_id);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Data de realização atualizada");
+      setDocItem(null);
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["asos"] });
+      qc.invalidateQueries({ queryKey: ["collaborator-trainings"] });
+      qc.invalidateQueries({ queryKey: ["client-integrations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const modalChecks = checkItem ? checksByItem.get(checkItem.id) ?? [] : [];
   const pendingCount = (items.data ?? []).filter((i) => i.status !== "concluido").length;
   const doneCount = (items.data ?? []).filter((i) => i.status === "concluido").length;
@@ -417,27 +469,27 @@ function ConferencePage() {
                     ) : canWrite ? (
                       <div className="flex justify-end gap-1">
                         <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7"
-                          onClick={() => {
-                            setCheckItem(i);
-                            setEditOnly(false);
-                          }}
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          aria-label="Conferir documento"
+                          title="Conferir documento"
+                          onClick={() => setCheckItem(i)}
                         >
-                          Conferir
+                          <CalendarDays className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          aria-label="Editar data"
+                          aria-label="Editar data de realização"
+                          title="Editar data de realização"
                           onClick={() => {
-                            setCheckItem(i);
-                            setEditOnly(true);
+                            setDocItem(i);
+                            setDocDate(i.document_date);
                           }}
                         >
-                          <CalendarDays className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -480,7 +532,7 @@ function ConferencePage() {
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editOnly ? "Editar datas de conferência" : "Conferir documento"}</DialogTitle>
+            <DialogTitle>Conferir documento</DialogTitle>
             <DialogDescription>
               {checkItem
                 ? `${personById.get(checkItem.collaborator_id)?.full_name ?? ""} — ${docLabel(checkItem)}`
@@ -523,7 +575,7 @@ function ConferencePage() {
                   >
                     Salvar data
                   </Button>
-                  {!editOnly && !c.approved && (
+                  {!c.approved && (
                     <Button size="sm" className="h-8" disabled={approve.isPending} onClick={() => approve.mutate(c)}>
                       <Check className="h-4 w-4" /> Documento aceito
                     </Button>
@@ -547,6 +599,35 @@ function ConferencePage() {
               }}
             >
               Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Editar data de realização */}
+      <Dialog open={!!docItem} onOpenChange={(v) => !v && setDocItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar data de realização</DialogTitle>
+            <DialogDescription>
+              {docItem
+                ? `${personById.get(docItem.collaborator_id)?.full_name ?? ""} — ${docLabel(docItem)}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <Label className="text-xs">Realizado em</Label>
+            <Input type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDocItem(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={saveDocDate.isPending}
+              onClick={() => docItem && saveDocDate.mutate({ item: docItem, date: docDate })}
+            >
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
