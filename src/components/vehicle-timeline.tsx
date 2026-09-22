@@ -475,11 +475,11 @@ export function VehicleTimeline() {
         </Button>
       </div>
 
-      <div className="panel overflow-x-auto">
+      <div className="panel overflow-auto" ref={scrollRef} onScroll={onTableScroll}>
         <table className="w-max border-collapse text-xs">
           <thead>
             <tr>
-              <th className="sticky left-0 z-20 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 text-left text-[11px]">
+              <th className="sticky left-0 z-20 w-40 min-w-40 border-b border-r border-border bg-card px-2 py-1 text-left text-[11px] shadow-[inset_-1px_0_0_0_hsl(var(--border))]">
                 Veículo
               </th>
               {days.map((d) => (
