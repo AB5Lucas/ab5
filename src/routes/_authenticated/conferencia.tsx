@@ -294,6 +294,54 @@ function ConferencePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const validityById = useMemo(() => {
+    const m = new Map<string, number>();
+    (trainings.data ?? []).forEach((t) => m.set(t.id, t.validity_months ?? 12));
+    return m;
+  }, [trainings.data]);
+
+  const addMonths = (iso: string, months: number) => {
+    const d = new Date(`${iso}T00:00:00`);
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const saveDocDate = useMutation({
+    mutationFn: async ({ item, date }: { item: Item; date: string }) => {
+      if (!date) throw new Error("Informe a data de realização");
+      const { error } = await supabase
+        .from("conference_items")
+        .update({ document_date: date })
+        .eq("id", item.id);
+      if (error) throw error;
+
+      if (item.type === "aso") {
+        await supabase.from("asos").update({ exam_date: date }).eq("collaborator_id", item.collaborator_id);
+      } else if (item.type === "treinamento" && item.training_id) {
+        await supabase
+          .from("collaborator_trainings")
+          .update({ completed_at: date, expires_at: addMonths(date, validityById.get(item.training_id) ?? 12) })
+          .eq("collaborator_id", item.collaborator_id)
+          .eq("training_id", item.training_id);
+      } else if (item.type === "integracao" && item.client_id) {
+        await supabase
+          .from("client_integrations")
+          .update({ integration_date: date, expires_at: addMonths(date, 12) })
+          .eq("collaborator_id", item.collaborator_id)
+          .eq("client_id", item.client_id);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Data de realização atualizada");
+      setDocItem(null);
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["asos"] });
+      qc.invalidateQueries({ queryKey: ["collaborator-trainings"] });
+      qc.invalidateQueries({ queryKey: ["client-integrations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const modalChecks = checkItem ? checksByItem.get(checkItem.id) ?? [] : [];
   const pendingCount = (items.data ?? []).filter((i) => i.status !== "concluido").length;
   const doneCount = (items.data ?? []).filter((i) => i.status === "concluido").length;
