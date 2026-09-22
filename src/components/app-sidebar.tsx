@@ -79,6 +79,7 @@ const groups: Group[] = [
     icon: Truck,
     items: [
       { title: "Frota", url: "/veiculos" },
+      { title: "Relatórios", url: "/veiculos/relatorios" },
       { title: "Motoristas", url: "/veiculos/motoristas" },
     ],
   },
@@ -98,6 +99,7 @@ const groups: Group[] = [
     items: [
       { title: "Vale-Transporte", url: "/beneficios/vale-transporte" },
       { title: "Prêmio de Viagem", url: "/beneficios/premio-viagem" },
+      { title: "Prêmio de Motorista", url: "/beneficios/premio-motorista" },
     ],
   },
   { label: "Relatórios", icon: FileBarChart, items: [{ title: "Relatórios", url: "/relatorios" }] },

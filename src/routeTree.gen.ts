@@ -25,6 +25,7 @@ import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authen
 import { Route as AuthenticatedAusenciasAtestadosRouteImport } from './routes/_authenticated/ausencias.atestados'
 import { Route as AuthenticatedAusenciasFeriasRouteImport } from './routes/_authenticated/ausencias.ferias'
 import { Route as AuthenticatedAusenciasFolgasRouteImport } from './routes/_authenticated/ausencias.folgas'
+import { Route as AuthenticatedBeneficiosPremioMotoristaRouteImport } from './routes/_authenticated/beneficios.premio-motorista'
 import { Route as AuthenticatedBeneficiosPremioViagemRouteImport } from './routes/_authenticated/beneficios.premio-viagem'
 import { Route as AuthenticatedBeneficiosValeTransporteRouteImport } from './routes/_authenticated/beneficios.vale-transporte'
 import { Route as AuthenticatedColaboradoresIndexRouteImport } from './routes/_authenticated/colaboradores.index'
@@ -39,6 +40,7 @@ import { Route as AuthenticatedProgramacaoHojeRouteImport } from './routes/_auth
 import { Route as AuthenticatedProgramacaoSemanalRouteImport } from './routes/_authenticated/programacao.semanal'
 import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authenticated/veiculos.index'
 import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_authenticated/veiculos.motoristas'
+import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
 import { Route as AuthenticatedVeiculosTransporteRouteImport } from './routes/_authenticated/veiculos.transporte'
 
 const IndexRoute = IndexRouteImport.update({
@@ -129,6 +131,12 @@ const AuthenticatedAusenciasFolgasRoute =
     path: '/ausencias/folgas',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedBeneficiosPremioMotoristaRoute =
+  AuthenticatedBeneficiosPremioMotoristaRouteImport.update({
+    id: '/beneficios/premio-motorista',
+    path: '/beneficios/premio-motorista',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedBeneficiosPremioViagemRoute =
   AuthenticatedBeneficiosPremioViagemRouteImport.update({
     id: '/beneficios/premio-viagem',
@@ -212,6 +220,12 @@ const AuthenticatedVeiculosMotoristasRoute =
     path: '/veiculos/motoristas',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedVeiculosRelatoriosRoute =
+  AuthenticatedVeiculosRelatoriosRouteImport.update({
+    id: '/veiculos/relatorios',
+    path: '/veiculos/relatorios',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVeiculosTransporteRoute =
   AuthenticatedVeiculosTransporteRouteImport.update({
     id: '/veiculos/transporte',
@@ -235,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
   '/ausencias/ferias': typeof AuthenticatedAusenciasFeriasRoute
   '/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
+  '/beneficios/premio-motorista': typeof AuthenticatedBeneficiosPremioMotoristaRoute
   '/beneficios/premio-viagem': typeof AuthenticatedBeneficiosPremioViagemRoute
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
@@ -246,6 +261,7 @@ export interface FileRoutesByFullPath {
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
+  '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
   '/obras/': typeof AuthenticatedObrasIndexRoute
@@ -267,6 +283,7 @@ export interface FileRoutesByTo {
   '/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
   '/ausencias/ferias': typeof AuthenticatedAusenciasFeriasRoute
   '/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
+  '/beneficios/premio-motorista': typeof AuthenticatedBeneficiosPremioMotoristaRoute
   '/beneficios/premio-viagem': typeof AuthenticatedBeneficiosPremioViagemRoute
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
@@ -278,6 +295,7 @@ export interface FileRoutesByTo {
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
+  '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/colaboradores': typeof AuthenticatedColaboradoresIndexRoute
   '/obras': typeof AuthenticatedObrasIndexRoute
@@ -301,6 +319,7 @@ export interface FileRoutesById {
   '/_authenticated/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
   '/_authenticated/ausencias/ferias': typeof AuthenticatedAusenciasFeriasRoute
   '/_authenticated/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
+  '/_authenticated/beneficios/premio-motorista': typeof AuthenticatedBeneficiosPremioMotoristaRoute
   '/_authenticated/beneficios/premio-viagem': typeof AuthenticatedBeneficiosPremioViagemRoute
   '/_authenticated/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/_authenticated/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
@@ -312,6 +331,7 @@ export interface FileRoutesById {
   '/_authenticated/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/_authenticated/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/_authenticated/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
+  '/_authenticated/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/_authenticated/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
   '/_authenticated/obras/': typeof AuthenticatedObrasIndexRoute
@@ -335,6 +355,7 @@ export interface FileRouteTypes {
     | '/ausencias/atestados'
     | '/ausencias/ferias'
     | '/ausencias/folgas'
+    | '/beneficios/premio-motorista'
     | '/beneficios/premio-viagem'
     | '/beneficios/vale-transporte'
     | '/colaboradores/asos'
@@ -346,6 +367,7 @@ export interface FileRouteTypes {
     | '/programacao/hoje'
     | '/programacao/semanal'
     | '/veiculos/motoristas'
+    | '/veiculos/relatorios'
     | '/veiculos/transporte'
     | '/colaboradores/'
     | '/obras/'
@@ -367,6 +389,7 @@ export interface FileRouteTypes {
     | '/ausencias/atestados'
     | '/ausencias/ferias'
     | '/ausencias/folgas'
+    | '/beneficios/premio-motorista'
     | '/beneficios/premio-viagem'
     | '/beneficios/vale-transporte'
     | '/colaboradores/asos'
@@ -378,6 +401,7 @@ export interface FileRouteTypes {
     | '/programacao/hoje'
     | '/programacao/semanal'
     | '/veiculos/motoristas'
+    | '/veiculos/relatorios'
     | '/veiculos/transporte'
     | '/colaboradores'
     | '/obras'
@@ -400,6 +424,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ausencias/atestados'
     | '/_authenticated/ausencias/ferias'
     | '/_authenticated/ausencias/folgas'
+    | '/_authenticated/beneficios/premio-motorista'
     | '/_authenticated/beneficios/premio-viagem'
     | '/_authenticated/beneficios/vale-transporte'
     | '/_authenticated/colaboradores/asos'
@@ -411,6 +436,7 @@ export interface FileRouteTypes {
     | '/_authenticated/programacao/hoje'
     | '/_authenticated/programacao/semanal'
     | '/_authenticated/veiculos/motoristas'
+    | '/_authenticated/veiculos/relatorios'
     | '/_authenticated/veiculos/transporte'
     | '/_authenticated/colaboradores/'
     | '/_authenticated/obras/'
@@ -538,6 +564,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAusenciasFolgasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/beneficios/premio-motorista': {
+      id: '/_authenticated/beneficios/premio-motorista'
+      path: '/beneficios/premio-motorista'
+      fullPath: '/beneficios/premio-motorista'
+      preLoaderRoute: typeof AuthenticatedBeneficiosPremioMotoristaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/beneficios/premio-viagem': {
       id: '/_authenticated/beneficios/premio-viagem'
       path: '/beneficios/premio-viagem'
@@ -636,6 +669,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVeiculosMotoristasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/veiculos/relatorios': {
+      id: '/_authenticated/veiculos/relatorios'
+      path: '/veiculos/relatorios'
+      fullPath: '/veiculos/relatorios'
+      preLoaderRoute: typeof AuthenticatedVeiculosRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/veiculos/transporte': {
       id: '/_authenticated/veiculos/transporte'
       path: '/veiculos/transporte'
@@ -659,6 +699,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAusenciasAtestadosRoute: typeof AuthenticatedAusenciasAtestadosRoute
   AuthenticatedAusenciasFeriasRoute: typeof AuthenticatedAusenciasFeriasRoute
   AuthenticatedAusenciasFolgasRoute: typeof AuthenticatedAusenciasFolgasRoute
+  AuthenticatedBeneficiosPremioMotoristaRoute: typeof AuthenticatedBeneficiosPremioMotoristaRoute
   AuthenticatedBeneficiosPremioViagemRoute: typeof AuthenticatedBeneficiosPremioViagemRoute
   AuthenticatedBeneficiosValeTransporteRoute: typeof AuthenticatedBeneficiosValeTransporteRoute
   AuthenticatedColaboradoresAsosRoute: typeof AuthenticatedColaboradoresAsosRoute
@@ -670,6 +711,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProgramacaoHojeRoute: typeof AuthenticatedProgramacaoHojeRoute
   AuthenticatedProgramacaoSemanalRoute: typeof AuthenticatedProgramacaoSemanalRoute
   AuthenticatedVeiculosMotoristasRoute: typeof AuthenticatedVeiculosMotoristasRoute
+  AuthenticatedVeiculosRelatoriosRoute: typeof AuthenticatedVeiculosRelatoriosRoute
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
   AuthenticatedColaboradoresIndexRoute: typeof AuthenticatedColaboradoresIndexRoute
   AuthenticatedObrasIndexRoute: typeof AuthenticatedObrasIndexRoute
@@ -689,6 +731,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAusenciasAtestadosRoute: AuthenticatedAusenciasAtestadosRoute,
   AuthenticatedAusenciasFeriasRoute: AuthenticatedAusenciasFeriasRoute,
   AuthenticatedAusenciasFolgasRoute: AuthenticatedAusenciasFolgasRoute,
+  AuthenticatedBeneficiosPremioMotoristaRoute:
+    AuthenticatedBeneficiosPremioMotoristaRoute,
   AuthenticatedBeneficiosPremioViagemRoute:
     AuthenticatedBeneficiosPremioViagemRoute,
   AuthenticatedBeneficiosValeTransporteRoute:
@@ -704,6 +748,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProgramacaoHojeRoute: AuthenticatedProgramacaoHojeRoute,
   AuthenticatedProgramacaoSemanalRoute: AuthenticatedProgramacaoSemanalRoute,
   AuthenticatedVeiculosMotoristasRoute: AuthenticatedVeiculosMotoristasRoute,
+  AuthenticatedVeiculosRelatoriosRoute: AuthenticatedVeiculosRelatoriosRoute,
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
   AuthenticatedColaboradoresIndexRoute: AuthenticatedColaboradoresIndexRoute,
   AuthenticatedObrasIndexRoute: AuthenticatedObrasIndexRoute,

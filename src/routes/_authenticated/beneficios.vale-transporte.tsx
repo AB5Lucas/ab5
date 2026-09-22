@@ -151,7 +151,9 @@ function VoucherPage() {
 
       const { data: allocations, error: ae } = await supabase
         .from("daily_allocations")
-        .select("collaborator_id, schedule_id, driver, collaborators(full_name, registration_number)")
+        .select(
+          "collaborator_id, schedule_id, driver, collaborators(full_name, registration_number), works(clients(needs_transport_voucher))",
+        )
         .in("schedule_id", ids);
       if (ae) throw ae;
 
@@ -159,6 +161,10 @@ function VoucherPage() {
       for (const a of allocations ?? []) {
         const c = (a as unknown as { collaborators: { full_name: string; registration_number: string } | null })
           .collaborators;
+        const client = (a as unknown as { works: { clients: { needs_transport_voucher: boolean } | null } | null })
+          .works?.clients;
+        // Somente obras cujo cliente está marcado como "Necessita de Vale-Transporte".
+        if (!client?.needs_transport_voucher) continue;
         const key = a.collaborator_id;
         const entry = map.get(key) ?? {
           name: c?.full_name ?? "—",
@@ -213,7 +219,7 @@ function VoucherPage() {
     <div className="space-y-6">
       <PageHeader
         title="Vale-Transporte"
-        description="Regras configuráveis e apuração mensal com base nos dias programados."
+        description='Apuração mensal dos colaboradores escalados em clientes marcados com "Necessita de Vale-Transporte".'
         actions={
           canWrite ? (
             <Button onClick={openNew}>
