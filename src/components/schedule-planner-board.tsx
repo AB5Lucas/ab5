@@ -1040,27 +1040,9 @@ export function SchedulePlannerBoard({
             </DropdownMenuContent>
           </DropdownMenu>
           {editable && (
-            <>
-              <Button size="sm" variant="outline" onClick={() => generateFromBase.mutate()} disabled={generateFromBase.isPending}>
-                <Users className="h-4 w-4" /> Equipes base
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => copyPrevious.mutate()} disabled={copyPrevious.isPending}>
-                <Copy className="h-4 w-4" /> Copiar dia anterior
-              </Button>
-            </>
-          )}
-          {canWrite && schedule.data && (
-            finalized ? (
-              isAdmin && (
-                <Button size="sm" variant="outline" onClick={() => setStatus.mutate("in_progress")}>
-                  <LockOpen className="h-4 w-4" /> Reabrir
-                </Button>
-              )
-            ) : (
-              <Button size="sm" variant="secondary" onClick={() => setStatus.mutate("finalized")}>
-                <Lock className="h-4 w-4" /> Finalizar
-              </Button>
-            )
+            <Button size="sm" variant="outline" onClick={() => copyPrevious.mutate()} disabled={copyPrevious.isPending}>
+              <Copy className="h-4 w-4" /> Copiar dia anterior
+            </Button>
           )}
         </div>
       </div>
