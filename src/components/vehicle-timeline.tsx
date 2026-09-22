@@ -450,7 +450,7 @@ export function VehicleTimeline() {
           <PopoverContent className="max-h-80 w-72 overflow-y-auto">
             <p className="mb-2 text-xs text-muted-foreground">Marque os veículos exibidos na timeline.</p>
             <div className="space-y-2">
-              {(vehicles.data ?? []).map((v) => (
+              {orderedVehicles.map((v) => (
                 <label key={v.id} className="flex items-center gap-2 text-sm">
                   <Checkbox
                     checked={!hidden.has(v.id)}
