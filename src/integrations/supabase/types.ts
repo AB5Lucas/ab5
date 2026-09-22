@@ -234,6 +234,8 @@ export type Database = {
           distance_km: number | null
           id: string
           name: string
+          needs_company_transport: boolean
+          needs_transport_voucher: boolean
           neighborhood: string | null
           notes: string | null
           number: string | null
@@ -250,6 +252,8 @@ export type Database = {
           distance_km?: number | null
           id?: string
           name: string
+          needs_company_transport?: boolean
+          needs_transport_voucher?: boolean
           neighborhood?: string | null
           notes?: string | null
           number?: string | null
@@ -266,6 +270,8 @@ export type Database = {
           distance_km?: number | null
           id?: string
           name?: string
+          needs_company_transport?: boolean
+          needs_transport_voucher?: boolean
           neighborhood?: string | null
           notes?: string | null
           number?: string | null
@@ -806,6 +812,36 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_bonus_rules: {
+        Row: {
+          active: boolean
+          amount: number
+          calculation_type: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount?: number
+          calculation_type?: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          calculation_type?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       holidays: {
         Row: {
           created_at: string
@@ -1211,6 +1247,91 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vehicle_schedules: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          driver_bonus: boolean
+          driver_id: string | null
+          id: string
+          is_external: boolean
+          km: number
+          notes: string | null
+          schedule_date: string
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          driver_bonus?: boolean
+          driver_id?: string | null
+          id?: string
+          is_external?: boolean
+          km?: number
+          notes?: string | null
+          schedule_date: string
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          driver_bonus?: boolean
+          driver_id?: string | null
+          id?: string
+          is_external?: boolean
+          km?: number
+          notes?: string | null
+          schedule_date?: string
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_schedules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_schedules_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_schedules_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_view_prefs: {
+        Row: {
+          created_at: string
+          hidden_vehicle_ids: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hidden_vehicle_ids?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hidden_vehicle_ids?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       vehicles: {
         Row: {
