@@ -41,7 +41,14 @@ const groups: Group[] = [
       { title: "Histórico", url: "/programacao/historico" },
     ],
   },
-  { label: "Agendamentos", icon: CalendarClock, items: [{ title: "Agendamentos", url: "/agendamentos" }] },
+  {
+    label: "Agendamentos",
+    icon: CalendarClock,
+    items: [
+      { title: "Agendamentos", url: "/agendamentos" },
+      { title: "Conferência", url: "/conferencia" },
+    ],
+  },
   {
     label: "Colaboradores",
     icon: Users,

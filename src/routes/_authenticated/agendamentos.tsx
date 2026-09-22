@@ -281,6 +281,7 @@ function AppointmentsPage() {
     qc.invalidateQueries({ queryKey: ["asos"] });
     qc.invalidateQueries({ queryKey: ["client-integrations"] });
     qc.invalidateQueries({ queryKey: ["training-records"] });
+    qc.invalidateQueries({ queryKey: ["conference"] });
   };
 
   const create = useMutation({
@@ -378,9 +379,38 @@ function AppointmentsPage() {
         })
         .eq("id", row.id);
       if (error) throw error;
+
+      // Envia o item para a Conferência
+      const { data: item, error: itemError } = await supabase
+        .from("conference_items")
+        .insert({
+          appointment_id: row.id,
+          collaborator_id: row.collaborator_id,
+          type: row.type,
+          training_id: row.training_id,
+          client_id: row.client_id,
+          document_date: date,
+          notes: row.notes,
+        })
+        .select("id")
+        .single();
+      if (itemError) throw itemError;
+
+      const { data: integrations } = await supabase
+        .from("client_integrations")
+        .select("client_id")
+        .eq("collaborator_id", row.collaborator_id);
+      const clientIds = new Set<string>((integrations ?? []).map((i) => i.client_id));
+      if (row.client_id) clientIds.add(row.client_id);
+      if (clientIds.size > 0) {
+        const { error: checksError } = await supabase
+          .from("conference_checks")
+          .insert([...clientIds].map((client_id) => ({ item_id: item.id, client_id })));
+        if (checksError) throw checksError;
+      }
     },
     onSuccess: () => {
-      toast.success("Realização confirmada e cadastro atualizado");
+      toast.success("Realização confirmada e enviada para a Conferência");
       setDoneRow(null);
       invalidate();
     },
