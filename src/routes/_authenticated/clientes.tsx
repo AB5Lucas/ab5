@@ -394,14 +394,41 @@ function ClientsPage() {
               <Input value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Distância (km)</Label>
+              <Label>Distância de ida (km)</Label>
               <Input
                 type="number"
                 step="0.1"
                 value={form.distance_km}
                 onChange={(e) => set("distance_km", e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">Somente a ida; o sistema considera o dobro (ida e volta).</p>
             </div>
+            <div className="space-y-1">
+              <Label>Viagens por dia</Label>
+              <Input
+                type="number"
+                min={1}
+                step="1"
+                value={form.trips_per_day}
+                onChange={(e) => set("trips_per_day", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Ex.: Suzano = 2 viagens com o mesmo motorista (6 pessoas na 1ª e 5 na 2ª).
+              </p>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 sm:col-span-2">
+              <div>
+                <Label htmlFor="has-toll">Tem pedágio?</Label>
+                <p className="text-xs text-muted-foreground">Informe o valor da ida; o sistema dobra para ida e volta.</p>
+              </div>
+              <Switch id="has-toll" checked={form.has_toll} onCheckedChange={(v) => set("has_toll", v)} />
+            </div>
+            {form.has_toll && (
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Valor do pedágio por ida (R$)</Label>
+                <Input value={form.toll_amount} onChange={(e) => set("toll_amount", e.target.value)} />
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 sm:col-span-2">
               <div>
                 <Label htmlFor="requires-integration">Exige integração</Label>
