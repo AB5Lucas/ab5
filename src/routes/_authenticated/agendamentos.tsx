@@ -352,18 +352,24 @@ function AppointmentsPage() {
         .single();
       if (itemError) throw itemError;
 
-      const { data: integrations } = await supabase
-        .from("client_integrations")
-        .select("client_id")
-        .eq("collaborator_id", row.collaborator_id);
-      const clientIds = new Set<string>((integrations ?? []).map((i) => i.client_id));
-      if (row.client_id) clientIds.add(row.client_id);
-      if (clientIds.size > 0) {
+      let clientIds: string[] = [];
+      if (row.type === "integracao") {
+        // Integração: confere somente o cliente do agendamento
+        clientIds = row.client_id ? [row.client_id] : [];
+      } else {
+        const { data: integrations } = await supabase
+          .from("client_integrations")
+          .select("client_id")
+          .eq("collaborator_id", row.collaborator_id);
+        clientIds = [...new Set<string>((integrations ?? []).map((i) => i.client_id))];
+      }
+      if (clientIds.length > 0) {
         const { error: checksError } = await supabase
           .from("conference_checks")
-          .insert([...clientIds].map((client_id) => ({ item_id: item.id, client_id })));
+          .insert(clientIds.map((client_id) => ({ item_id: item.id, client_id })));
         if (checksError) throw checksError;
       }
+
     },
     onSuccess: () => {
       toast.success("Realização confirmada e enviada para a Conferência");
