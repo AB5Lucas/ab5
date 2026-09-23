@@ -29,6 +29,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const EXTERNAL_KEY = "__external__";
+export const MAINTENANCE_KEY = "__maintenance__";
 export const KM_WORK = 100;
 export const KM_EXTERNAL = 200;
 
@@ -39,6 +40,7 @@ export type VehicleScheduleRow = {
   driver_id: string | null;
   client_id: string | null;
   is_external: boolean;
+  is_maintenance: boolean;
   driver_bonus: boolean;
   km: number;
 };
