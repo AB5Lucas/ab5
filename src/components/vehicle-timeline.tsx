@@ -727,7 +727,12 @@ export function VehicleTimeline() {
                               </span>
                             </div>
                             <div className="truncate text-[10px] uppercase text-muted-foreground">
-                              {row.km}km {row.is_external ? "EXTERNO" : clientName.get(row.client_id ?? "") ?? "—"}
+                              {row.km}km{" "}
+                              {row.is_maintenance
+                                ? "MANUTENÇÃO"
+                                : row.is_external
+                                  ? "EXTERNO"
+                                  : clientName.get(row.client_id ?? "") ?? "—"}
                             </div>
                           </>
                         ) : (
