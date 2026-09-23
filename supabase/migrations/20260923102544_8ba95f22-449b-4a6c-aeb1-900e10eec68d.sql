@@ -1,0 +1,1 @@
+ALTER TABLE public.vehicle_schedules ADD COLUMN IF NOT EXISTS is_maintenance boolean NOT NULL DEFAULT false;

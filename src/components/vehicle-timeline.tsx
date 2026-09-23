@@ -29,6 +29,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const EXTERNAL_KEY = "__external__";
+export const MAINTENANCE_KEY = "__maintenance__";
 export const KM_WORK = 100;
 export const KM_EXTERNAL = 200;
 
@@ -39,6 +40,7 @@ export type VehicleScheduleRow = {
   driver_id: string | null;
   client_id: string | null;
   is_external: boolean;
+  is_maintenance: boolean;
   driver_bonus: boolean;
   km: number;
 };
@@ -261,7 +263,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, driver_bonus, km")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -360,15 +362,21 @@ export function VehicleTimeline() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  function buildRow(vehicleId: string, date: string, f: { driver_id: string | null; client_id: string | null; is_external: boolean; driver_bonus: boolean }) {
+  function buildRow(
+    vehicleId: string,
+    date: string,
+    f: { driver_id: string | null; client_id: string | null; is_external: boolean; is_maintenance: boolean; driver_bonus: boolean },
+  ) {
+    const special = f.is_external || f.is_maintenance;
     return {
       schedule_date: date,
       vehicle_id: vehicleId,
       driver_id: f.driver_id,
-      client_id: f.is_external ? null : f.client_id,
+      client_id: special ? null : f.client_id,
       is_external: f.is_external,
-      driver_bonus: f.is_external ? false : f.driver_bonus,
-      km: f.is_external ? KM_EXTERNAL : (f.client_id ? clientKm.get(f.client_id) ?? 0 : 0),
+      is_maintenance: f.is_maintenance,
+      driver_bonus: special ? false : f.driver_bonus,
+      km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
     };
   }
 
@@ -377,7 +385,13 @@ export function VehicleTimeline() {
     const current = byCell.get(`${vehicleId}|${date}`);
     setForm({
       driver_id: current?.driver_id ?? NONE,
-      client_id: current ? (current.is_external ? EXTERNAL_KEY : current.client_id ?? NONE) : NONE,
+      client_id: current
+        ? current.is_maintenance
+          ? MAINTENANCE_KEY
+          : current.is_external
+            ? EXTERNAL_KEY
+            : current.client_id ?? NONE
+        : NONE,
       driver_bonus: current?.driver_bonus ?? false,
       repeat_until: "",
     });
@@ -388,14 +402,16 @@ export function VehicleTimeline() {
   function saveCell() {
     if (!cell) return;
     if (form.client_id === NONE) {
-      toast.error("Selecione a obra/cliente ou EXTERNO.");
+      toast.error("Selecione a obra/cliente, EXTERNO ou MANUTENÇÃO.");
       return;
     }
     const isExternal = form.client_id === EXTERNAL_KEY;
+    const isMaintenance = form.client_id === MAINTENANCE_KEY;
     const base = {
       driver_id: form.driver_id === NONE ? null : form.driver_id,
-      client_id: isExternal ? null : form.client_id,
+      client_id: isExternal || isMaintenance ? null : form.client_id,
       is_external: isExternal,
+      is_maintenance: isMaintenance,
       driver_bonus: form.driver_bonus,
     };
     const targets: string[] = [cell.date];
@@ -419,6 +435,7 @@ export function VehicleTimeline() {
           driver_id: src.driver_id,
           client_id: src.client_id,
           is_external: src.is_external,
+          is_maintenance: src.is_maintenance ?? false,
           driver_bonus: src.driver_bonus,
         }),
       ]);
@@ -447,6 +464,7 @@ export function VehicleTimeline() {
             driver_id: s.driver_id,
             client_id: s.client_id,
             is_external: s.is_external,
+            is_maintenance: s.is_maintenance ?? false,
             driver_bonus: s.driver_bonus,
           }),
         );
@@ -709,7 +727,12 @@ export function VehicleTimeline() {
                               </span>
                             </div>
                             <div className="truncate text-[10px] uppercase text-muted-foreground">
-                              {row.km}km {row.is_external ? "EXTERNO" : clientName.get(row.client_id ?? "") ?? "—"}
+                              {row.km}km{" "}
+                              {row.is_maintenance
+                                ? "MANUTENÇÃO"
+                                : row.is_external
+                                  ? "EXTERNO"
+                                  : clientName.get(row.client_id ?? "") ?? "—"}
                             </div>
                           </>
                         ) : (
@@ -785,14 +808,17 @@ export function VehicleTimeline() {
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                   <SelectItem value={EXTERNAL_KEY}>EXTERNO</SelectItem>
+                  <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {form.client_id === EXTERNAL_KEY
-                  ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
-                  : form.client_id && form.client_id !== NONE
-                    ? `${clientKm.get(form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
-                    : "A quilometragem vem da distância cadastrada do cliente."}
+                {form.client_id === MAINTENANCE_KEY
+                  ? "Manutenção: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem."
+                  : form.client_id === EXTERNAL_KEY
+                    ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
+                    : form.client_id && form.client_id !== NONE
+                      ? `${clientKm.get(form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
+                      : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
             </div>
             <div className="flex items-center justify-between rounded-md border border-border p-3">
@@ -801,8 +827,8 @@ export function VehicleTimeline() {
                 <p className="text-xs text-muted-foreground">Verde = recebe · Cinza = não recebe</p>
               </div>
               <Switch
-                checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY}
-                disabled={form.client_id === EXTERNAL_KEY}
+                checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY && form.client_id !== MAINTENANCE_KEY}
+                disabled={form.client_id === EXTERNAL_KEY || form.client_id === MAINTENANCE_KEY}
                 onCheckedChange={(v) => setForm((f) => ({ ...f, driver_bonus: v }))}
               />
             </div>
