@@ -808,14 +808,17 @@ export function VehicleTimeline() {
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                   <SelectItem value={EXTERNAL_KEY}>EXTERNO</SelectItem>
+                  <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {form.client_id === EXTERNAL_KEY
-                  ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
-                  : form.client_id && form.client_id !== NONE
-                    ? `${clientKm.get(form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
-                    : "A quilometragem vem da distância cadastrada do cliente."}
+                {form.client_id === MAINTENANCE_KEY
+                  ? "Manutenção: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem."
+                  : form.client_id === EXTERNAL_KEY
+                    ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
+                    : form.client_id && form.client_id !== NONE
+                      ? `${clientKm.get(form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
+                      : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
             </div>
             <div className="flex items-center justify-between rounded-md border border-border p-3">
@@ -824,8 +827,8 @@ export function VehicleTimeline() {
                 <p className="text-xs text-muted-foreground">Verde = recebe · Cinza = não recebe</p>
               </div>
               <Switch
-                checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY}
-                disabled={form.client_id === EXTERNAL_KEY}
+                checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY && form.client_id !== MAINTENANCE_KEY}
+                disabled={form.client_id === EXTERNAL_KEY || form.client_id === MAINTENANCE_KEY}
                 onCheckedChange={(v) => setForm((f) => ({ ...f, driver_bonus: v }))}
               />
             </div>
