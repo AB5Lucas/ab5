@@ -469,15 +469,45 @@ export function VehicleTimeline() {
         .maybeSingle();
       const counts: Record<string, number> = {};
       if (sched) {
-        const { data } = await supabase
-          .from("daily_allocations")
-          .select("collaborator_id, works(client_id)")
-          .eq("schedule_id", sched.id);
-        (data ?? []).forEach((a) => {
+        // Quem está ausente (férias, atestado, folga) ou com compromisso agendado
+        // não conta como passageiro, mesmo que tenha sobrado uma alocação antiga.
+        const [vacations, leaves, daysOff, appts, allocs] = await Promise.all([
+          supabase
+            .from("vacations")
+            .select("collaborator_id")
+            .lte("start_date", needsDate)
+            .gte("end_date", needsDate),
+          supabase
+            .from("medical_leaves")
+            .select("collaborator_id")
+            .lte("start_date", needsDate)
+            .gte("end_date", needsDate),
+          supabase
+            .from("days_off")
+            .select("collaborator_id")
+            .lte("date", needsDate)
+            .or(`end_date.gte.${needsDate},and(end_date.is.null,date.eq.${needsDate})`),
+          supabase
+            .from("appointments")
+            .select("collaborator_id")
+            .eq("scheduled_date", needsDate)
+            .neq("status", "cancelled"),
+          supabase
+            .from("daily_allocations")
+            .select("collaborator_id, works(client_id)")
+            .eq("schedule_id", sched.id),
+        ]);
+        const unavailable = new Set<string>();
+        [vacations.data, leaves.data, daysOff.data, appts.data].forEach((list) =>
+          (list ?? []).forEach((r) => unavailable.add(r.collaborator_id)),
+        );
+        (allocs.data ?? []).forEach((a) => {
+          if (unavailable.has(a.collaborator_id)) return;
           const cid = (a as unknown as { works: { client_id: string | null } | null }).works?.client_id;
           if (cid) counts[cid] = (counts[cid] ?? 0) + 1;
         });
       }
+
       const { data: vs } = await supabase
         .from("vehicle_schedules")
         .select("client_id, vehicle_id")
