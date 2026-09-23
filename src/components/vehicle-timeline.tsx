@@ -435,6 +435,7 @@ export function VehicleTimeline() {
           driver_id: src.driver_id,
           client_id: src.client_id,
           is_external: src.is_external,
+          is_maintenance: src.is_maintenance ?? false,
           driver_bonus: src.driver_bonus,
         }),
       ]);
@@ -463,6 +464,7 @@ export function VehicleTimeline() {
             driver_id: s.driver_id,
             client_id: s.client_id,
             is_external: s.is_external,
+            is_maintenance: s.is_maintenance ?? false,
             driver_bonus: s.driver_bonus,
           }),
         );
