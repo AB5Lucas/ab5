@@ -11,7 +11,7 @@ import {
   Wallet,
   FileBarChart,
   Shield,
-  HardHat,
+  Network,
   ClipboardList,
 } from "lucide-react";
 import {
@@ -124,11 +124,11 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-            <HardHat className="h-4 w-4" />
+            <Network className="h-4 w-4" />
           </span>
           {!collapsed && (
             <div className="leading-tight">
-              <p className="font-display text-sm font-semibold tracking-wide uppercase">Programação</p>
+              <p className="font-display text-sm font-semibold tracking-wide uppercase">AB5 Hub</p>
               <p className="text-xs text-sidebar-foreground/60">Sistema Operacional</p>
             </div>
           )}
