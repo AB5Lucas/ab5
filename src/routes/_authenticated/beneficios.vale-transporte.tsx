@@ -147,34 +147,58 @@ function VoucherPage() {
         .lt("schedule_date", end);
       if (se) throw se;
       const ids = (schedules ?? []).map((s) => s.id);
-      if (ids.length === 0) return [] as { name: string; reg: string; days: number; driver: boolean }[];
+      const dateById = new Map((schedules ?? []).map((s) => [s.id, s.schedule_date]));
 
-      const { data: allocations, error: ae } = await supabase
-        .from("daily_allocations")
-        .select(
-          "collaborator_id, schedule_id, driver, collaborators(full_name, registration_number), works(clients(needs_transport_voucher))",
-        )
-        .in("schedule_id", ids);
-      if (ae) throw ae;
+      const allocations = ids.length
+        ? await (async () => {
+            const { data, error: ae } = await supabase
+              .from("daily_allocations")
+              .select(
+                "collaborator_id, schedule_id, driver, collaborators(full_name, registration_number), works(clients(needs_transport_voucher))",
+              )
+              .in("schedule_id", ids);
+            if (ae) throw ae;
+            return data ?? [];
+          })()
+        : [];
+
+      const { data: appts, error: pe } = await supabase
+        .from("appointments")
+        .select("collaborator_id, scheduled_date, collaborators(full_name, registration_number)")
+        .eq("type", "integracao")
+        .eq("pays_transport_voucher", true)
+        .neq("status", "cancelado")
+        .gte("scheduled_date", start)
+        .lt("scheduled_date", end);
+      if (pe) throw pe;
 
       const map = new Map<string, { name: string; reg: string; days: Set<string>; driver: boolean }>();
-      for (const a of allocations ?? []) {
-        const c = (a as unknown as { collaborators: { full_name: string; registration_number: string } | null })
-          .collaborators;
-        const client = (a as unknown as { works: { clients: { needs_transport_voucher: boolean } | null } | null })
-          .works?.clients;
-        // Somente obras cujo cliente está marcado como "Necessita de Vale-Transporte".
-        if (!client?.needs_transport_voucher) continue;
-        const key = a.collaborator_id;
+      const entryFor = (key: string, c: { full_name: string; registration_number: string } | null) => {
         const entry = map.get(key) ?? {
           name: c?.full_name ?? "—",
           reg: c?.registration_number ?? "",
           days: new Set<string>(),
           driver: false,
         };
-        entry.days.add(a.schedule_id);
-        if (a.driver) entry.driver = true;
         map.set(key, entry);
+        return entry;
+      };
+      for (const a of allocations) {
+        const c = (a as unknown as { collaborators: { full_name: string; registration_number: string } | null })
+          .collaborators;
+        const client = (a as unknown as { works: { clients: { needs_transport_voucher: boolean } | null } | null })
+          .works?.clients;
+        // Somente obras cujo cliente está marcado como "Necessita de Vale-Transporte".
+        if (!client?.needs_transport_voucher) continue;
+        const entry = entryFor(a.collaborator_id, c);
+        entry.days.add(dateById.get(a.schedule_id) ?? a.schedule_id);
+        if (a.driver) entry.driver = true;
+      }
+      // Integrações agendadas com "Pagar VT" marcado.
+      for (const p of appts ?? []) {
+        const c = (p as unknown as { collaborators: { full_name: string; registration_number: string } | null })
+          .collaborators;
+        entryFor(p.collaborator_id, c).days.add(p.scheduled_date);
       }
       return [...map.values()]
         .map((e) => ({ name: e.name, reg: e.reg, days: e.days.size, driver: e.driver }))
