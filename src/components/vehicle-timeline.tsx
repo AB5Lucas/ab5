@@ -507,7 +507,7 @@ export function VehicleTimeline() {
             .or(`end_date.gte.${needsDate},and(end_date.is.null,date.eq.${needsDate})`),
           supabase
             .from("appointments")
-            .select("collaborator_id")
+            .select("collaborator_id, type, client_id")
             .eq("scheduled_date", needsDate)
             .neq("status", "cancelled"),
           supabase
@@ -525,6 +525,20 @@ export function VehicleTimeline() {
           if (cid) counts[cid] = (counts[cid] ?? 0) + 1;
         });
       }
+      // Integrações agendadas também viajam para o cliente e somam na necessidade.
+      const { data: integ } = await supabase
+        .from("appointments")
+        .select("collaborator_id, type, client_id")
+        .eq("scheduled_date", needsDate)
+        .neq("status", "cancelled");
+      const seen = new Set<string>();
+      (integ ?? []).forEach((a) => {
+        if (!a.client_id || !String(a.type).toLowerCase().startsWith("integ")) return;
+        const k = `${a.collaborator_id}|${a.client_id}`;
+        if (seen.has(k)) return;
+        seen.add(k);
+        counts[a.client_id] = (counts[a.client_id] ?? 0) + 1;
+      });
 
       const { data: vs } = await supabase
         .from("vehicle_schedules")
