@@ -40,6 +40,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { AppointmentDialog } from "@/components/appointment-dialog";
+import { useScheduled } from "@/hooks/use-scheduled";
 import { emptyToNull, normText, parseDate } from "@/lib/import-helpers";
 import { asoStatusOf, formatDateBR, todayISO, ASO_LABEL, type AsoStatus } from "@/lib/scheduling";
 
@@ -104,6 +105,7 @@ function expiryOf(examDate: string): string {
 
 function AsosPage() {
   const { canWrite, isAdmin } = useCurrentUser();
+  const scheduled = useScheduled("aso");
   const qc = useQueryClient();
   const today = todayISO();
 
@@ -406,7 +408,7 @@ function AsosPage() {
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono text-xs">{p?.registration_number ?? "—"}</TableCell>
-                  <TableCell className="font-medium">{p?.full_name ?? "—"}</TableCell>
+                  <TableCell className="font-medium">{p?.full_name ?? "—"}{scheduled.has(r.collaborator_id) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Agendado</Badge>}</TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                     {(p?.position_id && positionById.get(p.position_id)) || "—"}
                   </TableCell>
