@@ -26,6 +26,7 @@ export type Database = {
           notes: string | null
           original_date: string | null
           original_time: string | null
+          pays_transport_voucher: boolean
           reschedules: Json
           scheduled_date: string
           scheduled_time: string | null
@@ -46,6 +47,7 @@ export type Database = {
           notes?: string | null
           original_date?: string | null
           original_time?: string | null
+          pays_transport_voucher?: boolean
           reschedules?: Json
           scheduled_date: string
           scheduled_time?: string | null
@@ -66,6 +68,7 @@ export type Database = {
           notes?: string | null
           original_date?: string | null
           original_time?: string | null
+          pays_transport_voucher?: boolean
           reschedules?: Json
           scheduled_date?: string
           scheduled_time?: string | null
