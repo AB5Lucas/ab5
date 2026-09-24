@@ -99,6 +99,7 @@ type FormState = {
   training_id: string;
   client_id: string;
   notes: string;
+  pays_transport_voucher: boolean;
 };
 
 const emptyForm = (): FormState => ({
@@ -109,6 +110,7 @@ const emptyForm = (): FormState => ({
   training_id: "",
   client_id: "",
   notes: "",
+  pays_transport_voucher: false,
 });
 
 function AppointmentsPage() {
@@ -301,6 +303,7 @@ function AppointmentsPage() {
         training_id: form.type === "treinamento" ? form.training_id : null,
         client_id: form.type === "integracao" ? form.client_id : null,
         work_id: null,
+        pays_transport_voucher: form.type === "integracao" ? form.pays_transport_voucher : false,
         notes: form.notes.trim() || null,
       });
       if (error) throw error;
@@ -741,6 +744,13 @@ function AppointmentsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <label className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                  <span>Pagar VT para a pessoa</span>
+                  <Switch
+                    checked={form.pays_transport_voucher}
+                    onCheckedChange={(v) => set("pays_transport_voucher", v)}
+                  />
+                </label>
                 <div className="space-y-1.5">
                   <Label htmlFor="new-notes">Observação</Label>
                   <Textarea
