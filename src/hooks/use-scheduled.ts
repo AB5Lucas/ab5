@@ -18,7 +18,7 @@ export function useScheduled(type: "aso" | "treinamento" | "integracao") {
   (q.data ?? []).forEach((a) => {
     const t = String(a.type).toLowerCase();
     const match =
-      type === "aso" ? t.includes("aso") : type === "treinamento" ? t.startsWith("trein") || t === "training" : t.startsWith("integ");
+      type === "aso" ? t.includes("aso") : type === "treinamento" ? t.startsWith("trein") : t.startsWith("integ");
     if (!match) return;
     set.add(a.collaborator_id);
     if (a.training_id) set.add(`${a.collaborator_id}|${a.training_id}`);

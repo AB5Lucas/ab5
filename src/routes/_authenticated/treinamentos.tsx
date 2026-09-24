@@ -34,6 +34,7 @@ export const Route = createFileRoute("/_authenticated/treinamentos")({
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { AppointmentDialog } from "@/components/appointment-dialog";
+import { useScheduled } from "@/hooks/use-scheduled";
 import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate } from "@/lib/import-helpers";
 
 const RECORD_COLUMNS: ImportColumn[] = [
@@ -101,6 +102,7 @@ async function upsertTrainingRecord(values: {
 
 function TrainingsPage() {
   const { canWrite, isAdmin } = useCurrentUser();
+  const scheduled = useScheduled("treinamento");
   const qc = useQueryClient();
 
   const trainings = useQuery({
