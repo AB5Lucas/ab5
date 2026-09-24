@@ -34,7 +34,7 @@ export const Route = createFileRoute("/_authenticated/treinamentos")({
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { AppointmentDialog } from "@/components/appointment-dialog";
-import { useScheduled } from "@/hooks/use-scheduled";
+import { useInConference, useScheduled } from "@/hooks/use-scheduled";
 import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate } from "@/lib/import-helpers";
 
 const RECORD_COLUMNS: ImportColumn[] = [
@@ -103,6 +103,7 @@ async function upsertTrainingRecord(values: {
 function TrainingsPage() {
   const { canWrite, isAdmin } = useCurrentUser();
   const scheduled = useScheduled("treinamento");
+  const inConf = useInConference("treinamento");
   const qc = useQueryClient();
 
   const trainings = useQuery({
@@ -448,7 +449,7 @@ function TrainingsPage() {
                     const st = statusOf(r.expires_at);
                     return (
                       <TableRow key={r.id}>
-                        <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}{scheduled.has(`${r.collaborator_id}|${r.training_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Agendado</Badge>}</TableCell>
+                        <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}{scheduled.has(`${r.collaborator_id}|${r.training_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Agendado</Badge>}{inConf.has(`${r.collaborator_id}|${r.training_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Conferência</Badge>}</TableCell>
                         <TableCell>{nameById.get(r.training_id) ?? "—"}</TableCell>
                         <TableCell className="hidden md:table-cell">{formatDateBR(r.completed_at)}</TableCell>
                         <TableCell className="hidden md:table-cell">
