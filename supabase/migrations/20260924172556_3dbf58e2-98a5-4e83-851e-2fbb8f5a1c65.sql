@@ -1,0 +1,1 @@
+ALTER TABLE public.appointments ADD COLUMN pays_transport_voucher boolean NOT NULL DEFAULT false;
