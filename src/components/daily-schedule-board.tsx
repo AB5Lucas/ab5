@@ -538,7 +538,7 @@ export function DailyScheduleBoard({
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(c?.works ?? []).map((w) => (
+                  {(c?.works ?? []).filter((w) => w.active).map((w) => (
                     <SelectItem key={w.id} value={w.id}>
                       {w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}
                     </SelectItem>
