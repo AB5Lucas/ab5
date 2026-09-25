@@ -357,6 +357,41 @@ export function SchedulePlannerBoard({
 
   const entries = statusEntries.data ?? [];
 
+  const workVt = useQuery({
+    queryKey: ["work-vt", scheduleId],
+    enabled: !!scheduleId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", scheduleId!);
+      if (error) throw error;
+      return new Map((data ?? []).map((r) => [r.work_id, r.pays_vt]));
+    },
+  });
+  const workPaysVt = (workId: string) => workVt.data?.get(workId) ?? false;
+
+  const toggleWorkVt = useMutation({
+    mutationFn: async (workId: string) => {
+      const id = await ensureSchedule();
+      const { error } = await supabase
+        .from("schedule_work_vt")
+        .upsert({ schedule_id: id, work_id: workId, pays_vt: !workPaysVt(workId) }, { onConflict: "schedule_id,work_id" });
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => queryClient.invalidateQueries({ queryKey: ["work-vt", id] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleAllocVt = useMutation({
+    mutationFn: async ({ id, workId, current }: { id: string; workId: string; current: boolean }) => {
+      const next = !current;
+      const override = next === workPaysVt(workId) ? null : next;
+      const { error } = await supabase.from("daily_allocations").update({ vt_override: override }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   /** Agendamentos (ASO, treinamento, integração) marcados para esta data. */
   const appointments = useQuery({
     queryKey: ["appointments-day", date],
