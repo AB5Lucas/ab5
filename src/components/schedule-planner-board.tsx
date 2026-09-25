@@ -1318,10 +1318,7 @@ export function SchedulePlannerBoard({
 
           {/* Caixas de situação */}
           {[
-            ...STATUS_BOXES.filter((b) => b.key !== "integracao").map((b) => ({
-              key: b.key as string,
-              label: b.label as string,
-            })),
+            // Integrações (por cliente) logo após as obras
             ...[
               ...new Set([
                 ...[...appointmentsByBox.keys()].filter((k) => k.startsWith(INTEGRATION_PREFIX)),
@@ -1330,6 +1327,10 @@ export function SchedulePlannerBoard({
             ]
               .sort((a, b) => a.localeCompare(b, "pt-BR"))
               .map((key) => ({ key, label: boxLabelOf(key) })),
+            ...STATUS_BOXES.filter((b) => b.key !== "integracao").map((b) => ({
+              key: b.key as string,
+              label: b.label as string,
+            })),
           ]
             .filter(
               (b) =>
