@@ -1398,6 +1398,7 @@ export type Database = {
           driver_bonus: boolean
           driver_id: string | null
           extra_client_ids: string[]
+          extra_driver_ids: string[]
           extra_km: number
           id: string
           is_external: boolean
@@ -1414,6 +1415,7 @@ export type Database = {
           driver_bonus?: boolean
           driver_id?: string | null
           extra_client_ids?: string[]
+          extra_driver_ids?: string[]
           extra_km?: number
           id?: string
           is_external?: boolean
@@ -1430,6 +1432,7 @@ export type Database = {
           driver_bonus?: boolean
           driver_id?: string | null
           extra_client_ids?: string[]
+          extra_driver_ids?: string[]
           extra_km?: number
           id?: string
           is_external?: boolean
