@@ -45,8 +45,8 @@ export type VehicleScheduleRow = {
   is_maintenance: boolean;
   driver_bonus: boolean;
   km: number;
-  extra_client_ids?: string[] | null;
-  extra_km?: number | null;
+  extra_client_ids?: string[];
+  extra_km?: number;
 };
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -376,7 +376,7 @@ export function VehicleTimeline() {
       is_external: boolean;
       is_maintenance: boolean;
       driver_bonus: boolean;
-      extra_client_ids?: string[] | null;
+      extra_client_ids?: string[] | undefined;
     },
   ) {
     const special = f.is_external || f.is_maintenance;
