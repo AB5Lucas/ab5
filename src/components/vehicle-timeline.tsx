@@ -9,6 +9,8 @@ import {
   GripVertical,
   Search,
   Trash2,
+  Plus,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -43,6 +45,8 @@ export type VehicleScheduleRow = {
   is_maintenance: boolean;
   driver_bonus: boolean;
   km: number;
+  extra_client_ids?: string[];
+  extra_km?: number;
 };
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -95,6 +99,7 @@ type CellForm = {
   client_id: string;
   driver_bonus: boolean;
   repeat_until: string;
+  extras: string[];
 };
 
 const NONE = "__none__";
@@ -106,7 +111,7 @@ export function VehicleTimeline() {
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [driverSearch, setDriverSearch] = useState("");
   const [cell, setCell] = useState<{ vehicleId: string; date: string } | null>(null);
-  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "" });
+  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [] });
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
@@ -263,7 +268,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_km")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -365,9 +370,17 @@ export function VehicleTimeline() {
   function buildRow(
     vehicleId: string,
     date: string,
-    f: { driver_id: string | null; client_id: string | null; is_external: boolean; is_maintenance: boolean; driver_bonus: boolean },
+    f: {
+      driver_id: string | null;
+      client_id: string | null;
+      is_external: boolean;
+      is_maintenance: boolean;
+      driver_bonus: boolean;
+      extra_client_ids?: string[] | undefined;
+    },
   ) {
     const special = f.is_external || f.is_maintenance;
+    const extras = f.is_maintenance ? [] : (f.extra_client_ids ?? []).filter((x) => x && x !== NONE);
     return {
       schedule_date: date,
       vehicle_id: vehicleId,
@@ -377,6 +390,8 @@ export function VehicleTimeline() {
       is_maintenance: f.is_maintenance,
       driver_bonus: special ? false : f.driver_bonus,
       km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
+      extra_client_ids: extras,
+      extra_km: extras.reduce((s, id) => s + (clientKm.get(id) ?? 0), 0),
     };
   }
 
@@ -394,6 +409,7 @@ export function VehicleTimeline() {
         : NONE,
       driver_bonus: current?.driver_bonus ?? false,
       repeat_until: "",
+      extras: [...(current?.extra_client_ids ?? [])],
     });
     setDriverSearch("");
     setCell({ vehicleId, date });
@@ -413,6 +429,7 @@ export function VehicleTimeline() {
       is_external: isExternal,
       is_maintenance: isMaintenance,
       driver_bonus: form.driver_bonus,
+      extra_client_ids: form.extras,
     };
     const targets: string[] = [cell.date];
     if (form.repeat_until && form.repeat_until > cell.date) {
@@ -437,6 +454,7 @@ export function VehicleTimeline() {
           is_external: src.is_external,
           is_maintenance: src.is_maintenance ?? false,
           driver_bonus: src.driver_bonus,
+          extra_client_ids: src.extra_client_ids,
         }),
       ]);
     } catch {
@@ -466,6 +484,7 @@ export function VehicleTimeline() {
             is_external: s.is_external,
             is_maintenance: s.is_maintenance ?? false,
             driver_bonus: s.driver_bonus,
+            extra_client_ids: s.extra_client_ids,
           }),
         );
       }
@@ -740,13 +759,23 @@ export function VehicleTimeline() {
                                 {row.driver_id ? shortName(driverName.get(row.driver_id) ?? "—") : "Sem motorista"}
                               </span>
                             </div>
-                            <div className="truncate text-[10px] uppercase text-muted-foreground">
-                              {row.km}km{" "}
+                            <div
+                              className="truncate text-[10px] uppercase text-muted-foreground"
+                              title={
+                                (row.extra_client_ids ?? []).length
+                                  ? `+ ${(row.extra_client_ids ?? []).map((id) => clientName.get(id) ?? "—").join(", ")}`
+                                  : undefined
+                              }
+                            >
+                              {Number(row.km) + Number(row.extra_km ?? 0)}km{" "}
                               {row.is_maintenance
                                 ? "MANUTENÇÃO"
                                 : row.is_external
                                   ? "EXTERNO"
                                   : clientName.get(row.client_id ?? "") ?? "—"}
+                              {(row.extra_client_ids ?? []).length > 0 && (
+                                <span className="font-semibold text-primary"> +{row.extra_client_ids!.length}</span>
+                              )}
                             </div>
                           </>
                         ) : (
@@ -835,6 +864,50 @@ export function VehicleTimeline() {
                       : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
             </div>
+            {form.client_id !== MAINTENANCE_KEY && (
+              <div className="space-y-2">
+                <Label>Obras adicionais no dia</Label>
+                {form.extras.map((cid, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Select
+                      value={cid}
+                      onValueChange={(v) =>
+                        setForm((f) => ({ ...f, extras: f.extras.map((x, j) => (j === i ? v : x)) }))
+                      }
+                    >
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
+                      <SelectContent>
+                        {(clients.data ?? []).map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="w-14 text-right text-xs text-muted-foreground">
+                      {cid !== NONE ? `${clientKm.get(cid) ?? 0} km` : ""}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Remover obra adicional"
+                      onClick={() => setForm((f) => ({ ...f, extras: f.extras.filter((_, j) => j !== i) }))}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setForm((f) => ({ ...f, extras: [...f.extras, NONE] }))}
+                >
+                  <Plus className="h-4 w-4" /> Adicionar obra
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Para quando o carro atende mais de uma demanda no dia. O KM das obras adicionais é somado no
+                  relatório da frota; os prêmios continuam pela obra principal.
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between rounded-md border border-border p-3">
               <div>
                 <Label>Recebe Prêmio de Motorista</Label>
