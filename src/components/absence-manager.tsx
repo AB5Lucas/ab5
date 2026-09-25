@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -58,6 +58,7 @@ export function AbsenceManager({
   const [singleEnd, setSingleEnd] = useState("");
   const [extra, setExtra] = useState("");
   const [notes, setNotes] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const people = useQuery({
     queryKey: ["collaborators-min"],
@@ -99,6 +100,21 @@ export function AbsenceManager({
     setNotes("");
   };
 
+  const startEdit = (r: Row) => {
+    setEditingId(r.id);
+    setPerson(r.collaborator_id);
+    if (mode === "single") {
+      setStart(r.date ?? today());
+      setSingleEnd(r.end_date ?? "");
+    } else {
+      setStart(r.start_date ?? today());
+      setEnd(r.end_date ?? today());
+    }
+    setExtra((extraFieldName ? r[extraFieldName] : "") ?? "");
+    setNotes(r.notes ?? "");
+    setOpen(true);
+  };
+
   const add = useMutation({
     mutationFn: async () => {
       if (!person) throw new Error("Selecione o colaborador");
@@ -111,19 +127,24 @@ export function AbsenceManager({
       if (table === "vacations") base["status"] = "scheduled";
       base["notes"] = notes.trim() || null;
 
+      if (editingId && table === "vacations") delete base["status"];
       const payload: Record<string, unknown> =
         mode === "single"
           ? { ...base, collaborator_id: person, date: start, end_date: singleEnd || null }
           : { ...base, collaborator_id: person, start_date: start, end_date: end };
 
-      const { error } = await supabase.from(table).insert(payload as never);
+      const { error } = editingId
+        ? await supabase.from(table).update(payload as never).eq("id", editingId)
+        : await supabase.from(table).insert(payload as never);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Registro salvo.");
+      toast.success(editingId ? "Registro atualizado." : "Registro salvo.");
       setOpen(false);
       reset();
+      setEditingId(null);
       qc.invalidateQueries({ queryKey: [table] });
+      qc.invalidateQueries();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -158,7 +179,7 @@ export function AbsenceManager({
         description={description}
         actions={
           canWrite && (
-            <Button size="sm" onClick={() => { reset(); setOpen(true); }}>
+            <Button size="sm" onClick={() => { reset(); setEditingId(null); setOpen(true); }}>
               <Plus className="h-4 w-4" /> {addLabel}
             </Button>
           )
@@ -222,7 +243,12 @@ export function AbsenceManager({
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden max-w-[220px] truncate lg:table-cell">{r.notes || "—"}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="whitespace-nowrap text-right">
+                    {canWrite && (
+                      <Button variant="ghost" size="icon" aria-label="Editar registro" onClick={() => startEdit(r)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
                     {isAdmin && (
                       <Button variant="ghost" size="icon" aria-label="Remover registro" onClick={() => remove.mutate(r.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -239,7 +265,7 @@ export function AbsenceManager({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{addLabel}</DialogTitle>
+            <DialogTitle>{editingId ? `Editar ${title.toLowerCase()}` : addLabel}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
             <div className="space-y-1">
