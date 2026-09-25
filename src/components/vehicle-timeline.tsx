@@ -482,6 +482,7 @@ export function VehicleTimeline() {
             is_external: s.is_external,
             is_maintenance: s.is_maintenance ?? false,
             driver_bonus: s.driver_bonus,
+            extra_client_ids: s.extra_client_ids,
           }),
         );
       }
