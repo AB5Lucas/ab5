@@ -1130,7 +1130,7 @@ export function SchedulePlannerBoard({
         <p className="text-sm text-muted-foreground">Carregando programação...</p>
       )}
 
-      <div className="grid gap-2 lg:grid-cols-[1fr_209px]">
+      <div className="grid gap-2 lg:grid-cols-[1fr_240px]">
         {/* Obras */}
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {shownWorks.length === 0 && !ctx.isLoading && (
