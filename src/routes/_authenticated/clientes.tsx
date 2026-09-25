@@ -333,7 +333,7 @@ function ClientsPage() {
                     {c.needs_company_transport && (
                       <Badge className="text-[10px]">Transporte da empresa</Badge>
                     )}
-                    {c.needs_transport_voucher && (
+                    {false && c.needs_transport_voucher && (
                       <Badge variant="secondary" className="text-[10px]">Vale-transporte</Badge>
                     )}
                   </div>
@@ -446,29 +446,14 @@ function ClientsPage() {
               <div>
                 <Label htmlFor="needs-company-transport">Necessita de transporte da empresa?</Label>
                 <p className="text-xs text-muted-foreground">
-                  Gera necessidade de vagas na frota. Ao ligar, o vale-transporte é desligado automaticamente.
+                  Gera necessidade de vagas na frota.
                 </p>
               </div>
               <Switch
                 id="needs-company-transport"
                 checked={form.needs_company_transport}
                 onCheckedChange={(v) =>
-                  setForm((f) => ({ ...f, needs_company_transport: v, needs_transport_voucher: v ? false : f.needs_transport_voucher }))
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 sm:col-span-2">
-              <div>
-                <Label htmlFor="needs-transport-voucher">Necessita de Vale-Transporte?</Label>
-                <p className="text-xs text-muted-foreground">
-                  Os colaboradores escalados entram no vale-transporte. Ao ligar, o transporte da empresa é desligado.
-                </p>
-              </div>
-              <Switch
-                id="needs-transport-voucher"
-                checked={form.needs_transport_voucher}
-                onCheckedChange={(v) =>
-                  setForm((f) => ({ ...f, needs_transport_voucher: v, needs_company_transport: v ? false : f.needs_company_transport }))
+                  setForm((f) => ({ ...f, needs_company_transport: v, needs_transport_voucher: false }))
                 }
               />
             </div>
