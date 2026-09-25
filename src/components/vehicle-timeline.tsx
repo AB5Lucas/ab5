@@ -32,6 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export const EXTERNAL_KEY = "__external__";
 export const MAINTENANCE_KEY = "__maintenance__";
+export const SUZANO_LOCAL_KEY = "__suzano_local__";
+export const KM_SUZANO_LOCAL = 6;
 export const KM_WORK = 50;
 export const KM_EXTERNAL = 100;
 
@@ -48,6 +50,8 @@ export type VehicleScheduleRow = {
   extra_client_ids?: string[];
   extra_driver_ids?: string[];
   extra_km?: number;
+  trips?: number;
+  is_suzano_local?: boolean;
 };
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -102,6 +106,7 @@ type CellForm = {
   repeat_until: string;
   extras: string[];
   extraDrivers: string[];
+  trips: string;
 };
 
 const NONE = "__none__";
@@ -113,7 +118,7 @@ export function VehicleTimeline() {
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [driverSearch, setDriverSearch] = useState("");
   const [cell, setCell] = useState<{ vehicleId: string; date: string } | null>(null);
-  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [] });
+  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], trips: "1" });
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
@@ -270,7 +275,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_km")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_km, trips, is_suzano_local")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -372,13 +377,28 @@ export function VehicleTimeline() {
   function extraKm(id: string) {
     if (id === EXTERNAL_KEY) return KM_EXTERNAL;
     if (id === MAINTENANCE_KEY) return 0;
+    if (id === SUZANO_LOCAL_KEY) return KM_SUZANO_LOCAL;
     return clientKm.get(id) ?? 0;
   }
 
   function extraName(id: string) {
     if (id === EXTERNAL_KEY) return "EXTERNO";
     if (id === MAINTENANCE_KEY) return "MANUTENÇÃO";
+    if (id === SUZANO_LOCAL_KEY) return "SUZANO LOCAL";
     return clientName.get(id) ?? "—";
+  }
+
+  function clientOptions() {
+    const list = clients.data ?? [];
+    let idx = list.findIndex((c) => /^suzano$/i.test((c.name ?? "").trim()));
+    if (idx < 0) idx = list.findIndex((c) => /suzano/i.test(c.name ?? ""));
+    const out: React.ReactNode[] = [];
+    list.forEach((c, i) => {
+      out.push(<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>);
+      if (i === idx) out.push(<SelectItem key={SUZANO_LOCAL_KEY} value={SUZANO_LOCAL_KEY}>SUZANO LOCAL</SelectItem>);
+    });
+    if (idx < 0) out.push(<SelectItem key={SUZANO_LOCAL_KEY} value={SUZANO_LOCAL_KEY}>SUZANO LOCAL</SelectItem>);
+    return out;
   }
 
   function buildRow(
@@ -392,9 +412,11 @@ export function VehicleTimeline() {
       driver_bonus: boolean;
       extra_client_ids?: string[] | undefined;
       extra_driver_ids?: string[] | undefined;
+      trips?: number | undefined;
+      is_suzano_local?: boolean | undefined;
     },
   ) {
-    const special = f.is_external || f.is_maintenance;
+    const special = f.is_external || f.is_maintenance || !!f.is_suzano_local;
     const pairs = (f.extra_client_ids ?? [])
           .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "" }))
           .filter((p) => p.c && p.c !== NONE);
@@ -406,8 +428,10 @@ export function VehicleTimeline() {
       client_id: special ? null : f.client_id,
       is_external: f.is_external,
       is_maintenance: f.is_maintenance,
-      driver_bonus: special ? false : f.driver_bonus,
-      km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
+      driver_bonus: f.is_external || f.is_maintenance ? false : f.driver_bonus,
+      trips: Math.max(1, Math.floor(Number(f.trips ?? 1)) || 1),
+      is_suzano_local: !!f.is_suzano_local,
+      km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : f.is_suzano_local ? KM_SUZANO_LOCAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
       extra_client_ids: extras,
       extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
       extra_km: extras.reduce((s, id) => s + extraKm(id), 0),
@@ -424,12 +448,15 @@ export function VehicleTimeline() {
           ? MAINTENANCE_KEY
           : current.is_external
             ? EXTERNAL_KEY
-            : current.client_id ?? NONE
+            : current.is_suzano_local
+              ? SUZANO_LOCAL_KEY
+              : current.client_id ?? NONE
         : NONE,
       driver_bonus: current?.driver_bonus ?? false,
       repeat_until: "",
       extras: [...(current?.extra_client_ids ?? [])],
       extraDrivers: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_driver_ids?.[i] || NONE),
+      trips: String(current?.trips ?? 1),
     });
     setDriverSearch("");
     setCell({ vehicleId, date });
@@ -443,9 +470,12 @@ export function VehicleTimeline() {
     }
     const isExternal = form.client_id === EXTERNAL_KEY;
     const isMaintenance = form.client_id === MAINTENANCE_KEY;
+    const isLocal = form.client_id === SUZANO_LOCAL_KEY;
     const base = {
       driver_id: form.driver_id === NONE ? null : form.driver_id,
-      client_id: isExternal || isMaintenance ? null : form.client_id,
+      client_id: isExternal || isMaintenance || isLocal ? null : form.client_id,
+      is_suzano_local: isLocal,
+      trips: Number(form.trips) || 1,
       is_external: isExternal,
       is_maintenance: isMaintenance,
       driver_bonus: form.driver_bonus,
@@ -477,6 +507,8 @@ export function VehicleTimeline() {
           driver_bonus: src.driver_bonus,
           extra_client_ids: src.extra_client_ids,
           extra_driver_ids: src.extra_driver_ids,
+          trips: src.trips,
+          is_suzano_local: src.is_suzano_local,
         }),
       ]);
     } catch {
@@ -508,6 +540,8 @@ export function VehicleTimeline() {
             driver_bonus: s.driver_bonus,
             extra_client_ids: s.extra_client_ids,
             extra_driver_ids: s.extra_driver_ids,
+            trips: s.trips,
+            is_suzano_local: s.is_suzano_local,
           }),
         );
       }
@@ -584,7 +618,7 @@ export function VehicleTimeline() {
 
       const { data: vs } = await supabase
         .from("vehicle_schedules")
-        .select("client_id, vehicle_id")
+        .select("client_id, vehicle_id, trips")
         .eq("schedule_date", needsDate);
       return { counts, vehicleRows: vs ?? [] };
     },
@@ -603,11 +637,11 @@ export function VehicleTimeline() {
       .map((c) => {
         const people = counts[c.id] ?? 0;
         const vehicleRows = (needs.data?.vehicleRows ?? []).filter((v) => v.client_id === c.id);
-        const trips = Math.max(1, Number(c.trips_per_day ?? 1) || 1);
         // Em clientes com mais de uma viagem o mesmo motorista retorna: a 1ª viagem leva a lotação
         // cheia e as seguintes uma pessoa a menos (ex.: Suzano, 6 e depois 5).
         const seats = vehicleRows.reduce((s, v) => {
           const cap = capacityOf.get(v.vehicle_id) ?? 0;
+          const trips = Math.max(1, Number(v.trips ?? 1) || 1);
           return s + cap + Math.max(0, cap - 1) * (trips - 1);
         }, 0);
         return { id: c.id, name: c.name, people, vehicles: vehicleRows.length, seats };
@@ -795,6 +829,8 @@ export function VehicleTimeline() {
                                 ? "MANUTENÇÃO"
                                 : row.is_external
                                   ? "EXTERNO"
+                                  : row.is_suzano_local
+                                    ? "SUZANO LOCAL"
                                   : clientName.get(row.client_id ?? "") ?? "—"}
                               {(row.extra_client_ids ?? []).length > 0 && (
                                 <span className="font-semibold text-primary"> +{row.extra_client_ids!.length}</span>
@@ -870,9 +906,7 @@ export function VehicleTimeline() {
               <Select value={form.client_id} onValueChange={(v) => setForm((f) => ({ ...f, client_id: v }))}>
                 <SelectTrigger><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
                 <SelectContent>
-                  {(clients.data ?? []).map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
+                  {clientOptions()}
                   <SelectItem value={EXTERNAL_KEY}>EXTERNO</SelectItem>
                   <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
                 </SelectContent>
@@ -880,12 +914,30 @@ export function VehicleTimeline() {
               <p className="text-xs text-muted-foreground">
                 {form.client_id === MAINTENANCE_KEY
                   ? "Manutenção: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem."
+                  : form.client_id === SUZANO_LOCAL_KEY
+                    ? `Suzano Local: ${KM_SUZANO_LOCAL} km de ida por viagem (${KM_SUZANO_LOCAL * 2} km ida e volta).`
                   : form.client_id === EXTERNAL_KEY
                     ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
                     : form.client_id && form.client_id !== NONE
                       ? `${clientKm.get(form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
                       : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+              <div>
+                <Label>Viagens no dia</Label>
+                <p className="text-xs text-muted-foreground">
+                  Na 1ª viagem vai a lotação cheia; nas seguintes, uma pessoa a menos (ex.: Suzano, 6 e 5).
+                </p>
+              </div>
+              <Input
+                type="number"
+                min={1}
+                step="1"
+                className="w-20"
+                value={form.trips}
+                onChange={(e) => setForm((f) => ({ ...f, trips: e.target.value }))}
+              />
             </div>
             {(
               <div className="space-y-2">
@@ -913,9 +965,7 @@ export function VehicleTimeline() {
                     >
                       <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
                       <SelectContent>
-                        {(clients.data ?? []).map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                        ))}
+                        {clientOptions()}
                         <SelectItem value={EXTERNAL_KEY}>EXTERNO</SelectItem>
                         <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
                       </SelectContent>
