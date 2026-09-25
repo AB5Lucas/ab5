@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDateBR } from "@/lib/scheduling";
+import { expiryFrom, formatDateBR } from "@/lib/scheduling";
 import { normText } from "@/lib/import-helpers";
 import { APPOINTMENT_TYPE_LABEL } from "@/components/appointment-dialog";
 import type { AppointmentType } from "@/components/appointment-dialog";
