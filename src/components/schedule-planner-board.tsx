@@ -377,7 +377,7 @@ export function SchedulePlannerBoard({
       if (error) throw error;
       return id;
     },
-    onSuccess: (id) => queryClient.invalidateQueries({ queryKey: ["work-vt", id] }),
+    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["work-vt", id] }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -388,7 +388,7 @@ export function SchedulePlannerBoard({
       const { error } = await supabase.from("daily_allocations").update({ vt_override: override }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -877,6 +877,7 @@ export function SchedulePlannerBoard({
           position_id: r.position_id,
           vehicle_id: r.vehicle_id,
           driver: r.driver,
+          vt_override: r.vt_override,
           source: "copied_previous_day" as const,
           confirmation_status: "pending" as const,
           has_pending_requirement: checkRequirements(c, r.work_id, r.collaborator_id, date).length > 0,
@@ -886,6 +887,13 @@ export function SchedulePlannerBoard({
       const { error } = await supabase.from("daily_allocations").insert(inserts);
       if (error) throw error;
       await supabase.from("daily_schedules").update({ copied_from_schedule_id: prevSchedule.id }).eq("id", id);
+      const { data: prevVt } = await supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", prevSchedule.id);
+      if (prevVt && prevVt.length) {
+        const current = workVt.data ?? new Map<string, boolean>();
+        const vtRows = prevVt.filter((v) => !current.has(v.work_id)).map((v) => ({ schedule_id: id, work_id: v.work_id, pays_vt: v.pays_vt }));
+        if (vtRows.length) await supabase.from("schedule_work_vt").upsert(vtRows, { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
+      }
+      qc.invalidateQueries({ queryKey: ["work-vt", id] });
       return { count: inserts.length, id };
     },
     onSuccess: (r) => {
@@ -1121,6 +1129,14 @@ export function SchedulePlannerBoard({
                       <Users className="mr-0.5 h-2.5 w-2.5" />
                       {workRows.length}
                     </Badge>
+                    <button
+                      type="button"
+                      disabled={!editable}
+                      title={workPaysVt(w.id) ? "VT: todos recebem (clique para desligar)" : "VT: ninguém recebe (clique para ligar)"}
+                      aria-label="Alternar VT da obra"
+                      onClick={(e) => { e.stopPropagation(); toggleWorkVt.mutate(w.id); }}
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${workPaysVt(w.id) ? "bg-success" : "bg-muted-foreground/40"}`}
+                    />
                   </div>
                   <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
                     <MapPin className="h-2.5 w-2.5" />
@@ -1188,6 +1204,19 @@ export function SchedulePlannerBoard({
                             <X className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         )}
+                        {(() => {
+                          const vt = r.vt_override ?? workPaysVt(w.id);
+                          return (
+                            <button
+                              type="button"
+                              disabled={!editable}
+                              title={`${vt ? "Recebe VT" : "Sem VT"}${r.vt_override !== null && r.vt_override !== undefined ? " (exceção)" : ""}`}
+                              aria-label="Alternar VT do colaborador"
+                              onClick={(e) => { e.stopPropagation(); toggleAllocVt.mutate({ id: r.id, workId: w.id, current: vt }); }}
+                              className={`h-2 w-2 shrink-0 rounded-full ${vt ? "bg-success" : "bg-muted-foreground/40"} ${r.vt_override !== null && r.vt_override !== undefined ? "ring-1 ring-foreground/60" : ""}`}
+                            />
+                          );
+                        })()}
                       </li>
                     );
                   })}
