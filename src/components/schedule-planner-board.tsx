@@ -48,11 +48,6 @@ import {
 import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Rascunho",
-  in_progress: "Em andamento",
-  finalized: "Finalizada",
-};
 
 type Level = "ok" | "warn" | "block" | "busy";
 
@@ -324,8 +319,7 @@ export function SchedulePlannerBoard({
   });
 
   const scheduleId = schedule.data?.id ?? null;
-  const finalized = schedule.data?.status === "finalized";
-  const editable = canWrite && !finalized;
+  const editable = canWrite;
 
   const allocations = useQuery({
     queryKey: ["allocations", scheduleId],
@@ -957,9 +951,6 @@ export function SchedulePlannerBoard({
         </div>
 
         <div className="order-3 flex basis-full flex-wrap items-center gap-2 text-xs">
-          <Badge variant={finalized ? "default" : "secondary"}>
-            {schedule.data ? STATUS_LABEL[schedule.data.status] : "Não iniciada"}
-          </Badge>
           <Badge variant="outline">Colaboradores: {people.length}</Badge>
           <Badge variant="outline">Alocados: {allocatedCount}</Badge>
           <Badge variant="outline">Não alocados: {Math.max(people.length - allocatedCount, 0)}</Badge>

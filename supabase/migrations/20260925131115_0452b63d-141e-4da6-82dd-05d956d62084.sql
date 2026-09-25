@@ -1,0 +1,2 @@
+UPDATE public.daily_schedules SET status = 'in_progress', finalized_at = NULL WHERE status = 'finalized';
+UPDATE public.daily_allocations SET vt_override = false WHERE id = '5d1f4722-e14a-4f06-91f7-a5f3d536fdd6';
