@@ -154,13 +154,23 @@ function VoucherPage() {
             const { data, error: ae } = await supabase
               .from("daily_allocations")
               .select(
-                "collaborator_id, schedule_id, driver, collaborators(full_name, registration_number), works(clients(needs_transport_voucher))",
+                "collaborator_id, schedule_id, work_id, driver, vt_override, collaborators(full_name, registration_number)",
               )
               .in("schedule_id", ids);
             if (ae) throw ae;
             return data ?? [];
           })()
         : [];
+
+      const vtMap = new Map<string, boolean>();
+      if (ids.length) {
+        const { data: vts, error: ve } = await supabase
+          .from("schedule_work_vt")
+          .select("schedule_id, work_id, pays_vt")
+          .in("schedule_id", ids);
+        if (ve) throw ve;
+        for (const v of vts ?? []) vtMap.set(`${v.schedule_id}|${v.work_id}`, v.pays_vt);
+      }
 
       const { data: appts, error: pe } = await supabase
         .from("appointments")
@@ -186,10 +196,9 @@ function VoucherPage() {
       for (const a of allocations) {
         const c = (a as unknown as { collaborators: { full_name: string; registration_number: string } | null })
           .collaborators;
-        const client = (a as unknown as { works: { clients: { needs_transport_voucher: boolean } | null } | null })
-          .works?.clients;
-        // Somente obras cujo cliente está marcado como "Necessita de Vale-Transporte".
-        if (!client?.needs_transport_voucher) continue;
+        // Regra: status de VT da obra no dia; exceção individual do colaborador prevalece.
+        const pays = a.vt_override ?? vtMap.get(`${a.schedule_id}|${a.work_id}`) ?? false;
+        if (!pays) continue;
         const entry = entryFor(a.collaborator_id, c);
         entry.days.add(dateById.get(a.schedule_id) ?? a.schedule_id);
         if (a.driver) entry.driver = true;
@@ -243,7 +252,7 @@ function VoucherPage() {
     <div className="space-y-6">
       <PageHeader
         title="Vale-Transporte"
-        description='Apuração mensal dos colaboradores escalados em clientes marcados com "Necessita de Vale-Transporte".'
+        description='Apuração mensal dos colaboradores escalados em obras com VT ligado na programação diária.'
         actions={
           canWrite ? (
             <Button onClick={openNew}>
