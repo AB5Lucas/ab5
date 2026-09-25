@@ -141,7 +141,7 @@ function DriverBonusPage() {
       const { data, error } = await supabase
         .from("vehicle_schedules")
         .select(
-          "driver_id, schedule_date, is_external, driver_bonus, km, collaborators(full_name, registration_number), clients(has_toll, toll_amount, trips_per_day)",
+          "driver_id, schedule_date, is_external, driver_bonus, km, trips, collaborators(full_name, registration_number), clients(has_toll, toll_amount, trips_per_day)",
         )
         .gte("schedule_date", start)
         .lt("schedule_date", end)
@@ -166,7 +166,7 @@ function DriverBonusPage() {
             reg: row.collaborators?.registration_number ?? "",
             days: new Map<string, { km: number; toll: number }>(),
           };
-        const trips = Math.max(1, Number(row.clients?.trips_per_day ?? 1) || 1);
+        const trips = Math.max(1, Number((row as { trips?: number }).trips ?? 1) || 1);
         // O pedágio cadastrado é de ida: ida e volta em cada viagem do dia.
         const toll = row.clients?.has_toll ? (Number(row.clients.toll_amount ?? 0) || 0) * 2 * trips : 0;
         const prev = entry.days.get(row.schedule_date) ?? { km: 0, toll: 0 };

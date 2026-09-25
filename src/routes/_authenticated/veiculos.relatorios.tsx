@@ -51,7 +51,7 @@ function FleetReportsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("vehicle_id, schedule_date, is_external, km, extra_km")
+        .select("vehicle_id, schedule_date, is_external, km, extra_km, trips")
         .gte("schedule_date", start)
         .lte("schedule_date", end);
       if (error) throw error;
@@ -64,7 +64,7 @@ function FleetReportsPage() {
     const monthPrefix = today().slice(0, 7);
     for (const r of report.data ?? []) {
       const entry = totals.get(r.vehicle_id) ?? { work: 0, external: 0, today: 0, month: 0 };
-      const value = (Number(r.km ?? 0) + Number(r.extra_km ?? 0)) * 2; // ida e volta, somando obras adicionais
+      const value = (Number(r.km ?? 0) * Math.max(1, Number(r.trips ?? 1) || 1) + Number(r.extra_km ?? 0)) * 2; // ida e volta, somando obras adicionais
       if (r.is_external) entry.external += value;
       else entry.work += value;
       if (r.schedule_date === today()) entry.today += value;

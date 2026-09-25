@@ -403,19 +403,6 @@ function ClientsPage() {
               />
               <p className="text-xs text-muted-foreground">Somente a ida; o sistema considera o dobro (ida e volta).</p>
             </div>
-            <div className="space-y-1">
-              <Label>Viagens por dia</Label>
-              <Input
-                type="number"
-                min={1}
-                step="1"
-                value={form.trips_per_day}
-                onChange={(e) => set("trips_per_day", e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Ex.: Suzano = 2 viagens com o mesmo motorista (6 pessoas na 1ª e 5 na 2ª).
-              </p>
-            </div>
             <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 sm:col-span-2">
               <div>
                 <Label htmlFor="has-toll">Tem pedágio?</Label>

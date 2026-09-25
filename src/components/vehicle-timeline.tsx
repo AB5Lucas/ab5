@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -392,7 +392,7 @@ export function VehicleTimeline() {
     const list = clients.data ?? [];
     let idx = list.findIndex((c) => /^suzano$/i.test((c.name ?? "").trim()));
     if (idx < 0) idx = list.findIndex((c) => /suzano/i.test(c.name ?? ""));
-    const out: React.ReactNode[] = [];
+    const out: ReactNode[] = [];
     list.forEach((c, i) => {
       out.push(<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>);
       if (i === idx) out.push(<SelectItem key={SUZANO_LOCAL_KEY} value={SUZANO_LOCAL_KEY}>SUZANO LOCAL</SelectItem>);
