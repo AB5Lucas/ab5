@@ -42,7 +42,7 @@ import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/im
 import { AppointmentDialog } from "@/components/appointment-dialog";
 import { useInConference, useScheduled } from "@/hooks/use-scheduled";
 import { createNameMatcher, emptyToNull, normText, parseDate } from "@/lib/import-helpers";
-import { addDays, formatDateBR, todayISO, INTEGRATION_WARN_DAYS } from "@/lib/scheduling";
+import { addDays, expiryFrom, formatDateBR, todayISO, INTEGRATION_WARN_DAYS } from "@/lib/scheduling";
 
 export const Route = createFileRoute("/_authenticated/obras/integracoes")({
   head: () => ({
@@ -95,7 +95,7 @@ const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "matricula", required: true, hint: "Identifica o colaborador já cadastrado.", example: "1024" },
   { key: "cliente", required: true, hint: "Nome do cliente já cadastrado.", example: "Cristália" },
   { key: "data_integracao", required: true, hint: "AAAA-MM-DD ou DD/MM/AAAA.", example: "2026-01-15" },
-  { key: "validade", hint: "Data de vencimento. Em branco = sem vencimento.", example: "2027-01-15" },
+  { key: "validade", hint: "Data de vencimento. Em branco = calculada automaticamente (1 ano − 1 dia).", example: "2027-01-15" },
   { key: "observacoes" },
 ];
 
@@ -256,7 +256,7 @@ function IntegrationsPage() {
         collaborator_id: form.collaborator_id,
         client_id: form.client_id,
         integration_date: form.integration_date,
-        expires_at: form.expires_at || null,
+        expires_at: form.expires_at || (form.integration_date ? expiryFrom(form.integration_date, 12) : null),
         notes: form.notes.trim() || null,
       };
       if (editing) {
@@ -354,7 +354,7 @@ function IntegrationsPage() {
         errors.push(`Linha ${line}: data da integração inválida.`);
         continue;
       }
-      const expires = r["validade"] ? parseDate(r["validade"]!) : null;
+      const expires = r["validade"] ? parseDate(r["validade"]!) : date ? expiryFrom(date, 12) : null;
       if (r["validade"] && !expires) {
         errors.push(`Linha ${line}: data de validade inválida.`);
         continue;
@@ -580,7 +580,10 @@ function IntegrationsPage() {
               <Input
                 type="date"
                 value={form.integration_date}
-                onChange={(e) => set("integration_date", e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setForm((f) => ({ ...f, integration_date: v, expires_at: v ? expiryFrom(v, 12) : f.expires_at }));
+                }}
               />
             </div>
             <div className="space-y-1">
