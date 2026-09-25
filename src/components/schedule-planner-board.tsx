@@ -492,7 +492,11 @@ export function SchedulePlannerBoard({
 
   const rows = allocations.data ?? [];
   const c = ctx.data;
-  const works = c?.works ?? [];
+  /** Serviços disponíveis + inativos que tiveram gente escalada nesta data. */
+  const works = useMemo(() => {
+    const allocated = new Set(rows.map((r) => r.work_id));
+    return (c?.works ?? []).filter((w) => w.active || allocated.has(w.id));
+  }, [c, rows]);
   /** Clientes com serviços ativos (lista do botão "Clientes"). */
   const clientOptions = useMemo(() => {
     const m = new Map<string, string>();
