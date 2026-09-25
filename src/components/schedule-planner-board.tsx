@@ -67,16 +67,18 @@ type DragPayload = { collaboratorId: string; allocationId: string | null; entryI
 
 /** Caixas de situação que podem ser exibidas junto aos cards de obra. */
 const STATUS_BOXES = [
-  { key: "folga", label: "FOLGAS" },
+  // Compromissos logo após as obras
+  { key: "integracao", label: "INTEGRAÇÃO" },
   { key: "aso", label: "ASO" },
-  { key: "medico", label: "MÉDICO" },
+  { key: "treinamento", label: "TREINAMENTO" },
+  // Depois ausências e situações
+  { key: "folga", label: "FOLGAS" },
   { key: "atestado", label: "ATESTADO" },
+  { key: "ferias", label: "FÉRIAS" },
+  { key: "medico", label: "MÉDICO" },
   { key: "afastado", label: "AFASTADO" },
   { key: "falta", label: "FALTA" },
   { key: "interjornada", label: "INTERJORNADA" },
-  { key: "treinamento", label: "TREINAMENTO" },
-  { key: "ferias", label: "FÉRIAS" },
-  { key: "integracao", label: "INTEGRAÇÃO" },
 ] as const;
 
 const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
@@ -1316,10 +1318,7 @@ export function SchedulePlannerBoard({
 
           {/* Caixas de situação */}
           {[
-            ...STATUS_BOXES.filter((b) => b.key !== "integracao").map((b) => ({
-              key: b.key as string,
-              label: b.label as string,
-            })),
+            // Integrações (por cliente) logo após as obras
             ...[
               ...new Set([
                 ...[...appointmentsByBox.keys()].filter((k) => k.startsWith(INTEGRATION_PREFIX)),
@@ -1328,6 +1327,10 @@ export function SchedulePlannerBoard({
             ]
               .sort((a, b) => a.localeCompare(b, "pt-BR"))
               .map((key) => ({ key, label: boxLabelOf(key) })),
+            ...STATUS_BOXES.filter((b) => b.key !== "integracao").map((b) => ({
+              key: b.key as string,
+              label: b.label as string,
+            })),
           ]
             .filter(
               (b) =>
