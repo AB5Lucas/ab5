@@ -454,6 +454,21 @@ export function SchedulePlannerBoard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const personDot = (key: string, collaboratorId: string) => {
+    const on = personPaysVt(key, collaboratorId);
+    const exception = boxVt.data?.person.has(`${key}|${collaboratorId}`) ?? false;
+    const label = key === "aso" ? (on ? "2 VTs (ASO + adicional)" : "1 VT (ASO)") : on ? "Recebe VT" : "Sem VT";
+    return (
+      <button
+        type="button"
+        disabled={!editable}
+        title={`${label}${exception ? " (exceção)" : ""}`}
+        onClick={(e) => { e.stopPropagation(); togglePersonVt.mutate({ key, collaboratorId }); }}
+        className={`h-2 w-2 shrink-0 rounded-full ${on ? "bg-success" : "bg-muted-foreground/40"} ${exception ? "ring-1 ring-foreground/60" : ""}`}
+      />
+    );
+  };
+
   /** Agendamentos (ASO, treinamento, integração) marcados para esta data. */
   const appointments = useQuery({
     queryKey: ["appointments-day", date],
