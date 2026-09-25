@@ -369,6 +369,18 @@ export function VehicleTimeline() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  function extraKm(id: string) {
+    if (id === EXTERNAL_KEY) return KM_EXTERNAL;
+    if (id === MAINTENANCE_KEY) return 0;
+    return clientKm.get(id) ?? 0;
+  }
+
+  function extraName(id: string) {
+    if (id === EXTERNAL_KEY) return "EXTERNO";
+    if (id === MAINTENANCE_KEY) return "MANUTENÇÃO";
+    return clientName.get(id) ?? "—";
+  }
+
   function buildRow(
     vehicleId: string,
     date: string,
@@ -383,9 +395,7 @@ export function VehicleTimeline() {
     },
   ) {
     const special = f.is_external || f.is_maintenance;
-    const pairs = f.is_maintenance
-      ? []
-      : (f.extra_client_ids ?? [])
+    const pairs = (f.extra_client_ids ?? [])
           .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "" }))
           .filter((p) => p.c && p.c !== NONE);
     const extras = pairs.map((p) => p.c);
@@ -400,7 +410,7 @@ export function VehicleTimeline() {
       km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
       extra_client_ids: extras,
       extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
-      extra_km: extras.reduce((s, id) => s + (clientKm.get(id) ?? 0), 0),
+      extra_km: extras.reduce((s, id) => s + extraKm(id), 0),
     };
   }
 
@@ -776,7 +786,7 @@ export function VehicleTimeline() {
                               className="truncate text-[10px] uppercase text-muted-foreground"
                               title={
                                 (row.extra_client_ids ?? []).length
-                                  ? `+ ${(row.extra_client_ids ?? []).map((id, i) => { const dr = row.extra_driver_ids?.[i]; return `${clientName.get(id) ?? "—"}${dr ? ` (${driverName.get(dr) ?? "—"})` : ""}`; }).join(", ")}`
+                                  ? `+ ${(row.extra_client_ids ?? []).map((id, i) => { const dr = row.extra_driver_ids?.[i]; return `${extraName(id)}${dr ? ` (${driverName.get(dr) ?? "—"})` : ""}`; }).join(", ")}`
                                   : undefined
                               }
                             >
@@ -877,9 +887,21 @@ export function VehicleTimeline() {
                       : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
             </div>
-            {form.client_id !== MAINTENANCE_KEY && (
+            {(
               <div className="space-y-2">
-                <Label>Obras adicionais no dia</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Obras adicionais no dia</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setForm((f) => ({ ...f, extras: [...f.extras, NONE], extraDrivers: [...f.extraDrivers, f.driver_id] }))}
+                  >
+                    <Plus className="h-4 w-4" /> Adicionar obra
+                  </Button>
+                </div>
+                {form.extras.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhuma obra adicional.</p>
+                )}
                 {form.extras.map((cid, i) => (
                   <div key={i} className="space-y-1 rounded-md border border-border p-2">
                   <div className="flex items-center gap-2">
@@ -894,10 +916,12 @@ export function VehicleTimeline() {
                         {(clients.data ?? []).map((c) => (
                           <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                         ))}
+                        <SelectItem value={EXTERNAL_KEY}>EXTERNO</SelectItem>
+                        <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
                       </SelectContent>
                     </Select>
                     <span className="w-14 text-right text-xs text-muted-foreground">
-                      {cid !== NONE ? `${clientKm.get(cid) ?? 0} km` : ""}
+                      {cid !== NONE ? `${extraKm(cid)} km` : ""}
                     </span>
                     <Button
                       variant="ghost"
@@ -928,13 +952,6 @@ export function VehicleTimeline() {
                   </Select>
                   </div>
                 ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setForm((f) => ({ ...f, extras: [...f.extras, NONE], extraDrivers: [...f.extraDrivers, f.driver_id] }))}
-                >
-                  <Plus className="h-4 w-4" /> Adicionar obra
-                </Button>
                 <p className="text-xs text-muted-foreground">
                   Para quando o carro atende mais de uma demanda no dia. O KM das obras adicionais é somado no
                   relatório da frota; os prêmios continuam pela obra principal.
