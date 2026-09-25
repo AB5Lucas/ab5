@@ -960,6 +960,17 @@ export function SchedulePlannerBoard({
         if (vtRows.length) await supabase.from("schedule_work_vt").upsert(vtRows, { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
       }
       qc.invalidateQueries({ queryKey: ["work-vt", id] });
+      const { data: prevBoxVt } = await supabase
+        .from("schedule_box_vt")
+        .select("box_key, pays_vt")
+        .eq("schedule_id", prevSchedule.id);
+      if (prevBoxVt && prevBoxVt.length) {
+        await supabase.from("schedule_box_vt").upsert(
+          prevBoxVt.map((v) => ({ schedule_id: id, box_key: v.box_key, pays_vt: v.pays_vt })),
+          { onConflict: "schedule_id,box_key", ignoreDuplicates: true },
+        );
+        qc.invalidateQueries({ queryKey: ["box-vt", id] });
+      }
       return { count: inserts.length, id };
     },
     onSuccess: (r) => {
@@ -1374,6 +1385,23 @@ export function SchedulePlannerBoard({
                       <Users className="mr-0.5 h-2.5 w-2.5" />
                       {boxRows.length + autoRows.length}
                     </Badge>
+                    {vtBoxDefault(b.key) !== null && (
+                      <button
+                        type="button"
+                        disabled={!editable}
+                        title={
+                          b.key === "aso"
+                            ? boxPaysVt(b.key)
+                              ? "VT adicional ligado: 2 VTs (clique para desligar)"
+                              : "Somente o VT do ASO: 1 VT (clique para ligar o adicional)"
+                            : boxPaysVt(b.key)
+                              ? "VT: todos recebem (clique para desligar)"
+                              : "VT: ninguém recebe (clique para ligar)"
+                        }
+                        onClick={(e) => { e.stopPropagation(); toggleBoxVt.mutate(b.key); }}
+                        className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full border border-border ${boxPaysVt(b.key) ? "bg-success" : "bg-muted-foreground/40"}`}
+                      />
+                    )}
                   </div>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">Caixa de situação do dia</p>
                 </header>
@@ -1412,6 +1440,7 @@ export function SchedulePlannerBoard({
                         >
                           {a.note}
                         </Badge>
+                        {vtBoxDefault(b.key) !== null && personDot(b.key, a.id)}
                       </li>
                     );
                   })}
@@ -1440,6 +1469,7 @@ export function SchedulePlannerBoard({
                             {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
                           </p>
                         </div>
+                        {vtBoxDefault(b.key) !== null && personDot(b.key, entry.collaborator_id)}
                         {editable && (
                           <Button
                             variant="ghost"
