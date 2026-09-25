@@ -459,7 +459,6 @@ function IntegrationsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Colaborador</TableHead>
-              <TableHead className="hidden lg:table-cell">CPF</TableHead>
               <TableHead className="hidden lg:table-cell">Função</TableHead>
               <TableHead>Cliente</TableHead>
               
@@ -472,14 +471,14 @@ function IntegrationsPage() {
           <TableBody>
             {integrations.isLoading && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!integrations.isLoading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                   Nenhuma integração encontrada.
                 </TableCell>
               </TableRow>
@@ -491,7 +490,6 @@ function IntegrationsPage() {
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{p?.full_name ?? "—"}{(scheduled.has(`${r.collaborator_id}|${r.client_id}`)) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Agendado</Badge>}{inConf.has(`${r.collaborator_id}|${r.client_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Conferência</Badge>}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{p?.cpf || "—"}</TableCell>
                   <TableCell className="hidden lg:table-cell">
                     {p?.position_id ? positionById.get(p.position_id) ?? "—" : "—"}
                   </TableCell>
