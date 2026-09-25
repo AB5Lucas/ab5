@@ -1,0 +1,1 @@
+ALTER TABLE public.vehicle_schedules ADD COLUMN IF NOT EXISTS extra_driver_ids text[] NOT NULL DEFAULT '{}';

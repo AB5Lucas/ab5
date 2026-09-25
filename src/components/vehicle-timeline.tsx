@@ -46,6 +46,7 @@ export type VehicleScheduleRow = {
   driver_bonus: boolean;
   km: number;
   extra_client_ids?: string[];
+  extra_driver_ids?: string[];
   extra_km?: number;
 };
 
@@ -100,6 +101,7 @@ type CellForm = {
   driver_bonus: boolean;
   repeat_until: string;
   extras: string[];
+  extraDrivers: string[];
 };
 
 const NONE = "__none__";
@@ -111,7 +113,7 @@ export function VehicleTimeline() {
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [driverSearch, setDriverSearch] = useState("");
   const [cell, setCell] = useState<{ vehicleId: string; date: string } | null>(null);
-  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [] });
+  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [] });
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
@@ -268,7 +270,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_km")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_km")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -377,10 +379,16 @@ export function VehicleTimeline() {
       is_maintenance: boolean;
       driver_bonus: boolean;
       extra_client_ids?: string[] | undefined;
+      extra_driver_ids?: string[] | undefined;
     },
   ) {
     const special = f.is_external || f.is_maintenance;
-    const extras = f.is_maintenance ? [] : (f.extra_client_ids ?? []).filter((x) => x && x !== NONE);
+    const pairs = f.is_maintenance
+      ? []
+      : (f.extra_client_ids ?? [])
+          .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "" }))
+          .filter((p) => p.c && p.c !== NONE);
+    const extras = pairs.map((p) => p.c);
     return {
       schedule_date: date,
       vehicle_id: vehicleId,
@@ -391,6 +399,7 @@ export function VehicleTimeline() {
       driver_bonus: special ? false : f.driver_bonus,
       km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
       extra_client_ids: extras,
+      extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
       extra_km: extras.reduce((s, id) => s + (clientKm.get(id) ?? 0), 0),
     };
   }
@@ -410,6 +419,7 @@ export function VehicleTimeline() {
       driver_bonus: current?.driver_bonus ?? false,
       repeat_until: "",
       extras: [...(current?.extra_client_ids ?? [])],
+      extraDrivers: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_driver_ids?.[i] || NONE),
     });
     setDriverSearch("");
     setCell({ vehicleId, date });
@@ -430,6 +440,7 @@ export function VehicleTimeline() {
       is_maintenance: isMaintenance,
       driver_bonus: form.driver_bonus,
       extra_client_ids: form.extras,
+      extra_driver_ids: form.extraDrivers,
     };
     const targets: string[] = [cell.date];
     if (form.repeat_until && form.repeat_until > cell.date) {
@@ -455,6 +466,7 @@ export function VehicleTimeline() {
           is_maintenance: src.is_maintenance ?? false,
           driver_bonus: src.driver_bonus,
           extra_client_ids: src.extra_client_ids,
+          extra_driver_ids: src.extra_driver_ids,
         }),
       ]);
     } catch {
@@ -485,6 +497,7 @@ export function VehicleTimeline() {
             is_maintenance: s.is_maintenance ?? false,
             driver_bonus: s.driver_bonus,
             extra_client_ids: s.extra_client_ids,
+            extra_driver_ids: s.extra_driver_ids,
           }),
         );
       }
@@ -763,7 +776,7 @@ export function VehicleTimeline() {
                               className="truncate text-[10px] uppercase text-muted-foreground"
                               title={
                                 (row.extra_client_ids ?? []).length
-                                  ? `+ ${(row.extra_client_ids ?? []).map((id) => clientName.get(id) ?? "—").join(", ")}`
+                                  ? `+ ${(row.extra_client_ids ?? []).map((id, i) => { const dr = row.extra_driver_ids?.[i]; return `${clientName.get(id) ?? "—"}${dr ? ` (${driverName.get(dr) ?? "—"})` : ""}`; }).join(", ")}`
                                   : undefined
                               }
                             >
@@ -868,7 +881,8 @@ export function VehicleTimeline() {
               <div className="space-y-2">
                 <Label>Obras adicionais no dia</Label>
                 {form.extras.map((cid, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="space-y-1 rounded-md border border-border p-2">
+                  <div className="flex items-center gap-2">
                     <Select
                       value={cid}
                       onValueChange={(v) =>
@@ -889,16 +903,35 @@ export function VehicleTimeline() {
                       variant="ghost"
                       size="icon"
                       aria-label="Remover obra adicional"
-                      onClick={() => setForm((f) => ({ ...f, extras: f.extras.filter((_, j) => j !== i) }))}
+                      onClick={() => setForm((f) => ({ ...f, extras: f.extras.filter((_, j) => j !== i), extraDrivers: f.extraDrivers.filter((_, j) => j !== i) }))}
                     >
                       <X className="h-4 w-4" />
                     </Button>
+                  </div>
+                  <Select
+                    value={form.extraDrivers[i] ?? NONE}
+                    onValueChange={(v) =>
+                      setForm((f) => {
+                        const d = [...f.extraDrivers];
+                        d[i] = v;
+                        return { ...f, extraDrivers: d };
+                      })
+                    }
+                  >
+                    <SelectTrigger><SelectValue placeholder="Motorista desta obra" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Sem motorista</SelectItem>
+                      {(drivers.data ?? []).map((d) => (
+                        <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   </div>
                 ))}
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setForm((f) => ({ ...f, extras: [...f.extras, NONE] }))}
+                  onClick={() => setForm((f) => ({ ...f, extras: [...f.extras, NONE], extraDrivers: [...f.extraDrivers, f.driver_id] }))}
                 >
                   <Plus className="h-4 w-4" /> Adicionar obra
                 </Button>
