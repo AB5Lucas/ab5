@@ -47,15 +47,11 @@ const RECORD_COLUMNS: ImportColumn[] = [
   { key: "documento_url", hint: "Link do certificado/documento.", example: "https://..." },
 ];
 
-import { formatDateBR } from "@/lib/scheduling";
+import { expiryFrom, formatDateBR } from "@/lib/scheduling";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-function addMonths(dateStr: string, months: number) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setMonth(d.getMonth() + months);
-  return d.toISOString().slice(0, 10);
-}
+const addMonths = expiryFrom;
 
 function statusOf(expires: string | null): "valid" | "expiring" | "expired" {
   if (!expires) return "valid";

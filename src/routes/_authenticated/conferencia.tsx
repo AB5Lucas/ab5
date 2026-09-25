@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDateBR } from "@/lib/scheduling";
+import { expiryFrom, formatDateBR } from "@/lib/scheduling";
 import { normText } from "@/lib/import-helpers";
 import { APPOINTMENT_TYPE_LABEL } from "@/components/appointment-dialog";
 import type { AppointmentType } from "@/components/appointment-dialog";
@@ -362,11 +362,7 @@ function ConferencePage() {
     return m;
   }, [trainings.data]);
 
-  const addMonths = (iso: string, months: number) => {
-    const d = new Date(`${iso}T00:00:00`);
-    d.setMonth(d.getMonth() + months);
-    return d.toISOString().slice(0, 10);
-  };
+  const addMonths = expiryFrom;
 
   const saveDocDate = useMutation({
     mutationFn: async ({ item, date }: { item: Item; date: string }) => {

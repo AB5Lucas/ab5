@@ -12,6 +12,17 @@ export const addDays = (iso: string, days: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+/**
+ * Vencimento = realização + validade (meses) − 1 dia.
+ * Ex.: 15/01/2026 + 12 meses → 14/01/2027. Válido até o próprio dia do vencimento.
+ */
+export const expiryFrom = (iso: string, months: number) => {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1 + months, d!));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  return dt.toISOString().slice(0, 10);
+};
+
 /** Dia anterior de programação: numa segunda-feira, volta para a sexta. */
 export const previousScheduleDay = (iso: string) => {
   const weekday = new Date(iso + "T12:00:00").getDay();
