@@ -1,0 +1,1 @@
+UPDATE public.vehicle_schedules vs SET km = c.distance_km FROM public.clients c WHERE c.id = vs.client_id AND c.name ILIKE '%suzano%' AND vs.km IS DISTINCT FROM c.distance_km;
