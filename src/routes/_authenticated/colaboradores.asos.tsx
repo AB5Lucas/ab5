@@ -42,7 +42,7 @@ import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/im
 import { AppointmentDialog } from "@/components/appointment-dialog";
 import { useInConference, useScheduled } from "@/hooks/use-scheduled";
 import { emptyToNull, normText, parseDate } from "@/lib/import-helpers";
-import { asoStatusOf, formatDateBR, todayISO, ASO_LABEL, type AsoStatus } from "@/lib/scheduling";
+import { asoStatusOf, expiryFrom, formatDateBR, todayISO, ASO_LABEL, type AsoStatus } from "@/lib/scheduling";
 
 export const Route = createFileRoute("/_authenticated/colaboradores/asos")({
   head: () => ({
@@ -51,7 +51,7 @@ export const Route = createFileRoute("/_authenticated/colaboradores/asos")({
       {
         name: "description",
         content:
-          "Cadastro e controle dos Atestados de Saúde Ocupacional dos colaboradores, com vencimento automático em 1 ano.",
+          "Cadastro e controle dos Atestados de Saúde Ocupacional dos colaboradores, com vencimento automático em 1 ano menos 1 dia.",
       },
       { property: "og:title", content: "ASOs | Programação Operacional" },
       {
@@ -97,11 +97,8 @@ type FormState = { collaborator_id: string; exam_date: string; notes: string };
 
 const emptyForm: FormState = { collaborator_id: "", exam_date: todayISO(), notes: "" };
 
-/** Vencimento = 1 ano após a realização (mesma regra do banco). */
-function expiryOf(examDate: string): string {
-  const [y, m, d] = examDate.slice(0, 10).split("-");
-  return `${Number(y) + 1}-${m}-${d}`;
-}
+/** Vencimento = 1 ano após a realização − 1 dia (mesma regra do banco). */
+const expiryOf = (examDate: string) => expiryFrom(examDate, 12);
 
 function AsosPage() {
   const { canWrite, isAdmin } = useCurrentUser();

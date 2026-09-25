@@ -362,11 +362,7 @@ function ConferencePage() {
     return m;
   }, [trainings.data]);
 
-  const addMonths = (iso: string, months: number) => {
-    const d = new Date(`${iso}T00:00:00`);
-    d.setMonth(d.getMonth() + months);
-    return d.toISOString().slice(0, 10);
-  };
+  const addMonths = expiryFrom;
 
   const saveDocDate = useMutation({
     mutationFn: async ({ item, date }: { item: Item; date: string }) => {
