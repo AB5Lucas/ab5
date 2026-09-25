@@ -83,23 +83,15 @@ const nn = (v: string) => (v.trim() === "" ? null : v.trim());
 const ref = (v: string) => (v === NONE ? null : v);
 
 function TransportPage() {
+  // Transporte diário inativado: a página mostra apenas a timeline mensal.
   return (
-    <Tabs defaultValue="timeline" className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="timeline">Timeline mensal</TabsTrigger>
-        <TabsTrigger value="diario">Transporte diário</TabsTrigger>
-      </TabsList>
-      <TabsContent value="timeline" className="space-y-4">
-        <PageHeader
-          title="Transporte"
-          description="Programação mensal da frota: motorista, obra/cliente, prêmio de motorista e quilometragem automática."
-        />
-        <VehicleTimeline />
-      </TabsContent>
-      <TabsContent value="diario">
-        <DailyTransportSection />
-      </TabsContent>
-    </Tabs>
+    <div className="space-y-4">
+      <PageHeader
+        title="Transporte"
+        description="Programação mensal da frota: motorista, obra/cliente, prêmio de motorista e quilometragem automática."
+      />
+      <VehicleTimeline />
+    </div>
   );
 }
 
