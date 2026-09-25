@@ -64,7 +64,7 @@ function FleetReportsPage() {
     const monthPrefix = today().slice(0, 7);
     for (const r of report.data ?? []) {
       const entry = totals.get(r.vehicle_id) ?? { work: 0, external: 0, today: 0, month: 0 };
-      const value = Number(r.km ?? 0);
+      const value = Number(r.km ?? 0) * 2; // ida e volta
       if (r.is_external) entry.external += value;
       else entry.work += value;
       if (r.schedule_date === today()) entry.today += value;
@@ -96,7 +96,7 @@ function FleetReportsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Relatórios da Frota"
-        description="Quilometragem calculada automaticamente pela programação de transporte (obra 100 km/dia, externo 200 km/dia)."
+        description="Quilometragem calculada automaticamente pela programação de transporte (ida e volta: KM de ida da obra × 2; Indústria 100 km/dia, Externo 200 km/dia)."
       />
 
       <div className="flex flex-wrap items-end gap-3">

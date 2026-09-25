@@ -30,8 +30,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export const EXTERNAL_KEY = "__external__";
 export const MAINTENANCE_KEY = "__maintenance__";
-export const KM_WORK = 100;
-export const KM_EXTERNAL = 200;
+export const KM_WORK = 50;
+export const KM_EXTERNAL = 100;
 
 export type VehicleScheduleRow = {
   id: string;
