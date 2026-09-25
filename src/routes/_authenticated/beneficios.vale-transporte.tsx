@@ -366,7 +366,7 @@ function VoucherPage() {
                 <TableRow>
                   <TableHead>Colaborador</TableHead>
                   <TableHead>Matrícula</TableHead>
-                  <TableHead>Dias programados</TableHead>
+                  <TableHead>VTs no período</TableHead>
                   <TableHead>Motorista</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                 </TableRow>
