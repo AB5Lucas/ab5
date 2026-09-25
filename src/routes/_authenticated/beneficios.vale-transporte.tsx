@@ -135,10 +135,13 @@ function VoucherPage() {
   const calc = useQuery({
     queryKey: ["vt-calc", month],
     queryFn: async () => {
-      const start = `${month}-01`;
-      const endDate = new Date(`${month}-01T00:00:00`);
-      endDate.setMonth(endDate.getMonth() + 1);
-      const end = endDate.toISOString().slice(0, 10);
+      // Período de fechamento: dia 26 do mês anterior até 25 do mês selecionado
+      const y = Number(month.slice(0, 4));
+      const m = Number(month.slice(5, 7));
+      const fmt = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const start = fmt(new Date(y, m - 2, 26));
+      const end = fmt(new Date(y, m - 1, 26));
 
       const { data: schedules, error: se } = await supabase
         .from("daily_schedules")
@@ -149,18 +152,30 @@ function VoucherPage() {
       const ids = (schedules ?? []).map((s) => s.id);
       const dateById = new Map((schedules ?? []).map((s) => [s.id, s.schedule_date]));
 
-      const allocations = ids.length
-        ? await (async () => {
-            const { data, error: ae } = await supabase
-              .from("daily_allocations")
-              .select(
-                "collaborator_id, schedule_id, work_id, driver, vt_override, collaborators(full_name, registration_number)",
-              )
-              .in("schedule_id", ids);
-            if (ae) throw ae;
-            return data ?? [];
-          })()
-        : [];
+      type AllocRow = {
+        collaborator_id: string;
+        schedule_id: string;
+        work_id: string;
+        driver: boolean;
+        vt_override: boolean | null;
+        collaborators: unknown;
+      };
+      const allocations: AllocRow[] = [];
+      if (ids.length) {
+        for (let from = 0; ; from += 1000) {
+          const { data, error: ae } = await supabase
+            .from("daily_allocations")
+            .select(
+              "collaborator_id, schedule_id, work_id, driver, vt_override, collaborators(full_name, registration_number)",
+            )
+            .in("schedule_id", ids)
+            .order("id")
+            .range(from, from + 999);
+          if (ae) throw ae;
+          allocations.push(...((data ?? []) as AllocRow[]));
+          if (!data || data.length < 1000) break;
+        }
+      }
 
       const vtMap = new Map<string, boolean>();
       if (ids.length) {

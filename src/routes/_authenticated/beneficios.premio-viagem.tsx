@@ -177,13 +177,20 @@ function BonusPage() {
           distance: number;
         }[];
 
-      const { data, error } = await supabase
-        .from("daily_allocations")
-        .select(
-          "collaborator_id, schedule_id, collaborators(full_name, registration_number), works(distance_km, clients(distance_km))",
-        )
-        .in("schedule_id", ids);
-      if (error) throw error;
+      const data: unknown[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data: page, error } = await supabase
+          .from("daily_allocations")
+          .select(
+            "collaborator_id, schedule_id, collaborators(full_name, registration_number), works(distance_km, clients(distance_km))",
+          )
+          .in("schedule_id", ids)
+          .order("id")
+          .range(from, from + 999);
+        if (error) throw error;
+        data.push(...(page ?? []));
+        if (!page || page.length < 1000) break;
+      }
 
       return (data ?? []).map((a) => {
         const row = a as unknown as {
