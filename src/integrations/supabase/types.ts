@@ -946,6 +946,41 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_box_vt: {
+        Row: {
+          box_key: string
+          created_at: string
+          id: string
+          pays_vt: boolean
+          schedule_id: string
+          updated_at: string
+        }
+        Insert: {
+          box_key: string
+          created_at?: string
+          id?: string
+          pays_vt: boolean
+          schedule_id: string
+          updated_at?: string
+        }
+        Update: {
+          box_key?: string
+          created_at?: string
+          id?: string
+          pays_vt?: boolean
+          schedule_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_box_vt_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "daily_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_client_visibility: {
         Row: {
           client_id: string
@@ -977,6 +1012,51 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_person_vt: {
+        Row: {
+          box_key: string
+          collaborator_id: string
+          created_at: string
+          id: string
+          pays_vt: boolean
+          schedule_id: string
+          updated_at: string
+        }
+        Insert: {
+          box_key: string
+          collaborator_id: string
+          created_at?: string
+          id?: string
+          pays_vt: boolean
+          schedule_id: string
+          updated_at?: string
+        }
+        Update: {
+          box_key?: string
+          collaborator_id?: string
+          created_at?: string
+          id?: string
+          pays_vt?: boolean
+          schedule_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_person_vt_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_person_vt_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "daily_schedules"
             referencedColumns: ["id"]
           },
         ]

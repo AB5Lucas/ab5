@@ -191,45 +191,100 @@ function VoucherPage() {
         for (const v of vts ?? []) vtMap.set(`${v.schedule_id}|${v.work_id}`, v.pays_vt);
       }
 
+      // Quadros de ASO / Treinamento / Integração
       const { data: appts, error: pe } = await supabase
         .from("appointments")
-        .select("collaborator_id, scheduled_date, collaborators(full_name, registration_number)")
-        .eq("type", "integracao")
-        .eq("pays_transport_voucher", true)
+        .select(
+          "type, collaborator_id, scheduled_date, pays_transport_voucher, clients(name), collaborators(full_name, registration_number)",
+        )
+        .in("type", ["aso", "treinamento", "integracao"])
         .neq("status", "cancelado")
         .gte("scheduled_date", start)
         .lt("scheduled_date", end);
       if (pe) throw pe;
 
-      const map = new Map<string, { name: string; reg: string; days: Set<string>; driver: boolean }>();
-      const entryFor = (key: string, c: { full_name: string; registration_number: string } | null) => {
+      const boxVt = new Map<string, boolean>();
+      const personVt = new Map<string, boolean>();
+      type Entry = { schedule_id: string; box_key: string; collaborator_id: string; collaborators: unknown };
+      let entries: Entry[] = [];
+      if (ids.length) {
+        const [b, p, e] = await Promise.all([
+          supabase.from("schedule_box_vt").select("schedule_id, box_key, pays_vt").in("schedule_id", ids),
+          supabase.from("schedule_person_vt").select("schedule_id, box_key, collaborator_id, pays_vt").in("schedule_id", ids),
+          supabase
+            .from("daily_status_entries")
+            .select("schedule_id, box_key, collaborator_id, collaborators(full_name, registration_number)")
+            .in("schedule_id", ids)
+            .or("box_key.eq.aso,box_key.eq.treinamento,box_key.like.integracao%"),
+        ]);
+        if (b.error) throw b.error;
+        if (p.error) throw p.error;
+        if (e.error) throw e.error;
+        for (const r of b.data ?? []) boxVt.set(`${r.schedule_id}|${r.box_key}`, r.pays_vt);
+        for (const r of p.data ?? []) personVt.set(`${r.schedule_id}|${r.box_key}|${r.collaborator_id}`, r.pays_vt);
+        entries = (e.data ?? []) as Entry[];
+      }
+      const scheduleByDate = new Map((schedules ?? []).map((s) => [s.schedule_date, s.id]));
+      const boxDefault = (k: string) => k === "aso" || k === "treinamento";
+
+      type C = { full_name: string; registration_number: string } | null;
+      const map = new Map<string, { name: string; reg: string; units: Map<string, number>; driver: boolean }>();
+      const entryFor = (key: string, c: C) => {
         const entry = map.get(key) ?? {
           name: c?.full_name ?? "—",
           reg: c?.registration_number ?? "",
-          days: new Set<string>(),
+          units: new Map<string, number>(),
           driver: false,
         };
         map.set(key, entry);
         return entry;
       };
+      const add = (collab: string, c: C, dayKey: string, n: number) => {
+        if (n <= 0) return;
+        const e = entryFor(collab, c);
+        e.units.set(dayKey, (e.units.get(dayKey) ?? 0) + n);
+      };
       for (const a of allocations) {
-        const c = (a as unknown as { collaborators: { full_name: string; registration_number: string } | null })
-          .collaborators;
+        const c = (a as unknown as { collaborators: C }).collaborators;
         // Regra: status de VT da obra no dia; exceção individual do colaborador prevalece.
         const pays = a.vt_override ?? vtMap.get(`${a.schedule_id}|${a.work_id}`) ?? false;
         if (!pays) continue;
-        const entry = entryFor(a.collaborator_id, c);
-        entry.days.add(dateById.get(a.schedule_id) ?? a.schedule_id);
-        if (a.driver) entry.driver = true;
+        const date = dateById.get(a.schedule_id) ?? a.schedule_id;
+        const e = entryFor(a.collaborator_id, c);
+        if (!e.units.has(date)) e.units.set(date, 1); // uma obra por dia
+        if (a.driver) e.driver = true;
       }
-      // Integrações agendadas com "Pagar VT" marcado.
+      // Membros dos quadros (sem duplicar pessoa no mesmo quadro/dia)
+      const seen = new Set<string>();
+      const boxMember = (date: string, box: string, collab: string, c: C, apptVt: boolean) => {
+        const sid = scheduleByDate.get(date) ?? null;
+        const k = `${date}|${box}|${collab}`;
+        if (seen.has(k)) return;
+        seen.add(k);
+        const override = sid ? personVt.get(`${sid}|${box}|${collab}`) : undefined;
+        const boxOn = (sid ? boxVt.get(`${sid}|${box}`) : undefined) ?? boxDefault(box);
+        const on = override ?? (apptVt ? true : boxOn);
+        const base = box === "aso" ? 1 : 0; // ASO sempre tem 1 VT
+        add(collab, c, date, base + (on ? 1 : 0));
+      };
       for (const p of appts ?? []) {
-        const c = (p as unknown as { collaborators: { full_name: string; registration_number: string } | null })
-          .collaborators;
-        entryFor(p.collaborator_id, c).days.add(p.scheduled_date);
+        const row = p as unknown as { clients: { name: string } | null; collaborators: C };
+        const box = p.type === "integracao" ? `integracao:${row.clients?.name ?? "—"}` : p.type;
+        boxMember(p.scheduled_date, box, p.collaborator_id, row.collaborators, p.type === "integracao" && p.pays_transport_voucher);
+      }
+      for (const e of entries) {
+        const date = dateById.get(e.schedule_id);
+        if (!date) continue;
+        boxMember(date, e.box_key, e.collaborator_id, (e.collaborators as C) ?? null, false);
       }
       return [...map.values()]
-        .map((e) => ({ name: e.name, reg: e.reg, days: e.days.size, driver: e.driver }))
+        .map((e) => ({
+          name: e.name,
+          reg: e.reg,
+          days: [...e.units.values()].reduce((s, n) => s + n, 0),
+          driver: e.driver,
+        }))
+        .filter((e) => e.days > 0)
         .sort((a, b) => a.name.localeCompare(b.name));
     },
   });
@@ -311,7 +366,7 @@ function VoucherPage() {
                 <TableRow>
                   <TableHead>Colaborador</TableHead>
                   <TableHead>Matrícula</TableHead>
-                  <TableHead>Dias programados</TableHead>
+                  <TableHead>VTs no período</TableHead>
                   <TableHead>Motorista</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                 </TableRow>
