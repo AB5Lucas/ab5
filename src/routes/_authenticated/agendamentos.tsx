@@ -198,6 +198,27 @@ function AppointmentsPage() {
     },
   });
 
+  const asoRecs = useQuery({
+    queryKey: ["asos-min-validity"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("asos").select("collaborator_id, expires_at").range(0, 9999);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const integrationRecs = useQuery({
+    queryKey: ["integrations-min-validity"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_integrations")
+        .select("collaborator_id, client_id, expires_at")
+        .range(0, 9999);
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const personById = useMemo(() => {
     const m = new Map<string, { full_name: string; registration_number: string }>();
     (collaborators.data ?? []).forEach((p) => m.set(p.id, p));
@@ -428,9 +449,20 @@ function AppointmentsPage() {
     return "Exame ASO";
   };
 
+  const latestBy = <T extends { expires_at: string | null }>(recs: T[]) =>
+    recs.length === 0 ? null : recs.reduce((a, b) => ((b.expires_at ?? "") > (a.expires_at ?? "") ? b : a));
+
   const validityCell = (r: Row) => {
-    if (r.type !== "treinamento") return <span className="text-muted-foreground">—</span>;
-    const rec = currentValidity(r.collaborator_id, r.training_id);
+    let rec: { expires_at: string | null } | null = null;
+    if (r.type === "treinamento") rec = currentValidity(r.collaborator_id, r.training_id);
+    else if (r.type === "aso")
+      rec = latestBy((asoRecs.data ?? []).filter((a) => a.collaborator_id === r.collaborator_id));
+    else if (r.type === "integracao")
+      rec = latestBy(
+        (integrationRecs.data ?? []).filter(
+          (a) => a.collaborator_id === r.collaborator_id && a.client_id === r.client_id,
+        ),
+      );
     if (!rec) return <span className="text-muted-foreground">Não possui</span>;
     if (!rec.expires_at) return <span>Sem validade</span>;
     if (rec.expires_at < today)
