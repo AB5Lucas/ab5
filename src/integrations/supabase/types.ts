@@ -1403,9 +1403,11 @@ export type Database = {
           id: string
           is_external: boolean
           is_maintenance: boolean
+          is_suzano_local: boolean
           km: number
           notes: string | null
           schedule_date: string
+          trips: number
           updated_at: string
           vehicle_id: string
         }
@@ -1420,9 +1422,11 @@ export type Database = {
           id?: string
           is_external?: boolean
           is_maintenance?: boolean
+          is_suzano_local?: boolean
           km?: number
           notes?: string | null
           schedule_date: string
+          trips?: number
           updated_at?: string
           vehicle_id: string
         }
@@ -1437,9 +1441,11 @@ export type Database = {
           id?: string
           is_external?: boolean
           is_maintenance?: boolean
+          is_suzano_local?: boolean
           km?: number
           notes?: string | null
           schedule_date?: string
+          trips?: number
           updated_at?: string
           vehicle_id?: string
         }
