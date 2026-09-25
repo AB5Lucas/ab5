@@ -595,6 +595,7 @@ export type Database = {
           source: Database["public"]["Enums"]["allocation_source"]
           updated_at: string
           vehicle_id: string | null
+          vt_override: boolean | null
           work_id: string
         }
         Insert: {
@@ -614,6 +615,7 @@ export type Database = {
           source?: Database["public"]["Enums"]["allocation_source"]
           updated_at?: string
           vehicle_id?: string | null
+          vt_override?: boolean | null
           work_id: string
         }
         Update: {
@@ -633,6 +635,7 @@ export type Database = {
           source?: Database["public"]["Enums"]["allocation_source"]
           updated_at?: string
           vehicle_id?: string | null
+          vt_override?: boolean | null
           work_id?: string
         }
         Relationships: [
@@ -974,6 +977,48 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_work_vt: {
+        Row: {
+          created_at: string
+          id: string
+          pays_vt: boolean
+          schedule_id: string
+          updated_at: string
+          work_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pays_vt?: boolean
+          schedule_id: string
+          updated_at?: string
+          work_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pays_vt?: boolean
+          schedule_id?: string
+          updated_at?: string
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_work_vt_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "daily_schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_work_vt_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
             referencedColumns: ["id"]
           },
         ]
