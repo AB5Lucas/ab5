@@ -198,6 +198,27 @@ function AppointmentsPage() {
     },
   });
 
+  const asoRecs = useQuery({
+    queryKey: ["asos-min-validity"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("asos").select("collaborator_id, expires_at").range(0, 9999);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const integrationRecs = useQuery({
+    queryKey: ["integrations-min-validity"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_integrations")
+        .select("collaborator_id, client_id, expires_at")
+        .range(0, 9999);
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const personById = useMemo(() => {
     const m = new Map<string, { full_name: string; registration_number: string }>();
     (collaborators.data ?? []).forEach((p) => m.set(p.id, p));
