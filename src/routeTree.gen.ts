@@ -35,6 +35,7 @@ import { Route as AuthenticatedExternoRelatorioDiarioRouteImport } from './route
 import { Route as AuthenticatedObrasIndexRouteImport } from './routes/_authenticated/obras.index'
 import { Route as AuthenticatedObrasIntegracoesRouteImport } from './routes/_authenticated/obras.integracoes'
 import { Route as AuthenticatedObrasRequisitosRouteImport } from './routes/_authenticated/obras.requisitos'
+import { Route as AuthenticatedObrasResultadoRouteImport } from './routes/_authenticated/obras.resultado'
 import { Route as AuthenticatedProgramacaoDiariaRouteImport } from './routes/_authenticated/programacao.diaria'
 import { Route as AuthenticatedProgramacaoHistoricoRouteImport } from './routes/_authenticated/programacao.historico'
 import { Route as AuthenticatedProgramacaoHojeRouteImport } from './routes/_authenticated/programacao.hoje'
@@ -191,6 +192,12 @@ const AuthenticatedObrasRequisitosRoute =
     path: '/obras/requisitos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedObrasResultadoRoute =
+  AuthenticatedObrasResultadoRouteImport.update({
+    id: '/obras/resultado',
+    path: '/obras/resultado',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedProgramacaoDiariaRoute =
   AuthenticatedProgramacaoDiariaRouteImport.update({
     id: '/programacao/diaria',
@@ -264,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
+  '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
   '/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
   '/programacao/historico': typeof AuthenticatedProgramacaoHistoricoRoute
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
@@ -299,6 +307,7 @@ export interface FileRoutesByTo {
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
+  '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
   '/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
   '/programacao/historico': typeof AuthenticatedProgramacaoHistoricoRoute
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
@@ -336,6 +345,7 @@ export interface FileRoutesById {
   '/_authenticated/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/_authenticated/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/_authenticated/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
+  '/_authenticated/obras/resultado': typeof AuthenticatedObrasResultadoRoute
   '/_authenticated/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
   '/_authenticated/programacao/historico': typeof AuthenticatedProgramacaoHistoricoRoute
   '/_authenticated/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
@@ -373,6 +383,7 @@ export interface FileRouteTypes {
     | '/externo/relatorio-diario'
     | '/obras/integracoes'
     | '/obras/requisitos'
+    | '/obras/resultado'
     | '/programacao/diaria'
     | '/programacao/historico'
     | '/programacao/hoje'
@@ -408,6 +419,7 @@ export interface FileRouteTypes {
     | '/externo/relatorio-diario'
     | '/obras/integracoes'
     | '/obras/requisitos'
+    | '/obras/resultado'
     | '/programacao/diaria'
     | '/programacao/historico'
     | '/programacao/hoje'
@@ -444,6 +456,7 @@ export interface FileRouteTypes {
     | '/_authenticated/externo/relatorio-diario'
     | '/_authenticated/obras/integracoes'
     | '/_authenticated/obras/requisitos'
+    | '/_authenticated/obras/resultado'
     | '/_authenticated/programacao/diaria'
     | '/_authenticated/programacao/historico'
     | '/_authenticated/programacao/hoje'
@@ -647,6 +660,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedObrasRequisitosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/obras/resultado': {
+      id: '/_authenticated/obras/resultado'
+      path: '/obras/resultado'
+      fullPath: '/obras/resultado'
+      preLoaderRoute: typeof AuthenticatedObrasResultadoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/programacao/diaria': {
       id: '/_authenticated/programacao/diaria'
       path: '/programacao/diaria'
@@ -727,6 +747,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedExternoRelatorioDiarioRoute: typeof AuthenticatedExternoRelatorioDiarioRoute
   AuthenticatedObrasIntegracoesRoute: typeof AuthenticatedObrasIntegracoesRoute
   AuthenticatedObrasRequisitosRoute: typeof AuthenticatedObrasRequisitosRoute
+  AuthenticatedObrasResultadoRoute: typeof AuthenticatedObrasResultadoRoute
   AuthenticatedProgramacaoDiariaRoute: typeof AuthenticatedProgramacaoDiariaRoute
   AuthenticatedProgramacaoHistoricoRoute: typeof AuthenticatedProgramacaoHistoricoRoute
   AuthenticatedProgramacaoHojeRoute: typeof AuthenticatedProgramacaoHojeRoute
@@ -765,6 +786,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedExternoRelatorioDiarioRoute,
   AuthenticatedObrasIntegracoesRoute: AuthenticatedObrasIntegracoesRoute,
   AuthenticatedObrasRequisitosRoute: AuthenticatedObrasRequisitosRoute,
+  AuthenticatedObrasResultadoRoute: AuthenticatedObrasResultadoRoute,
   AuthenticatedProgramacaoDiariaRoute: AuthenticatedProgramacaoDiariaRoute,
   AuthenticatedProgramacaoHistoricoRoute:
     AuthenticatedProgramacaoHistoricoRoute,
