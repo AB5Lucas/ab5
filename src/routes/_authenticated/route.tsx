@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { LogOut, User2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,8 +21,12 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
-  const { profile, role } = useCurrentUser();
+  const { profile, role, isForeman } = useCurrentUser();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (r) => r.location.pathname });
+  useEffect(() => {
+    if (isForeman && !pathname.startsWith("/externo")) navigate({ to: "/externo/relatorio-diario", replace: true });
+  }, [isForeman, pathname, navigate]);
   const queryClient = useQueryClient();
 
   async function handleSignOut() {

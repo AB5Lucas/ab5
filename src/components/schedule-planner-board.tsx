@@ -47,6 +47,8 @@ import {
 } from "@/lib/scheduling";
 import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
+import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
+import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
 
 
 type Level = "ok" | "warn" | "block" | "busy";
@@ -329,6 +331,7 @@ export function SchedulePlannerBoard({
 
   const scheduleId = schedule.data?.id ?? null;
   const editable = canWrite;
+  const canClassify = canWrite;
 
   const allocations = useQuery({
     queryKey: ["allocations", scheduleId],
@@ -342,6 +345,35 @@ export function SchedulePlannerBoard({
       if (error) throw error;
       return data;
     },
+  });
+
+  const pendingOcc = useQuery({
+    queryKey: ["rdo-pending", date],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("rdo_workforce")
+        .select("id, rdo_id, work_id, report_date, collaborator_id, allocation_id, reported_reason, reported_note")
+        .eq("report_date", date)
+        .eq("occurrence_status", "pending");
+      return (data ?? []) as PendingOccurrence[];
+    },
+  });
+  const [occOpen, setOccOpen] = useState<PendingOccurrence | null>(null);
+  const classify = useMutation({
+    mutationFn: async ({ occ, key }: { occ: PendingOccurrence; key: string }) => {
+      const { data: u } = await supabase.auth.getUser();
+      await classifyOccurrence(occ, key, u.user?.id ?? null);
+      return occ;
+    },
+    onSuccess: () => {
+      toast.success("Ocorrência classificada e programação atualizada");
+      setOccOpen(null);
+      qc.invalidateQueries({ queryKey: ["rdo-pending", date] });
+      qc.invalidateQueries({ queryKey: ["schedule", date] });
+      qc.invalidateQueries({ queryKey: ["allocations"] });
+      qc.invalidateQueries({ queryKey: ["status-entries"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const statusEntries = useQuery({
@@ -1031,6 +1063,18 @@ export function SchedulePlannerBoard({
 
   return (
     <div className="space-y-4">
+      <RdoAbsenceDialog
+        open={!!occOpen}
+        onOpenChange={(v) => !v && setOccOpen(null)}
+        mode="classify"
+        collaboratorName={occOpen ? (personById.get(occOpen.collaborator_id)?.full_name ?? "Colaborador") : ""}
+        workName={occOpen ? (() => { const w = c?.works.find((x) => x.id === occOpen.work_id); return w ? workLabel(w) : ""; })() : ""}
+        date={occOpen?.report_date}
+        reportedReason={occOpen?.reported_reason}
+        reportedNote={occOpen?.reported_note}
+        busy={classify.isPending}
+        onConfirm={(key) => occOpen && classify.mutate({ occ: occOpen, key })}
+      />
       {/* Data, resumo e ações */}
       <div className="panel flex flex-wrap items-center gap-3 p-3">
         <div className="flex items-center gap-2">
@@ -1193,6 +1237,21 @@ export function SchedulePlannerBoard({
                     <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
                       {workLabel(w)}
                     </h2>
+                    {(() => {
+                      const occ = (pendingOcc.data ?? []).filter((o) => o.work_id === w.id);
+                      if (!occ.length) return null;
+                      return (
+                        <button
+                          type="button"
+                          title={`${occ.length} ausência(s) aguardando classificação`}
+                          aria-label="Ocorrência pendente"
+                          className="shrink-0"
+                          onClick={(e) => { e.stopPropagation(); if (canClassify) setOccOpen(occ[0]!); }}
+                        >
+                          <AlertTriangle className="h-4 w-4 fill-destructive text-destructive-foreground" />
+                        </button>
+                      );
+                    })()}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -1276,6 +1335,21 @@ export function SchedulePlannerBoard({
                             {(r.position_id ? positionById.get(r.position_id) : p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
                           </p>
                         </div>
+                        {(() => {
+                          const occ = (pendingOcc.data ?? []).find((o) => o.work_id === w.id && o.collaborator_id === r.collaborator_id);
+                          if (!occ) return null;
+                          return (
+                            <button
+                              type="button"
+                              title="Ausência informada no RDO — clique para classificar"
+                              aria-label="Classificar ocorrência"
+                              className="shrink-0"
+                              onClick={(e) => { e.stopPropagation(); if (canClassify) setOccOpen(occ); }}
+                            >
+                              <AlertTriangle className="h-4 w-4 fill-destructive text-destructive-foreground" />
+                            </button>
+                          );
+                        })()}
                         {r.has_pending_requirement && (
                           <Badge variant="destructive" className="shrink-0 px-1 py-0 text-[10px]">
                             <AlertTriangle className="mr-0.5 h-2.5 w-2.5" /> Pendência

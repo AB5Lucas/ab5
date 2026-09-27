@@ -1,0 +1,835 @@
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  AlertTriangle,
+  Camera,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileDown,
+  ImagePlus,
+  Lock,
+  Plus,
+  Trash2,
+  Undo2,
+  Video,
+  X,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
+import { SignaturePad } from "@/components/signature-pad";
+import { RDO_STATUS_LABEL, SCAFFOLD_OPS, SERVICE_CATEGORIES, reasonLabel, workedHours } from "@/lib/rdo";
+import { exportRdoPdf } from "@/lib/rdo-pdf";
+import { useCurrentUser } from "@/hooks/use-auth";
+
+const STEPS = ["Efetivo", "Atividades", "Serviços", "Fotos e vídeos", "Observações", "Assinaturas", "Finalizar"] as const;
+
+type WorkRow = {
+  id: string;
+  name: string;
+  client_id: string | null;
+  entry_time: string | null;
+  exit_time: string | null;
+  exit_time_weekend: string | null;
+  clients: { name: string } | null;
+};
+
+export const workLabel = (w: { name: string; clients: { name: string } | null }) =>
+  w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name;
+
+/** Cria/sincroniza o RDO da obra+data com a Programação e mostra o preenchimento por etapas. */
+export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
+  const qc = useQueryClient();
+  const { user, profile, canWrite } = useCurrentUser();
+  const [step, setStep] = useState(0);
+
+  const rdo = useQuery({
+    queryKey: ["rdo", work.id, date],
+    queryFn: async () => {
+      const { data } = await supabase.from("rdos").select("*").eq("work_id", work.id).eq("report_date", date).maybeSingle();
+      return data;
+    },
+  });
+
+  const planned = useQuery({
+    queryKey: ["rdo-planned", work.id, date],
+    queryFn: async () => {
+      const { data: s } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
+      if (!s) return { scheduleId: null as string | null, allocs: [] };
+      const { data } = await supabase
+        .from("daily_allocations")
+        .select("id, collaborator_id, position_id, collaborators(position_id)")
+        .eq("schedule_id", s.id)
+        .eq("work_id", work.id);
+      return { scheduleId: s.id as string | null, allocs: data ?? [] };
+    },
+  });
+
+  const create = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("rdos").insert({
+        work_id: work.id,
+        client_id: work.client_id,
+        report_date: date,
+        schedule_id: planned.data?.scheduleId ?? null,
+        user_id: user?.id ?? null,
+        responsible_name: profile?.full_name || profile?.email || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rdo", work.id, date] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const r = rdo.data;
+  const editable = !!r && (r.status === "draft" || canWrite);
+
+  const defaultTimes = useMemo(() => {
+    const wd = new Date(date + "T12:00:00").getDay();
+    const exit = (wd === 0 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
+    return { entry: work.entry_time?.slice(0, 5) ?? "07:00", exit: exit?.slice(0, 5) ?? "17:00" };
+  }, [date, work]);
+
+  const team = useQuery({
+    queryKey: ["rdo-team", r?.id],
+    enabled: !!r?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("rdo_workforce")
+        .select("*, collaborators(full_name, registration_number), positions(name)")
+        .eq("rdo_id", r!.id);
+      return (data ?? []).sort((a, b) =>
+        (a.collaborators?.full_name ?? "").localeCompare(b.collaborators?.full_name ?? "", "pt-BR"),
+      );
+    },
+  });
+
+  // Sincroniza com a Programação enquanto o RDO está em rascunho (sem duplicar).
+  useEffect(() => {
+    if (!r || r.status !== "draft" || !team.data || !planned.data || !editable) return;
+    const have = new Map(team.data.map((t) => [t.collaborator_id, t]));
+    const allocIds = new Set(planned.data.allocs.map((a) => a.collaborator_id));
+    const inserts = planned.data.allocs
+      .filter((a) => !have.has(a.collaborator_id))
+      .map((a) => ({
+        rdo_id: r.id,
+        work_id: work.id,
+        report_date: date,
+        collaborator_id: a.collaborator_id,
+        allocation_id: a.id,
+        position_id: a.position_id ?? a.collaborators?.position_id ?? null,
+        planned: true,
+        entry_time: defaultTimes.entry,
+        exit_time: defaultTimes.exit,
+      }));
+    const removed = team.data
+      .filter((t) => t.planned && !allocIds.has(t.collaborator_id) && t.present && t.occurrence_status === "none")
+      .map((t) => t.id);
+    if (!inserts.length && !removed.length) return;
+    (async () => {
+      if (inserts.length) await supabase.from("rdo_workforce").upsert(inserts, { onConflict: "rdo_id,collaborator_id", ignoreDuplicates: true });
+      if (removed.length) await supabase.from("rdo_workforce").delete().in("id", removed);
+      qc.invalidateQueries({ queryKey: ["rdo-team", r.id] });
+    })();
+  }, [r, team.data, planned.data, editable, defaultTimes, date, work.id, qc]);
+
+  const updateRdo = useMutation({
+    mutationFn: async (patch: Record<string, unknown>) => {
+      const { error } = await supabase.from("rdos").update(patch as never).eq("id", r!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rdo", work.id, date] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (rdo.isLoading || planned.isLoading) return <p className="p-4 text-sm text-muted-foreground">Carregando...</p>;
+
+  if (!r) {
+    return (
+      <div className="panel space-y-3 p-5 text-center">
+        <p className="font-display text-lg uppercase">Nenhum RDO para este dia</p>
+        <p className="text-sm text-muted-foreground">
+          Programação do dia: <b>{planned.data?.allocs.length ?? 0}</b> colaborador(es) escalado(s) nesta obra.
+        </p>
+        <Button size="lg" className="w-full sm:w-auto" onClick={() => create.mutate()} disabled={create.isPending}>
+          <Plus className="h-5 w-5" /> Criar RDO
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={r.status === "draft" ? "secondary" : "default"}>{RDO_STATUS_LABEL[r.status] ?? r.status}</Badge>
+        {r.responsible_name && <span className="text-xs text-muted-foreground">Responsável: {r.responsible_name}</span>}
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          onClick={() => toast.promise(exportRdoPdf(r.id), { loading: "Gerando PDF...", success: "PDF gerado", error: (e) => e.message })}
+        >
+          <FileDown className="h-4 w-4" /> Exportar RDO
+        </Button>
+      </div>
+
+      <nav className="-mx-1 flex gap-1 overflow-x-auto pb-1">
+        {STEPS.map((s, i) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStep(i)}
+            className={cn(
+              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
+              i === step ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card",
+            )}
+          >
+            {i + 1}. {s}
+          </button>
+        ))}
+      </nav>
+
+      {!editable && (
+        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Lock className="h-3.5 w-3.5" /> RDO finalizado — somente consulta.
+        </p>
+      )}
+
+      <div className="panel p-3 sm:p-4">
+        {step === 0 && <TeamStep rdoId={r.id} work={work} date={date} rows={team.data ?? []} editable={editable} />}
+        {step === 1 && (
+          <TextStep
+            label="Atividades realizadas no dia"
+            value={r.activities ?? ""}
+            editable={editable}
+            onSave={(v) => updateRdo.mutate({ activities: v })}
+          />
+        )}
+        {step === 2 && <ServicesStep rdoId={r.id} editable={editable} />}
+        {step === 3 && <MediaStep rdoId={r.id} editable={editable} />}
+        {step === 4 && (
+          <TextStep
+            label="Observações"
+            placeholder="Problemas, atrasos, falta de material, interferências, solicitações do cliente..."
+            value={r.notes ?? ""}
+            editable={editable}
+            onSave={(v) => updateRdo.mutate({ notes: v })}
+          />
+        )}
+        {step === 5 && <SignaturesStep rdoId={r.id} editable={editable} />}
+        {step === 6 && (
+          <FinalizeStep
+            status={r.status}
+            canReopen={canWrite}
+            onFinalize={() => updateRdo.mutate({ status: "finalized", finalized_at: new Date().toISOString() })}
+            onReopen={() => updateRdo.mutate({ status: "draft", finalized_at: null })}
+          />
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <Button variant="outline" size="lg" className="flex-1" disabled={step === 0} onClick={() => setStep((s) => s - 1)}>
+          <ChevronLeft className="h-5 w-5" /> Voltar
+        </Button>
+        <Button size="lg" className="flex-1" disabled={step === STEPS.length - 1} onClick={() => setStep((s) => s + 1)}>
+          Próximo <ChevronRight className="h-5 w-5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Efetivo ---------------- */
+
+type TeamRow = {
+  id: string;
+  collaborator_id: string;
+  present: boolean;
+  entry_time: string | null;
+  exit_time: string | null;
+  break_minutes: number;
+  worked_hours: number | null;
+  reported_reason: string | null;
+  reported_note: string | null;
+  occurrence_status: string;
+  final_classification: string | null;
+  collaborators: { full_name: string; registration_number: string } | null;
+  positions: { name: string } | null;
+};
+
+function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: WorkRow; date: string; rows: TeamRow[]; editable: boolean }) {
+  const qc = useQueryClient();
+  const [absent, setAbsent] = useState<TeamRow | null>(null);
+
+  const patch = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
+      const { error } = await supabase.from("rdo_workforce").update(data as never).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rdo-team", rdoId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const present = rows.filter((r) => r.present);
+  const total = present.reduce((s, r) => s + workedHours(r.entry_time?.slice(0, 5), r.exit_time?.slice(0, 5), r.break_minutes), 0);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-base uppercase">Efetivo</h2>
+        <p className="text-xs text-muted-foreground">
+          {present.length} presentes de {rows.length} previstos · {total.toFixed(2).replace(".", ",")} h · intervalo 1h
+        </p>
+      </div>
+      {rows.length === 0 && (
+        <p className="py-6 text-center text-sm text-muted-foreground">Ninguém escalado nesta obra na Programação deste dia.</p>
+      )}
+      <ul className="space-y-2">
+        {rows.map((r) => (
+          <li key={r.id} className={cn("rounded-md border border-border p-3", !r.present && "bg-destructive/5")}>
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <p className={cn("font-medium leading-tight", !r.present && "line-through opacity-70")}>{r.collaborators?.full_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {r.positions?.name ?? "Sem função"} · Mat. {r.collaborators?.registration_number}
+                </p>
+                {!r.present && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {reasonLabel(r.reported_reason, r.reported_note)}
+                    {r.occurrence_status === "pending" && " · aguardando classificação"}
+                    {r.occurrence_status === "classified" && ` · classificado: ${reasonLabel(r.final_classification)}`}
+                  </p>
+                )}
+              </div>
+              {editable && r.occurrence_status !== "classified" && (
+                r.present ? (
+                  <Button variant="outline" size="icon" className="h-11 w-11 shrink-0 border-destructive/40" aria-label="Não compareceu" onClick={() => setAbsent(r)}>
+                    <X className="h-5 w-5 text-destructive" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 shrink-0"
+                    aria-label="Marcar como presente"
+                    onClick={() =>
+                      patch.mutate({ id: r.id, data: { present: true, reported_reason: null, reported_note: null, occurrence_status: "none" } })
+                    }
+                  >
+                    <Undo2 className="h-5 w-5" />
+                  </Button>
+                )
+              )}
+              {r.present && <Check className="mt-3 h-5 w-5 shrink-0 text-success" />}
+            </div>
+            {r.present && (
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-[11px]">Entrada</Label>
+                  <Input
+                    type="time"
+                    className="h-11"
+                    disabled={!editable}
+                    defaultValue={r.entry_time?.slice(0, 5) ?? ""}
+                    onBlur={(e) => e.target.value !== r.entry_time?.slice(0, 5) && patch.mutate({ id: r.id, data: { entry_time: e.target.value || null } })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-[11px]">Saída</Label>
+                  <Input
+                    type="time"
+                    className="h-11"
+                    disabled={!editable}
+                    defaultValue={r.exit_time?.slice(0, 5) ?? ""}
+                    onBlur={(e) => e.target.value !== r.exit_time?.slice(0, 5) && patch.mutate({ id: r.id, data: { exit_time: e.target.value || null } })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-[11px]">Horas</Label>
+                  <p className="flex h-11 items-center font-semibold">
+                    {workedHours(r.entry_time?.slice(0, 5), r.exit_time?.slice(0, 5), r.break_minutes).toFixed(2).replace(".", ",")}
+                  </p>
+                </div>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      <RdoAbsenceDialog
+        open={!!absent}
+        onOpenChange={(v) => !v && setAbsent(null)}
+        mode="report"
+        collaboratorName={absent?.collaborators?.full_name ?? ""}
+        workName={workLabel(work)}
+        date={date}
+        reportedReason={absent?.reported_reason}
+        reportedNote={absent?.reported_note}
+        busy={patch.isPending}
+        onConfirm={(key, note) => {
+          if (!absent) return;
+          patch.mutate(
+            { id: absent.id, data: { present: false, reported_reason: key, reported_note: note || null, occurrence_status: "pending" } },
+            { onSuccess: () => setAbsent(null) },
+          );
+        }}
+      />
+    </div>
+  );
+}
+
+/* ---------------- Texto livre ---------------- */
+
+function TextStep({ label, value, placeholder, editable, onSave }: { label: string; value: string; placeholder?: string; editable: boolean; onSave: (v: string) => void }) {
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  return (
+    <div className="space-y-2">
+      <h2 className="font-display text-base uppercase">{label}</h2>
+      <Textarea rows={8} value={v} placeholder={placeholder} disabled={!editable} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onSave(v)} />
+      <p className="text-xs text-muted-foreground">Salvo automaticamente ao sair do campo.</p>
+    </div>
+  );
+}
+
+/* ---------------- Serviços + Andaimes ---------------- */
+
+function ServicesStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
+  const qc = useQueryClient();
+  const [svcDialog, setSvcDialog] = useState<string | null>(null);
+  const [scafOpen, setScafOpen] = useState(false);
+
+  const services = useQuery({
+    queryKey: ["rdo-services", rdoId],
+    queryFn: async () => (await supabase.from("rdo_services").select("*").eq("rdo_id", rdoId).order("created_at")).data ?? [],
+  });
+  const scaffolds = useQuery({
+    queryKey: ["rdo-scaffolds", rdoId],
+    queryFn: async () => (await supabase.from("rdo_scaffolds").select("*").eq("rdo_id", rdoId).order("created_at")).data ?? [],
+  });
+  const del = useMutation({
+    mutationFn: async ({ table, id }: { table: "rdo_services" | "rdo_scaffolds"; id: string }) => {
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rdo-services", rdoId] });
+      qc.invalidateQueries({ queryKey: ["rdo-scaffolds", rdoId] });
+    },
+  });
+
+  const block = (title: string, onAdd: () => void, addLabel: string, children: React.ReactNode) => (
+    <div className="rounded-md border border-border">
+      <div className="flex items-center justify-between border-b border-border bg-secondary/50 px-3 py-2">
+        <h3 className="font-display text-sm uppercase">{title}</h3>
+        {editable && (
+          <Button size="sm" variant="outline" onClick={onAdd}>
+            <Plus className="h-4 w-4" /> {addLabel}
+          </Button>
+        )}
+      </div>
+      <div className="divide-y divide-border">{children}</div>
+    </div>
+  );
+
+  const svcList = (cat: string) => {
+    const list = (services.data ?? []).filter((s) => s.category === cat);
+    if (!list.length) return <p className="px-3 py-3 text-xs text-muted-foreground">Nenhum registro.</p>;
+    return list.map((s) => (
+      <div key={s.id} className="flex items-start gap-2 px-3 py-2 text-sm">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">{s.description}</p>
+          <p className="text-xs text-muted-foreground">
+            {[s.location, s.quantity != null && `${s.quantity} ${s.unit ?? ""}`, s.productivity != null && `produt. ${s.productivity}`, s.team, s.notes]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+        {editable && (
+          <Button variant="ghost" size="icon" onClick={() => del.mutate({ table: "rdo_services", id: s.id })} aria-label="Excluir">
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        )}
+      </div>
+    ));
+  };
+
+  return (
+    <div className="space-y-3">
+      <h2 className="font-display text-base uppercase">Serviços / apontamentos</h2>
+      {block("Civil", () => setSvcDialog("civil"), "Adicionar", svcList("civil"))}
+      {block(
+        "Andaimes",
+        () => setScafOpen(true),
+        "Adicionar andaime",
+        (scaffolds.data ?? []).length ? (
+          (scaffolds.data ?? []).map((s) => {
+            const area = s.length_m && s.height_m ? Number(s.length_m) * Number(s.height_m) * Number(s.quantity) : null;
+            const vol = area && s.width_m ? area * Number(s.width_m) : null;
+            return (
+              <div key={s.id} className="flex items-start gap-2 px-3 py-2 text-sm">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {SCAFFOLD_OPS.find((o) => o.key === s.operation)?.label} · {s.scaffold_type || "Andaime"} ×{s.quantity}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {[s.location, `${s.length_m ?? "-"} × ${s.width_m ?? "-"} × ${s.height_m ?? "-"} m`, area && `${area.toFixed(2)} m²`, vol && `${vol.toFixed(2)} m³`, s.notes]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+                {editable && (
+                  <Button variant="ghost" size="icon" onClick={() => del.mutate({ table: "rdo_scaffolds", id: s.id })} aria-label="Excluir">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <p className="px-3 py-3 text-xs text-muted-foreground">Nenhum andaime.</p>
+        ),
+      )}
+      {SERVICE_CATEGORIES.filter((c) => c.key !== "civil").map((c) => (
+        <div key={c.key}>{block(c.label, () => setSvcDialog(c.key), "Adicionar", svcList(c.key))}</div>
+      ))}
+      <ServiceDialog rdoId={rdoId} category={svcDialog} onClose={() => setSvcDialog(null)} />
+      <ScaffoldDialog rdoId={rdoId} open={scafOpen} onClose={() => setScafOpen(false)} />
+    </div>
+  );
+}
+
+const num = (v: string) => (v.trim() === "" ? null : Number(v.replace(",", ".")));
+
+function ServiceDialog({ rdoId, category, onClose }: { rdoId: string; category: string | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const empty = { description: "", location: "", quantity: "", unit: "", productivity: "", team: "", notes: "" };
+  const [f, setF] = useState(empty);
+  useEffect(() => setF(empty), [category]); // eslint-disable-line react-hooks/exhaustive-deps
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("rdo_services").insert({
+        rdo_id: rdoId,
+        category: category!,
+        description: f.description.trim(),
+        location: f.location || null,
+        quantity: num(f.quantity),
+        unit: f.unit || null,
+        productivity: num(f.productivity),
+        team: f.team || null,
+        notes: f.notes || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rdo-services", rdoId] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
+  return (
+    <Dialog open={!!category} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{SERVICE_CATEGORIES.find((c) => c.key === category)?.label}</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="col-span-2"><Label>Atividade *</Label><Input className="h-11" value={f.description} onChange={set("description")} /></div>
+          <div className="col-span-2"><Label>Local</Label><Input className="h-11" value={f.location} onChange={set("location")} /></div>
+          <div><Label>Quantidade</Label><Input className="h-11" inputMode="decimal" value={f.quantity} onChange={set("quantity")} /></div>
+          <div><Label>Unidade</Label><Input className="h-11" placeholder="m², m, un" value={f.unit} onChange={set("unit")} /></div>
+          <div><Label>Produtividade</Label><Input className="h-11" inputMode="decimal" value={f.productivity} onChange={set("productivity")} /></div>
+          {category === "alpinismo" && <div><Label>Equipe envolvida</Label><Input className="h-11" value={f.team} onChange={set("team")} /></div>}
+          <div className="col-span-2"><Label>Observações</Label><Textarea value={f.notes} onChange={set("notes")} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!f.description.trim() || save.isPending} onClick={() => save.mutate()}>Salvar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ScaffoldDialog({ rdoId, open, onClose }: { rdoId: string; open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const empty = { scaffold_type: "", location: "", length_m: "", width_m: "", height_m: "", quantity: "1", operation: "montagem", notes: "" };
+  const [f, setF] = useState(empty);
+  useEffect(() => { if (open) setF(empty); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("rdo_scaffolds").insert({
+        rdo_id: rdoId,
+        scaffold_type: f.scaffold_type || null,
+        location: f.location || null,
+        length_m: num(f.length_m),
+        width_m: num(f.width_m),
+        height_m: num(f.height_m),
+        quantity: num(f.quantity) ?? 1,
+        operation: f.operation,
+        notes: f.notes || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rdo-scaffolds", rdoId] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
+  const l = num(f.length_m), w = num(f.width_m), h = num(f.height_m), q = num(f.quantity) ?? 1;
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Adicionar andaime</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="col-span-3">
+            <Label>Operação</Label>
+            <div className="grid grid-cols-3 gap-1">
+              {SCAFFOLD_OPS.map((o) => (
+                <button key={o.key} type="button" onClick={() => setF({ ...f, operation: o.key })}
+                  className={cn("min-h-11 rounded-md border text-xs font-medium", f.operation === o.key ? "border-primary bg-primary text-primary-foreground" : "border-border")}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="col-span-2"><Label>Tipo</Label><Input className="h-11" placeholder="Tubular, multidirecional..." value={f.scaffold_type} onChange={set("scaffold_type")} /></div>
+          <div><Label>Qtd.</Label><Input className="h-11" inputMode="decimal" value={f.quantity} onChange={set("quantity")} /></div>
+          <div className="col-span-3"><Label>Local</Label><Input className="h-11" value={f.location} onChange={set("location")} /></div>
+          <div><Label>Compr. (m)</Label><Input className="h-11" inputMode="decimal" value={f.length_m} onChange={set("length_m")} /></div>
+          <div><Label>Largura (m)</Label><Input className="h-11" inputMode="decimal" value={f.width_m} onChange={set("width_m")} /></div>
+          <div><Label>Altura (m)</Label><Input className="h-11" inputMode="decimal" value={f.height_m} onChange={set("height_m")} /></div>
+          <p className="col-span-3 text-xs text-muted-foreground">
+            {l && h ? `Área: ${(l * h * q).toFixed(2)} m²` : "Área: —"}
+            {l && h && w ? ` · Volume: ${(l * h * w * q).toFixed(2)} m³` : ""}
+          </p>
+          <div className="col-span-3"><Label>Observações</Label><Textarea value={f.notes} onChange={set("notes")} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={save.isPending} onClick={() => save.mutate()}>Salvar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------------- Fotos e vídeos ---------------- */
+
+function MediaStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
+  const qc = useQueryClient();
+  const [uploading, setUploading] = useState(false);
+  const media = useQuery({
+    queryKey: ["rdo-media", rdoId],
+    queryFn: async () => {
+      const { data } = await supabase.from("rdo_media").select("*").eq("rdo_id", rdoId).order("created_at");
+      const list = data ?? [];
+      const urls = list.length
+        ? (await supabase.storage.from("rdo-media").createSignedUrls(list.map((m) => m.storage_path), 3600)).data ?? []
+        : [];
+      return list.map((m, i) => ({ ...m, url: urls[i]?.signedUrl ?? "" }));
+    },
+  });
+
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const kind = file.type.startsWith("video") ? "video" : "photo";
+        const ext = file.name.split(".").pop() || (kind === "video" ? "mp4" : "jpg");
+        const path = `${rdoId}/${crypto.randomUUID()}.${ext}`;
+        const { error } = await supabase.storage.from("rdo-media").upload(path, file, { contentType: file.type });
+        if (error) throw error;
+        const { error: e2 } = await supabase.from("rdo_media").insert({ rdo_id: rdoId, kind, storage_path: path });
+        if (e2) throw e2;
+      }
+      toast.success("Arquivo(s) enviado(s)");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploading(false);
+      qc.invalidateQueries({ queryKey: ["rdo-media", rdoId] });
+    }
+  }
+
+  const remove = useMutation({
+    mutationFn: async (m: { id: string; storage_path: string }) => {
+      await supabase.storage.from("rdo-media").remove([m.storage_path]);
+      const { error } = await supabase.from("rdo_media").delete().eq("id", m.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rdo-media", rdoId] }),
+  });
+  const describe = useMutation({
+    mutationFn: async ({ id, description }: { id: string; description: string }) => {
+      const { error } = await supabase.from("rdo_media").update({ description: description || null }).eq("id", id);
+      if (error) throw error;
+    },
+  });
+
+  const picker = (label: string, icon: React.ReactNode, accept: string, capture?: "environment") => (
+    <label className={cn("flex min-h-14 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border text-xs font-medium hover:bg-muted", (!editable || uploading) && "pointer-events-none opacity-50")}>
+      {icon}
+      {label}
+      <input type="file" className="hidden" accept={accept} multiple={!capture} capture={capture} onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} />
+    </label>
+  );
+
+  return (
+    <div className="space-y-3">
+      <h2 className="font-display text-base uppercase">Fotos e vídeos</h2>
+      {editable && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {picker("Tirar foto", <Camera className="h-5 w-5" />, "image/*", "environment")}
+          {picker("Gravar vídeo", <Video className="h-5 w-5" />, "video/*", "environment")}
+          {picker("Importar fotos", <ImagePlus className="h-5 w-5" />, "image/*")}
+          {picker("Importar vídeos", <Video className="h-5 w-5" />, "video/*")}
+        </div>
+      )}
+      {uploading && <p className="text-xs text-muted-foreground">Enviando...</p>}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {(media.data ?? []).map((m) => (
+          <div key={m.id} className="space-y-1 rounded-md border border-border p-2">
+            {m.kind === "video" ? (
+              <video src={m.url} controls className="aspect-video w-full rounded bg-black" />
+            ) : (
+              <img src={m.url} alt={m.description ?? "Foto do RDO"} className="aspect-video w-full rounded object-cover" />
+            )}
+            <div className="flex gap-1">
+              <Input
+                placeholder="Descrição (opcional)"
+                defaultValue={m.description ?? ""}
+                disabled={!editable}
+                onBlur={(e) => e.target.value !== (m.description ?? "") && describe.mutate({ id: m.id, description: e.target.value })}
+              />
+              {editable && (
+                <Button variant="ghost" size="icon" onClick={() => remove.mutate(m)} aria-label="Excluir">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {!media.data?.length && <p className="text-center text-xs text-muted-foreground">Nenhuma mídia anexada.</p>}
+    </div>
+  );
+}
+
+/* ---------------- Assinaturas ---------------- */
+
+function SignaturesStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
+  const sigs = useQuery({
+    queryKey: ["rdo-sigs", rdoId],
+    queryFn: async () => (await supabase.from("rdo_signatures").select("*").eq("rdo_id", rdoId)).data ?? [],
+  });
+  return (
+    <div className="space-y-4">
+      <h2 className="font-display text-base uppercase">Assinaturas</h2>
+      <div className="grid gap-4 md:grid-cols-2">
+        <SignatureBox rdoId={rdoId} kind="ab5" title="Responsável AB5" existing={sigs.data?.find((s) => s.kind === "ab5")} editable={editable} />
+        <SignatureBox rdoId={rdoId} kind="client" title="Responsável cliente" existing={sigs.data?.find((s) => s.kind === "client")} editable={editable} />
+      </div>
+    </div>
+  );
+}
+
+function SignatureBox({ rdoId, kind, title, existing, editable }: { rdoId: string; kind: string; title: string; existing?: { id: string; signer_name: string; signature_data: string; signed_at: string } | undefined; editable: boolean }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [data, setData] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("rdo_signatures").upsert(
+        { rdo_id: rdoId, kind, signer_name: name.trim(), signature_data: data!, signed_at: new Date().toISOString() },
+        { onConflict: "rdo_id,kind" },
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Assinatura salva"); qc.invalidateQueries({ queryKey: ["rdo-sigs", rdoId] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const remove = useMutation({
+    mutationFn: async () => { await supabase.from("rdo_signatures").delete().eq("id", existing!.id); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rdo-sigs", rdoId] }),
+  });
+  return (
+    <div className="space-y-2 rounded-md border border-border p-3">
+      <h3 className="font-display text-sm uppercase">{title}</h3>
+      {existing ? (
+        <>
+          <img src={existing.signature_data} alt={`Assinatura de ${existing.signer_name}`} className="h-32 w-full rounded bg-white object-contain" />
+          <p className="text-sm font-medium">{existing.signer_name}</p>
+          <p className="text-xs text-muted-foreground">{new Date(existing.signed_at).toLocaleString("pt-BR")}</p>
+          {editable && <Button variant="outline" size="sm" onClick={() => remove.mutate()}>Refazer assinatura</Button>}
+        </>
+      ) : editable ? (
+        <>
+          <Input className="h-11" placeholder="Nome do responsável" value={name} onChange={(e) => setName(e.target.value)} />
+          <SignaturePad onChange={setData} />
+          <Button className="w-full" size="lg" disabled={!name.trim() || !data || save.isPending} onClick={() => save.mutate()}>Salvar assinatura</Button>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">Não assinado.</p>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Finalizar ---------------- */
+
+function FinalizeStep({ status, canReopen, onFinalize, onReopen }: { status: string; canReopen: boolean; onFinalize: () => void; onReopen: () => void }) {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div className="space-y-3 text-center">
+      <h2 className="font-display text-base uppercase">Finalizar RDO</h2>
+      {status === "draft" ? (
+        <Button size="lg" className="w-full" onClick={() => setConfirm(true)}>
+          <Check className="h-5 w-5" /> Finalizar RDO
+        </Button>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">Este RDO está finalizado.</p>
+          {canReopen && <Button variant="outline" onClick={onReopen}>Reabrir como rascunho</Button>}
+        </>
+      )}
+      <AlertDialog open={confirm} onOpenChange={setConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalizar RDO</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja finalizar este RDO? Após a finalização, algumas informações poderão ficar bloqueadas para edição.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={onFinalize}>Finalizar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

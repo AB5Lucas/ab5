@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ForemanWorksButton } from "@/components/foreman-works-dialog";
 import { useCurrentUser, ROLE_LABEL, type AppRole } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/admin/usuarios")({
@@ -45,7 +46,9 @@ function UsersPage() {
           ? "admin"
           : list.includes("programmer")
             ? "programmer"
-            : "viewer";
+            : list.includes("encarregado")
+              ? "encarregado"
+              : "viewer";
         return { ...p, role };
       });
     },
@@ -131,7 +134,7 @@ function UsersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {(["admin", "programmer", "viewer"] as AppRole[]).map((r) => (
+                        {(["admin", "programmer", "viewer", "encarregado"] as AppRole[]).map((r) => (
                           <SelectItem key={r} value={r}>
                             {ROLE_LABEL[r]}
                           </SelectItem>
@@ -141,6 +144,7 @@ function UsersPage() {
                   ) : (
                     <Badge variant="secondary">{ROLE_LABEL[u.role]}</Badge>
                   )}
+                  {isAdmin && u.role === "encarregado" && <ForemanWorksButton userId={u.id} name={u.full_name || u.email} />}
                 </TableCell>
                 <TableCell>
                   <Switch
