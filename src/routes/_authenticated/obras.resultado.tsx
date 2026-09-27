@@ -35,6 +35,7 @@ const KM_RATE = 1.35;
 const DEFAULT_HOURS = 8;
 
 const CATEGORIES = [
+  { key: "mao_obra", label: "Mão de obra" },
   { key: "materiais", label: "Materiais" },
   { key: "ferramentas", label: "Ferramentas" },
   { key: "andaimes", label: "Andaimes" },
@@ -53,7 +54,7 @@ const ITEMS = [
 ] as const;
 type ItemKey = (typeof ITEMS)[number]["key"];
 const entryItem = (cat: string): ItemKey | null =>
-  cat === "terceiros" ? "transporte" : cat === "ferramentas" || cat === "materiais" || cat === "andaimes" ? cat : null;
+  cat === "mao_obra" ? "mo" : cat === "terceiros" ? "transporte" : cat === "ferramentas" || cat === "materiais" || cat === "andaimes" ? cat : null;
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
@@ -601,7 +602,7 @@ function ResultadoPage() {
                       </TableRow>
                     ))}
                     <TableRow className="font-bold">
-                      <TableCell colSpan={4}>Total</TableCell>
+                      <TableCell colSpan={4}>Total calculado</TableCell>
                       <TableCell className="text-right">{brl(calc.tot.labor)}</TableCell>
                     </TableRow>
                   </TableBody>
