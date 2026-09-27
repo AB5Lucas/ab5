@@ -2152,6 +2152,7 @@ export type Database = {
           active: boolean
           address: string | null
           budget_cost: number
+          budget_items: Json
           city: string | null
           client: string | null
           client_id: string | null
@@ -2183,6 +2184,7 @@ export type Database = {
           active?: boolean
           address?: string | null
           budget_cost?: number
+          budget_items?: Json
           city?: string | null
           client?: string | null
           client_id?: string | null
@@ -2214,6 +2216,7 @@ export type Database = {
           active?: boolean
           address?: string | null
           budget_cost?: number
+          budget_items?: Json
           city?: string | null
           client?: string | null
           client_id?: string | null
