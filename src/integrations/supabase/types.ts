@@ -2174,6 +2174,7 @@ export type Database = {
           number: string | null
           order_number: string | null
           order_value: number
+          orders: Json
           quote_number: string | null
           start_date: string | null
           state: string | null
@@ -2208,6 +2209,7 @@ export type Database = {
           number?: string | null
           order_number?: string | null
           order_value?: number
+          orders?: Json
           quote_number?: string | null
           start_date?: string | null
           state?: string | null
@@ -2242,6 +2244,7 @@ export type Database = {
           number?: string | null
           order_number?: string | null
           order_value?: number
+          orders?: Json
           quote_number?: string | null
           start_date?: string | null
           state?: string | null

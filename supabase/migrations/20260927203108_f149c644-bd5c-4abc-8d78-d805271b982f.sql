@@ -1,0 +1,2 @@
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS orders jsonb NOT NULL DEFAULT '[]'::jsonb;
+UPDATE public.works SET orders = jsonb_build_array(jsonb_build_object('number', coalesce(order_number,''), 'value', order_value)) WHERE order_value > 0 OR order_number IS NOT NULL;
