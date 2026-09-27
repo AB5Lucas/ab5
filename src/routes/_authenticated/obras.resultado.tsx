@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Trash2, Plus } from "lucide-react";
-import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, LabelList, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -36,10 +36,23 @@ const DEFAULT_HOURS = 8;
 const CATEGORIES = [
   { key: "materiais", label: "Materiais" },
   { key: "ferramentas", label: "Ferramentas" },
+  { key: "andaimes", label: "Andaimes" },
   { key: "terceiros", label: "Transporte de terceiros" },
   { key: "faturamento", label: "Faturamento" },
 ] as const;
 const catLabel = (k: string) => CATEGORIES.find((c) => c.key === k)?.label ?? k;
+
+/** Itens de custo orçados/realizados. */
+const ITEMS = [
+  { key: "mo", label: "Mão de obra" },
+  { key: "transporte", label: "Transporte" },
+  { key: "ferramentas", label: "Ferramentas" },
+  { key: "materiais", label: "Materiais" },
+  { key: "andaimes", label: "Andaimes" },
+] as const;
+type ItemKey = (typeof ITEMS)[number]["key"];
+const entryItem = (cat: string): ItemKey | null =>
+  cat === "terceiros" ? "transporte" : cat === "ferramentas" || cat === "materiais" || cat === "andaimes" ? cat : null;
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
@@ -192,12 +205,24 @@ function ResultadoPage() {
       tot.transport += r.transport;
       tot.others += r.others;
     });
-    return { rows, last, order, budget, budgetMarginPct, tot };
+    const real: Record<ItemKey, number> = { mo: tot.labor, transporte: tot.transport, ferramentas: 0, materiais: 0, andaimes: 0 };
+    for (const e of d.entries) {
+      const k = entryItem(e.category);
+      if (k) real[k] += Number(e.amount);
+    }
+    const bi = ((work as any).budget_items ?? {}) as Record<string, number>;
+    const items = ITEMS.map((it) => {
+      const b = Number(bi[it.key] ?? 0);
+      const r = real[it.key];
+      return { label: it.label, budget: b, real: r, used: b ? (r / b) * 100 : r ? 100 : 0 };
+    });
+    return { rows, last, order, budget, budgetMarginPct, tot, items };
   }, [work, data.data]);
 
   // ---------- Edição ----------
   const [orderStr, setOrderStr] = useState("");
-  const [budgetStr, setBudgetStr] = useState("");
+  const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
+  const itemsSum = ITEMS.reduce((a, it) => a + num(itemStrs[it.key] ?? ""), 0);
   const [progMonth, setProgMonth] = useState(new Date().toISOString().slice(0, 7));
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "" });
@@ -211,7 +236,11 @@ function ResultadoPage() {
     mutationFn: async () => {
       const { error } = await supabase
         .from("works")
-        .update({ order_value: num(orderStr), budget_cost: num(budgetStr) })
+        .update({
+          order_value: num(orderStr),
+          budget_cost: itemsSum,
+          budget_items: Object.fromEntries(ITEMS.map((it) => [it.key, num(itemStrs[it.key] ?? "")])),
+        } as any)
         .eq("id", workId);
       if (error) throw error;
     },
@@ -281,7 +310,8 @@ function ResultadoPage() {
     const w = works.data?.find((x) => x.id === id);
     const f = (v: unknown) => (Number(v ?? 0) ? Number(v).toFixed(2).replace(".", ",") : "");
     setOrderStr(f(w?.order_value));
-    setBudgetStr(f(w?.budget_cost));
+    const bi = ((w as any)?.budget_items ?? {}) as Record<string, number>;
+    setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, f(bi[it.key])])));
   };
 
   const last = calc?.last;
@@ -308,26 +338,71 @@ function ResultadoPage() {
 
       {work && (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Orçamento</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label>Valor do pedido (R$)</Label>
-                <Input value={orderStr} onChange={(e) => setOrderStr(e.target.value)} disabled={!canWrite} />
-              </div>
-              <div className="space-y-1">
-                <Label>Custo total orçado (R$)</Label>
-                <Input value={budgetStr} onChange={(e) => setBudgetStr(e.target.value)} disabled={!canWrite} />
-              </div>
-              {canWrite && (
-                <Button onClick={() => saveValues.mutate()} disabled={saveValues.isPending}>
-                  Salvar
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Orçado x realizado por item</CardTitle>
+              </CardHeader>
+              <CardContent className="h-72">
+                {calc ? (
+                  <ResponsiveContainer>
+                    <BarChart data={calc.items} layout="vertical" margin={{ right: 56, left: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                      <XAxis type="number" fontSize={12} tickFormatter={(v: number) => v.toLocaleString("pt-BR", { notation: "compact" })} />
+                      <YAxis type="category" dataKey="label" width={100} fontSize={12} />
+                      <Tooltip formatter={(v: number) => brl(v)} />
+                      <Legend />
+                      <Bar dataKey="budget" name="Orçado" fill="var(--muted-foreground)" />
+                      <Bar dataKey="real" name="Realizado" fill="var(--primary)">
+                        <LabelList
+                          dataKey="used"
+                          position="right"
+                          fontSize={12}
+                          className="fill-foreground"
+                          formatter={(v: number) => pct(v)}
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Carregando…</p>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Orçamento</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Valor do pedido (R$)</Label>
+                    <Input value={orderStr} onChange={(e) => setOrderStr(e.target.value)} disabled={!canWrite} />
+                  </div>
+                  {ITEMS.map((it) => (
+                    <div key={it.key} className="space-y-1">
+                      <Label>{it.label} orçado (R$)</Label>
+                      <Input
+                        value={itemStrs[it.key] ?? ""}
+                        onChange={(e) => setItemStrs((s) => ({ ...s, [it.key]: e.target.value }))}
+                        disabled={!canWrite}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    Custo total orçado: <span className="font-semibold text-foreground">{brl(itemsSum)}</span>
+                  </p>
+                  {canWrite && (
+                    <Button onClick={() => saveValues.mutate()} disabled={saveValues.isPending}>
+                      Salvar
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {calc && (
             <Card>

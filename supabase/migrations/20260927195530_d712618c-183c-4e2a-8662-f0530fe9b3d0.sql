@@ -1,0 +1,1 @@
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS budget_items jsonb NOT NULL DEFAULT '{}'::jsonb;
