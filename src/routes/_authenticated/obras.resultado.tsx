@@ -103,7 +103,7 @@ function ResultadoPage() {
         ),
         supabase.from("work_progress").select("*").eq("work_id", w.id).order("month"),
         supabase.from("work_entries").select("*").eq("work_id", w.id).order("entry_date", { ascending: false }),
-        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name").range(a, b)),
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
@@ -140,6 +140,14 @@ function ResultadoPage() {
       monthly.set(ym, m);
     };
     const seen = new Set<string>();
+    const laborBy = new Map<string, { days: number; hours: number; cost: number }>();
+    const addLabor = (id: string, hours: number, cost: number) => {
+      const l = laborBy.get(id) ?? { days: 0, hours: 0, cost: 0 };
+      l.days += 1;
+      l.hours += hours;
+      l.cost += cost;
+      laborBy.set(id, l);
+    };
     for (const a of d.allocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
       if (!date) continue;
@@ -147,18 +155,27 @@ function ResultadoPage() {
       seen.add(key);
       const r = rdoKey.get(key);
       const hours = r ? (r.present ? Number(r.worked_hours ?? DEFAULT_HOURS) : 0) : DEFAULT_HOURS;
-      bump(date.slice(0, 7), "labor", hours * (rate.get(a.collaborator_id) ?? 0) * ENCARGOS);
+      const cost = hours * (rate.get(a.collaborator_id) ?? 0) * ENCARGOS;
+      addLabor(a.collaborator_id, hours, cost);
+      bump(date.slice(0, 7), "labor", cost);
     }
     for (const r of d.rdoWf) {
       const key = `${r.collaborator_id}|${r.report_date}`;
       if (seen.has(key) || !r.present) continue;
-      bump(r.report_date.slice(0, 7), "labor", Number(r.worked_hours ?? 0) * (rate.get(r.collaborator_id) ?? 0) * ENCARGOS);
+      const hours = Number(r.worked_hours ?? 0);
+      const cost = hours * (rate.get(r.collaborator_id) ?? 0) * ENCARGOS;
+      addLabor(r.collaborator_id, hours, cost);
+      bump(r.report_date.slice(0, 7), "labor", cost);
     }
     const toll = d.client?.has_toll ? Number(d.client.toll_amount ?? 0) : 0;
+    const transportRows: { date: string; km: number; trips: number; kmCost: number; toll: number; share: number }[] = [];
     for (const v of d.vs) {
       const trips = Number(v.trips ?? 1);
-      const cost = Number(v.km ?? 0) * 2 * trips * KM_RATE + toll * 2 * trips;
-      bump(v.schedule_date.slice(0, 7), "transport", cost / d.siblingCount);
+      const kmCost = Number(v.km ?? 0) * 2 * trips * KM_RATE;
+      const t = toll * 2 * trips;
+      const share = (kmCost + t) / d.siblingCount;
+      transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share });
+      bump(v.schedule_date.slice(0, 7), "transport", share);
     }
     for (const e of d.entries) {
       bump(e.entry_date.slice(0, 7), e.category === "faturamento" ? "billing" : "entries", Number(e.amount));
@@ -229,7 +246,12 @@ function ResultadoPage() {
     const first = dates[0];
     const lastDay = dates[dates.length - 1];
     const days = first ? Math.round((Date.parse(lastDay!) - Date.parse(first)) / 86400000) + 1 : 0;
-    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days };
+    const names = new Map<string, string>(d.people.map((p: any) => [p.id, p.full_name]));
+    const laborRows = [...laborBy.entries()]
+      .map(([id, l]) => ({ id, name: names.get(id) ?? "—", rate: rate.get(id) ?? 0, ...l }))
+      .sort((a, b) => b.cost - a.cost);
+    transportRows.sort((a, b) => a.date.localeCompare(b.date));
+    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, siblingCount: d.siblingCount };
   }, [work, data.data]);
 
   // ---------- Edição ----------
@@ -242,6 +264,7 @@ function ResultadoPage() {
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "" });
   const [dlg, setDlg] = useState<null | "cliente" | "orcamento" | "andamento" | "lancamentos">(null);
+  const [detail, setDetail] = useState<ItemKey | null>(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["work-result", workId] });
@@ -489,7 +512,19 @@ function ResultadoPage() {
                     <tr key={i.key}>
                       <td className="py-1 pl-3">{i.label}</td>
                       <td className="text-right">{brl(i.budget)}</td>
-                      <td className="text-right">{brl(i.real)}</td>
+                      <td className="text-right">
+                        <button
+                          type="button"
+                          className="text-primary underline-offset-2 hover:underline"
+                          title="Ver detalhes"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetail(i.key);
+                          }}
+                        >
+                          {brl(i.real)}
+                        </button>
+                      </td>
                       <td className={`text-right ${i.used > 100 ? "text-destructive" : ""}`}>{Math.round(i.used)}%</td>
                     </tr>
                   ))}
@@ -521,6 +556,85 @@ function ResultadoPage() {
       )}
 
       {/* Diálogos */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Custo realizado — {ITEMS.find((i) => i.key === detail)?.label}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-auto text-sm">
+            {detail === "mo" && calc && (
+              <>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Horas do RDO (ausente = 0h; sem RDO, escalado = {DEFAULT_HOURS}h) × valor hora × {String(ENCARGOS).replace(".", ",")} (encargos).
+                </p>
+                <Table>
+                  <TableBody>
+                    <TableRow className="font-semibold">
+                      <TableCell>Colaborador</TableCell>
+                      <TableCell className="text-right">Dias</TableCell>
+                      <TableCell className="text-right">Horas</TableCell>
+                      <TableCell className="text-right">Valor hora</TableCell>
+                      <TableCell className="text-right">Custo</TableCell>
+                    </TableRow>
+                    {calc.laborRows.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell>{l.name}</TableCell>
+                        <TableCell className="text-right">{l.days}</TableCell>
+                        <TableCell className="text-right">{l.hours.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="text-right">{brl(l.rate)}</TableCell>
+                        <TableCell className="text-right">{brl(l.cost)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold">
+                      <TableCell colSpan={4}>Total</TableCell>
+                      <TableCell className="text-right">{brl(calc.tot.labor)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </>
+            )}
+            {detail === "transporte" && calc && (
+              <>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  (KM ida × 2 × viagens × R$ {KM_RATE.toFixed(2).replace(".", ",")}) + (pedágio × 2 × viagens), dividido por {calc.siblingCount} serviço(s) do mesmo cliente. Transporte de terceiros vem dos lançamentos.
+                </p>
+                <Table>
+                  <TableBody>
+                    <TableRow className="font-semibold">
+                      <TableCell>Data</TableCell>
+                      <TableCell className="text-right">KM ida</TableCell>
+                      <TableCell className="text-right">Viagens</TableCell>
+                      <TableCell className="text-right">KM</TableCell>
+                      <TableCell className="text-right">Pedágio</TableCell>
+                      <TableCell className="text-right">Custo dia</TableCell>
+                      <TableCell className="text-right">Rateado</TableCell>
+                    </TableRow>
+                    {calc.transportRows.map((t, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{fmtDate(t.date)}</TableCell>
+                        <TableCell className="text-right">{t.km}</TableCell>
+                        <TableCell className="text-right">{t.trips}</TableCell>
+                        <TableCell className="text-right">{brl(t.kmCost)}</TableCell>
+                        <TableCell className="text-right">{brl(t.toll)}</TableCell>
+                        <TableCell className="text-right">{brl(t.kmCost + t.toll)}</TableCell>
+                        <TableCell className="text-right">{brl(t.share)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold">
+                      <TableCell colSpan={6}>Total veículos</TableCell>
+                      <TableCell className="text-right">{brl(calc.tot.transport)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </>
+            )}
+            {detail && (
+              <EntryList entries={(data.data?.entries ?? []).filter((e: any) => entryItem(e.category) === detail)} />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={dlg === "cliente"} onOpenChange={(o) => !o && setDlg(null)}>
         <DialogContent>
           <DialogHeader>
