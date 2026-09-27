@@ -206,17 +206,30 @@ function ResultadoPage() {
       tot.others += r.others;
     });
     const real: Record<ItemKey, number> = { mo: tot.labor, transporte: tot.transport, ferramentas: 0, materiais: 0, andaimes: 0 };
+    const perMonth = new Map<string, Record<ItemKey, number>>();
+    rows.forEach((r) => perMonth.set(r.ym, { mo: r.labor, transporte: r.transport, ferramentas: 0, materiais: 0, andaimes: 0 }));
     for (const e of d.entries) {
       const k = entryItem(e.category);
-      if (k) real[k] += Number(e.amount);
+      if (!k) continue;
+      real[k] += Number(e.amount);
+      const pm = perMonth.get(e.entry_date.slice(0, 7));
+      if (pm) pm[k] += Number(e.amount);
     }
+    const monthBars = rows.map((r) => ({ label: r.label, ...perMonth.get(r.ym)! }));
     const bi = ((work as any).budget_items ?? {}) as Record<string, number>;
     const items = ITEMS.map((it) => {
       const b = Number(bi[it.key] ?? 0);
       const r = real[it.key];
-      return { label: it.label, budget: b, real: r, used: b ? (r / b) * 100 : r ? 100 : 0 };
+      return { key: it.key, label: it.label, budget: b, real: r, used: b ? (r / b) * 100 : r ? 100 : 0 };
     });
-    return { rows, last, order, budget, budgetMarginPct, tot, items };
+    const dates = [
+      ...d.allocs.map((a: any) => a.daily_schedules?.schedule_date).filter(Boolean),
+      ...d.rdoWf.map((r: any) => r.report_date),
+    ].sort() as string[];
+    const first = dates[0];
+    const lastDay = dates[dates.length - 1];
+    const days = first ? Math.round((Date.parse(lastDay) - Date.parse(first)) / 86400000) + 1 : 0;
+    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days };
   }, [work, data.data]);
 
   // ---------- Edição ----------
