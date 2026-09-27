@@ -2027,6 +2027,82 @@ export type Database = {
           },
         ]
       }
+      work_entries: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string | null
+          entry_date: string
+          id: string
+          updated_at: string
+          work_id: string
+        }
+        Insert: {
+          amount?: number
+          category: string
+          created_at?: string
+          description?: string | null
+          entry_date: string
+          id?: string
+          updated_at?: string
+          work_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          id?: string
+          updated_at?: string
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_entries_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_progress: {
+        Row: {
+          created_at: string
+          id: string
+          month: string
+          percent: number
+          updated_at: string
+          work_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: string
+          percent?: number
+          updated_at?: string
+          work_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: string
+          percent?: number
+          updated_at?: string
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_progress_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_requirements: {
         Row: {
           active: boolean
@@ -2075,6 +2151,7 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          budget_cost: number
           city: string | null
           client: string | null
           client_id: string | null
@@ -2094,6 +2171,7 @@ export type Database = {
           neighborhood: string | null
           notes: string | null
           number: string | null
+          order_value: number
           start_date: string | null
           state: string | null
           status: Database["public"]["Enums"]["work_status"]
@@ -2104,6 +2182,7 @@ export type Database = {
         Insert: {
           active?: boolean
           address?: string | null
+          budget_cost?: number
           city?: string | null
           client?: string | null
           client_id?: string | null
@@ -2123,6 +2202,7 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           number?: string | null
+          order_value?: number
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]
@@ -2133,6 +2213,7 @@ export type Database = {
         Update: {
           active?: boolean
           address?: string | null
+          budget_cost?: number
           city?: string | null
           client?: string | null
           client_id?: string | null
@@ -2152,6 +2233,7 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           number?: string | null
+          order_value?: number
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]
