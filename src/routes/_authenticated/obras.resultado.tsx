@@ -3,16 +3,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Trash2, Plus } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, LabelList, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { PageHeader } from "@/components/page-header";
+
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/obras/resultado")({
   head: () => ({
@@ -234,11 +234,14 @@ function ResultadoPage() {
 
   // ---------- Edição ----------
   const [orderStr, setOrderStr] = useState("");
+  const [orderNo, setOrderNo] = useState("");
+  const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
   const itemsSum = ITEMS.reduce((a, it) => a + num(itemStrs[it.key] ?? ""), 0);
   const [progMonth, setProgMonth] = useState(new Date().toISOString().slice(0, 7));
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "" });
+  const [dlg, setDlg] = useState<null | "cliente" | "orcamento" | "andamento" | "lancamentos">(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["work-result", workId] });
@@ -251,6 +254,8 @@ function ResultadoPage() {
         .from("works")
         .update({
           order_value: num(orderStr),
+          order_number: orderNo.trim() || null,
+          quote_number: quoteNo.trim() || null,
           budget_cost: itemsSum,
           budget_items: Object.fromEntries(ITEMS.map((it) => [it.key, num(itemStrs[it.key] ?? "")])),
         } as any)
@@ -259,6 +264,7 @@ function ResultadoPage() {
     },
     onSuccess: () => {
       toast.success("Valores salvos");
+      setDlg(null);
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -320,338 +326,366 @@ function ResultadoPage() {
 
   const selectWork = (id: string) => {
     setWorkId(id);
-    const w = works.data?.find((x) => x.id === id);
+    const w = works.data?.find((x) => x.id === id) as any;
     const f = (v: unknown) => (Number(v ?? 0) ? Number(v).toFixed(2).replace(".", ",") : "");
     setOrderStr(f(w?.order_value));
-    const bi = ((w as any)?.budget_items ?? {}) as Record<string, number>;
+    setOrderNo(w?.order_number ?? "");
+    setQuoteNo(w?.quote_number ?? "");
+    const bi = (w?.budget_items ?? {}) as Record<string, number>;
     setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, f(bi[it.key])])));
   };
 
   const last = calc?.last;
-  const deviation = (last?.marginPct ?? 0) - (calc?.budgetMarginPct ?? 0);
+  const billed = last?.billing ?? 0;
+  const order = calc?.order ?? 0;
+  const budgetMargin = order - (calc?.budget ?? 0);
+  const realMargin = (last?.revenue ?? 0) - (last?.cost ?? 0);
+  const totBudget = calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0;
+  const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
+  const barItems = (calc?.items ?? []).filter((i) => i.budget || i.real);
+  const open = (k: NonNullable<typeof dlg>) => canWrite && setDlg(k);
+  const clickable = canWrite ? "cursor-pointer rounded-md transition-colors hover:bg-muted/60" : "";
+  const w = work as any;
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Resultado da Obra" description="Margem de contribuição proporcional ao andamento do serviço." />
-
-      <div className="max-w-xl">
-        <Select value={workId} onValueChange={selectWork}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione o serviço" />
-          </SelectTrigger>
-          <SelectContent>
-            {(works.data ?? []).map((w) => (
-              <SelectItem key={w.id} value={w.id}>
-                {w.client ? `${w.client} - ${w.name}` : w.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-full max-w-xl">
+          <Select value={workId} onValueChange={selectWork}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o serviço" />
+            </SelectTrigger>
+            <SelectContent>
+              {(works.data ?? []).map((x) => (
+                <SelectItem key={x.id} value={x.id}>
+                  {x.client ? `${x.client} - ${x.name}` : x.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {work && canWrite && (
+          <Button variant="outline" onClick={() => setDlg("lancamentos")}>
+            Lançamentos
+          </Button>
+        )}
       </div>
 
+      {!work && <p className="text-sm text-muted-foreground">Selecione um serviço para ver o relatório financeiro.</p>}
+
       {work && (
-        <>
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Orçado x realizado por item</CardTitle>
-              </CardHeader>
-              <CardContent className="h-72">
-                {calc ? (
+        <div className="rounded-lg border bg-card px-8 py-6 shadow-sm">
+          {/* Cabeçalho */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 border-b pb-4">
+            <div className="grid grid-cols-[auto_auto_auto_auto] gap-x-6 gap-y-1 text-sm justify-self-start">
+              <span className="text-muted-foreground">Primeiro Dia:</span>
+              <span className="font-semibold">{calc?.first ? fmtDate(calc.first) : "—"}</span>
+              <span className="text-muted-foreground">Dias Totais</span>
+              <span />
+              <span className="text-muted-foreground">Último Dia:</span>
+              <span className="font-semibold">{calc?.lastDay ? fmtDate(calc.lastDay) : "—"}</span>
+              <span className="font-semibold">{calc?.days ?? 0}</span>
+              <span />
+            </div>
+            <h1 className="text-center text-3xl font-bold italic tracking-wide">RELATÓRIO FINANCEIRO DE OBRAS</h1>
+            <div className="flex items-center gap-4 justify-self-end">
+              <span className="font-display text-3xl font-black italic text-primary">AB5</span>
+              <div className="text-sm">
+                <p className="text-muted-foreground">Atualização</p>
+                <p className="font-semibold">{fmtDate(new Date().toISOString().slice(0, 10))}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Linha 1 */}
+          <div className="grid gap-6 border-b py-5 xl:grid-cols-[1fr_2fr_1fr]">
+            <div className={`p-3 ${clickable}`} onClick={() => open("cliente")} title={canWrite ? "Clique para editar" : undefined}>
+              <SectionTitle>Dados do Cliente</SectionTitle>
+              <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+                <Lbl>Cliente</Lbl>
+                <span className="text-lg font-bold">{w.client ?? "—"}</span>
+                <Lbl>Obra</Lbl>
+                <span className="text-xs uppercase">{w.name}</span>
+                <Lbl>Nº Pedido</Lbl>
+                <span>{w.order_number || "—"}</span>
+                <Lbl>Nº Orç. AB5</Lbl>
+                <span className="flex justify-between">
+                  <span>{w.quote_number || "—"}</span>
+                  <span>{order ? `${Math.round((billed / order) * 100)}%` : ""}</span>
+                </span>
+                <Lbl>Valor Faturado</Lbl>
+                <span>{brl(billed)}</span>
+                <Lbl>Saldo a Faturar</Lbl>
+                <span>{brl(order - billed)}</span>
+              </div>
+              <div className="mt-6 text-center">
+                <SectionTitle>Valor do Pedido</SectionTitle>
+                <p className="mt-2 text-xl font-bold">{brl(order)}</p>
+              </div>
+            </div>
+
+            <div>
+              <SectionTitle>Andamento Mensal</SectionTitle>
+              <div className="mt-2 h-64">
+                {calc && calc.monthBars.length > 0 ? (
                   <ResponsiveContainer>
-                    <BarChart data={calc.items} layout="vertical" margin={{ right: 56, left: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
-                      <XAxis type="number" fontSize={12} tickFormatter={(v: number) => v.toLocaleString("pt-BR", { notation: "compact" })} />
-                      <YAxis type="category" dataKey="label" width={100} fontSize={12} />
+                    <BarChart data={calc.monthBars} margin={{ left: 20 }}>
+                      <CartesianGrid vertical={false} className="stroke-border" />
+                      <XAxis dataKey="label" fontSize={11} />
+                      <YAxis fontSize={11} tickFormatter={(v: number) => brl(v)} width={100} />
                       <Tooltip formatter={(v: number) => brl(v)} />
-                      <Legend />
-                      <Bar dataKey="budget" name="Orçado" fill="var(--muted-foreground)" />
-                      <Bar dataKey="real" name="Realizado" fill="var(--primary)">
-                        <LabelList
-                          dataKey="used"
-                          position="right"
-                          fontSize={12}
-                          className="fill-foreground"
-                          formatter={(v: number) => pct(v)}
-                        />
-                      </Bar>
+                      <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="mo" name="R$ Total MO" fill="var(--muted-foreground)" />
+                      <Bar dataKey="materiais" name="R$ Total Materiais" fill="var(--primary)" />
+                      <Bar dataKey="transporte" name="R$ Total Transporte" fill="var(--foreground)" />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Carregando…</p>
+                  <p className="pt-10 text-center text-sm text-muted-foreground">Sem custos lançados.</p>
                 )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Orçamento</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label>Valor do pedido (R$)</Label>
-                    <Input value={orderStr} onChange={(e) => setOrderStr(e.target.value)} disabled={!canWrite} />
-                  </div>
-                  {ITEMS.map((it) => (
-                    <div key={it.key} className="space-y-1">
-                      <Label>{it.label} orçado (R$)</Label>
-                      <Input
-                        value={itemStrs[it.key] ?? ""}
-                        onChange={(e) => setItemStrs((s) => ({ ...s, [it.key]: e.target.value }))}
-                        disabled={!canWrite}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm text-muted-foreground">
-                    Custo total orçado: <span className="font-semibold text-foreground">{brl(itemsSum)}</span>
-                  </p>
-                  {canWrite && (
-                    <Button onClick={() => saveValues.mutate()} disabled={saveValues.isPending}>
-                      Salvar
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {calc && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Margem de contribuição</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-6 md:grid-cols-3">
-                <div className="space-y-1 text-sm">
-                  <p className="font-semibold uppercase text-muted-foreground">Orçado</p>
-                  <Kv k="Valor do pedido" v={brl(calc.order)} />
-                  <Kv k="Custo total orçado" v={brl(calc.budget)} />
-                  <Kv k="Margem total orçada" v={brl(calc.order - calc.budget)} />
-                  <Kv k="Margem %" v={pct(calc.budgetMarginPct)} />
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="font-semibold uppercase text-muted-foreground">Realizado / proporcional</p>
-                  <Kv k="Andamento da obra" v={pct(last?.progress ?? 0)} />
-                  <Kv k="Receita proporcional" v={brl(last?.revenue ?? 0)} />
-                  <Kv k="Custo realizado" v={brl(last?.cost ?? 0)} />
-                  <Kv k="Margem proporcional" v={brl(last?.margin ?? 0)} />
-                  <Kv k="Margem %" v={pct(last?.marginPct ?? 0)} />
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="font-semibold uppercase text-muted-foreground">Comparativos</p>
-                  <Kv
-                    k="Desvio da margem"
-                    v={`${deviation >= 0 ? "+" : ""}${deviation.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} p.p.`}
-                    bad={deviation < 0}
-                  />
-                  <Kv
-                    k="Desvio em R$"
-                    v={brl((last?.margin ?? 0) - ((last?.revenue ?? 0) * calc.budgetMarginPct) / 100)}
-                    bad={deviation < 0}
-                  />
-                  <Kv k="Obra executada" v={pct(last?.progress ?? 0)} />
-                  <Kv k="Orçamento consumido" v={pct(last?.consumed ?? 0)} bad={(last?.consumed ?? 0) > (last?.progress ?? 0)} />
-                  <Kv k="Faturado (lançamentos)" v={brl(last?.billing ?? 0)} />
-                  <p className="pt-2 text-xs text-muted-foreground">
-                    Mão de obra {brl(calc.tot.labor)} · Transporte {brl(calc.tot.transport)} · Lançamentos {brl(calc.tot.others)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {calc && calc.rows.length > 0 && (
-            <div className="grid gap-4 xl:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Andamento x custo x margem</CardTitle>
-                </CardHeader>
-                <CardContent className="h-72">
-                  <ResponsiveContainer>
-                    <ComposedChart data={calc.rows}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="label" fontSize={12} />
-                      <YAxis unit="%" fontSize={12} />
-                      <Tooltip formatter={(v: number) => pct(v)} />
-                      <Legend />
-                      <Bar dataKey="progress" name="% andamento" fill="var(--primary)" />
-                      <Line dataKey="consumed" name="% orçamento consumido" stroke="var(--foreground)" />
-                      <Line dataKey="marginPct" name="% margem proporcional" stroke="var(--chart-2, var(--muted-foreground))" />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Margem orçada x margem proporcional realizada</CardTitle>
-                </CardHeader>
-                <CardContent className="h-72">
-                  <ResponsiveContainer>
-                    <ComposedChart data={calc.rows}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="label" fontSize={12} />
-                      <YAxis unit="%" fontSize={12} />
-                      <Tooltip formatter={(v: number) => pct(v)} />
-                      <Legend />
-                      <Line dataKey="budgetMarginPct" name="Margem orçada" stroke="var(--muted-foreground)" strokeDasharray="5 5" />
-                      <Line dataKey="marginPct" name="Margem realizada" stroke="var(--primary)" />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              </div>
             </div>
-          )}
 
-          {calc && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Comparativo mensal</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Mês</TableHead>
-                      <TableHead className="text-right">Andamento</TableHead>
-                      <TableHead className="text-right">Avanço do mês</TableHead>
-                      <TableHead className="text-right">Receita proporcional</TableHead>
-                      <TableHead className="text-right">Custo do mês</TableHead>
-                      <TableHead className="text-right">Custo acumulado</TableHead>
-                      <TableHead className="text-right">Margem proporcional</TableHead>
-                      <TableHead className="text-right">Margem %</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {calc.rows.map((r) => (
-                      <TableRow key={r.ym}>
-                        <TableCell>{r.label}</TableCell>
-                        <TableCell className="text-right">{pct(r.progress)}</TableCell>
-                        <TableCell className="text-right">{pct(r.advance)}</TableCell>
-                        <TableCell className="text-right">{brl(r.revenue)}</TableCell>
-                        <TableCell className="text-right">{brl(r.monthCost)}</TableCell>
-                        <TableCell className="text-right">{brl(r.cost)}</TableCell>
-                        <TableCell className={`text-right ${r.margin < 0 ? "text-destructive" : ""}`}>{brl(r.margin)}</TableCell>
-                        <TableCell className="text-right">{pct(r.marginPct)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Andamento da obra</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {canWrite && (
-                  <div className="flex flex-wrap items-end gap-2">
-                    <div className="space-y-1">
-                      <Label>Mês</Label>
-                      <Input type="month" value={progMonth} onChange={(e) => setProgMonth(e.target.value)} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>% acumulado</Label>
-                      <Input className="w-28" value={progPct} onChange={(e) => setProgPct(e.target.value)} />
-                    </div>
-                    <Button onClick={() => saveProgress.mutate()} disabled={saveProgress.isPending}>
-                      Salvar
-                    </Button>
-                  </div>
-                )}
-                <Table>
-                  <TableBody>
-                    {(data.data?.progress ?? []).map((p: any) => (
-                      <TableRow key={p.id}>
-                        <TableCell>{monthLabel(String(p.month).slice(0, 7))}</TableCell>
-                        <TableCell className="text-right">{pct(Number(p.percent))}</TableCell>
-                        <TableCell className="w-10">
-                          {canWrite && (
-                            <Button variant="ghost" size="icon" onClick={() => delProgress.mutate(p.id)} aria-label="Excluir">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Lançamentos</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {canWrite && (
-                  <div className="flex flex-wrap items-end gap-2">
-                    <Input type="date" className="w-40" value={entry.date} onChange={(e) => setEntry({ ...entry, date: e.target.value })} />
-                    <Select value={entry.category} onValueChange={(v) => setEntry({ ...entry, category: v })}>
-                      <SelectTrigger className="w-52">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map((c) => (
-                          <SelectItem key={c.key} value={c.key}>
-                            {c.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      className="min-w-40 flex-1"
-                      placeholder="Descrição"
-                      value={entry.description}
-                      onChange={(e) => setEntry({ ...entry, description: e.target.value })}
-                    />
-                    <Input
-                      className="w-32"
-                      placeholder="Valor"
-                      value={entry.amount}
-                      onChange={(e) => setEntry({ ...entry, amount: e.target.value })}
-                    />
-                    <Button onClick={() => saveEntry.mutate()} disabled={saveEntry.isPending}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-                <Table>
-                  <TableBody>
-                    {(data.data?.entries ?? []).map((e: any) => (
-                      <TableRow key={e.id}>
-                        <TableCell>{fmtDate(e.entry_date)}</TableCell>
-                        <TableCell>{catLabel(e.category)}</TableCell>
-                        <TableCell>{e.description ?? "—"}</TableCell>
-                        <TableCell className="text-right">{brl(Number(e.amount))}</TableCell>
-                        <TableCell className="w-10">
-                          {canWrite && (
-                            <Button variant="ghost" size="icon" onClick={() => delEntry.mutate(e.id)} aria-label="Excluir">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <div className={`p-3 ${clickable}`} onClick={() => open("andamento")} title={canWrite ? "Clique para lançar o andamento" : undefined}>
+              <SectionTitle>Conclusão da Obra</SectionTitle>
+              <Gauge value={last?.progress ?? 0} />
+            </div>
           </div>
-        </>
+
+          {/* Linha 2 */}
+          <div className="grid gap-6 pt-5 xl:grid-cols-[1fr_2fr_1fr]">
+            <div className="h-64">
+              {barItems.length ? (
+                <ResponsiveContainer>
+                  <BarChart data={barItems} layout="vertical" margin={{ right: 48 }} barGap={2}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="label" width={80} fontSize={11} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(v: number) => brl(v)} />
+                    <Legend wrapperStyle={{ fontSize: 13 }} />
+                    <Bar dataKey="real" name="Custo Realizado" fill="var(--primary)">
+                      <LabelList dataKey="used" position="right" fontSize={11} className="fill-foreground" formatter={(v: number) => pct(Math.round(v))} />
+                    </Bar>
+                    <Bar dataKey="budget" name="Custo Orçado" fill="var(--muted-foreground)" fillOpacity={0.45} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="pt-10 text-center text-sm text-muted-foreground">Sem orçamento por item.</p>
+              )}
+            </div>
+
+            <div className={`p-3 ${clickable}`} onClick={() => open("orcamento")} title={canWrite ? "Clique para editar o orçado" : undefined}>
+              <SectionTitle>Custos Orçados x Realizado</SectionTitle>
+              <table className="mx-auto mt-4 w-full max-w-2xl text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground italic">
+                    <th className="py-1 text-left font-normal">Tipo de Custo</th>
+                    <th className="text-right font-normal">Custo Orçado</th>
+                    <th className="text-right font-normal">Custo Realizado</th>
+                    <th className="text-right font-normal">% Utilizado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(calc?.items ?? []).map((i) => (
+                    <tr key={i.key}>
+                      <td className="py-1 pl-3">{i.label}</td>
+                      <td className="text-right">{brl(i.budget)}</td>
+                      <td className="text-right">{brl(i.real)}</td>
+                      <td className={`text-right ${i.used > 100 ? "text-destructive" : ""}`}>{Math.round(i.used)}%</td>
+                    </tr>
+                  ))}
+                  <tr className="font-bold italic">
+                    <td className="py-1">Total</td>
+                    <td className="text-right">{brl(totBudget)}</td>
+                    <td className="text-right">{brl(totReal)}</td>
+                    <td className="text-right">{totBudget ? Math.round((totReal / totBudget) * 100) : 0}%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-3">
+              <SectionTitle>Margem de Contribuição</SectionTitle>
+              <div className="mt-4 grid grid-cols-[1fr_auto_1fr] text-center">
+                <p className="border-b pb-1 text-sm italic text-muted-foreground">Orçado</p>
+                <p className="border-b pb-1 text-sm font-bold text-primary">% | %</p>
+                <p className="border-b pb-1 text-sm italic text-muted-foreground">Realizado</p>
+                <p className="pt-6 text-sm">{brl(budgetMargin)}</p>
+                <div className="row-span-2 mx-4 w-px bg-border" />
+                <p className={`pt-6 text-sm ${realMargin < 0 ? "text-destructive" : ""}`}>{brl(realMargin)}</p>
+                <p className="pt-4 text-lg">{pct(calc?.budgetMarginPct ?? 0)}</p>
+                <p className={`pt-4 text-lg ${(last?.marginPct ?? 0) < 0 ? "text-destructive" : ""}`}>{pct(last?.marginPct ?? 0)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
+
+      {/* Diálogos */}
+      <Dialog open={dlg === "cliente"} onOpenChange={(o) => !o && setDlg(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dados do cliente</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Field label="Nº Pedido" value={orderNo} onChange={setOrderNo} />
+            <Field label="Nº Orç. AB5" value={quoteNo} onChange={setQuoteNo} />
+            <Field label="Valor do pedido (R$)" value={orderStr} onChange={setOrderStr} />
+            <p className="text-xs text-muted-foreground">O valor faturado vem dos lançamentos de Faturamento.</p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => saveValues.mutate()} disabled={saveValues.isPending}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dlg === "orcamento"} onOpenChange={(o) => !o && setDlg(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Custos orçados</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {ITEMS.map((it) => (
+              <Field
+                key={it.key}
+                label={`${it.label} (R$)`}
+                value={itemStrs[it.key] ?? ""}
+                onChange={(v) => setItemStrs((s) => ({ ...s, [it.key]: v }))}
+              />
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Total orçado: <span className="font-semibold text-foreground">{brl(itemsSum)}</span>
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDlg("lancamentos")}>Lançar custo realizado</Button>
+            <Button onClick={() => saveValues.mutate()} disabled={saveValues.isPending}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dlg === "andamento"} onOpenChange={(o) => !o && setDlg(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Andamento da obra</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label>Mês</Label>
+              <Input type="month" value={progMonth} onChange={(e) => setProgMonth(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>% acumulado</Label>
+              <Input className="w-28" value={progPct} onChange={(e) => setProgPct(e.target.value)} />
+            </div>
+            <Button onClick={() => saveProgress.mutate()} disabled={saveProgress.isPending}>Salvar</Button>
+          </div>
+          <Table>
+            <TableBody>
+              {(data.data?.progress ?? []).map((p: any) => (
+                <TableRow key={p.id}>
+                  <TableCell>{monthLabel(String(p.month).slice(0, 7))}</TableCell>
+                  <TableCell className="text-right">{pct(Number(p.percent))}</TableCell>
+                  <TableCell className="w-10">
+                    <Button variant="ghost" size="icon" onClick={() => delProgress.mutate(p.id)} aria-label="Excluir">
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dlg === "lancamentos"} onOpenChange={(o) => !o && setDlg(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Lançamentos</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-wrap items-end gap-2">
+            <Input type="date" className="w-40" value={entry.date} onChange={(e) => setEntry({ ...entry, date: e.target.value })} />
+            <Select value={entry.category} onValueChange={(v) => setEntry({ ...entry, category: v })}>
+              <SelectTrigger className="w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input className="min-w-40 flex-1" placeholder="Descrição" value={entry.description} onChange={(e) => setEntry({ ...entry, description: e.target.value })} />
+            <Input className="w-32" placeholder="Valor" value={entry.amount} onChange={(e) => setEntry({ ...entry, amount: e.target.value })} />
+            <Button onClick={() => saveEntry.mutate()} disabled={saveEntry.isPending}>
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="max-h-96 overflow-auto">
+            <Table>
+              <TableBody>
+                {(data.data?.entries ?? []).map((e: any) => (
+                  <TableRow key={e.id}>
+                    <TableCell>{fmtDate(e.entry_date)}</TableCell>
+                    <TableCell>{catLabel(e.category)}</TableCell>
+                    <TableCell>{e.description ?? "—"}</TableCell>
+                    <TableCell className="text-right">{brl(Number(e.amount))}</TableCell>
+                    <TableCell className="w-10">
+                      <Button variant="ghost" size="icon" onClick={() => delEntry.mutate(e.id)} aria-label="Excluir">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function Kv({ k, v, bad }: { k: string; v: string; bad?: boolean }) {
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <p className="text-center text-sm font-semibold uppercase italic text-muted-foreground">{children}</p>;
+}
+function Lbl({ children }: { children: React.ReactNode }) {
+  return <span className="font-semibold italic text-muted-foreground">{children}</span>;
+}
+function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-border py-1">
-      <span className="text-muted-foreground">{k}</span>
-      <span className={`font-medium ${bad ? "text-destructive" : ""}`}>{v}</span>
+    <div className="space-y-1">
+      <Label>{label}</Label>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+/** Velocímetro semicircular com faixas e ponteiro. */
+function Gauge({ value }: { value: number }) {
+  const v = Math.max(0, Math.min(100, value));
+  const cx = 120, cy = 120, R = 100, r = 70;
+  const pt = (p: number, rad: number) => {
+    const a = Math.PI * (1 - p / 100);
+    return [cx + rad * Math.cos(a), cy - rad * Math.sin(a)];
+  };
+  const seg = (a: number, b: number) => {
+    const [x1, y1] = pt(a, R), [x2, y2] = pt(b, R), [x3, y3] = pt(b, r), [x4, y4] = pt(a, r);
+    return `M${x1},${y1} A${R},${R} 0 0 1 ${x2},${y2} L${x3},${y3} A${r},${r} 0 0 0 ${x4},${y4} Z`;
+  };
+  const bands = [0, 20, 40, 60, 80, 100];
+  const [nx, ny] = pt(v, R - 4);
+  const [bx1, by1] = pt(v + 50, 5);
+  const [bx2, by2] = pt(v - 50, 5);
+  return (
+    <div className="mt-2 flex flex-col items-center">
+      <svg viewBox="0 0 240 135" className="w-full max-w-xs">
+        {bands.slice(0, -1).map((b, i) => (
+          <path key={b} d={seg(b, bands[i + 1])} fill="var(--primary)" fillOpacity={0.15 + i * 0.2} />
+        ))}
+        <polygon points={`${nx},${ny} ${bx1},${by1} ${bx2},${by2}`} fill="var(--muted-foreground)" />
+        <circle cx={cx} cy={cy} r={5} fill="var(--muted-foreground)" />
+      </svg>
+      <p className="text-2xl font-bold">{pct(v)}</p>
     </div>
   );
 }
