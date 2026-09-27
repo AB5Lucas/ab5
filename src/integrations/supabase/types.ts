@@ -863,6 +863,35 @@ export type Database = {
         }
         Relationships: []
       }
+      foreman_works: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+          work_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+          work_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foreman_works_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holidays: {
         Row: {
           created_at: string
@@ -945,6 +974,398 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      rdo_media: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          kind: string
+          rdo_id: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind?: string
+          rdo_id: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind?: string
+          rdo_id?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_media_rdo_id_fkey"
+            columns: ["rdo_id"]
+            isOneToOne: false
+            referencedRelation: "rdos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rdo_scaffolds: {
+        Row: {
+          created_at: string
+          height_m: number | null
+          id: string
+          length_m: number | null
+          location: string | null
+          notes: string | null
+          operation: string
+          quantity: number
+          rdo_id: string
+          scaffold_type: string | null
+          updated_at: string
+          width_m: number | null
+        }
+        Insert: {
+          created_at?: string
+          height_m?: number | null
+          id?: string
+          length_m?: number | null
+          location?: string | null
+          notes?: string | null
+          operation?: string
+          quantity?: number
+          rdo_id: string
+          scaffold_type?: string | null
+          updated_at?: string
+          width_m?: number | null
+        }
+        Update: {
+          created_at?: string
+          height_m?: number | null
+          id?: string
+          length_m?: number | null
+          location?: string | null
+          notes?: string | null
+          operation?: string
+          quantity?: number
+          rdo_id?: string
+          scaffold_type?: string | null
+          updated_at?: string
+          width_m?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_scaffolds_rdo_id_fkey"
+            columns: ["rdo_id"]
+            isOneToOne: false
+            referencedRelation: "rdos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rdo_services: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          location: string | null
+          notes: string | null
+          productivity: number | null
+          quantity: number | null
+          rdo_id: string
+          team: string | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          productivity?: number | null
+          quantity?: number | null
+          rdo_id: string
+          team?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          productivity?: number | null
+          quantity?: number | null
+          rdo_id?: string
+          team?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_services_rdo_id_fkey"
+            columns: ["rdo_id"]
+            isOneToOne: false
+            referencedRelation: "rdos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rdo_signatures: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          rdo_id: string
+          signature_data: string
+          signed_at: string
+          signer_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          rdo_id: string
+          signature_data: string
+          signed_at?: string
+          signer_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          rdo_id?: string
+          signature_data?: string
+          signed_at?: string
+          signer_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_signatures_rdo_id_fkey"
+            columns: ["rdo_id"]
+            isOneToOne: false
+            referencedRelation: "rdos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rdo_user_prefs: {
+        Row: {
+          created_at: string
+          last_work_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          last_work_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          last_work_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_user_prefs_last_work_id_fkey"
+            columns: ["last_work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rdo_workforce: {
+        Row: {
+          allocation_id: string | null
+          break_minutes: number
+          classified_at: string | null
+          classified_by: string | null
+          collaborator_id: string
+          created_at: string
+          entry_time: string | null
+          exit_time: string | null
+          final_classification: string | null
+          id: string
+          occurrence_status: string
+          planned: boolean
+          position_id: string | null
+          present: boolean
+          rdo_id: string
+          report_date: string
+          reported_note: string | null
+          reported_reason: string | null
+          updated_at: string
+          work_id: string
+          worked_hours: number | null
+        }
+        Insert: {
+          allocation_id?: string | null
+          break_minutes?: number
+          classified_at?: string | null
+          classified_by?: string | null
+          collaborator_id: string
+          created_at?: string
+          entry_time?: string | null
+          exit_time?: string | null
+          final_classification?: string | null
+          id?: string
+          occurrence_status?: string
+          planned?: boolean
+          position_id?: string | null
+          present?: boolean
+          rdo_id: string
+          report_date: string
+          reported_note?: string | null
+          reported_reason?: string | null
+          updated_at?: string
+          work_id: string
+          worked_hours?: number | null
+        }
+        Update: {
+          allocation_id?: string | null
+          break_minutes?: number
+          classified_at?: string | null
+          classified_by?: string | null
+          collaborator_id?: string
+          created_at?: string
+          entry_time?: string | null
+          exit_time?: string | null
+          final_classification?: string | null
+          id?: string
+          occurrence_status?: string
+          planned?: boolean
+          position_id?: string | null
+          present?: boolean
+          rdo_id?: string
+          report_date?: string
+          reported_note?: string | null
+          reported_reason?: string | null
+          updated_at?: string
+          work_id?: string
+          worked_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdo_workforce_allocation_id_fkey"
+            columns: ["allocation_id"]
+            isOneToOne: false
+            referencedRelation: "daily_allocations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rdo_workforce_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rdo_workforce_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rdo_workforce_rdo_id_fkey"
+            columns: ["rdo_id"]
+            isOneToOne: false
+            referencedRelation: "rdos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rdo_workforce_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rdos: {
+        Row: {
+          activities: string | null
+          client_id: string | null
+          created_at: string
+          finalized_at: string | null
+          id: string
+          notes: string | null
+          report_date: string
+          responsible_name: string | null
+          schedule_id: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+          work_id: string
+        }
+        Insert: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          notes?: string | null
+          report_date: string
+          responsible_name?: string | null
+          schedule_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_id: string
+        }
+        Update: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          notes?: string | null
+          report_date?: string
+          responsible_name?: string | null
+          schedule_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rdos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rdos_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "daily_schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rdos_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       schedule_box_vt: {
         Row: {
@@ -1767,6 +2188,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_rdo: { Args: { _rdo_id: string }; Returns: boolean }
+      can_access_work: { Args: { _work_id: string }; Returns: boolean }
+      can_edit_rdo: { Args: { _rdo_id: string }; Returns: boolean }
       can_write: { Args: never; Returns: boolean }
       has_role: {
         Args: {
