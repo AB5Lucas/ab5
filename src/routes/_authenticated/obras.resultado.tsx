@@ -228,7 +228,7 @@ function ResultadoPage() {
     ].sort() as string[];
     const first = dates[0];
     const lastDay = dates[dates.length - 1];
-    const days = first ? Math.round((Date.parse(lastDay) - Date.parse(first)) / 86400000) + 1 : 0;
+    const days = first ? Math.round((Date.parse(lastDay!) - Date.parse(first)) / 86400000) + 1 : 0;
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days };
   }, [work, data.data]);
 
@@ -680,7 +680,7 @@ function Gauge({ value }: { value: number }) {
     <div className="mt-2 flex flex-col items-center">
       <svg viewBox="0 0 240 135" className="w-full max-w-xs">
         {bands.slice(0, -1).map((b, i) => (
-          <path key={b} d={seg(b, bands[i + 1])} fill="var(--primary)" fillOpacity={0.15 + i * 0.2} />
+          <path key={b} d={seg(b, bands[i + 1]!)} fill="var(--primary)" fillOpacity={0.15 + i * 0.2} />
         ))}
         <polygon points={`${nx},${ny} ${bx1},${by1} ${bx2},${by2}`} fill="var(--muted-foreground)" />
         <circle cx={cx} cy={cy} r={5} fill="var(--muted-foreground)" />
