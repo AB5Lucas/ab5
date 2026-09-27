@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.can_access_work(uuid), public.can_access_rdo(uuid), public.can_edit_rdo(uuid) FROM PUBLIC, anon;
