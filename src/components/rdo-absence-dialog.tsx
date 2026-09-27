@@ -26,11 +26,11 @@ export function RdoAbsenceDialog({
   onOpenChange: (v: boolean) => void;
   mode: "report" | "classify";
   collaboratorName: string;
-  workName?: string;
-  date?: string;
-  reportedReason?: string | null;
-  reportedNote?: string | null;
-  busy?: boolean;
+  workName?: string | undefined;
+  date?: string | undefined;
+  reportedReason?: string | null | undefined;
+  reportedNote?: string | null | undefined;
+  busy?: boolean | undefined;
   onConfirm: (key: string, note: string) => void;
 }) {
   const [choice, setChoice] = useState<string>("");

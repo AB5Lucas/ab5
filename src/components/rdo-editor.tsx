@@ -91,7 +91,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
         client_id: work.client_id,
         report_date: date,
         schedule_id: planned.data?.scheduleId ?? null,
-        user_id: user?.id,
+        user_id: user?.id ?? null,
         responsible_name: profile?.full_name || profile?.email || null,
       });
       if (error) throw error;
@@ -154,7 +154,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
 
   const updateRdo = useMutation({
     mutationFn: async (patch: Record<string, unknown>) => {
-      const { error } = await supabase.from("rdos").update(patch).eq("id", r!.id);
+      const { error } = await supabase.from("rdos").update(patch as never).eq("id", r!.id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rdo", work.id, date] }),
@@ -282,7 +282,7 @@ function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: 
 
   const patch = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
-      const { error } = await supabase.from("rdo_workforce").update(data).eq("id", id);
+      const { error } = await supabase.from("rdo_workforce").update(data as never).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rdo-team", rdoId] }),
@@ -757,7 +757,7 @@ function SignaturesStep({ rdoId, editable }: { rdoId: string; editable: boolean 
   );
 }
 
-function SignatureBox({ rdoId, kind, title, existing, editable }: { rdoId: string; kind: string; title: string; existing?: { id: string; signer_name: string; signature_data: string; signed_at: string }; editable: boolean }) {
+function SignatureBox({ rdoId, kind, title, existing, editable }: { rdoId: string; kind: string; title: string; existing?: { id: string; signer_name: string; signature_data: string; signed_at: string } | undefined; editable: boolean }) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [data, setData] = useState<string | null>(null);
