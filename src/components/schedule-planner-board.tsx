@@ -47,6 +47,8 @@ import {
 } from "@/lib/scheduling";
 import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
+import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
+import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
 
 
 type Level = "ok" | "warn" | "block" | "busy";
@@ -329,6 +331,7 @@ export function SchedulePlannerBoard({
 
   const scheduleId = schedule.data?.id ?? null;
   const editable = canWrite;
+  const canClassify = canWrite;
 
   const allocations = useQuery({
     queryKey: ["allocations", scheduleId],
@@ -1060,6 +1063,18 @@ export function SchedulePlannerBoard({
 
   return (
     <div className="space-y-4">
+      <RdoAbsenceDialog
+        open={!!occOpen}
+        onOpenChange={(v) => !v && setOccOpen(null)}
+        mode="classify"
+        collaboratorName={occOpen ? (personById.get(occOpen.collaborator_id)?.full_name ?? "Colaborador") : ""}
+        workName={occOpen ? (() => { const w = c?.works.find((x) => x.id === occOpen.work_id); return w ? workLabel(w) : ""; })() : ""}
+        date={occOpen?.report_date}
+        reportedReason={occOpen?.reported_reason}
+        reportedNote={occOpen?.reported_note}
+        busy={classify.isPending}
+        onConfirm={(key) => occOpen && classify.mutate({ occ: occOpen, key })}
+      />
       {/* Data, resumo e ações */}
       <div className="panel flex flex-wrap items-center gap-3 p-3">
         <div className="flex items-center gap-2">
