@@ -803,3 +803,29 @@ function Gauge({ value }: { value: number }) {
     </div>
   );
 }
+
+function EntryList({ entries }: { entries: any[] }) {
+  if (!entries.length) return <p className="mt-4 text-xs text-muted-foreground">Nenhum lançamento manual para este item.</p>;
+  const total = entries.reduce((a, e) => a + Number(e.amount), 0);
+  return (
+    <div className="mt-4">
+      <p className="mb-1 font-semibold">Lançamentos</p>
+      <Table>
+        <TableBody>
+          {entries.map((e) => (
+            <TableRow key={e.id}>
+              <TableCell>{fmtDate(e.entry_date)}</TableCell>
+              <TableCell>{catLabel(e.category)}</TableCell>
+              <TableCell>{e.description ?? "—"}</TableCell>
+              <TableCell className="text-right">{brl(Number(e.amount))}</TableCell>
+            </TableRow>
+          ))}
+          <TableRow className="font-bold">
+            <TableCell colSpan={3}>Total</TableCell>
+            <TableCell className="text-right">{brl(total)}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
