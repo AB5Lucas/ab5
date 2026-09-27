@@ -72,6 +72,7 @@ const groups: Group[] = [
     icon: Building2,
     items: [
       { title: "Serviços", url: "/obras" },
+      { title: "Resultado da Obra", url: "/obras/resultado" },
       { title: "Clientes", url: "/clientes" },
       { title: "Requisitos", url: "/obras/requisitos" },
     ],
