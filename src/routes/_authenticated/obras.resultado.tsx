@@ -36,10 +36,23 @@ const DEFAULT_HOURS = 8;
 const CATEGORIES = [
   { key: "materiais", label: "Materiais" },
   { key: "ferramentas", label: "Ferramentas" },
+  { key: "andaimes", label: "Andaimes" },
   { key: "terceiros", label: "Transporte de terceiros" },
   { key: "faturamento", label: "Faturamento" },
 ] as const;
 const catLabel = (k: string) => CATEGORIES.find((c) => c.key === k)?.label ?? k;
+
+/** Itens de custo orçados/realizados. */
+const ITEMS = [
+  { key: "mo", label: "Mão de obra" },
+  { key: "transporte", label: "Transporte" },
+  { key: "ferramentas", label: "Ferramentas" },
+  { key: "materiais", label: "Materiais" },
+  { key: "andaimes", label: "Andaimes" },
+] as const;
+type ItemKey = (typeof ITEMS)[number]["key"];
+const entryItem = (cat: string): ItemKey | null =>
+  cat === "terceiros" ? "transporte" : cat === "ferramentas" || cat === "materiais" || cat === "andaimes" ? cat : null;
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
@@ -192,7 +205,18 @@ function ResultadoPage() {
       tot.transport += r.transport;
       tot.others += r.others;
     });
-    return { rows, last, order, budget, budgetMarginPct, tot };
+    const real: Record<ItemKey, number> = { mo: tot.labor, transporte: tot.transport, ferramentas: 0, materiais: 0, andaimes: 0 };
+    for (const e of d.entries) {
+      const k = entryItem(e.category);
+      if (k) real[k] += Number(e.amount);
+    }
+    const bi = ((work as any).budget_items ?? {}) as Record<string, number>;
+    const items = ITEMS.map((it) => {
+      const b = Number(bi[it.key] ?? 0);
+      const r = real[it.key];
+      return { label: it.label, budget: b, real: r, used: b ? (r / b) * 100 : r ? 100 : 0 };
+    });
+    return { rows, last, order, budget, budgetMarginPct, tot, items };
   }, [work, data.data]);
 
   // ---------- Edição ----------
