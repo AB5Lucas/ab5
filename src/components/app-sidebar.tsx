@@ -121,8 +121,8 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const { isForeman } = useCurrentUser();
-  const visible = isForeman ? groups.filter((g) => g.label === "Externo") : groups;
+  const { isForeman, loading } = useCurrentUser();
+  const visible = loading ? [] : isForeman ? groups.filter((g) => g.label === "Externo") : groups;
 
   return (
     <Sidebar collapsible="icon">
