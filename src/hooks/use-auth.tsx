@@ -3,12 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = "admin" | "programmer" | "viewer";
+export type AppRole = "admin" | "programmer" | "viewer" | "encarregado";
 
 export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Administrador",
   programmer: "Programador",
   viewer: "Consulta",
+  encarregado: "Encarregado",
 };
 
 export function useSession() {
@@ -46,7 +47,9 @@ export function useCurrentUser() {
         ? "admin"
         : roleList.includes("programmer")
           ? "programmer"
-          : "viewer";
+          : roleList.includes("encarregado")
+            ? "encarregado"
+            : "viewer";
       return { profile: p, role };
     },
   });
@@ -61,5 +64,6 @@ export function useCurrentUser() {
     role,
     isAdmin: role === "admin",
     canWrite: role === "admin" || role === "programmer",
+    isForeman: role === "encarregado",
   };
 }
