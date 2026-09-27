@@ -602,7 +602,7 @@ function ResultadoPage() {
                       </TableRow>
                     ))}
                     <TableRow className="font-bold">
-                      <TableCell colSpan={4}>Total</TableCell>
+                      <TableCell colSpan={4}>Total calculado</TableCell>
                       <TableCell className="text-right">{brl(calc.tot.labor)}</TableCell>
                     </TableRow>
                   </TableBody>
