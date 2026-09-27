@@ -43,9 +43,13 @@ function AuthenticatedLayout() {
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-card/90 px-3 backdrop-blur">
             <SidebarTrigger />
-            <Link to="/dashboard" className="font-display text-sm uppercase tracking-widest">
-              Programação Operacional
-            </Link>
+            {isForeman ? (
+              <span className="font-display text-sm uppercase tracking-widest">Relatório Diário</span>
+            ) : (
+              <Link to="/dashboard" className="font-display text-sm uppercase tracking-widest">
+                Programação Operacional
+              </Link>
+            )}
             <div className="ml-auto flex items-center gap-3">
               <Badge variant="secondary" className="hidden sm:inline-flex">
                 {ROLE_LABEL[role]}
