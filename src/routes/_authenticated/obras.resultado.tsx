@@ -103,7 +103,7 @@ function ResultadoPage() {
         ),
         supabase.from("work_progress").select("*").eq("work_id", w.id).order("month"),
         supabase.from("work_entries").select("*").eq("work_id", w.id).order("entry_date", { ascending: false }),
-        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type").range(a, b)),
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
@@ -155,7 +155,7 @@ function ResultadoPage() {
       seen.add(key);
       const r = rdoKey.get(key);
       const hours = r ? (r.present ? Number(r.worked_hours ?? DEFAULT_HOURS) : 0) : DEFAULT_HOURS;
-      const cost = hours * (rate.get(a.collaborator_id) ?? 0) * ENCARGOS;
+      const cost = hours * (rate.get(a.collaborator_id) ?? 0) * enc(a.collaborator_id);
       addLabor(a.collaborator_id, hours, cost);
       bump(date.slice(0, 7), "labor", cost);
     }
@@ -163,7 +163,7 @@ function ResultadoPage() {
       const key = `${r.collaborator_id}|${r.report_date}`;
       if (seen.has(key) || !r.present) continue;
       const hours = Number(r.worked_hours ?? 0);
-      const cost = hours * (rate.get(r.collaborator_id) ?? 0) * ENCARGOS;
+      const cost = hours * (rate.get(r.collaborator_id) ?? 0) * enc(r.collaborator_id);
       addLabor(r.collaborator_id, hours, cost);
       bump(r.report_date.slice(0, 7), "labor", cost);
     }
