@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -414,7 +415,7 @@ function ResultadoPage() {
             </div>
             <h1 className="text-center text-3xl font-bold italic tracking-wide">RELATÓRIO FINANCEIRO DE OBRAS</h1>
             <div className="flex items-center gap-4 justify-self-end">
-              <span className="font-display text-3xl font-black italic text-primary">AB5</span>
+              <img src={ab5Logo.url} alt="AB5" className="h-14 w-14 object-contain" />
               <div className="text-sm">
                 <p className="text-muted-foreground">Atualização</p>
                 <p className="font-semibold">{fmtDate(new Date().toISOString().slice(0, 10))}</p>
