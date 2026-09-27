@@ -103,7 +103,7 @@ function ResultadoPage() {
         ),
         supabase.from("work_progress").select("*").eq("work_id", w.id).order("month"),
         supabase.from("work_entries").select("*").eq("work_id", w.id).order("entry_date", { ascending: false }),
-        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type").range(a, b)),
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
@@ -132,6 +132,8 @@ function ResultadoPage() {
     if (!work || !data.data) return null;
     const d = data.data;
     const rate = new Map<string, number>(d.people.map((p: any) => [p.id, Number(p.salary ?? 0)]));
+    const pj = new Set<string>(d.people.filter((p: any) => p.contract_type === "pj").map((p: any) => p.id));
+    const enc = (id: string) => (pj.has(id) ? 1 : ENCARGOS);
     const rdoKey = new Map<string, any>(d.rdoWf.map((r: any) => [`${r.collaborator_id}|${r.report_date}`, r]));
     const monthly = new Map<string, { labor: number; transport: number; entries: number; billing: number }>();
     const bump = (ym: string, k: "labor" | "transport" | "entries" | "billing", v: number) => {
@@ -155,7 +157,7 @@ function ResultadoPage() {
       seen.add(key);
       const r = rdoKey.get(key);
       const hours = r ? (r.present ? Number(r.worked_hours ?? DEFAULT_HOURS) : 0) : DEFAULT_HOURS;
-      const cost = hours * (rate.get(a.collaborator_id) ?? 0) * ENCARGOS;
+      const cost = hours * (rate.get(a.collaborator_id) ?? 0) * enc(a.collaborator_id);
       addLabor(a.collaborator_id, hours, cost);
       bump(date.slice(0, 7), "labor", cost);
     }
@@ -163,7 +165,7 @@ function ResultadoPage() {
       const key = `${r.collaborator_id}|${r.report_date}`;
       if (seen.has(key) || !r.present) continue;
       const hours = Number(r.worked_hours ?? 0);
-      const cost = hours * (rate.get(r.collaborator_id) ?? 0) * ENCARGOS;
+      const cost = hours * (rate.get(r.collaborator_id) ?? 0) * enc(r.collaborator_id);
       addLabor(r.collaborator_id, hours, cost);
       bump(r.report_date.slice(0, 7), "labor", cost);
     }
@@ -248,7 +250,7 @@ function ResultadoPage() {
     const days = first ? Math.round((Date.parse(lastDay!) - Date.parse(first)) / 86400000) + 1 : 0;
     const names = new Map<string, string>(d.people.map((p: any) => [p.id, p.full_name]));
     const laborRows = [...laborBy.entries()]
-      .map(([id, l]) => ({ id, name: names.get(id) ?? "—", rate: rate.get(id) ?? 0, ...l }))
+      .map(([id, l]) => ({ id, name: `${names.get(id) ?? "—"}${pj.has(id) ? " (PJ)" : ""}`, rate: rate.get(id) ?? 0, ...l }))
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, siblingCount: d.siblingCount };
@@ -565,7 +567,7 @@ function ResultadoPage() {
             {detail === "mo" && calc && (
               <>
                 <p className="mb-2 text-xs text-muted-foreground">
-                  Horas do RDO (ausente = 0h; sem RDO, escalado = {DEFAULT_HOURS}h) × valor hora × {String(ENCARGOS).replace(".", ",")} (encargos).
+                  Horas do RDO (ausente = 0h; sem RDO, escalado = {DEFAULT_HOURS}h) × valor hora × {String(ENCARGOS).replace(".", ",")} (encargos; PJ sem encargos).
                 </p>
                 <Table>
                   <TableBody>
