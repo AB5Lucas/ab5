@@ -258,15 +258,15 @@ function ResultadoPage() {
   }, [work, data.data]);
 
   // ---------- Edição ----------
-  const [orderStr, setOrderStr] = useState("");
-  const [orderNo, setOrderNo] = useState("");
+  const [orderList, setOrderList] = useState<{ number: string; value: string }[]>([]);
+  const ordersSum = orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
   const itemsSum = ITEMS.reduce((a, it) => a + num(itemStrs[it.key] ?? ""), 0);
   const [progMonth, setProgMonth] = useState(new Date().toISOString().slice(0, 7));
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "" });
-  const [dlg, setDlg] = useState<null | "cliente" | "orcamento" | "andamento" | "lancamentos">(null);
+  const [dlg, setDlg] = useState<null | "cliente" | "orcamento" | "andamento" | "lancamentos" | "faturamentos">(null);
   const [detail, setDetail] = useState<ItemKey | null>(null);
 
   const invalidate = () => {
@@ -276,11 +276,13 @@ function ResultadoPage() {
 
   const saveValues = useMutation({
     mutationFn: async () => {
+      const list = orderList.filter((o) => o.number.trim() || num(o.value));
       const { error } = await supabase
         .from("works")
         .update({
-          order_value: num(orderStr),
-          order_number: orderNo.trim() || null,
+          orders: list.map((o) => ({ number: o.number.trim(), value: num(o.value) })),
+          order_value: ordersSum,
+          order_number: list.map((o) => o.number.trim()).filter(Boolean).join(" / ") || null,
           quote_number: quoteNo.trim() || null,
           budget_cost: itemsSum,
           budget_items: Object.fromEntries(ITEMS.map((it) => [it.key, num(itemStrs[it.key] ?? "")])),
@@ -354,8 +356,8 @@ function ResultadoPage() {
     setWorkId(id);
     const w = works.data?.find((x) => x.id === id) as any;
     const f = (v: unknown) => (Number(v ?? 0) ? Number(v).toFixed(2).replace(".", ",") : "");
-    setOrderStr(f(w?.order_value));
-    setOrderNo(w?.order_number ?? "");
+    const ol = Array.isArray(w?.orders) ? (w.orders as any[]) : [];
+    setOrderList(ol.length ? ol.map((o) => ({ number: String(o.number ?? ""), value: f(o.value) })) : [{ number: "", value: "" }]);
     setQuoteNo(w?.quote_number ?? "");
     const bi = (w?.budget_items ?? {}) as Record<string, number>;
     setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, f(bi[it.key])])));
@@ -370,6 +372,11 @@ function ResultadoPage() {
   const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
   const barItems = (calc?.items ?? []).filter((i) => i.budget || i.real);
   const open = (k: NonNullable<typeof dlg>) => canWrite && setDlg(k);
+  const isBilling = dlg === "faturamentos";
+  const openEntries = (k: "lancamentos" | "faturamentos") => {
+    setEntry((e) => ({ ...e, category: k === "faturamentos" ? "faturamento" : "materiais" }));
+    setDlg(k);
+  };
   const clickable = canWrite ? "cursor-pointer rounded-md transition-colors hover:bg-muted/60" : "";
   const w = work as any;
 
@@ -391,9 +398,14 @@ function ResultadoPage() {
           </Select>
         </div>
         {work && canWrite && (
-          <Button variant="outline" onClick={() => setDlg("lancamentos")}>
-            Lançamentos
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => openEntries("lancamentos")}>
+              Lançamentos
+            </Button>
+            <Button variant="outline" onClick={() => openEntries("faturamentos")}>
+              Faturamentos
+            </Button>
+          </>
         )}
       </div>
 
@@ -644,10 +656,26 @@ function ResultadoPage() {
             <DialogTitle>Dados do cliente</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
-            <Field label="Nº Pedido" value={orderNo} onChange={setOrderNo} />
             <Field label="Nº Orç. AB5" value={quoteNo} onChange={setQuoteNo} />
-            <Field label="Valor do pedido (R$)" value={orderStr} onChange={setOrderStr} />
-            <p className="text-xs text-muted-foreground">O valor faturado vem dos lançamentos de Faturamento.</p>
+            <div className="flex items-center justify-between">
+              <Label>Pedidos</Label>
+              <Button type="button" size="sm" variant="outline" onClick={() => setOrderList((l) => [...l, { number: "", value: "" }])}>
+                <Plus className="h-4 w-4" /> Adicionar pedido
+              </Button>
+            </div>
+            {orderList.map((o, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Input placeholder="Nº Pedido" value={o.number} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))} />
+                <Input className="w-40" placeholder="Valor (R$)" value={o.value} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
+                <Button type="button" variant="ghost" size="icon" aria-label="Remover" onClick={() => setOrderList((l) => l.filter((_, j) => j !== i))}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+            <p className="text-sm text-muted-foreground">
+              Valor do pedido (soma): <span className="font-semibold text-foreground">{brl(ordersSum)}</span>
+            </p>
+            <p className="text-xs text-muted-foreground">O valor faturado vem do botão Faturamentos.</p>
           </div>
           <DialogFooter>
             <Button onClick={() => saveValues.mutate()} disabled={saveValues.isPending}>Salvar</Button>
@@ -674,7 +702,7 @@ function ResultadoPage() {
             Total orçado: <span className="font-semibold text-foreground">{brl(itemsSum)}</span>
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDlg("lancamentos")}>Lançar custo realizado</Button>
+            <Button variant="outline" onClick={() => openEntries("lancamentos")}>Lançar custo realizado</Button>
             <Button onClick={() => saveValues.mutate()} disabled={saveValues.isPending}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
@@ -714,19 +742,19 @@ function ResultadoPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={dlg === "lancamentos"} onOpenChange={(o) => !o && setDlg(null)}>
+      <Dialog open={dlg === "lancamentos" || dlg === "faturamentos"} onOpenChange={(o) => !o && setDlg(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Lançamentos</DialogTitle>
+            <DialogTitle>{isBilling ? "Faturamentos" : "Lançamentos"}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-wrap items-end gap-2">
             <Input type="date" className="w-40" value={entry.date} onChange={(e) => setEntry({ ...entry, date: e.target.value })} />
-            <Select value={entry.category} onValueChange={(v) => setEntry({ ...entry, category: v })}>
+            <Select value={entry.category} onValueChange={(v) => setEntry({ ...entry, category: v })} disabled={isBilling}>
               <SelectTrigger className="w-52">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => (
+                {CATEGORIES.filter((c) => (c.key === "faturamento") === isBilling).map((c) => (
                   <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -740,7 +768,7 @@ function ResultadoPage() {
           <div className="max-h-96 overflow-auto">
             <Table>
               <TableBody>
-                {(data.data?.entries ?? []).map((e: any) => (
+                {(data.data?.entries ?? []).filter((e: any) => (e.category === "faturamento") === isBilling).map((e: any) => (
                   <TableRow key={e.id}>
                     <TableCell>{fmtDate(e.entry_date)}</TableCell>
                     <TableCell>{catLabel(e.category)}</TableCell>
