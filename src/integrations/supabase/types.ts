@@ -2172,7 +2172,9 @@ export type Database = {
           neighborhood: string | null
           notes: string | null
           number: string | null
+          order_number: string | null
           order_value: number
+          quote_number: string | null
           start_date: string | null
           state: string | null
           status: Database["public"]["Enums"]["work_status"]
@@ -2204,7 +2206,9 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           number?: string | null
+          order_number?: string | null
           order_value?: number
+          quote_number?: string | null
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]
@@ -2236,7 +2240,9 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           number?: string | null
+          order_number?: string | null
           order_value?: number
+          quote_number?: string | null
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]

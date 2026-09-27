@@ -1,0 +1,1 @@
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS order_number text, ADD COLUMN IF NOT EXISTS quote_number text;
