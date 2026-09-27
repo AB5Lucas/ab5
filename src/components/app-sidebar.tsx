@@ -13,6 +13,7 @@ import {
   Shield,
   Network,
   ClipboardList,
+  HardHat,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,6 +27,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useCurrentUser } from "@/hooks/use-auth";
 
 type Item = { title: string; url: string };
 type Group = { label: string; icon: typeof Users; items: Item[] };
@@ -102,6 +104,7 @@ const groups: Group[] = [
       { title: "Prêmio de Motorista", url: "/beneficios/premio-motorista" },
     ],
   },
+  { label: "Externo", icon: HardHat, items: [{ title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
   { label: "Relatórios", icon: FileBarChart, items: [{ title: "Relatórios", url: "/relatorios" }] },
   {
     label: "Administração",
@@ -118,6 +121,8 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const { isForeman } = useCurrentUser();
+  const visible = isForeman ? groups.filter((g) => g.label === "Externo") : groups;
 
   return (
     <Sidebar collapsible="icon">
@@ -136,7 +141,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {groups.map((group) => (
+        {visible.map((group) => (
           <SidebarGroup key={group.label}>
             {!collapsed && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
             <SidebarGroupContent>
