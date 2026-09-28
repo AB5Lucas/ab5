@@ -116,8 +116,15 @@ function ResultadoPage() {
           ? supabase.from("clients").select("has_toll, toll_amount").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
       ]);
+      const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
+      const sibAllocs = sibIds.length
+        ? await fetchAll<any>((a, b) =>
+            supabase.from("daily_allocations").select("work_id, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
+          )
+        : [];
       return {
         allocs,
+        sibAllocs,
         rdoWf,
         progress: progress.data ?? [],
         entries: entries.data ?? [],
@@ -172,13 +179,23 @@ function ResultadoPage() {
       bump(r.report_date.slice(0, 7), "labor", cost);
     }
     const toll = d.client?.has_toll ? Number(d.client.toll_amount ?? 0) : 0;
-    const transportRows: { date: string; km: number; trips: number; kmCost: number; toll: number; share: number }[] = [];
+    const transportRows: { date: string; km: number; trips: number; kmCost: number; toll: number; share: number; mine: number; total: number }[] = [];
+    const dayTotal = new Map<string, number>();
+    const dayMine = new Map<string, number>();
+    for (const a of d.sibAllocs) {
+      const dt = a.daily_schedules?.schedule_date as string | undefined;
+      if (!dt) continue;
+      dayTotal.set(dt, (dayTotal.get(dt) ?? 0) + 1);
+      if (a.work_id === work.id) dayMine.set(dt, (dayMine.get(dt) ?? 0) + 1);
+    }
     for (const v of d.vs) {
       const trips = Number(v.trips ?? 1);
       const kmCost = Number(v.km ?? 0) * 2 * trips * KM_RATE;
       const t = toll * 2 * trips;
-      const share = (kmCost + t) / d.siblingCount;
-      transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share });
+      const total = dayTotal.get(v.schedule_date) ?? 0;
+      const mine = dayMine.get(v.schedule_date) ?? 0;
+      const share = total > 0 ? ((kmCost + t) * mine) / total : (kmCost + t) / d.siblingCount;
+      transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share, mine, total });
       bump(v.schedule_date.slice(0, 7), "transport", share);
     }
     for (const e of d.entries) {
@@ -612,7 +629,7 @@ function ResultadoPage() {
             {detail === "transporte" && calc && (
               <>
                 <p className="mb-2 text-xs text-muted-foreground">
-                  (KM ida × 2 × viagens × R$ {KM_RATE.toFixed(2).replace(".", ",")}) + (pedágio × 2 × viagens), dividido por {calc.siblingCount} serviço(s) do mesmo cliente. Transporte de terceiros vem dos lançamentos.
+                  (KM ida × 2 × viagens × R$ {KM_RATE.toFixed(2).replace(".", ",")}) + (pedágio × 2 × viagens), rateado entre os {calc.siblingCount} serviço(s) do mesmo cliente proporcional aos colaboradores escalados no dia (sem ninguém escalado, divisão igual). Transporte de terceiros vem dos lançamentos.
                 </p>
                 <Table>
                   <TableBody>
@@ -623,6 +640,7 @@ function ResultadoPage() {
                       <TableCell className="text-right">KM</TableCell>
                       <TableCell className="text-right">Pedágio</TableCell>
                       <TableCell className="text-right">Custo dia</TableCell>
+                      <TableCell className="text-right">Colab. (serviço/cliente)</TableCell>
                       <TableCell className="text-right">Rateado</TableCell>
                     </TableRow>
                     {calc.transportRows.map((t, i) => (
@@ -633,11 +651,12 @@ function ResultadoPage() {
                         <TableCell className="text-right">{brl(t.kmCost)}</TableCell>
                         <TableCell className="text-right">{brl(t.toll)}</TableCell>
                         <TableCell className="text-right">{brl(t.kmCost + t.toll)}</TableCell>
+                        <TableCell className="text-right">{t.total > 0 ? `${t.mine}/${t.total}` : "—"}</TableCell>
                         <TableCell className="text-right">{brl(t.share)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold">
-                      <TableCell colSpan={6}>Total veículos</TableCell>
+                      <TableCell colSpan={7}>Total veículos</TableCell>
                       <TableCell className="text-right">{brl(calc.tot.transport)}</TableCell>
                     </TableRow>
                   </TableBody>
