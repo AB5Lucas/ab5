@@ -181,6 +181,31 @@ function VoucherPage() {
         }
       }
 
+      // Sem VT para quem está em falta, atestado, médico ou interjornada no dia.
+      const noVt = new Set<string>();
+      if (ids.length) {
+        const [st, ml] = await Promise.all([
+          supabase
+            .from("daily_status_entries")
+            .select("schedule_id, collaborator_id")
+            .in("schedule_id", ids)
+            .in("box_key", ["falta", "atestado", "medico", "interjornada"]),
+          supabase
+            .from("medical_leaves")
+            .select("collaborator_id, start_date, end_date")
+            .lt("start_date", end)
+            .gte("end_date", start),
+        ]);
+        for (const r of st.data ?? []) noVt.add(`${r.schedule_id}|${r.collaborator_id}`);
+        for (const [sid, d] of dateById) {
+          for (const l of ml.data ?? []) if (l.start_date <= d && l.end_date >= d) noVt.add(`${sid}|${l.collaborator_id}`);
+        }
+      }
+      for (let i = allocations.length - 1; i >= 0; i--) {
+        const a = allocations[i]!;
+        if (noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) allocations.splice(i, 1);
+      }
+
       const vtMap = new Map<string, boolean>();
       if (ids.length) {
         const { data: vts, error: ve } = await supabase
