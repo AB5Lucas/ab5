@@ -156,8 +156,6 @@ export async function exportRdoPdf(rdoId: string) {
   // Cabeçalho
   doc.setFillColor(...DARK);
   doc.rect(0, 0, W, 30, "F");
-  doc.setFillColor(...RED);
-  doc.rect(0, 30, W, 1.5, "F");
   const logoData = await toDataUrl(ab5Logo.url);
   let tx = M;
   {
@@ -168,8 +166,15 @@ export async function exportRdoPdf(rdoId: string) {
     const bottom = top - 8; // inclinação
     doc.setFillColor(255, 255, 255);
     doc.lines([[top, 0], [bottom - top, 30], [-bottom, 0]], 0, 0, [1, 1], "F", true);
-    doc.setFillColor(...RED);
-    doc.lines([[2, 0], [-8, 31.5], [-2, 0]], top, 0, [1, 1], "F", true);
+    // fios vermelhos finos (traço vetorial com pontas arredondadas, sem serrilhado)
+    doc.setDrawColor(...RED);
+    doc.setLineWidth(0.6);
+    doc.setLineCap("round");
+    doc.setLineJoin("round");
+    doc.line(top + 0.3, -1, bottom + 0.3, 30);
+    doc.line(0, 30.3, W, 30.3);
+    doc.setLineWidth(0.2);
+    doc.setLineCap("butt");
     if (logoData) {
       try {
         doc.addImage(logoData, "PNG", M, 6, lw, lh);
