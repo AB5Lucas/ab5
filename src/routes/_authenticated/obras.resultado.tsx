@@ -389,7 +389,20 @@ function ResultadoPage() {
   const realMargin = (last?.revenue ?? 0) - (last?.cost ?? 0);
   const totBudget = calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0;
   const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
-  const barItems = (calc?.items ?? []).filter((i) => i.budget || i.real);
+  const barItems = (() => {
+    const src = calc?.items ?? [];
+    const out: { key: string; label: string; budget: number; real: number; used: number }[] = [];
+    const mat = { key: "materiais", label: "Materiais", budget: 0, real: 0, used: 0 };
+    for (const i of src) {
+      if (i.key === "materiais" || i.key === "ferramentas") {
+        mat.budget += i.budget;
+        mat.real += i.real;
+        if (!out.includes(mat)) out.push(mat);
+      } else out.push({ ...i });
+    }
+    mat.used = mat.budget ? (mat.real / mat.budget) * 100 : mat.real ? 100 : 0;
+    return out.filter((i) => i.budget || i.real);
+  })();
   const open = (k: NonNullable<typeof dlg>) => canWrite && setDlg(k);
   const isBilling = dlg === "faturamentos";
   const openEntries = (k: "lancamentos" | "faturamentos") => {
