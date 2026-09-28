@@ -2300,6 +2300,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      rdo_report_absence: {
+        Args: { _note: string; _reason: string; _wf_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       allocation_source: "base_team" | "copied_previous_day" | "manual"
