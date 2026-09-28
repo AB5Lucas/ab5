@@ -863,9 +863,7 @@ export function VehicleTimeline() {
                                   ? "EXTERNO"
                                   : row.is_suzano_local
                                     ? "SUZANO LOCAL"
-                                  : row.work_id
-                                    ? workLabel(row.work_id)
-                                    : clientName.get(row.client_id ?? "") ?? "—"}
+                                  : clientName.get(row.client_id ?? "") ?? "—"}
                               {(row.extra_client_ids ?? []).length > 0 && (
                                 <span className="font-semibold text-primary"> +{row.extra_client_ids!.length}</span>
                               )}
