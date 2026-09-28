@@ -13,7 +13,7 @@ import {
   Shield,
   Network,
   ClipboardList,
-  HardHat,
+ 
 } from "lucide-react";
 import {
   Sidebar,
