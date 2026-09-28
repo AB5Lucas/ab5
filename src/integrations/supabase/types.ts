@@ -2316,6 +2316,16 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      rdo_add_worker: {
+        Args: {
+          _collaborator_id: string
+          _entry: string
+          _exit: string
+          _position_id: string
+          _rdo_id: string
+        }
+        Returns: undefined
+      }
       rdo_report_absence: {
         Args: { _note: string; _reason: string; _wf_id: string }
         Returns: undefined
