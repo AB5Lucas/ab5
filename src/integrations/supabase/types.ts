@@ -1305,6 +1305,7 @@ export type Database = {
           finalized_at: string | null
           id: string
           notes: string | null
+          number: number
           report_date: string
           responsible_name: string | null
           schedule_id: string | null
@@ -1320,6 +1321,7 @@ export type Database = {
           finalized_at?: string | null
           id?: string
           notes?: string | null
+          number?: number
           report_date: string
           responsible_name?: string | null
           schedule_id?: string | null
@@ -1335,6 +1337,7 @@ export type Database = {
           finalized_at?: string | null
           id?: string
           notes?: string | null
+          number?: number
           report_date?: string
           responsible_name?: string | null
           schedule_id?: string | null
