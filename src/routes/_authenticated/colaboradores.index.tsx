@@ -96,6 +96,7 @@ const schema = z.object({
   full_name: z.string().trim().min(3, "Informe o nome completo").max(150),
   social_name: z.string().trim().max(150).optional().or(z.literal("")),
   cpf: z.string().trim().max(20).optional().or(z.literal("")),
+  city: z.string().trim().max(120).optional().or(z.literal("")),
   rg: z.string().trim().max(20).optional().or(z.literal("")),
   phone: z.string().trim().max(30).optional().or(z.literal("")),
   email: z.string().trim().email("E-mail inválido").max(255).optional().or(z.literal("")),
@@ -111,6 +112,7 @@ type FormState = {
   full_name: string;
   social_name: string;
   cpf: string;
+  city: string;
   phone: string;
   email: string;
   birth_date: string;
@@ -133,6 +135,7 @@ const emptyForm: FormState = {
   full_name: "",
   social_name: "",
   cpf: "",
+  city: "",
   phone: "",
   email: "",
   birth_date: "",
@@ -156,6 +159,7 @@ function toForm(c: Collaborator): FormState {
     full_name: c.full_name ?? "",
     social_name: c.social_name ?? "",
     cpf: c.cpf ?? "",
+    city: (c as { city?: string | null }).city ?? "",
     phone: c.phone ?? "",
     email: c.email ?? "",
     birth_date: c.birth_date ?? "",
@@ -240,6 +244,7 @@ function CollaboratorsPage() {
         full_name: form.full_name.trim(),
         social_name: nn(form.social_name),
         cpf: nn(form.cpf),
+        city: titleCaseOrNull(form.city ?? ""),
         rg: nn(form.rg),
         salary: form.salary.trim() === "" ? null : Number(form.salary.replace(",", ".")),
         contract_type: form.contract_type === NONE ? null : (form.contract_type as "efetivo" | "pj" | "intermitente"),
@@ -496,12 +501,12 @@ function CollaboratorsPage() {
               <Input id="full_name" value={form.full_name} onChange={(e) => set("full_name", e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="social_name">Nome social</Label>
-              <Input id="social_name" value={form.social_name} onChange={(e) => set("social_name", e.target.value)} />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="cpf">CPF</Label>
               <Input id="cpf" value={form.cpf} onChange={(e) => set("cpf", e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="city">Cidade</Label>
+              <Input id="city" value={form.city} onChange={(e) => set("city", e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Telefone</Label>
