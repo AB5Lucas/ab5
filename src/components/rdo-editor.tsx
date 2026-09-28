@@ -425,12 +425,20 @@ function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: 
         reportedReason={absent?.reported_reason}
         reportedNote={absent?.reported_note}
         busy={patch.isPending}
-        onConfirm={(key, note) => {
+        onConfirm={async (key, note) => {
           if (!absent) return;
-          patch.mutate(
-            { id: absent.id, data: { present: false, reported_reason: key, reported_note: note || null, occurrence_status: "pending" } },
-            { onSuccess: () => setAbsent(null) },
-          );
+          // Motivos diretos já vão para a caixa da Programação; "outro" fica pendente.
+          const { error } = await supabase.rpc("rdo_report_absence" as never, {
+            _wf_id: absent.id,
+            _reason: key,
+            _note: note || null,
+          } as never);
+          if (error) {
+            alert(error.message);
+            return;
+          }
+          qc.invalidateQueries({ queryKey: ["rdo-team"] });
+          setAbsent(null);
         }}
       />
     </div>
