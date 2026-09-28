@@ -130,11 +130,12 @@ function AsosPage() {
   });
 
   const collaborators = useQuery({
-    queryKey: ["collaborators-min"],
+    queryKey: ["collaborators-min-active-aso"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("collaborators")
         .select("id, full_name, registration_number, position_id")
+        .eq("status", "active")
         .order("full_name");
       if (error) throw error;
       return data;
@@ -169,6 +170,7 @@ function AsosPage() {
     const q = normText(search);
     return (asos.data ?? []).filter((r) => {
       const p = personById.get(r.collaborator_id);
+      if (!p) return false;
       const status = asoStatusOf(r.expires_at, today);
       if (statusFilter !== "all" && status !== statusFilter) return false;
       if (q) {

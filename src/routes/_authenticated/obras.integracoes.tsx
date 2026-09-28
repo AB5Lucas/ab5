@@ -154,11 +154,12 @@ function IntegrationsPage() {
   });
 
   const collaborators = useQuery({
-    queryKey: ["collaborators-min"],
+    queryKey: ["collaborators-min-active-int"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("collaborators")
         .select("id, full_name, cpf, registration_number, position_id")
+        .eq("status", "active")
         .order("full_name");
       if (error) throw error;
       return data;
@@ -210,6 +211,7 @@ function IntegrationsPage() {
     const qDigits = onlyDigits(search);
     return (integrations.data ?? []).filter((r) => {
       const p = personById.get(r.collaborator_id);
+      if (!p) return false;
       const clientName = clientById.get(r.client_id) ?? "";
       if (clientFilter !== "all" && r.client_id !== clientFilter) return false;
       if (statusFilter !== "all" && statusOf(r.expires_at, today) !== statusFilter) return false;

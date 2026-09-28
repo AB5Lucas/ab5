@@ -258,6 +258,7 @@ function TrainingsPage() {
   }, [records.data, trainingIds]);
 
   const filtered = (records.data ?? []).filter((r) => {
+    if (!nameById.has(r.collaborator_id)) return false;
     if (filter !== "all" && statusOf(r.expires_at) !== filter) return false;
     const p = normText(personSearch);
     if (p && !normText(nameById.get(r.collaborator_id) ?? "").includes(p)) return false;
