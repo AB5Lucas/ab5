@@ -124,7 +124,7 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
     queryFn: async () => {
       const { data } = await supabase
         .from("rdos")
-        .select("id, work_id, report_date, status, responsible_name, works(name, clients(name)), rdo_workforce(present), rdo_media(id), rdo_signatures(kind)")
+        .select("id, number, work_id, report_date, status, responsible_name, works(name, clients(name)), rdo_workforce(present), rdo_media(id), rdo_signatures(kind)")
         .order("report_date", { ascending: false })
         .limit(500);
       return data ?? [];
@@ -133,7 +133,7 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
   const rows = useMemo(
     () =>
       (list.data ?? []).filter((r) => {
-        const hay = `${r.works?.name} ${r.works?.clients?.name} ${r.responsible_name}`.toLowerCase();
+        const hay = `${r.number} ${r.works?.name} ${r.works?.clients?.name} ${r.responsible_name}`.toLowerCase();
         return (
           (!f.text || hay.includes(f.text.toLowerCase())) &&
           (!f.from || r.report_date >= f.from) &&
@@ -168,7 +168,7 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="font-medium leading-tight">{r.works ? workLabel(r.works) : "—"}</p>
-                  <p className="text-xs text-muted-foreground">{formatDateBR(r.report_date)} · {r.responsible_name ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">Nº {String(r.number ?? "").padStart(4, "0")} · {formatDateBR(r.report_date)} · {r.responsible_name ?? "—"}</p>
                 </div>
                 <Badge variant={r.status === "draft" ? "secondary" : "default"}>{RDO_STATUS_LABEL[r.status] ?? r.status}</Badge>
               </div>
