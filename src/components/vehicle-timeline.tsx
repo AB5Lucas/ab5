@@ -957,7 +957,7 @@ export function VehicleTimeline() {
                   : form.client_id === EXTERNAL_KEY
                     ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
                     : form.client_id && form.client_id !== NONE
-                      ? `${clientKm.get(form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
+                      ? `${clientKm.get(form.client_id.startsWith(WORK_PREFIX) ? workById.get(form.client_id.slice(WORK_PREFIX.length))?.client_id ?? "" : form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
                       : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
             </div>
