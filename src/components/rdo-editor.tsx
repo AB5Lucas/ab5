@@ -191,6 +191,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
+        <span className="font-display text-sm">RDO Nº {String(r.number ?? "").padStart(4, "0")}</span>
         <Badge variant={r.status === "draft" ? "secondary" : "default"}>{RDO_STATUS_LABEL[r.status] ?? r.status}</Badge>
         {r.responsible_name && <span className="text-xs text-muted-foreground">Responsável: {r.responsible_name}</span>}
         <Button
