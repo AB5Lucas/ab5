@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
-import { RDO_STATUS_LABEL, SCAFFOLD_OPS, SERVICE_CATEGORIES, reasonLabel, positionLabel } from "@/lib/rdo";
+import { RDO_STATUS_LABEL, SCAFFOLD_OPS, reasonLabel, positionLabel } from "@/lib/rdo";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 
 /** Remove o fundo branco do logo e aplica um contorno branco (para fundo escuro). */
@@ -82,14 +82,13 @@ function imgSize(dataUrl: string): Promise<{ w: number; h: number }> {
 }
 
 export async function exportRdoPdf(rdoId: string) {
-  const [{ data: rdo }, { data: team }, { data: services }, { data: scaffolds }, { data: media }, { data: sigs }] =
+  const [{ data: rdo }, { data: team }, { data: scaffolds }, { data: media }, { data: sigs }] =
     await Promise.all([
       supabase.from("rdos").select("*, works(name, clients(name))").eq("id", rdoId).single(),
       supabase
         .from("rdo_workforce")
         .select("*, collaborators(full_name, registration_number), positions(name)")
         .eq("rdo_id", rdoId),
-      supabase.from("rdo_services").select("*").eq("rdo_id", rdoId).order("created_at"),
       supabase.from("rdo_scaffolds").select("*").eq("rdo_id", rdoId).order("created_at"),
       supabase.from("rdo_media").select("*").eq("rdo_id", rdoId).order("created_at"),
       supabase.from("rdo_signatures").select("*").eq("rdo_id", rdoId),
@@ -159,14 +158,28 @@ export async function exportRdoPdf(rdoId: string) {
   doc.rect(0, 0, W, 30, "F");
   doc.setFillColor(...RED);
   doc.rect(0, 30, W, 1.5, "F");
-  const logo = await logoForDark();
+  const logoData = await toDataUrl(ab5Logo.url);
   let tx = M;
-  if (logo) {
+  {
     const lh = 18;
-    const lw = (logo.w / logo.h) * lh;
-    doc.addImage(logo.data, "PNG", M, 6, lw, lh);
-    tx = M + lw + 5;
+    const s = logoData ? await imgSize(logoData) : { w: 3, h: 1 };
+    const lw = (s.w / s.h) * lh;
+    const top = M + lw + 12; // largura no topo
+    const bottom = top - 8; // inclinação
+    doc.setFillColor(255, 255, 255);
+    doc.lines([[top, 0], [bottom - top, 30], [-bottom, 0]], 0, 0, [1, 1], "F", true);
+    doc.setFillColor(...RED);
+    doc.lines([[2, 0], [-8, 31.5], [-2, 0]], top, 0, [1, 1], "F", true);
+    if (logoData) {
+      try {
+        doc.addImage(logoData, "PNG", M, 6, lw, lh);
+      } catch {
+        /* ignora */
+      }
+    }
+    tx = top + 4;
   }
+  void logoForDark;
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
@@ -186,6 +199,29 @@ export async function exportRdoPdf(rdoId: string) {
     [18, 52, 42, 25, 45],
     [[String(rdo.number ?? ""), work?.name ?? "—", work?.clients?.name ?? "—", formatDateBR(rdo.report_date), rdo.responsible_name ?? "—"]],
   );
+
+  if (rdo.activities?.trim() || (scaffolds ?? []).length) {
+    section("Atividades");
+    if (rdo.activities?.trim()) para(rdo.activities);
+   if ((scaffolds ?? []).length) {
+     ensure(8);
+     doc.setFont("helvetica", "bold");
+     doc.text("Andaimes", M, y + 1);
+     y += 5;
+     table(
+       ["Tipo", "Local", "C×L×A (m)", "Qtd.", "Operação", "Obs."],
+       [30, 34, 30, 14, 26, 48],
+       (scaffolds ?? []).map((s) => [
+         s.scaffold_type ?? "",
+         s.location ?? "",
+         [s.length_m, s.width_m, s.height_m].map((v) => v ?? "-").join(" × "),
+         String(s.quantity),
+         SCAFFOLD_OPS.find((o) => o.key === s.operation)?.label ?? s.operation,
+         s.notes ?? "",
+       ]),
+     );
+   }
+  }
 
   section("Efetivo");
   const t = (team ?? []).slice().sort((a, b) =>
@@ -228,44 +264,6 @@ export async function exportRdoPdf(rdoId: string) {
     );
   }
 
-  if (rdo.activities?.trim()) {
-    section("Atividades");
-    para(rdo.activities);
-  }
-
-  const hasSvc = (services ?? []).length > 0 || (scaffolds ?? []).length > 0;
-  if (hasSvc) section("Serviços");
-  for (const c of SERVICE_CATEGORIES) {
-    const list = (services ?? []).filter((s) => s.category === c.key);
-    if (!list.length) continue;
-    ensure(8);
-    doc.setFont("helvetica", "bold");
-    doc.text(c.label, M, y + 1);
-    y += 5;
-    table(
-      ["Atividade", "Local", "Qtd.", "Un.", "Produt.", "Obs."],
-      [52, 34, 16, 14, 18, 48],
-      list.map((s) => [s.description, s.location ?? "", s.quantity?.toString() ?? "", s.unit ?? "", s.productivity?.toString() ?? "", [s.team, s.notes].filter(Boolean).join(" · ")]),
-    );
-  }
-  if ((scaffolds ?? []).length) {
-    ensure(8);
-    doc.setFont("helvetica", "bold");
-    doc.text("Andaimes", M, y + 1);
-    y += 5;
-    table(
-      ["Tipo", "Local", "C×L×A (m)", "Qtd.", "Operação", "Obs."],
-      [30, 34, 30, 14, 26, 48],
-      (scaffolds ?? []).map((s) => [
-        s.scaffold_type ?? "",
-        s.location ?? "",
-        [s.length_m, s.width_m, s.height_m].map((v) => v ?? "-").join(" × "),
-        String(s.quantity),
-        SCAFFOLD_OPS.find((o) => o.key === s.operation)?.label ?? s.operation,
-        s.notes ?? "",
-      ]),
-    );
-  }
   if (rdo.notes?.trim()) {
     section("Observações");
     para(rdo.notes);
