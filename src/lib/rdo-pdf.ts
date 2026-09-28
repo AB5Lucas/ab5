@@ -1,6 +1,58 @@
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
-import { RDO_STATUS_LABEL, SCAFFOLD_OPS, SERVICE_CATEGORIES, reasonLabel } from "@/lib/rdo";
+import { RDO_STATUS_LABEL, SCAFFOLD_OPS, SERVICE_CATEGORIES, reasonLabel, positionLabel } from "@/lib/rdo";
+import ab5Logo from "@/assets/ab5-logo.png.asset.json";
+
+/** Remove o fundo branco do logo e aplica um contorno branco (para fundo escuro). */
+async function logoForDark(): Promise<{ data: string; w: number; h: number } | null> {
+  try {
+    const src = await toDataUrl(ab5Logo.url);
+    if (!src) return null;
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = rej;
+      i.src = src;
+    });
+    const pad = 10;
+    const w = img.width + pad * 2;
+    const h = img.height + pad * 2;
+    const base = document.createElement("canvas");
+    base.width = w;
+    base.height = h;
+    const bc = base.getContext("2d")!;
+    bc.drawImage(img, pad, pad);
+    const d = bc.getImageData(0, 0, w, h);
+    for (let i = 0; i < d.data.length; i += 4) {
+      const m = Math.min(d.data[i]!, d.data[i + 1]!, d.data[i + 2]!);
+      if (m > 225) d.data[i + 3] = 0;
+      else if (m > 190) d.data[i + 3] = Math.round((d.data[i + 3]! * (225 - m)) / 35);
+    }
+    bc.putImageData(d, 0, 0);
+    // silhueta branca
+    const sil = document.createElement("canvas");
+    sil.width = w;
+    sil.height = h;
+    const sc = sil.getContext("2d")!;
+    sc.drawImage(base, 0, 0);
+    sc.globalCompositeOperation = "source-in";
+    sc.fillStyle = "#ffffff";
+    sc.fillRect(0, 0, w, h);
+    const out = document.createElement("canvas");
+    out.width = w;
+    out.height = h;
+    const oc = out.getContext("2d")!;
+    const r = Math.max(3, Math.round(img.width / 90));
+    for (let a = 0; a < 360; a += 20) {
+      const rad = (a * Math.PI) / 180;
+      oc.drawImage(sil, Math.cos(rad) * r, Math.sin(rad) * r);
+    }
+    oc.drawImage(base, 0, 0);
+    return { data: out.toDataURL("image/png"), w, h };
+  } catch {
+    return null;
+  }
+}
 import { formatDateBR } from "@/lib/scheduling";
 
 const RED: [number, number, number] = [200, 16, 46];
@@ -55,7 +107,9 @@ export async function exportRdoPdf(rdoId: string) {
       y = 16;
     }
   };
-  const section = (n: number, title: string) => {
+  let secN = 0;
+  const section = (title: string) => {
+    const n = ++secN;
     ensure(14);
     y += 4;
     doc.setFillColor(...RED);
@@ -105,31 +159,35 @@ export async function exportRdoPdf(rdoId: string) {
   doc.rect(0, 0, W, 30, "F");
   doc.setFillColor(...RED);
   doc.rect(0, 30, W, 1.5, "F");
-  doc.setFillColor(...RED);
-  doc.roundedRect(M, 8, 16, 14, 2, 2, "F");
+  const logo = await logoForDark();
+  let tx = M;
+  if (logo) {
+    const lh = 18;
+    const lw = (logo.w / logo.h) * lh;
+    doc.addImage(logo.data, "PNG", M, 6, lw, lh);
+    tx = M + lw + 5;
+  }
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("AB5", M + 8, 17, { align: "center" });
   doc.setFontSize(15);
-  doc.text("RELATÓRIO DIÁRIO DE OBRAS", M + 22, 15);
+  doc.text("RELATÓRIO DIÁRIO DE OBRAS", tx, 15);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("AB5 · RDO", M + 22, 21);
+  doc.text(`RDO Nº ${String(rdo.number ?? "").padStart(4, "0")}`, tx, 21);
   doc.text(formatDateBR(rdo.report_date), W - M, 15, { align: "right" });
   doc.text(RDO_STATUS_LABEL[rdo.status] ?? rdo.status, W - M, 21, { align: "right" });
   doc.setTextColor(...DARK);
   y = 40;
 
   const work = rdo.works as { name: string; clients: { name: string } | null } | null;
-  section(1, "Identificação");
+  section("Identificação");
   table(
-    ["Obra", "Cliente", "Data", "Responsável"],
-    [60, 50, 25, 47],
-    [[work?.name ?? "—", work?.clients?.name ?? "—", formatDateBR(rdo.report_date), rdo.responsible_name ?? "—"]],
+    ["RDO Nº", "Obra", "Cliente", "Data", "Responsável"],
+    [18, 52, 42, 25, 45],
+    [[String(rdo.number ?? ""), work?.name ?? "—", work?.clients?.name ?? "—", formatDateBR(rdo.report_date), rdo.responsible_name ?? "—"]],
   );
 
-  section(2, "Efetivo");
+  section("Efetivo");
   const t = (team ?? []).slice().sort((a, b) =>
     (a.collaborators?.full_name ?? "").localeCompare(b.collaborators?.full_name ?? "", "pt-BR"),
   );
@@ -140,7 +198,7 @@ export async function exportRdoPdf(rdoId: string) {
     [60, 44, 20, 20, 20, 18],
     present.map((r) => [
       r.collaborators?.full_name ?? "—",
-      r.positions?.name ?? "—",
+      positionLabel(r.positions?.name) ?? "—",
       r.entry_time?.slice(0, 5) ?? "—",
       r.exit_time?.slice(0, 5) ?? "—",
       `${r.break_minutes / 60}h`,
@@ -170,15 +228,16 @@ export async function exportRdoPdf(rdoId: string) {
     );
   }
 
-  section(3, "Atividades");
-  para(rdo.activities ?? "");
+  if (rdo.activities?.trim()) {
+    section("Atividades");
+    para(rdo.activities);
+  }
 
-  section(4, "Serviços");
-  let any = false;
+  const hasSvc = (services ?? []).length > 0 || (scaffolds ?? []).length > 0;
+  if (hasSvc) section("Serviços");
   for (const c of SERVICE_CATEGORIES) {
     const list = (services ?? []).filter((s) => s.category === c.key);
     if (!list.length) continue;
-    any = true;
     ensure(8);
     doc.setFont("helvetica", "bold");
     doc.text(c.label, M, y + 1);
@@ -190,7 +249,6 @@ export async function exportRdoPdf(rdoId: string) {
     );
   }
   if ((scaffolds ?? []).length) {
-    any = true;
     ensure(8);
     doc.setFont("helvetica", "bold");
     doc.text("Andaimes", M, y + 1);
@@ -208,15 +266,14 @@ export async function exportRdoPdf(rdoId: string) {
       ]),
     );
   }
-  if (!any) para("Nenhum serviço registrado.");
-
-  section(5, "Observações");
-  para(rdo.notes ?? "");
+  if (rdo.notes?.trim()) {
+    section("Observações");
+    para(rdo.notes);
+  }
 
   const photos = (media ?? []).filter((m) => m.kind === "photo");
   const videos = (media ?? []).filter((m) => m.kind === "video");
-  section(6, "Registro fotográfico");
-  if (!photos.length) para("Sem fotos.");
+  if (photos.length || videos.length) section("Registro fotográfico");
   const colW = (W - 2 * M - 6) / 2;
   let col = 0;
   for (const p of photos) {
@@ -243,9 +300,10 @@ export async function exportRdoPdf(rdoId: string) {
     col = col === 0 ? 1 : 0;
   }
   if (col === 1) y += 76;
+  // (sem fotos: seção omitida)
   if (videos.length) para(`${videos.length} vídeo(s) anexado(s) ao RDO no sistema.`);
 
-  section(7, "Assinaturas");
+  section("Assinaturas");
   ensure(45);
   const sw = (W - 2 * M - 10) / 2;
   (["ab5", "client"] as const).forEach((kind, i) => {
@@ -271,8 +329,8 @@ export async function exportRdoPdf(rdoId: string) {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(...GREY);
-    doc.text(`AB5 · RDO ${work?.name ?? ""} · ${formatDateBR(rdo.report_date)}`, M, 292);
+    doc.text(`AB5 · RDO Nº ${rdo.number ?? ""} · ${work?.name ?? ""} · ${formatDateBR(rdo.report_date)}`, M, 292);
     doc.text(`${i}/${pages}`, W - M, 292, { align: "right" });
   }
-  doc.save(`RDO_${(work?.name ?? "obra").replace(/\W+/g, "_")}_${rdo.report_date}.pdf`);
+  doc.save(`RDO_${rdo.number ?? ""}_${(work?.name ?? "obra").replace(/\W+/g, "_")}_${rdo.report_date}.pdf`);
 }
