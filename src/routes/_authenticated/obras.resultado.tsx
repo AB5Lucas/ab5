@@ -466,12 +466,12 @@ function ResultadoPage() {
                 <Lbl>Nº Pedido</Lbl>
                 <span>{w.order_number || "—"}</span>
                 <Lbl>Nº Orç. AB5</Lbl>
+                <span>{w.quote_number || "—"}</span>
+                <Lbl>Valor Faturado</Lbl>
                 <span className="flex justify-between">
-                  <span>{w.quote_number || "—"}</span>
+                  <span>{brl(billed)}</span>
                   <span>{order ? `${Math.round((billed / order) * 100)}%` : ""}</span>
                 </span>
-                <Lbl>Valor Faturado</Lbl>
-                <span>{brl(billed)}</span>
                 <Lbl>Saldo a Faturar</Lbl>
                 <span>{brl(order - billed)}</span>
               </div>
@@ -576,7 +576,7 @@ function ResultadoPage() {
               <SectionTitle>Margem de Contribuição</SectionTitle>
               <div className="mt-4 grid grid-cols-[1fr_auto_1fr] text-center">
                 <p className="border-b pb-1 text-sm italic text-muted-foreground">Orçado</p>
-                <p className="border-b pb-1 text-sm font-bold text-primary">% | %</p>
+                <p className="border-b pb-1" />
                 <p className="border-b pb-1 text-sm italic text-muted-foreground">Realizado</p>
                 <p className="pt-6 text-sm">{brl(budgetMargin)}</p>
                 <div className="row-span-2 mx-4 w-px bg-border" />
