@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileDown, Pencil } from "lucide-react";
+import { FileDown, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { RdoEditor, workLabel } from "@/components/rdo-editor";
@@ -118,6 +118,7 @@ function RdoPage() {
 }
 
 function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void }) {
+  const { isAdmin } = useCurrentUser();
   const [f, setF] = useState({ text: "", from: "", to: "", status: "all" });
   const list = useQuery({
     queryKey: ["rdo-history"],
@@ -182,6 +183,22 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
                 <Button size="sm" variant="outline" onClick={() => toast.promise(exportRdoPdf(r.id), { loading: "Gerando PDF...", success: "PDF gerado", error: (e) => e.message })}>
                   <FileDown className="h-4 w-4" /> PDF
                 </Button>
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label="Excluir RDO"
+                    onClick={async () => {
+                      if (!confirm(`Excluir o RDO Nº ${String(r.number ?? "").padStart(4, "0")}? Fotos, efetivo e assinaturas dele também serão apagados.`)) return;
+                      const { error } = await supabase.from("rdos").delete().eq("id", r.id);
+                      if (error) { toast.error(error.message); return; }
+                      toast.success("RDO excluído");
+                      void list.refetch();
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
               </div>
             </div>
           );
