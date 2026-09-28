@@ -328,6 +328,7 @@ function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: 
           {present.length} presentes de {rows.length} previstos · {total.toFixed(2).replace(".", ",")} h · intervalo 1h
         </p>
       </div>
+      {editable && <AddWorker rdoId={rdoId} work={work} date={date} existing={rows.map((r) => r.collaborator_id)} />}
       {rows.length === 0 && (
         <p className="py-6 text-center text-sm text-muted-foreground">Ninguém escalado nesta obra na Programação deste dia.</p>
       )}
