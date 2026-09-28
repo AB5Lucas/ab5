@@ -41,7 +41,7 @@ import { RDO_STATUS_LABEL, SCAFFOLD_OPS, SERVICE_CATEGORIES, reasonLabel, worked
 import { exportRdoPdf } from "@/lib/rdo-pdf";
 import { useCurrentUser } from "@/hooks/use-auth";
 
-const STEPS = ["Efetivo", "Atividades", "Serviços", "Fotos e vídeos", "Observações", "Assinaturas", "Finalizar"] as const;
+const STEPS = ["Efetivo", "Atividades", "Fotos e vídeos", "Observações", "Assinaturas", "Finalizar"] as const;
 
 type WorkRow = {
   id: string;
@@ -229,16 +229,18 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
       <div className="panel p-3 sm:p-4">
         {step === 0 && <TeamStep rdoId={r.id} work={work} date={date} rows={team.data ?? []} editable={editable} />}
         {step === 1 && (
-          <TextStep
-            label="Atividades realizadas no dia"
-            value={r.activities ?? ""}
-            editable={editable}
-            onSave={(v) => updateRdo.mutate({ activities: v })}
-          />
+          <div className="space-y-4">
+            <TextStep
+              label="Atividades realizadas no dia"
+              value={r.activities ?? ""}
+              editable={editable}
+              onSave={(v) => updateRdo.mutate({ activities: v })}
+            />
+            <ServicesStep rdoId={r.id} editable={editable} onlyScaffolds />
+          </div>
         )}
-        {step === 2 && <ServicesStep rdoId={r.id} editable={editable} />}
-        {step === 3 && <MediaStep rdoId={r.id} editable={editable} />}
-        {step === 4 && (
+        {step === 2 && <MediaStep rdoId={r.id} editable={editable} />}
+        {step === 3 && (
           <TextStep
             label="Observações"
             placeholder="Problemas, atrasos, falta de material, interferências, solicitações do cliente..."
@@ -247,8 +249,8 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
             onSave={(v) => updateRdo.mutate({ notes: v })}
           />
         )}
-        {step === 5 && <SignaturesStep rdoId={r.id} editable={editable} />}
-        {step === 6 && (
+        {step === 4 && <SignaturesStep rdoId={r.id} editable={editable} />}
+        {step === 5 && (
           <FinalizeStep
             status={r.status}
             canReopen={canWrite}
@@ -451,7 +453,7 @@ function TextStep({ label, value, placeholder, editable, onSave }: { label: stri
 
 /* ---------------- Serviços + Andaimes ---------------- */
 
-function ServicesStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
+function ServicesStep({ rdoId, editable, onlyScaffolds = false }: { rdoId: string; editable: boolean; onlyScaffolds?: boolean }) {
   const qc = useQueryClient();
   const [svcDialog, setSvcDialog] = useState<string | null>(null);
   const [scafOpen, setScafOpen] = useState(false);
@@ -513,12 +515,12 @@ function ServicesStep({ rdoId, editable }: { rdoId: string; editable: boolean })
 
   return (
     <div className="space-y-3">
-      <h2 className="font-display text-base uppercase">Serviços / apontamentos</h2>
-      {block("Civil", () => setSvcDialog("civil"), "Adicionar", svcList("civil"))}
+      {!onlyScaffolds && <h2 className="font-display text-base uppercase">Serviços / apontamentos</h2>}
+      {!onlyScaffolds && block("Civil", () => setSvcDialog("civil"), "Adicionar", svcList("civil"))}
       {block(
         "Andaimes",
         () => setScafOpen(true),
-        "Adicionar",
+        onlyScaffolds ? "Andaimes" : "Adicionar",
         (scaffolds.data ?? []).length ? (
           (scaffolds.data ?? []).map((s) => {
             const area = s.length_m && s.height_m ? Number(s.length_m) * Number(s.height_m) * Number(s.quantity) : null;
@@ -547,7 +549,7 @@ function ServicesStep({ rdoId, editable }: { rdoId: string; editable: boolean })
           <p className="px-3 py-3 text-xs text-muted-foreground">Nenhum andaime.</p>
         ),
       )}
-      {SERVICE_CATEGORIES.filter((c) => c.key !== "civil").map((c) => (
+      {!onlyScaffolds && SERVICE_CATEGORIES.filter((c) => c.key !== "civil").map((c) => (
         <div key={c.key}>{block(c.label, () => setSvcDialog(c.key), "Adicionar", svcList(c.key))}</div>
       ))}
       <ServiceDialog rdoId={rdoId} category={svcDialog} onClose={() => setSvcDialog(null)} />
