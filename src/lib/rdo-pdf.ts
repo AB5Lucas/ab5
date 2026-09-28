@@ -159,14 +159,28 @@ export async function exportRdoPdf(rdoId: string) {
   doc.rect(0, 0, W, 30, "F");
   doc.setFillColor(...RED);
   doc.rect(0, 30, W, 1.5, "F");
-  const logo = await logoForDark();
+  const logoData = await toDataUrl(ab5Logo.url);
   let tx = M;
-  if (logo) {
+  {
     const lh = 18;
-    const lw = (logo.w / logo.h) * lh;
-    doc.addImage(logo.data, "PNG", M, 6, lw, lh);
-    tx = M + lw + 5;
+    const s = logoData ? await imgSize(logoData) : { w: 3, h: 1 };
+    const lw = (s.w / s.h) * lh;
+    const top = M + lw + 12; // largura no topo
+    const bottom = top - 8; // inclinação
+    doc.setFillColor(255, 255, 255);
+    doc.lines([[top, 0], [bottom - top, 30], [-bottom, 0]], 0, 0, [1, 1], "F", true);
+    doc.setFillColor(...RED);
+    doc.lines([[2, 0], [-8, 31.5], [-2, 0]], top, 0, [1, 1], "F", true);
+    if (logoData) {
+      try {
+        doc.addImage(logoData, "PNG", M, 6, lw, lh);
+      } catch {
+        /* ignora */
+      }
+    }
+    tx = top + 4;
   }
+  void logoForDark;
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
