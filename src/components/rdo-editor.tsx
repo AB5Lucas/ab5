@@ -381,30 +381,30 @@ function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: 
               {r.present && <Check className="mt-3 h-5 w-5 shrink-0 text-success" />}
             </div>
             {r.present && (
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                <div>
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+                <div className="min-w-0">
                   <Label className="text-[11px]">Entrada</Label>
                   <Input
                     type="time"
-                    className="h-11"
+                    className="h-11 w-full min-w-0 max-w-full appearance-none px-2 text-base [&::-webkit-date-and-time-value]:text-left"
                     disabled={!editable}
                     defaultValue={r.entry_time?.slice(0, 5) ?? ""}
                     onBlur={(e) => e.target.value !== r.entry_time?.slice(0, 5) && patch.mutate({ id: r.id, data: { entry_time: e.target.value || null } })}
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <Label className="text-[11px]">Saída</Label>
                   <Input
                     type="time"
-                    className="h-11"
+                    className="h-11 w-full min-w-0 max-w-full appearance-none px-2 text-base [&::-webkit-date-and-time-value]:text-left"
                     disabled={!editable}
                     defaultValue={r.exit_time?.slice(0, 5) ?? ""}
                     onBlur={(e) => e.target.value !== r.exit_time?.slice(0, 5) && patch.mutate({ id: r.id, data: { exit_time: e.target.value || null } })}
                   />
                 </div>
-                <div>
+                <div className="w-14">
                   <Label className="text-[11px]">Horas</Label>
-                  <p className="flex h-11 items-center font-semibold">
+                  <p className="flex h-11 items-center justify-end font-semibold">
                     {workedHours(r.entry_time?.slice(0, 5), r.exit_time?.slice(0, 5), r.break_minutes).toFixed(2).replace(".", ",")}
                   </p>
                 </div>
