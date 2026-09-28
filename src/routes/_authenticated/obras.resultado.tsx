@@ -109,7 +109,7 @@ function ResultadoPage() {
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
-              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id").eq("client_id", w.client_id!).range(a, b),
+              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, vehicles(km_rate)").eq("client_id", w.client_id!).range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
@@ -179,7 +179,7 @@ function ResultadoPage() {
       bump(r.report_date.slice(0, 7), "labor", cost);
     }
     const toll = d.client?.has_toll ? Number(d.client.toll_amount ?? 0) : 0;
-    const transportRows: { date: string; km: number; trips: number; kmCost: number; toll: number; share: number; mine: number; total: number }[] = [];
+    const transportRows: { date: string; km: number; trips: number; kmCost: number; toll: number; share: number; mine: number; total: number; direct: boolean }[] = [];
     const dayTotal = new Map<string, number>();
     const dayMine = new Map<string, number>();
     for (const a of d.sibAllocs) {
@@ -189,13 +189,14 @@ function ResultadoPage() {
       if (a.work_id === work.id) dayMine.set(dt, (dayMine.get(dt) ?? 0) + 1);
     }
     for (const v of d.vs) {
+      if (v.work_id && v.work_id !== work.id) continue;
       const trips = Number(v.trips ?? 1);
-      const kmCost = Number(v.km ?? 0) * 2 * trips * KM_RATE;
+      const kmCost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? KM_RATE);
       const t = toll * 2 * trips;
       const total = dayTotal.get(v.schedule_date) ?? 0;
       const mine = dayMine.get(v.schedule_date) ?? 0;
-      const share = total > 0 ? ((kmCost + t) * mine) / total : (kmCost + t) / d.siblingCount;
-      transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share, mine, total });
+      const share = v.work_id ? kmCost + t : total > 0 ? ((kmCost + t) * mine) / total : (kmCost + t) / d.siblingCount;
+      transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share, mine, total, direct: !!v.work_id });
       bump(v.schedule_date.slice(0, 7), "transport", share);
     }
     for (const e of d.entries) {
@@ -629,7 +630,7 @@ function ResultadoPage() {
             {detail === "transporte" && calc && (
               <>
                 <p className="mb-2 text-xs text-muted-foreground">
-                  (KM ida × 2 × viagens × R$ {KM_RATE.toFixed(2).replace(".", ",")}) + (pedágio × 2 × viagens), rateado entre os {calc.siblingCount} serviço(s) do mesmo cliente proporcional aos colaboradores escalados no dia (sem ninguém escalado, divisão igual). Transporte de terceiros vem dos lançamentos.
+                  (KM ida × 2 × viagens × R$ {KM_RATE.toFixed(2).replace(".", ",")}) + (pedágio × 2 × viagens), rateado entre os {calc.siblingCount} serviço(s) do mesmo cliente proporcional aos colaboradores escalados no dia (sem ninguém escalado, divisão igual). Veículos com valor de KM próprio (ex.: Mercedes L1218 a R$ 5,00) escalados direto no serviço entram 100% neste serviço. Transporte de terceiros vem dos lançamentos.
                 </p>
                 <Table>
                   <TableBody>
@@ -651,7 +652,7 @@ function ResultadoPage() {
                         <TableCell className="text-right">{brl(t.kmCost)}</TableCell>
                         <TableCell className="text-right">{brl(t.toll)}</TableCell>
                         <TableCell className="text-right">{brl(t.kmCost + t.toll)}</TableCell>
-                        <TableCell className="text-right">{t.total > 0 ? `${t.mine}/${t.total}` : "—"}</TableCell>
+                        <TableCell className="text-right">{t.direct ? "Direto" : t.total > 0 ? `${t.mine}/${t.total}` : "—"}</TableCell>
                         <TableCell className="text-right">{brl(t.share)}</TableCell>
                       </TableRow>
                     ))}
