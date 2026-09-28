@@ -10,6 +10,7 @@ import {
   FileDown,
   ImagePlus,
   Lock,
+  Pencil,
   Plus,
   Trash2,
   Undo2,
@@ -361,23 +362,32 @@ function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: 
                   </p>
                 )}
               </div>
-              {editable && r.occurrence_status !== "classified" && (
+              {editable && (
                 r.present ? (
                   <Button variant="outline" size="icon" className="h-11 w-11 shrink-0 border-destructive/40" aria-label="Não compareceu" onClick={() => setAbsent(r)}>
                     <X className="h-5 w-5 text-destructive" />
                   </Button>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-11 w-11 shrink-0"
-                    aria-label="Marcar como presente"
-                    onClick={() =>
-                      patch.mutate({ id: r.id, data: { present: true, reported_reason: null, reported_note: null, occurrence_status: "none" } })
-                    }
-                  >
-                    <Undo2 className="h-5 w-5" />
-                  </Button>
+                  <div className="flex shrink-0 gap-1">
+                    <Button variant="outline" size="icon" className="h-11 w-11" aria-label="Editar falta" onClick={() => setAbsent(r)}>
+                      <Pencil className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11"
+                      aria-label="Marcar como presente"
+                      onClick={async () => {
+                        if (!confirm(`Desfazer a falta de ${r.collaborators?.full_name ?? "colaborador"} e marcar como presente?`)) return;
+                        const { error } = await supabase.rpc("rdo_undo_absence" as never, { _wf_id: r.id } as never);
+                        if (error) { toast.error(error.message); return; }
+                        toast.success("Marcado como presente");
+                        qc.invalidateQueries({ queryKey: ["rdo-team"] });
+                      }}
+                    >
+                      <Undo2 className="h-5 w-5" />
+                    </Button>
+                  </div>
                 )
               )}
               {r.present && <Check className="mt-3 h-5 w-5 shrink-0 text-success" />}
@@ -427,6 +437,11 @@ function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: 
         busy={patch.isPending}
         onConfirm={async (key, note) => {
           if (!absent) return;
+          // Editando uma falta já registrada: desfaz antes de registrar o novo motivo.
+          if (!absent.present) {
+            const { error: undoErr } = await supabase.rpc("rdo_undo_absence" as never, { _wf_id: absent.id } as never);
+            if (undoErr) { alert(undoErr.message); return; }
+          }
           // Motivos diretos já vão para a caixa da Programação; "outro" fica pendente.
           const { error } = await supabase.rpc("rdo_report_absence" as never, {
             _wf_id: absent.id,

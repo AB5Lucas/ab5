@@ -2320,6 +2320,7 @@ export type Database = {
         Args: { _note: string; _reason: string; _wf_id: string }
         Returns: undefined
       }
+      rdo_undo_absence: { Args: { _wf_id: string }; Returns: undefined }
     }
     Enums: {
       allocation_source: "base_team" | "copied_previous_day" | "manual"
