@@ -402,6 +402,16 @@ export function SchedulePlannerBoard({
     },
   });
   const workPaysVt = (workId: string) => workVt.data?.get(workId) ?? false;
+  // Colaboradores de Pouso Alegre recebem VT por padrão quando escalados em obra.
+  const pousoIds = useQuery({
+    queryKey: ["pouso-alegre-collabs"],
+    queryFn: async () => {
+      const { data } = await supabase.from("collaborators").select("id").ilike("city", "%pouso alegre%");
+      return new Set((data ?? []).map((r) => r.id));
+    },
+  });
+  const defaultAllocVt = (workId: string, collaboratorId: string) =>
+    workPaysVt(workId) || (pousoIds.data?.has(collaboratorId) ?? false);
 
   const toggleWorkVt = useMutation({
     mutationFn: async (workId: string) => {
@@ -417,9 +427,9 @@ export function SchedulePlannerBoard({
   });
 
   const toggleAllocVt = useMutation({
-    mutationFn: async ({ id, workId, current }: { id: string; workId: string; current: boolean }) => {
+    mutationFn: async ({ id, workId, collaboratorId, current }: { id: string; workId: string; collaboratorId: string; current: boolean }) => {
       const next = !current;
-      const override = next === workPaysVt(workId) ? null : next;
+      const override = next === defaultAllocVt(workId, collaboratorId) ? null : next;
       const { error } = await supabase.from("daily_allocations").update({ vt_override: override }).eq("id", id);
       if (error) throw error;
     },
@@ -1370,14 +1380,14 @@ export function SchedulePlannerBoard({
                           </Button>
                         )}
                         {(() => {
-                          const vt = r.vt_override ?? workPaysVt(w.id);
+                          const vt = r.vt_override ?? defaultAllocVt(w.id, r.collaborator_id);
                           return (
                             <button
                               type="button"
                               disabled={!editable}
                               title={`${vt ? "Recebe VT" : "Sem VT"}${r.vt_override !== null && r.vt_override !== undefined ? " (exceção)" : ""}`}
                               aria-label="Alternar VT do colaborador"
-                              onClick={(e) => { e.stopPropagation(); toggleAllocVt.mutate({ id: r.id, workId: w.id, current: vt }); }}
+                              onClick={(e) => { e.stopPropagation(); toggleAllocVt.mutate({ id: r.id, workId: w.id, collaboratorId: r.collaborator_id, current: vt }); }}
                               className={`h-2 w-2 shrink-0 rounded-full ${vt ? "bg-success" : "bg-muted-foreground/40"} ${r.vt_override !== null && r.vt_override !== undefined ? "ring-1 ring-foreground/60" : ""}`}
                             />
                           );

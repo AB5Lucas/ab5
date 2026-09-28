@@ -345,6 +345,7 @@ export type Database = {
       collaborators: {
         Row: {
           birth_date: string | null
+          city: string | null
           contract_type: Database["public"]["Enums"]["contract_type"] | null
           cpf: string | null
           created_at: string
@@ -371,6 +372,7 @@ export type Database = {
         }
         Insert: {
           birth_date?: string | null
+          city?: string | null
           contract_type?: Database["public"]["Enums"]["contract_type"] | null
           cpf?: string | null
           created_at?: string
@@ -397,6 +399,7 @@ export type Database = {
         }
         Update: {
           birth_date?: string | null
+          city?: string | null
           contract_type?: Database["public"]["Enums"]["contract_type"] | null
           cpf?: string | null
           created_at?: string
