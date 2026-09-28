@@ -109,3 +109,7 @@ export async function classifyOccurrence(occ: PendingOccurrence, finalKey: strin
     .eq("id", occ.id);
   if (error) throw error;
 }
+
+/** Nome da função sem o nível (N1..N4): "Ajudante N2" -> "Ajudante". */
+export const positionLabel = (name?: string | null) =>
+  name ? name.replace(/\s*[-–]?\s*\b(n[ií]vel|niv\.?|n)\s*\.?\s*[1-4]\b\s*$/i, "").trim() || name : null;
