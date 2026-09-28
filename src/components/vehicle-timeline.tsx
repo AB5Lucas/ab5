@@ -618,7 +618,7 @@ export function VehicleTimeline() {
 
       const { data: vs } = await supabase
         .from("vehicle_schedules")
-        .select("client_id, vehicle_id, trips")
+        .select("client_id, vehicle_id, trips, is_suzano_local")
         .eq("schedule_date", needsDate);
       return { counts, vehicleRows: vs ?? [] };
     },
@@ -632,11 +632,16 @@ export function VehicleTimeline() {
 
   const needsRows = useMemo(() => {
     const counts = needs.data?.counts ?? {};
-    const rows = (clients.data ?? [])
+    const all = clients.data ?? [];
+    const suzanoId = (all.find((c) => /^suzano$/i.test((c.name ?? "").trim())) ?? all.find((c) => /suzano/i.test(c.name ?? "")))?.id;
+    const rows = all
       .filter((c) => c.needs_company_transport)
       .map((c) => {
         const people = counts[c.id] ?? 0;
-        const vehicleRows = (needs.data?.vehicleRows ?? []).filter((v) => v.client_id === c.id);
+        // Carros em SUZANO LOCAL também contam como transporte da Suzano.
+        const vehicleRows = (needs.data?.vehicleRows ?? []).filter(
+          (v) => v.client_id === c.id || (c.id === suzanoId && v.is_suzano_local),
+        );
         // Em clientes com mais de uma viagem o mesmo motorista retorna: a 1ª viagem leva a lotação
         // cheia e as seguintes uma pessoa a menos (ex.: Suzano, 6 e depois 5).
         const seats = vehicleRows.reduce((s, v) => {
