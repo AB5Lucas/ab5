@@ -254,7 +254,10 @@ function ResultadoPage() {
       const pm = perMonth.get(e.entry_date.slice(0, 7));
       if (pm) pm[k] += Number(e.amount);
     }
-    const monthBars = rows.map((r) => ({ label: r.label, ...perMonth.get(r.ym)! }));
+    const monthBars = rows.map((r) => {
+      const pm = perMonth.get(r.ym)!;
+      return { label: r.label, ...pm, materiais: pm.materiais + pm.ferramentas };
+    });
     const bi = ((work as any).budget_items ?? {}) as Record<string, number>;
     const items = ITEMS.map((it) => {
       const b = Number(bi[it.key] ?? 0);
