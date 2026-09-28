@@ -292,6 +292,76 @@ type TeamRow = {
   positions: { name: string } | null;
 };
 
+function AddWorker({ rdoId, work, date, existing }: { rdoId: string; work: WorkRow; date: string; existing: string[] }) {
+  const qc = useQueryClient();
+  const { canWrite } = useCurrentUser();
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const wd = new Date(date + "T12:00:00").getDay();
+  const holiday = useQuery({
+    queryKey: ["holiday", date],
+    queryFn: async () => ((await supabase.from("holidays").select("id").eq("date", date)).data ?? []).length > 0,
+  });
+  const allowed = canWrite || wd === 0 || wd === 6 || !!holiday.data;
+  const people = useQuery({
+    queryKey: ["rdo-add-people"],
+    enabled: open,
+    queryFn: async () =>
+      (await supabase.from("collaborators").select("id, full_name, position_id").eq("status", "active").order("full_name")).data ?? [],
+  });
+  const add = useMutation({
+    mutationFn: async (p: { id: string; position_id: string | null }) => {
+      const exit = (wd === 0 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
+      const { error } = await supabase.rpc("rdo_add_worker" as never, {
+        _rdo_id: rdoId,
+        _collaborator_id: p.id,
+        _position_id: p.position_id,
+        _entry: work.entry_time?.slice(0, 5) ?? "07:00",
+        _exit: exit?.slice(0, 5) ?? "17:00",
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Colaborador adicionado e lançado na Programação");
+      qc.invalidateQueries({ queryKey: ["rdo-team", rdoId] });
+      qc.invalidateQueries({ queryKey: ["rdo-planned", work.id, date] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (!allowed) return null;
+  const list = (people.data ?? []).filter(
+    (p) => !existing.includes(p.id) && p.full_name.toLowerCase().includes(q.toLowerCase()),
+  );
+  return (
+    <>
+      <Button variant="outline" className="h-11 w-full" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" /> Adicionar colaborador
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[85vh] overflow-hidden">
+          <DialogHeader><DialogTitle>Adicionar colaborador</DialogTitle></DialogHeader>
+          <Input placeholder="Buscar pelo nome" value={q} onChange={(e) => setQ(e.target.value)} />
+          <ul className="max-h-[55vh] space-y-1 overflow-y-auto">
+            {people.isLoading && <li className="text-sm text-muted-foreground">Carregando...</li>}
+            {list.map((p) => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  disabled={add.isPending}
+                  className="w-full rounded-md border border-border p-3 text-left text-sm hover:bg-muted"
+                  onClick={() => add.mutate({ id: p.id, position_id: p.position_id })}
+                >
+                  {p.full_name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: WorkRow; date: string; rows: TeamRow[]; editable: boolean }) {
   const qc = useQueryClient();
   const [absent, setAbsent] = useState<TeamRow | null>(null);
