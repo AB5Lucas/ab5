@@ -1427,7 +1427,13 @@ export function SchedulePlannerBoard({
             const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
             const byName = (a: string, c: string) => nameOf(a).localeCompare(nameOf(c), "pt-BR");
             const boxRows = entries
-              .filter((e) => e.box_key === b.key && matchesRole(e.collaborator_id))
+              .filter((e) => {
+                if (e.box_key !== b.key || !matchesRole(e.collaborator_id)) return false;
+                // Ausência cadastrada (ex.: atestado do RH) prevalece sobre a caixa manual.
+                const reg = c?.absences.get(e.collaborator_id);
+                const regKey = reg ? ABSENCE_BOX[reg] : undefined;
+                return !regKey || regKey === b.key;
+              })
               .slice()
               .sort((x, y) => byName(x.collaborator_id, y.collaborator_id));
             const autoRows = (absenceMembers.get(b.key) ?? [])
