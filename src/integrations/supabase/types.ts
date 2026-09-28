@@ -1837,6 +1837,7 @@ export type Database = {
           trips: number
           updated_at: string
           vehicle_id: string
+          work_id: string | null
         }
         Insert: {
           client_id?: string | null
@@ -1856,6 +1857,7 @@ export type Database = {
           trips?: number
           updated_at?: string
           vehicle_id: string
+          work_id?: string | null
         }
         Update: {
           client_id?: string | null
@@ -1875,6 +1877,7 @@ export type Database = {
           trips?: number
           updated_at?: string
           vehicle_id?: string
+          work_id?: string | null
         }
         Relationships: [
           {
@@ -1896,6 +1899,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_schedules_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
             referencedColumns: ["id"]
           },
         ]
@@ -1926,11 +1936,13 @@ export type Database = {
       }
       vehicles: {
         Row: {
+          assign_by_work: boolean
           brand: string | null
           color: string | null
           created_at: string
           fuel_type: string | null
           id: string
+          km_rate: number | null
           model: string | null
           notes: string | null
           passenger_capacity: number
@@ -1941,11 +1953,13 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          assign_by_work?: boolean
           brand?: string | null
           color?: string | null
           created_at?: string
           fuel_type?: string | null
           id?: string
+          km_rate?: number | null
           model?: string | null
           notes?: string | null
           passenger_capacity?: number
@@ -1956,11 +1970,13 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          assign_by_work?: boolean
           brand?: string | null
           color?: string | null
           created_at?: string
           fuel_type?: string | null
           id?: string
+          km_rate?: number | null
           model?: string | null
           notes?: string | null
           passenger_capacity?: number

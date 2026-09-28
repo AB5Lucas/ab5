@@ -52,6 +52,7 @@ export type VehicleScheduleRow = {
   extra_km?: number;
   trips?: number;
   is_suzano_local?: boolean;
+  work_id?: string | null;
 };
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -110,6 +111,7 @@ type CellForm = {
 };
 
 const NONE = "__none__";
+const WORK_PREFIX = "w:";
 
 export function VehicleTimeline() {
   const { canWrite } = useCurrentUser();
@@ -275,7 +277,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_km, trips, is_suzano_local")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_km, trips, is_suzano_local, work_id")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -303,6 +305,21 @@ export function VehicleTimeline() {
   }, [clients.data]);
 
   // O KM exibido é apenas a distância de ida cadastrada no cliente.
+  const worksQ = useQuery({
+    queryKey: ["vehicle-timeline-works"],
+    queryFn: async () => {
+      const { data } = await supabase.from("works").select("id, name, client_id, clients(name)").eq("active", true).order("name");
+      return (data ?? []) as { id: string; name: string; client_id: string | null; clients: { name: string } | null }[];
+    },
+  });
+  const workById = useMemo(() => new Map((worksQ.data ?? []).map((w) => [w.id, w])), [worksQ.data]);
+  const workLabel = (id: string) => {
+    const w = workById.get(id);
+    return w ? `${w.clients?.name ? `${w.clients.name} - ` : ""}${w.name}` : "—";
+  };
+  const byWorkVehicle = (vehicleId: string) =>
+    !!(vehicles.data ?? []).find((v: any) => v.id === vehicleId)?.assign_by_work;
+
   const clientKm = useMemo(() => {
     const map = new Map<string, number>();
     (clients.data ?? []).forEach((c) => {
@@ -414,8 +431,11 @@ export function VehicleTimeline() {
       extra_driver_ids?: string[] | undefined;
       trips?: number | undefined;
       is_suzano_local?: boolean | undefined;
+      work_id?: string | null | undefined;
     },
   ) {
+    const workId = f.work_id ?? null;
+    if (workId) f = { ...f, client_id: workById.get(workId)?.client_id ?? f.client_id };
     const special = f.is_external || f.is_maintenance || !!f.is_suzano_local;
     const pairs = (f.extra_client_ids ?? [])
           .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "" }))
@@ -435,6 +455,7 @@ export function VehicleTimeline() {
       extra_client_ids: extras,
       extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
       extra_km: extras.reduce((s, id) => s + extraKm(id), 0),
+      work_id: special ? null : workId,
     };
   }
 
@@ -450,7 +471,9 @@ export function VehicleTimeline() {
             ? EXTERNAL_KEY
             : current.is_suzano_local
               ? SUZANO_LOCAL_KEY
-              : current.client_id ?? NONE
+              : current.work_id
+                ? WORK_PREFIX + current.work_id
+                : current.client_id ?? NONE
         : NONE,
       driver_bonus: current?.driver_bonus ?? false,
       repeat_until: "",
@@ -471,9 +494,11 @@ export function VehicleTimeline() {
     const isExternal = form.client_id === EXTERNAL_KEY;
     const isMaintenance = form.client_id === MAINTENANCE_KEY;
     const isLocal = form.client_id === SUZANO_LOCAL_KEY;
+    const workId = form.client_id.startsWith(WORK_PREFIX) ? form.client_id.slice(WORK_PREFIX.length) : null;
     const base = {
+      work_id: workId,
       driver_id: form.driver_id === NONE ? null : form.driver_id,
-      client_id: isExternal || isMaintenance || isLocal ? null : form.client_id,
+      client_id: isExternal || isMaintenance || isLocal ? null : workId ? workById.get(workId)?.client_id ?? null : form.client_id,
       is_suzano_local: isLocal,
       trips: Number(form.trips) || 1,
       is_external: isExternal,
@@ -509,6 +534,7 @@ export function VehicleTimeline() {
           extra_driver_ids: src.extra_driver_ids,
           trips: src.trips,
           is_suzano_local: src.is_suzano_local,
+          work_id: src.work_id,
         }),
       ]);
     } catch {
@@ -542,6 +568,7 @@ export function VehicleTimeline() {
             extra_driver_ids: s.extra_driver_ids,
             trips: s.trips,
             is_suzano_local: s.is_suzano_local,
+            work_id: s.work_id,
           }),
         );
       }
@@ -836,7 +863,9 @@ export function VehicleTimeline() {
                                   ? "EXTERNO"
                                   : row.is_suzano_local
                                     ? "SUZANO LOCAL"
-                                  : clientName.get(row.client_id ?? "") ?? "—"}
+                                  : row.work_id
+                                    ? workLabel(row.work_id)
+                                    : clientName.get(row.client_id ?? "") ?? "—"}
                               {(row.extra_client_ids ?? []).length > 0 && (
                                 <span className="font-semibold text-primary"> +{row.extra_client_ids!.length}</span>
                               )}
@@ -911,7 +940,11 @@ export function VehicleTimeline() {
               <Select value={form.client_id} onValueChange={(v) => setForm((f) => ({ ...f, client_id: v }))}>
                 <SelectTrigger><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
                 <SelectContent>
-                  {clientOptions()}
+                  {cell && byWorkVehicle(cell.vehicleId)
+                    ? (worksQ.data ?? []).map((w) => (
+                        <SelectItem key={w.id} value={WORK_PREFIX + w.id}>{workLabel(w.id)}</SelectItem>
+                      ))
+                    : clientOptions()}
                   <SelectItem value={EXTERNAL_KEY}>EXTERNO</SelectItem>
                   <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
                 </SelectContent>
@@ -924,7 +957,7 @@ export function VehicleTimeline() {
                   : form.client_id === EXTERNAL_KEY
                     ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
                     : form.client_id && form.client_id !== NONE
-                      ? `${clientKm.get(form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
+                      ? `${clientKm.get(form.client_id.startsWith(WORK_PREFIX) ? workById.get(form.client_id.slice(WORK_PREFIX.length))?.client_id ?? "" : form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
                       : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
             </div>

@@ -1,0 +1,2 @@
+ALTER TABLE public.vehicle_schedules ADD COLUMN work_id uuid REFERENCES public.works(id) ON DELETE SET NULL;
+ALTER TABLE public.vehicles ADD COLUMN km_rate numeric, ADD COLUMN assign_by_work boolean NOT NULL DEFAULT false;
