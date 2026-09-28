@@ -191,7 +191,7 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
                     onClick={async () => {
                       if (!confirm(`Excluir o RDO Nº ${String(r.number ?? "").padStart(4, "0")}? Fotos, efetivo e assinaturas dele também serão apagados.`)) return;
                       const { error } = await supabase.from("rdos").delete().eq("id", r.id);
-                      if (error) return toast.error(error.message);
+                      if (error) { toast.error(error.message); return; }
                       toast.success("RDO excluído");
                       void list.refetch();
                     }}
