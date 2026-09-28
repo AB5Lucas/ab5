@@ -10,6 +10,7 @@ import {
   FileDown,
   ImagePlus,
   Lock,
+  Pencil,
   Plus,
   Trash2,
   Undo2,
