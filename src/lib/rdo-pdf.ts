@@ -200,7 +200,6 @@ export async function exportRdoPdf(rdoId: string) {
     [[String(rdo.number ?? ""), work?.name ?? "—", work?.clients?.name ?? "—", formatDateBR(rdo.report_date), rdo.responsible_name ?? "—"]],
   );
 
-  if (rdo.activities?.trim()) {
   if (rdo.activities?.trim() || (scaffolds ?? []).length) {
     section("Atividades");
     if (rdo.activities?.trim()) para(rdo.activities);
