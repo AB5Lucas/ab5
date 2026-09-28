@@ -105,7 +105,7 @@ const groups: Group[] = [
       { title: "Prêmio de Motorista", url: "/beneficios/premio-motorista" },
     ],
   },
-  { label: "Externo", icon: HardHat, items: [{ title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
+  { label: "Externo", icon: ClipboardList, items: [{ title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
   { label: "Relatórios", icon: FileBarChart, items: [{ title: "Relatórios", url: "/relatorios" }] },
   {
     label: "Administração",
