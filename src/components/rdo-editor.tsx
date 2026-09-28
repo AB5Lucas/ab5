@@ -37,7 +37,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { cn } from "@/lib/utils";
 import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
 import { SignaturePad } from "@/components/signature-pad";
-import { RDO_STATUS_LABEL, SCAFFOLD_OPS, SERVICE_CATEGORIES, reasonLabel, workedHours } from "@/lib/rdo";
+import { RDO_STATUS_LABEL, SCAFFOLD_OPS, SERVICE_CATEGORIES, reasonLabel, workedHours, positionLabel } from "@/lib/rdo";
 import { exportRdoPdf } from "@/lib/rdo-pdf";
 import { useCurrentUser } from "@/hooks/use-auth";
 
@@ -74,13 +74,24 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
     queryKey: ["rdo-planned", work.id, date],
     queryFn: async () => {
       const { data: s } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
-      if (!s) return { scheduleId: null as string | null, allocs: [] };
+      if (!s) return { scheduleId: null as string | null, allocs: [] as { id: string; collaborator_id: string; position_id: string | null; collaborators: { position_id: string | null } | null; lastPos: string | null }[] };
       const { data } = await supabase
         .from("daily_allocations")
         .select("id, collaborator_id, position_id, collaborators(position_id)")
         .eq("schedule_id", s.id)
         .eq("work_id", work.id);
-      return { scheduleId: s.id as string | null, allocs: data ?? [] };
+      // Última função usada no RDO deste serviço (mantida para os próximos RDOs)
+      const { data: prev } = await supabase
+        .from("rdo_workforce")
+        .select("collaborator_id, position_id, report_date")
+        .eq("work_id", work.id)
+        .lt("report_date", date)
+        .not("position_id", "is", null)
+        .order("report_date", { ascending: false })
+        .limit(1000);
+      const lastPos: Record<string, string> = {};
+      for (const p of prev ?? []) if (!lastPos[p.collaborator_id]) lastPos[p.collaborator_id] = p.position_id!;
+      return { scheduleId: s.id as string | null, allocs: (data ?? []).map((a) => ({ ...a, lastPos: lastPos[a.collaborator_id] ?? null })) };
     },
   });
 
@@ -136,7 +147,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
         report_date: date,
         collaborator_id: a.collaborator_id,
         allocation_id: a.id,
-        position_id: a.position_id ?? a.collaborators?.position_id ?? null,
+        position_id: a.lastPos ?? a.position_id ?? a.collaborators?.position_id ?? null,
         planned: true,
         entry_time: defaultTimes.entry,
         exit_time: defaultTimes.exit,
@@ -273,6 +284,7 @@ type TeamRow = {
   occurrence_status: string;
   final_classification: string | null;
   collaborators: { full_name: string; registration_number: string } | null;
+  position_id: string | null;
   positions: { name: string } | null;
 };
 
@@ -288,6 +300,18 @@ function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: 
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rdo-team", rdoId] }),
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const positions = useQuery({
+    queryKey: ["rdo-positions"],
+    queryFn: async () => (await supabase.from("positions").select("id, name").eq("active", true).order("name")).data ?? [],
+  });
+  const posOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return (positions.data ?? [])
+      .map((p) => ({ id: p.id, label: positionLabel(p.name)! }))
+      .filter((p) => (seen.has(p.label.toLowerCase()) ? false : (seen.add(p.label.toLowerCase()), true)))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }, [positions.data]);
 
   const present = rows.filter((r) => r.present);
   const total = present.reduce((s, r) => s + workedHours(r.entry_time?.slice(0, 5), r.exit_time?.slice(0, 5), r.break_minutes), 0);
@@ -309,9 +333,22 @@ function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: 
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
                 <p className={cn("font-medium leading-tight", !r.present && "line-through opacity-70")}>{r.collaborators?.full_name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {r.positions?.name ?? "Sem função"} · Mat. {r.collaborators?.registration_number}
-                </p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                  {editable ? (
+                    <Select
+                      value={posOptions.find((o) => o.label === positionLabel(r.positions?.name))?.id ?? r.position_id ?? ""}
+                      onValueChange={(v) => patch.mutate({ id: r.id, data: { position_id: v } })}
+                    >
+                      <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs"><SelectValue placeholder="Sem função" /></SelectTrigger>
+                      <SelectContent>
+                        {posOptions.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span>{positionLabel(r.positions?.name) ?? "Sem função"}</span>
+                  )}
+                  <span>Mat. {r.collaborators?.registration_number}</span>
+                </div>
                 {!r.present && (
                   <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
                     <AlertTriangle className="h-3.5 w-3.5" />
@@ -480,7 +517,7 @@ function ServicesStep({ rdoId, editable }: { rdoId: string; editable: boolean })
       {block(
         "Andaimes",
         () => setScafOpen(true),
-        "Adicionar andaime",
+        "Adicionar",
         (scaffolds.data ?? []).length ? (
           (scaffolds.data ?? []).map((s) => {
             const area = s.length_m && s.height_m ? Number(s.length_m) * Number(s.height_m) * Number(s.quantity) : null;
