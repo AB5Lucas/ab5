@@ -347,11 +347,18 @@ function ConferencePage() {
     mutationFn: async (item: Item) => {
       const { error } = await supabase.from("conference_items").delete().eq("id", item.id);
       if (error) throw error;
+      // Cancela o agendamento de origem: o colaborador volta para a obra em que estava.
+      if (item.appointment_id) {
+        const { error: aErr } = await supabase.from("appointments").update({ status: "cancelado" }).eq("id", item.appointment_id);
+        if (aErr) throw aErr;
+      }
     },
     onSuccess: () => {
       toast.success("Item excluído da Conferência");
       setDeleteItem(null);
       invalidate();
+      qc.invalidateQueries({ queryKey: ["appointments-day"] });
+      qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
