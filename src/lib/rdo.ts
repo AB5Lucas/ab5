@@ -6,6 +6,7 @@ export const REPORTED_REASONS = [
   { key: "atestado", label: "Atestado" },
   { key: "medico", label: "Médico" },
   { key: "interjornada", label: "Interjornada" },
+  { key: "folga", label: "Folga" },
   { key: "outro", label: "Outro motivo" },
 ] as const;
 
@@ -15,6 +16,7 @@ export const FINAL_CLASSES = [
   { key: "atestado", label: "Atestado" },
   { key: "medico", label: "Médico" },
   { key: "interjornada", label: "Interjornada" },
+  { key: "folga", label: "Folga" },
 ] as const;
 
 export const reasonLabel = (key: string | null | undefined, note?: string | null) => {
