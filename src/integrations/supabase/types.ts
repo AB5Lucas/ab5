@@ -369,6 +369,7 @@ export type Database = {
           status: Database["public"]["Enums"]["collaborator_status"]
           supervisor_id: string | null
           updated_at: string
+          vt_enabled: boolean
         }
         Insert: {
           birth_date?: string | null
@@ -396,6 +397,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["collaborator_status"]
           supervisor_id?: string | null
           updated_at?: string
+          vt_enabled?: boolean
         }
         Update: {
           birth_date?: string | null
@@ -423,6 +425,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["collaborator_status"]
           supervisor_id?: string | null
           updated_at?: string
+          vt_enabled?: boolean
         }
         Relationships: [
           {
