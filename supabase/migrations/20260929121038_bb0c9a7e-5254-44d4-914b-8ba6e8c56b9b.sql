@@ -1,0 +1,1 @@
+ALTER TABLE public.collaborators ADD COLUMN vt_enabled boolean NOT NULL DEFAULT true;

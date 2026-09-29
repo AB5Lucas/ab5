@@ -403,15 +403,24 @@ export function SchedulePlannerBoard({
   });
   const workPaysVt = (workId: string) => workVt.data?.get(workId) ?? false;
   // Colaboradores de Pouso Alegre recebem VT por padrão quando escalados em obra.
+  // Colaboradores com "Vale Transporte" desligado no cadastro começam sempre sem VT.
   const pousoIds = useQuery({
     queryKey: ["pouso-alegre-collabs"],
     queryFn: async () => {
-      const { data } = await supabase.from("collaborators").select("id").ilike("city", "%pouso alegre%");
-      return new Set((data ?? []).map((r) => r.id));
+      const { data } = await supabase.from("collaborators").select("id, city, vt_enabled");
+      const pouso = new Set<string>();
+      const noVt = new Set<string>();
+      for (const r of data ?? []) {
+        if (r.vt_enabled === false) noVt.add(r.id);
+        else if ((r.city ?? "").toLowerCase().includes("pouso alegre")) pouso.add(r.id);
+      }
+      return { pouso, noVt };
     },
   });
-  const defaultAllocVt = (workId: string, collaboratorId: string) =>
-    workPaysVt(workId) || (pousoIds.data?.has(collaboratorId) ?? false);
+  const defaultAllocVt = (workId: string, collaboratorId: string) => {
+    if (pousoIds.data?.noVt.has(collaboratorId)) return false;
+    return workPaysVt(workId) || (pousoIds.data?.pouso.has(collaboratorId) ?? false);
+  };
 
   const toggleWorkVt = useMutation({
     mutationFn: async (workId: string) => {
