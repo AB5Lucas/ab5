@@ -117,7 +117,7 @@ function ConsultaPage() {
   );
 }
 
-function Row({ s, name, done, exp }: { s: St; name: string; done?: string | null; exp?: string | null }) {
+function Row({ s, name, done, exp }: { s: St; name: string; done?: string | null | undefined; exp?: string | null | undefined }) {
   return (
     <div className="flex items-center gap-3 border-b py-2 text-sm last:border-0">
       <Dot s={s} />
