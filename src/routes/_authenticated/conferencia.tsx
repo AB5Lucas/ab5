@@ -59,6 +59,7 @@ export const Route = createFileRoute("/_authenticated/conferencia")({
 
 type Item = {
   id: string;
+  appointment_id?: string | null;
   collaborator_id: string;
   type: AppointmentType;
   training_id: string | null;
@@ -99,7 +100,7 @@ function ConferencePage() {
       const { data, error } = await supabase
         .from("conference_items")
         .select(
-          "id, collaborator_id, type, training_id, client_id, document_date, status, notes, completed_at, completed_by, created_at",
+          "id, appointment_id, collaborator_id, type, training_id, client_id, document_date, status, notes, completed_at, completed_by, created_at",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -347,11 +348,18 @@ function ConferencePage() {
     mutationFn: async (item: Item) => {
       const { error } = await supabase.from("conference_items").delete().eq("id", item.id);
       if (error) throw error;
+      // Cancela o agendamento de origem: o colaborador volta para a obra em que estava.
+      if (item.appointment_id) {
+        const { error: aErr } = await supabase.from("appointments").update({ status: "cancelado" }).eq("id", item.appointment_id);
+        if (aErr) throw aErr;
+      }
     },
     onSuccess: () => {
       toast.success("Item excluído da Conferência");
       setDeleteItem(null);
       invalidate();
+      qc.invalidateQueries({ queryKey: ["appointments-day"] });
+      qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
