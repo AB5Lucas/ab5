@@ -170,7 +170,7 @@ function VoucherPage() {
           const { data, error: ae } = await supabase
             .from("daily_allocations")
             .select(
-              "collaborator_id, schedule_id, work_id, driver, vt_override, collaborators(full_name, registration_number, city)",
+              "collaborator_id, schedule_id, work_id, driver, vt_override, collaborators(full_name, registration_number, city, vt_enabled)",
             )
             .in("schedule_id", ids)
             .order("id")
@@ -272,9 +272,11 @@ function VoucherPage() {
       for (const a of allocations) {
         const c = (a as unknown as { collaborators: C }).collaborators;
         // Regra: status de VT da obra no dia; exceção individual do colaborador prevalece.
-        const city = ((a as unknown as { collaborators: { city?: string | null } | null }).collaborators?.city ?? "").toLowerCase();
+        const cc = (a as unknown as { collaborators: { city?: string | null; vt_enabled?: boolean | null } | null }).collaborators;
+        const city = (cc?.city ?? "").toLowerCase();
         const pouso = city.includes("pouso alegre");
-        const pays = a.vt_override ?? (vtMap.get(`${a.schedule_id}|${a.work_id}`) || pouso);
+        const base = cc?.vt_enabled === false ? false : (vtMap.get(`${a.schedule_id}|${a.work_id}`) || pouso);
+        const pays = a.vt_override ?? base;
         if (!pays) continue;
         const date = dateById.get(a.schedule_id) ?? a.schedule_id;
         const e = entryFor(a.collaborator_id, c);
