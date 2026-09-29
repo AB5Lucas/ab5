@@ -21,6 +21,7 @@ export function RdoAbsenceDialog({
   reportedNote,
   busy,
   onConfirm,
+  onKeep,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -32,6 +33,7 @@ export function RdoAbsenceDialog({
   reportedNote?: string | null | undefined;
   busy?: boolean | undefined;
   onConfirm: (key: string, note: string) => void;
+  onKeep?: (() => void) | undefined;
 }) {
   const [choice, setChoice] = useState<string>("");
   const [note, setNote] = useState("");
@@ -90,6 +92,11 @@ export function RdoAbsenceDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
+          {mode === "classify" && onKeep && (
+            <Button variant="secondary" disabled={busy} onClick={onKeep}>
+              Manter
+            </Button>
+          )}
           <Button disabled={!canSave || busy} onClick={() => onConfirm(choice, note.trim())}>
             {mode === "report" ? "Registrar ausência" : "Confirmar classificação"}
           </Button>

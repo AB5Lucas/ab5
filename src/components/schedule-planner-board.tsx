@@ -376,6 +376,21 @@ export function SchedulePlannerBoard({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const keepOcc = useMutation({
+    mutationFn: async (occ: PendingOccurrence) => {
+      const { error } = await supabase
+        .from("rdo_workforce")
+        .update({ present: true, occurrence_status: "none", reported_reason: null, reported_note: null, final_classification: null })
+        .eq("id", occ.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Colaborador mantido no efetivo");
+      setOccOpen(null);
+      qc.invalidateQueries({ queryKey: ["rdo-pending", date] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const statusEntries = useQuery({
     queryKey: ["status-entries", scheduleId],
@@ -1092,8 +1107,9 @@ export function SchedulePlannerBoard({
         date={occOpen?.report_date}
         reportedReason={occOpen?.reported_reason}
         reportedNote={occOpen?.reported_note}
-        busy={classify.isPending}
+        busy={classify.isPending || keepOcc.isPending}
         onConfirm={(key) => occOpen && classify.mutate({ occ: occOpen, key })}
+        onKeep={() => occOpen && keepOcc.mutate(occOpen)}
       />
       {/* Data, resumo e ações */}
       <div className="panel flex flex-wrap items-center gap-3 p-3">
