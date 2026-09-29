@@ -75,7 +75,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
     queryKey: ["rdo-planned", work.id, date],
     queryFn: async () => {
       const { data: s } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
-      if (!s) return { scheduleId: null as string | null, allocs: [] as { id: string; collaborator_id: string; position_id: string | null; collaborators: { position_id: string | null } | null; lastPos: string | null }[] };
+      if (!s) return { scheduleId: null as string | null, blocked: new Set<string>(), allocs: [] as { id: string; collaborator_id: string; position_id: string | null; collaborators: { position_id: string | null } | null; lastPos: string | null }[] };
       const { data: raw } = await supabase
         .from("daily_allocations")
         .select("id, collaborator_id, position_id, collaborators(position_id)")
@@ -168,7 +168,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
         exit_time: defaultTimes.exit,
       }));
     const removed = team.data
-      .filter((t) => t.planned && !allocIds.has(t.collaborator_id) && t.present && t.occurrence_status === "none")
+      .filter((t) => t.planned && !allocIds.has(t.collaborator_id) && ((t.present && t.occurrence_status === "none") || planned.data!.blocked.has(t.collaborator_id)))
       .map((t) => t.id);
     if (!inserts.length && !removed.length) return;
     (async () => {
