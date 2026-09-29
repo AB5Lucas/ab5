@@ -81,6 +81,7 @@ const STATUS_BOXES = [
   { key: "afastado", label: "AFASTADO" },
   { key: "falta", label: "FALTA" },
   { key: "interjornada", label: "INTERJORNADA" },
+  { key: "licenca", label: "LICENÇA" },
 ] as const;
 
 const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
