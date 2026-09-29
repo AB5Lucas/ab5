@@ -40,6 +40,7 @@ const groups: Group[] = [
     items: [
       { title: "Programação", url: "/programacao/diaria" },
       { title: "Transporte", url: "/veiculos/transporte" },
+      { title: "Consulta", url: "/consulta" },
     ],
   },
   {
