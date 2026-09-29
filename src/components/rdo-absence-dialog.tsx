@@ -88,19 +88,19 @@ export function RdoAbsenceDialog({
             onChange={(e) => setNote(e.target.value)}
           />
         )}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <div className={cn("grid gap-2", mode === "classify" && onKeep ? "grid-cols-[1fr_1fr_2fr]" : "grid-cols-2")}>
+          <Button variant="outline" className="w-full min-w-0 px-2" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           {mode === "classify" && onKeep && (
-            <Button variant="secondary" disabled={busy} onClick={onKeep}>
+            <Button variant="secondary" className="w-full min-w-0 px-2" disabled={busy} onClick={onKeep}>
               Manter
             </Button>
           )}
-          <Button disabled={!canSave || busy} onClick={() => onConfirm(choice, note.trim())}>
+          <Button className="w-full min-w-0 px-2" disabled={!canSave || busy} onClick={() => onConfirm(choice, note.trim())}>
             {mode === "report" ? "Registrar ausência" : "Confirmar classificação"}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
