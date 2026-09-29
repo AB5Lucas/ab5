@@ -76,11 +76,25 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
     queryFn: async () => {
       const { data: s } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
       if (!s) return { scheduleId: null as string | null, allocs: [] as { id: string; collaborator_id: string; position_id: string | null; collaborators: { position_id: string | null } | null; lastPos: string | null }[] };
-      const { data } = await supabase
+      const { data: raw } = await supabase
         .from("daily_allocations")
         .select("id, collaborator_id, position_id, collaborators(position_id)")
         .eq("schedule_id", s.id)
         .eq("work_id", work.id);
+      // Quem está de folga, férias ou atestado no dia não entra no RDO (a ausência prevalece).
+      const ids = (raw ?? []).map((a) => a.collaborator_id);
+      const blocked = new Set<string>();
+      if (ids.length) {
+        const [off, vac, med] = await Promise.all([
+          supabase.from("days_off").select("collaborator_id, date, end_date").in("collaborator_id", ids).lte("date", date),
+          supabase.from("vacations").select("collaborator_id").in("collaborator_id", ids).lte("start_date", date).gte("end_date", date).neq("status", "cancelled"),
+          supabase.from("medical_leaves").select("collaborator_id").in("collaborator_id", ids).lte("start_date", date).gte("end_date", date),
+        ]);
+        for (const o of off.data ?? []) if ((o.end_date ?? o.date) >= date) blocked.add(o.collaborator_id);
+        for (const v of vac.data ?? []) blocked.add(v.collaborator_id);
+        for (const m of med.data ?? []) blocked.add(m.collaborator_id);
+      }
+      const data = (raw ?? []).filter((a) => !blocked.has(a.collaborator_id));
       // Última função usada no RDO deste serviço (mantida para os próximos RDOs)
       const { data: prev } = await supabase
         .from("rdo_workforce")
@@ -92,7 +106,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
         .limit(1000);
       const lastPos: Record<string, string> = {};
       for (const p of prev ?? []) if (!lastPos[p.collaborator_id]) lastPos[p.collaborator_id] = p.position_id!;
-      return { scheduleId: s.id as string | null, allocs: (data ?? []).map((a) => ({ ...a, lastPos: lastPos[a.collaborator_id] ?? null })) };
+      return { scheduleId: s.id as string | null, blocked, allocs: data.map((a) => ({ ...a, lastPos: lastPos[a.collaborator_id] ?? null })) };
     },
   });
 
