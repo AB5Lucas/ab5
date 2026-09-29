@@ -49,6 +49,15 @@ import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/schedu
 import { cn } from "@/lib/utils";
 import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
 import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 type Level = "ok" | "warn" | "block" | "busy";
@@ -360,6 +369,8 @@ export function SchedulePlannerBoard({
     },
   });
   const [occOpen, setOccOpen] = useState<PendingOccurrence | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [copyAsk, setCopyAsk] = useState<{ work: any; siblings: any[] } | null>(null);
   const classify = useMutation({
     mutationFn: async ({ occ, key }: { occ: PendingOccurrence; key: string }) => {
       const { data: u } = await supabase.auth.getUser();
@@ -1096,8 +1107,52 @@ export function SchedulePlannerBoard({
   const pendingCount = effectiveRows.filter((r) => r.has_pending_requirement).length;
   const unavailableCount = c?.absences.size ?? 0;
 
+  const namesForWorks = (ids: Set<string>) =>
+    Array.from(
+      new Set(
+        rows
+          .filter(
+            (r) =>
+              ids.has(r.work_id) &&
+              matchesRole(r.collaborator_id, r.position_id) &&
+              !appointmentByCollaborator.has(r.collaborator_id) &&
+              !c?.absences.has(r.collaborator_id),
+          )
+          .map((r) => personById.get(r.collaborator_id)?.full_name ?? "")
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const copyWorks = (w: (typeof shownWorks)[number], list: (typeof shownWorks)) => {
+    const names = namesForWorks(new Set(list.map((x) => x.id)));
+    void copyToClipboard([`*${w.clients?.name ?? w.name}*`, dayLine(date), "", names.join("\n")].join("\n"));
+  };
+
   return (
     <div className="space-y-4">
+      <AlertDialog open={!!copyAsk} onOpenChange={(v) => !v && setCopyAsk(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Copiar efetivo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este cliente tem mais de um serviço hoje. Deseja copiar só este efetivo ou todos juntos?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => { if (copyAsk) copyWorks(copyAsk.work, [copyAsk.work]); setCopyAsk(null); }}
+            >
+              Só este efetivo
+            </Button>
+            <Button
+              onClick={() => { if (copyAsk) copyWorks(copyAsk.work, [copyAsk.work, ...copyAsk.siblings]); setCopyAsk(null); }}
+            >
+              Copiar todos juntos
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <RdoAbsenceDialog
         open={!!occOpen}
         onOpenChange={(v) => !v && setOccOpen(null)}
@@ -1296,17 +1351,11 @@ export function SchedulePlannerBoard({
                       aria-label="Copiar mensagem"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const names = workRows
-                          .map((r) => personById.get(r.collaborator_id)?.full_name ?? "")
-                          .filter(Boolean);
-                        void copyToClipboard(
-                          [
-                            `*${w.clients?.name ?? w.name}*`,
-                            dayLine(date),
-                            "",
-                            names.join("\n"),
-                          ].join("\n"),
-                        );
+                        const siblings = w.client_id
+                          ? shownWorks.filter((x) => x.client_id === w.client_id && x.id !== w.id)
+                          : [];
+                        if (siblings.length > 0) setCopyAsk({ work: w, siblings });
+                        else copyWorks(w, [w]);
                       }}
                     >
                       <Copy className="h-3 w-3" />
