@@ -31,6 +31,7 @@ export const Route = createFileRoute("/_authenticated/obras/resultado")({
 
 /** Multiplicador de encargos sobre o valor hora do colaborador. */
 const ENCARGOS = 2.6;
+const TAX_RATE = 0.1867; // imposto fixo sobre o valor do pedido
 const KM_RATE = 1.35;
 const DEFAULT_HOURS = 8;
 
@@ -206,7 +207,7 @@ function ResultadoPage() {
     const months = [...new Set([...monthly.keys(), ...progMap.keys()])].sort();
     const order = Number(work.order_value ?? 0);
     const budget = Number(work.budget_cost ?? 0);
-    const budgetMarginPct = order ? ((order - budget) / order) * 100 : 0;
+    const budgetMarginPct = order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0;
     let accCost = 0;
     let lastPct = 0;
     let accBilling = 0;
@@ -217,7 +218,7 @@ function ResultadoPage() {
       const prev = lastPct;
       if (progMap.has(ym)) lastPct = progMap.get(ym)!;
       const revenue = (order * lastPct) / 100;
-      const margin = revenue - accCost;
+      const margin = revenue - revenue * TAX_RATE - accCost;
       const marginPct = revenue ? (margin / revenue) * 100 : 0;
       return {
         ym,
@@ -388,8 +389,8 @@ function ResultadoPage() {
   const last = calc?.last;
   const billed = last?.billing ?? 0;
   const order = calc?.order ?? 0;
-  const budgetMargin = order - (calc?.budget ?? 0);
-  const realMargin = (last?.revenue ?? 0) - (last?.cost ?? 0);
+  const budgetMargin = order - order * TAX_RATE - (calc?.budget ?? 0);
+  const realMargin = (last?.revenue ?? 0) * (1 - TAX_RATE) - (last?.cost ?? 0);
   const totBudget = calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0;
   const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
   const barItems = (() => {
