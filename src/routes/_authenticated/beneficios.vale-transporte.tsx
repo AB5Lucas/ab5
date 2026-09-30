@@ -189,7 +189,7 @@ function VoucherPage() {
             .from("daily_status_entries")
             .select("schedule_id, collaborator_id")
             .in("schedule_id", ids)
-            .in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca"]),
+            .in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]),
           supabase
             .from("medical_leaves")
             .select("collaborator_id, start_date, end_date")
