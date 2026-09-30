@@ -93,7 +93,7 @@ function ResultadoPage() {
   const work = works.data?.find((w) => w.id === workId);
 
   const data = useQuery({
-    queryKey: ["work-result", workId],
+    queryKey: ["work-result", workId, "vt"],
     enabled: !!work,
     queryFn: async () => {
       const w = work!;
@@ -215,10 +215,10 @@ function ResultadoPage() {
     }
     // VT dos colaboradores escalados neste serviço entra no transporte da obra
     const person = new Map<string, any>(d.people.map((p: any) => [p.id, p]));
-    const workVt = new Map<string, boolean>(d.workVt.map((r: any) => [r.schedule_id, r.pays_vt]));
-    const noVt = new Set<string>(d.noVtRows.map((r: any) => `${r.schedule_id}|${r.collaborator_id}`));
+    const workVt = new Map<string, boolean>((d.workVt ?? []).map((r: any) => [r.schedule_id, r.pays_vt]));
+    const noVt = new Set<string>((d.noVtRows ?? []).map((r: any) => `${r.schedule_id}|${r.collaborator_id}`));
     const vtDay = (driver: boolean) =>
-      d.vtRules.reduce((sum: number, r: any) => {
+      (d.vtRules ?? []).reduce((sum: number, r: any) => {
         if (driver && !r.applies_to_drivers) return sum;
         if (!driver && !r.applies_to_collaborators) return sum;
         if (r.calculation_type === "fixed_monthly") return sum;
@@ -228,7 +228,7 @@ function ResultadoPage() {
     for (const a of d.allocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
       if (!date || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
-      if (d.leaves.some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
+      if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
       const base = p?.vt_enabled === false ? false : !!workVt.get(a.schedule_id) || pouso;
@@ -336,7 +336,7 @@ function ResultadoPage() {
   const [detail, setDetail] = useState<ItemKey | null>(null);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["work-result", workId] });
+    qc.invalidateQueries({ queryKey: ["work-result", workId, "vt"] });
     qc.invalidateQueries({ queryKey: ["works-result"] });
   };
 
