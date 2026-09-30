@@ -99,14 +99,14 @@ function ResultadoPage() {
       const w = work!;
       const [allocs, rdoWf, progress, entries, people, siblings, vs, client] = await Promise.all([
         fetchAll<any>((a, b) =>
-          supabase.from("daily_allocations").select("collaborator_id, daily_schedules(schedule_date)").eq("work_id", w.id).range(a, b),
+          supabase.from("daily_allocations").select("collaborator_id, schedule_id, driver, vt_override, daily_schedules(schedule_date)").eq("work_id", w.id).range(a, b),
         ),
         fetchAll<any>((a, b) =>
           supabase.from("rdo_workforce").select("collaborator_id, report_date, present, worked_hours").eq("work_id", w.id).range(a, b),
         ),
         supabase.from("work_progress").select("*").eq("work_id", w.id).order("month"),
         supabase.from("work_entries").select("*").eq("work_id", w.id).order("entry_date", { ascending: false }),
-        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, city, vt_enabled").range(a, b)),
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
@@ -116,6 +116,15 @@ function ResultadoPage() {
         w.client_id
           ? supabase.from("clients").select("has_toll, toll_amount").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
+      ]);
+      const [workVt, noVtRows, leaves, vtRules] = await Promise.all([
+        fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, pays_vt").eq("work_id", w.id).range(a, b)),
+        fetchAll<any>((a, b) =>
+          supabase.from("daily_status_entries").select("schedule_id, collaborator_id")
+            .in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b),
+        ),
+        fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
+        supabase.from("transport_voucher_rules").select("*").eq("active", true),
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
       const sibAllocs = sibIds.length
@@ -133,6 +142,10 @@ function ResultadoPage() {
         siblingCount: Math.max(1, (siblings as any).data?.length ?? 1),
         vs,
         client: (client as any).data,
+        workVt,
+        noVtRows,
+        leaves,
+        vtRules: vtRules.data ?? [],
       };
     },
   });
@@ -200,6 +213,36 @@ function ResultadoPage() {
       transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share, mine, total, direct: !!v.work_id });
       bump(v.schedule_date.slice(0, 7), "transport", share);
     }
+    // VT dos colaboradores escalados neste serviço entra no transporte da obra
+    const person = new Map<string, any>(d.people.map((p: any) => [p.id, p]));
+    const workVt = new Map<string, boolean>(d.workVt.map((r: any) => [r.schedule_id, r.pays_vt]));
+    const noVt = new Set<string>(d.noVtRows.map((r: any) => `${r.schedule_id}|${r.collaborator_id}`));
+    const vtDay = (driver: boolean) =>
+      d.vtRules.reduce((sum: number, r: any) => {
+        if (driver && !r.applies_to_drivers) return sum;
+        if (!driver && !r.applies_to_collaborators) return sum;
+        if (r.calculation_type === "fixed_monthly") return sum;
+        return sum + Number(r.amount) * (r.calculation_type === "round_trip" ? 2 : 1);
+      }, 0);
+    const vtByDate = new Map<string, { people: number; cost: number }>();
+    for (const a of d.allocs) {
+      const date = a.daily_schedules?.schedule_date as string | undefined;
+      if (!date || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      if (d.leaves.some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
+      const p = person.get(a.collaborator_id);
+      const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
+      const base = p?.vt_enabled === false ? false : !!workVt.get(a.schedule_id) || pouso;
+      if (!(a.vt_override ?? base)) continue;
+      const cost = vtDay(!!a.driver);
+      if (!cost) continue;
+      const v = vtByDate.get(date) ?? { people: 0, cost: 0 };
+      v.people += 1;
+      v.cost += cost;
+      vtByDate.set(date, v);
+      bump(date.slice(0, 7), "transport", cost);
+    }
+    const vtRows = [...vtByDate.entries()].map(([date, v]) => ({ date, ...v })).sort((x, y) => x.date.localeCompare(y.date));
+    const vtTotal = vtRows.reduce((s, r) => s + r.cost, 0);
     for (const e of d.entries) {
       bump(e.entry_date.slice(0, 7), e.category === "faturamento" ? "billing" : "entries", Number(e.amount));
     }
@@ -277,7 +320,7 @@ function ResultadoPage() {
       .map(([id, l]) => ({ id, name: `${names.get(id) ?? "—"}${pj.has(id) ? " (PJ)" : ""}`, rate: rate.get(id) ?? 0, ...l }))
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
-    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, siblingCount: d.siblingCount };
+    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, siblingCount: d.siblingCount };
   }, [work, data.data]);
 
   // ---------- Edição ----------
@@ -675,6 +718,33 @@ function ResultadoPage() {
                     ))}
                     <TableRow className="font-bold">
                       <TableCell colSpan={7}>Total veículos</TableCell>
+                      <TableCell className="text-right">{brl(calc.tot.transport - calc.vtTotal)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+                <p className="mb-2 mt-4 text-xs text-muted-foreground">
+                  Vale Transporte dos colaboradores escalados neste serviço (regras de VT diárias/ida e volta; sem VT em falta, atestado, licença, abono etc.).
+                </p>
+                <Table>
+                  <TableBody>
+                    <TableRow className="font-semibold">
+                      <TableCell>Data</TableCell>
+                      <TableCell className="text-right">Colaboradores com VT</TableCell>
+                      <TableCell className="text-right">Custo VT</TableCell>
+                    </TableRow>
+                    {calc.vtRows.map((r) => (
+                      <TableRow key={r.date}>
+                        <TableCell>{fmtDate(r.date)}</TableCell>
+                        <TableCell className="text-right">{r.people}</TableCell>
+                        <TableCell className="text-right">{brl(r.cost)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold">
+                      <TableCell colSpan={2}>Total VT</TableCell>
+                      <TableCell className="text-right">{brl(calc.vtTotal)}</TableCell>
+                    </TableRow>
+                    <TableRow className="font-bold">
+                      <TableCell colSpan={2}>Total transporte (veículos + VT)</TableCell>
                       <TableCell className="text-right">{brl(calc.tot.transport)}</TableCell>
                     </TableRow>
                   </TableBody>
