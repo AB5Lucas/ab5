@@ -280,7 +280,7 @@ function ServicesPage() {
         <div className="min-w-56 flex-1">
           <Label className="text-xs">Cliente</Label>
           <Select value={clientId} onValueChange={chooseClient}>
-            <SelectTrigger><SelectValue placeholder={clients.data?.length === 0 ? "Nenhum cliente liberado para você" : "Selecione o cliente"} /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={clients.data?.length === 0 ? "Nenhum cliente com efetivo escalado neste dia" : "Selecione o cliente"} /></SelectTrigger>
             <SelectContent>
               {(clients.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
             </SelectContent>
