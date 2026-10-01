@@ -78,7 +78,11 @@ function ServicesPage() {
       if (!sched) return [];
       const { data: al } = await supabase.from("daily_allocations").select("works(client_id)").eq("schedule_id", sched.id);
       const withStaff = new Set((al ?? []).map((a: any) => a.works?.client_id).filter(Boolean));
-      return list.filter((c) => withStaff.has(c.id));
+      // Clientes com só 1 serviço ativo usam direto o efetivo da Programação
+      const { data: act } = await supabase.from("works").select("client_id").eq("active", true).in("client_id", [...withStaff] as string[]);
+      const count = new Map<string, number>();
+      (act ?? []).forEach((w) => w.client_id && count.set(w.client_id, (count.get(w.client_id) ?? 0) + 1));
+      return list.filter((c) => withStaff.has(c.id) && (count.get(c.id) ?? 0) > 1);
     },
   });
 
