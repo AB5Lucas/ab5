@@ -124,7 +124,7 @@ function statusVariant(s: WorkStatus) {
 }
 
 function WorksPage() {
-  const { canWrite, isAdmin } = useCurrentUser();
+  const { canWrite, isAdmin, role, user } = useCurrentUser();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | WorkStatus>("all");
@@ -136,10 +136,17 @@ function WorksPage() {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const works = useQuery({
-    queryKey: ["works"],
+    queryKey: ["works", role, user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("works").select("*").order("name");
       if (error) throw error;
+      if (role === "coordenador" || role === "encarregado") {
+        const { data: mine } = await supabase.from("foreman_works").select("work_id").eq("user_id", user!.id);
+        const ids = new Set((mine ?? []).map((m) => m.work_id));
+        const cl = new Set(data.filter((w) => ids.has(w.id) && w.client_id).map((w) => w.client_id));
+        return data.filter((w) => ids.has(w.id) || (w.client_id && cl.has(w.client_id)));
+      }
       return data;
     },
   });
