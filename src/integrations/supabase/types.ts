@@ -294,6 +294,53 @@ export type Database = {
         }
         Relationships: []
       }
+      closing_adjustments: {
+        Row: {
+          amount: number
+          collaborator_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          entry_date: string
+          id: string
+          kind: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          collaborator_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entry_date: string
+          id?: string
+          kind: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          collaborator_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entry_date?: string
+          id?: string
+          kind?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closing_adjustments_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collaborator_trainings: {
         Row: {
           collaborator_id: string
