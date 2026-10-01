@@ -9,6 +9,8 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
+import { useAccess } from "@/hooks/use-access";
+import { menuUrlFor } from "@/lib/menu";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -28,6 +30,9 @@ function AuthenticatedLayout() {
     if (isForeman && !pathname.startsWith("/externo")) navigate({ to: "/externo/relatorio-diario", replace: true });
   }, [isForeman, pathname, navigate]);
   const queryClient = useQueryClient();
+  const { canAccess, loading: accessLoading } = useAccess();
+  const pageUrl = menuUrlFor(pathname);
+  const blocked = !accessLoading && !!pageUrl && !canAccess(pageUrl);
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
@@ -65,7 +70,13 @@ function AuthenticatedLayout() {
             </div>
           </header>
           <main className="flex-1 p-4 md:p-6">
-            <Outlet />
+            {accessLoading ? null : blocked ? (
+              <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+                Você não tem acesso a esta página. Fale com um administrador.
+              </div>
+            ) : (
+              <Outlet />
+            )}
           </main>
         </div>
       </div>

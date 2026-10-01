@@ -61,6 +61,8 @@ function UsersPage() {
           ? "admin"
           : list.includes("programmer")
             ? "programmer"
+            : list.includes("coordenador")
+              ? "coordenador"
             : list.includes("encarregado")
               ? "encarregado"
               : "viewer";
@@ -162,7 +164,7 @@ function UsersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {(["admin", "programmer", "viewer", "encarregado"] as AppRole[]).map((r) => (
+                        {(["admin", "programmer", "coordenador", "viewer", "encarregado"] as AppRole[]).map((r) => (
                           <SelectItem key={r} value={r}>
                             {ROLE_LABEL[r]}
                           </SelectItem>
