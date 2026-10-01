@@ -597,6 +597,7 @@ export type Database = {
           overnight: boolean
           position_id: string | null
           schedule_id: string
+          service_assigned: boolean
           sort_order: number
           source: Database["public"]["Enums"]["allocation_source"]
           updated_at: string
@@ -617,6 +618,7 @@ export type Database = {
           overnight?: boolean
           position_id?: string | null
           schedule_id: string
+          service_assigned?: boolean
           sort_order?: number
           source?: Database["public"]["Enums"]["allocation_source"]
           updated_at?: string
@@ -637,6 +639,7 @@ export type Database = {
           overnight?: boolean
           position_id?: string | null
           schedule_id?: string
+          service_assigned?: boolean
           sort_order?: number
           source?: Database["public"]["Enums"]["allocation_source"]
           updated_at?: string
@@ -1586,6 +1589,44 @@ export type Database = {
           },
         ]
       }
+      service_display_prefs: {
+        Row: {
+          client_id: string
+          created_at: string
+          hidden_work_ids: string[]
+          id: string
+          updated_at: string
+          user_id: string
+          work_order: string[]
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          hidden_work_ids?: string[]
+          id?: string
+          updated_at?: string
+          user_id?: string
+          work_order?: string[]
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          hidden_work_ids?: string[]
+          id?: string
+          updated_at?: string
+          user_id?: string
+          work_order?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_display_prefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trainings: {
         Row: {
           active: boolean
@@ -1683,6 +1724,58 @@ export type Database = {
             columns: ["work_id"]
             isOneToOne: false
             referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transport_passengers: {
+        Row: {
+          client_id: string
+          collaborator_id: string
+          created_at: string
+          id: string
+          schedule_date: string
+          sort_order: number
+          vehicle_schedule_id: string | null
+        }
+        Insert: {
+          client_id: string
+          collaborator_id: string
+          created_at?: string
+          id?: string
+          schedule_date: string
+          sort_order?: number
+          vehicle_schedule_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          collaborator_id?: string
+          created_at?: string
+          id?: string
+          schedule_date?: string
+          sort_order?: number
+          vehicle_schedule_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transport_passengers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_passengers_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_passengers_vehicle_schedule_id_fkey"
+            columns: ["vehicle_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_schedules"
             referencedColumns: ["id"]
           },
         ]
@@ -2337,6 +2430,10 @@ export type Database = {
         Args: { _client_id: string; _date: string }
         Returns: number
       }
+      copy_transport_prev: {
+        Args: { _client_id: string; _date: string }
+        Returns: number
+      }
       create_client_service: {
         Args: { _client_id: string; _name: string }
         Returns: string
@@ -2368,6 +2465,24 @@ export type Database = {
         Returns: undefined
       }
       rdo_undo_absence: { Args: { _wf_id: string }; Returns: undefined }
+      set_transport_passenger: {
+        Args: {
+          _client_id: string
+          _collaborator_id: string
+          _date: string
+          _remove?: boolean
+          _vs_id: string
+        }
+        Returns: undefined
+      }
+      set_vehicle_driver: {
+        Args: { _driver_id: string; _vs_id: string }
+        Returns: undefined
+      }
+      unassign_allocation_service: {
+        Args: { _alloc_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       allocation_source: "base_team" | "copied_previous_day" | "manual"
