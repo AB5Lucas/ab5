@@ -1376,6 +1376,27 @@ export type Database = {
           },
         ]
       }
+      role_page_access: {
+        Row: {
+          allowed: boolean
+          path: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        Insert: {
+          allowed?: boolean
+          path: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Update: {
+          allowed?: boolean
+          path?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       schedule_box_vt: {
         Row: {
           box_key: string
@@ -2337,7 +2358,12 @@ export type Database = {
     }
     Enums: {
       allocation_source: "base_team" | "copied_previous_day" | "manual"
-      app_role: "admin" | "programmer" | "viewer" | "encarregado"
+      app_role:
+        | "admin"
+        | "programmer"
+        | "viewer"
+        | "encarregado"
+        | "coordenador"
       bonus_calculation_type: "daily" | "trip" | "round_trip" | "overnight"
       collaborator_status: "active" | "inactive"
       confirmation_status: "confirmed" | "pending"
@@ -2481,7 +2507,7 @@ export const Constants = {
   public: {
     Enums: {
       allocation_source: ["base_team", "copied_previous_day", "manual"],
-      app_role: ["admin", "programmer", "viewer", "encarregado"],
+      app_role: ["admin", "programmer", "viewer", "encarregado", "coordenador"],
       bonus_calculation_type: ["daily", "trip", "round_trip", "overnight"],
       collaborator_status: ["active", "inactive"],
       confirmation_status: ["confirmed", "pending"],
