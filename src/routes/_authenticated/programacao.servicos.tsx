@@ -379,6 +379,21 @@ function ServicesPage() {
                 </section>
               );
             })}
+            {(integ.data ?? []).length > 0 && (
+              <section className="panel flex h-72 flex-col overflow-hidden">
+                <header className="flex items-center gap-1.5 border-b border-border bg-secondary/60 px-2 py-1.5">
+                  <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
+                    Integração - {clientName}
+                  </h2>
+                  <Badge variant="outline" className="px-1 py-0 text-[10px]"><Users className="mr-0.5 h-2.5 w-2.5" />{integ.data!.length}</Badge>
+                </header>
+                <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
+                  {[...integ.data!].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((p) => (
+                    <li key={p.collaborator_id} className="px-2 py-1.5 text-xs">{p.name.replace(" (Integração)", "")}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
             {shown.length === 0 && !data.isLoading && (
               <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground sm:col-span-2">
                 Este cliente ainda não tem serviços. Use “Novo Serviço”.
