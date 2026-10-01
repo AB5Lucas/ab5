@@ -2555,6 +2555,23 @@ export type Database = {
         Args: { _alloc_id: string }
         Returns: undefined
       }
+      weekend_add_allocation: {
+        Args: { _collaborator_id: string; _date: string; _work_id: string }
+        Returns: string
+      }
+      weekend_add_vehicle: {
+        Args: {
+          _client_id: string
+          _date: string
+          _driver_id: string
+          _vehicle_id: string
+        }
+        Returns: string
+      }
+      weekend_remove_allocation: {
+        Args: { _alloc_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       allocation_source: "base_team" | "copied_previous_day" | "manual"
