@@ -517,10 +517,6 @@ function CollaboratorsPage() {
               <Input id="phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email-c">E-mail</Label>
-              <Input id="email-c" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="birth">Data de nascimento</Label>
               <Input id="birth" type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} />
             </div>
@@ -567,14 +563,15 @@ function CollaboratorsPage() {
               </Select>
             </div>
 
-            <div className="flex items-center gap-3 pt-6">
-              <Switch id="driver" checked={form.is_driver} onCheckedChange={(v) => set("is_driver", v)} />
-              <Label htmlFor="driver">É motorista</Label>
-            </div>
-
-            <div className="flex items-center gap-3 pt-6">
-              <Switch id="vt_enabled" checked={form.vt_enabled} onCheckedChange={(v) => set("vt_enabled", v)} />
-              <Label htmlFor="vt_enabled">Vale Transporte</Label>
+            <div className="flex items-center gap-6 pt-6">
+              <div className="flex items-center gap-3">
+                <Switch id="driver" checked={form.is_driver} onCheckedChange={(v) => set("is_driver", v)} />
+                <Label htmlFor="driver">É motorista</Label>
+              </div>
+              <div className="flex items-center gap-3">
+                <Switch id="vt_enabled" checked={form.vt_enabled} onCheckedChange={(v) => set("vt_enabled", v)} />
+                <Label htmlFor="vt_enabled">Vale Transporte</Label>
+              </div>
             </div>
 
             {form.is_driver && (
