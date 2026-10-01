@@ -16,7 +16,7 @@ export type MenuItem = { title: string; url: string };
 export type MenuGroup = { label: string; icon: typeof Users; items: MenuItem[] };
 
 /** Menu real do sistema — fonte única para o menu lateral e a página Acessos. */
-export const MENU_GROUPS: MenuGroup[] = [
+const RAW_GROUPS: MenuGroup[] = [
   { label: "Dashboard", icon: LayoutDashboard, items: [{ title: "Dashboard", url: "/dashboard" }] },
   {
     label: "Planejamento",
@@ -102,6 +102,13 @@ export const MENU_GROUPS: MenuGroup[] = [
     ],
   },
 ];
+
+const byName = (a: string, b: string) => a.localeCompare(b, "pt-BR");
+/** Grupos e páginas sempre em ordem alfabética. */
+export const MENU_GROUPS: MenuGroup[] = RAW_GROUPS.map((g) => ({
+  ...g,
+  items: [...g.items].sort((a, b) => byName(a.title, b.title)),
+})).sort((a, b) => byName(a.label, b.label));
 
 export const ALL_MENU_URLS = MENU_GROUPS.flatMap((g) => g.items.map((i) => i.url));
 

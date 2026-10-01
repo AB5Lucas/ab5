@@ -26,13 +26,14 @@ function AuthenticatedLayout() {
   const { profile, role, isForeman } = useCurrentUser();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  useEffect(() => {
-    if (isForeman && !pathname.startsWith("/externo")) navigate({ to: "/externo/relatorio-diario", replace: true });
-  }, [isForeman, pathname, navigate]);
   const queryClient = useQueryClient();
   const { canAccess, loading: accessLoading } = useAccess();
   const pageUrl = menuUrlFor(pathname);
   const blocked = !accessLoading && !!pageUrl && !canAccess(pageUrl);
+  useEffect(() => {
+    if (isForeman && blocked && canAccess("/externo/relatorio-diario"))
+      navigate({ to: "/externo/relatorio-diario", replace: true });
+  }, [isForeman, blocked, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
