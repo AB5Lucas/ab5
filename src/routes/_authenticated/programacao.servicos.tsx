@@ -123,7 +123,18 @@ function ServicesPage() {
             .eq("schedule_id", sched.id)
             .in("work_id", ids)).data ?? []
         : [];
-      return { works: works ?? [], allocs };
+      // Quem está de folga, férias ou atestado no dia fica fora (efetivo e transporte)
+      const [{ data: off }, { data: vac }, { data: med }] = await Promise.all([
+        supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date),
+        supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date),
+        supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
+      ]);
+      const away = new Set<string>([
+        ...(off ?? []).filter((o) => (o.end_date ?? o.date) >= date).map((o) => o.collaborator_id),
+        ...(vac ?? []).map((v) => v.collaborator_id),
+        ...(med ?? []).map((m) => m.collaborator_id),
+      ]);
+      return { works: works ?? [], allocs: allocs.filter((a: any) => !away.has(a.collaborator_id)) };
     },
   });
 
