@@ -23,6 +23,7 @@ const RAW_GROUPS: MenuGroup[] = [
     icon: CalendarDays,
     items: [
       { title: "Programação", url: "/programacao/diaria" },
+      { title: "Serviços", url: "/programacao/servicos" },
       { title: "Transporte", url: "/veiculos/transporte" },
       { title: "Consulta", url: "/consulta" },
     ],
