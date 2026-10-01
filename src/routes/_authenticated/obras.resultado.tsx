@@ -499,7 +499,7 @@ function ResultadoPage() {
                   onValueChange={(v) => {
                     setClientKey(v);
                     const list = (works.data ?? []).filter((x) => keyOf(x) === v);
-                    if (list.length === 1) selectWork(list[0].id);
+                    if (list.length === 1) selectWork(list[0]!.id);
                     else setWorkId("");
                   }}
                 >
