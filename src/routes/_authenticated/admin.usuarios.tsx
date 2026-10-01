@@ -174,7 +174,7 @@ function UsersPage() {
                   ) : (
                     <Badge variant="secondary">{ROLE_LABEL[u.role]}</Badge>
                   )}
-                  {isAdmin && u.role === "encarregado" && <ForemanWorksButton userId={u.id} name={u.full_name || u.email} />}
+                  {isAdmin && (u.role === "encarregado" || u.role === "coordenador") && <ForemanWorksButton userId={u.id} name={u.full_name || u.email} />}
                 </TableCell>
                 <TableCell>
                   <Switch
