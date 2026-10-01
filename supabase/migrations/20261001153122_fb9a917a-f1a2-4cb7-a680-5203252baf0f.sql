@@ -1,0 +1,2 @@
+REVOKE EXECUTE ON FUNCTION public.unassign_allocation_service(uuid), public.set_transport_passenger(date,uuid,uuid,uuid,boolean), public.set_vehicle_driver(uuid,uuid), public.copy_transport_prev(uuid,date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.unassign_allocation_service(uuid), public.set_transport_passenger(date,uuid,uuid,uuid,boolean), public.set_vehicle_driver(uuid,uuid), public.copy_transport_prev(uuid,date) TO authenticated;
