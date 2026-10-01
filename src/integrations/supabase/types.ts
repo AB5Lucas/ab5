@@ -2469,6 +2469,7 @@ export type Database = {
     }
     Functions: {
       can_access_client: { Args: { _client_id: string }; Returns: boolean }
+      can_access_page: { Args: { _path: string }; Returns: boolean }
       can_access_rdo: { Args: { _rdo_id: string }; Returns: boolean }
       can_access_work: { Args: { _work_id: string }; Returns: boolean }
       can_edit_rdo: { Args: { _rdo_id: string }; Returns: boolean }
