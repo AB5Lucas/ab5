@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Copy, GripVertical, Plus, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, GripVertical, Plus, Search, SlidersHorizontal, Users } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -30,6 +38,11 @@ export const Route = createFileRoute("/_authenticated/programacao/servicos")({
 });
 
 const SAVED_CLIENT = "servicos-client";
+const SVC_FILTERS = [
+  { key: "ok", label: "Aptos" },
+  { key: "warn", label: "Com pendência" },
+  { key: "pj_int", label: "Intermitentes/PJs" },
+] as const;
 
 function ServicesPage() {
   const { user, canWrite } = useCurrentUser();
@@ -40,6 +53,9 @@ function ServicesPage() {
   const [hover, setHover] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [search, setSearch] = useState("");
+  const [roleSearch, setRoleSearch] = useState("");
+  const [filters, setFilters] = useState<Set<string>>(new Set());
 
   const clients = useQuery({
     queryKey: ["servicos-clients", user?.id, canWrite],
@@ -82,7 +98,7 @@ function ServicesPage() {
       const allocs = sched && ids.length
         ? (await supabase
             .from("daily_allocations")
-            .select("id, work_id, collaborator_id, position_id, collaborators(full_name, position_id), positions(name)")
+            .select("id, work_id, collaborator_id, position_id, has_pending_requirement, collaborators(full_name, position_id, registration_number, contract_type), positions(name)")
             .eq("schedule_id", sched.id)
             .in("work_id", ids)).data ?? []
         : [];
@@ -92,6 +108,20 @@ function ServicesPage() {
 
   const works = data.data?.works ?? [];
   const allocs = data.data?.allocs ?? [];
+  const filteredAllocs = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const rq = roleSearch.trim().toLowerCase();
+    return allocs.filter((a) => {
+      const c = a.collaborators;
+      if (q && !(c?.full_name ?? "").toLowerCase().includes(q) && !(c?.registration_number ?? "").toLowerCase().includes(q)) return false;
+      if (rq && !(a.positions?.name ?? "").toLowerCase().includes(rq)) return false;
+      const isPj = ["pj", "intermitente"].includes((c?.contract_type ?? "").toLowerCase());
+      if (filters.has("warn") && !a.has_pending_requirement) return false;
+      if (filters.has("ok") && a.has_pending_requirement) return false;
+      if (filters.has("pj_int") && !isPj) return false;
+      return true;
+    });
+  }, [allocs, search, roleSearch, filters]);
   const shown = useMemo(
     () => works.filter((w) => w.active || allocs.some((a) => a.work_id === w.id)),
     [works, allocs],
@@ -224,13 +254,49 @@ function ServicesPage() {
             )}
           </div>
           <aside className="panel flex max-h-[75vh] flex-col overflow-hidden">
-            <header className="border-b border-border bg-secondary/60 px-3 py-2">
+            <header className="space-y-1.5 border-b border-border bg-secondary/60 px-3 py-2">
               <p className="font-display text-xs font-semibold uppercase tracking-wide">Escalados no cliente</p>
               <p className="text-[11px] text-muted-foreground">{allocs.length} colaborador(es) na Programação do dia</p>
+              <div className="relative">
+                <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input className="h-7 pl-7 text-xs" placeholder="Buscar colaborador" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
+              <div className="relative">
+                <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input className="h-7 pl-7 text-xs" placeholder="Buscar função" value={roleSearch} onChange={(e) => setRoleSearch(e.target.value)} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 flex-1 justify-between px-2 text-xs">
+                      <span className="flex items-center gap-1.5"><SlidersHorizontal className="h-3.5 w-3.5" />Condições</span>
+                      {filters.size > 0 && <Badge variant="secondary" className="px-1 py-0 text-[10px]">{filters.size}</Badge>}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-60">
+                    <DropdownMenuLabel>Filtrar colaboradores</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {SVC_FILTERS.map((f) => (
+                      <DropdownMenuCheckboxItem
+                        key={f.key}
+                        checked={filters.has(f.key)}
+                        onCheckedChange={() => setFilters((s) => { const n = new Set(s); if (n.has(f.key)) n.delete(f.key); else n.add(f.key); return n; })}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        {f.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {filters.size > 0 && (
+                  <button type="button" onClick={() => setFilters(new Set())} className="shrink-0 text-[10px] text-muted-foreground underline">limpar</button>
+                )}
+              </div>
             </header>
             <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
               {allocs.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Ninguém escalado neste cliente na Programação.</li>}
-              {sorted(allocs).map((a) => (
+              {allocs.length > 0 && filteredAllocs.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Nenhum colaborador encontrado.</li>}
+              {sorted(filteredAllocs).map((a) => (
                 <div key={a.id} className="flex items-center">
                   <div className="flex-1">{person(a)}</div>
                   <span className="pr-2 text-[10px] text-muted-foreground">{works.find((w) => w.id === a.work_id)?.name}</span>
