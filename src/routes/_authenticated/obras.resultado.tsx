@@ -588,8 +588,8 @@ function ResultadoPage() {
                       <YAxis fontSize={11} tickFormatter={(v: number) => brl(v)} width={100} />
                       <Tooltip formatter={(v: number) => brl(v)} />
                       <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="mo" name="R$ Total MO" fill="var(--muted-foreground)" />
-                      <Bar dataKey="materiais" name="R$ Total Materiais" fill="var(--primary)" />
+                      <Bar dataKey="mo" name="R$ Total MO" fill="var(--primary)" />
+                      <Bar dataKey="materiais" name="R$ Total Materiais" fill="var(--muted-foreground)" />
                       <Bar dataKey="transporte" name="R$ Total Transporte" fill="var(--foreground)" />
                     </BarChart>
                   </ResponsiveContainer>
@@ -618,7 +618,7 @@ function ResultadoPage() {
                     <Bar dataKey="real" name="Custo Realizado" fill="var(--primary)">
                       <LabelList dataKey="used" position="right" fontSize={11} className="fill-foreground" formatter={(v: number) => pct(Math.round(v))} />
                     </Bar>
-                    <Bar dataKey="budget" name="Custo Orçado" fill="var(--muted-foreground)" fillOpacity={0.45} />
+                    <Bar dataKey="budget" name="Custo Orçado" fill="var(--chart-2)" />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
