@@ -81,6 +81,7 @@ function ResultadoPage() {
   const { canWrite, role, user } = useCurrentUser();
   const qc = useQueryClient();
   const [workId, setWorkId] = useState<string>("");
+  const [clientKey, setClientKey] = useState<string>("");
   const [untilMonth, setUntilMonth] = useState<string>("");
 
   const works = useQuery({
@@ -482,20 +483,51 @@ function ResultadoPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="w-full max-w-xl">
-          <Select value={workId} onValueChange={selectWork}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o serviço" />
-            </SelectTrigger>
-            <SelectContent>
-              {(works.data ?? []).map((x) => (
-                <SelectItem key={x.id} value={x.id}>
-                  {x.client ? `${x.client} - ${x.name}` : x.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {(() => {
+          const keyOf = (x: any) => x.client_id ?? `n:${x.client ?? "Sem cliente"}`;
+          const clientMap = new Map<string, string>();
+          (works.data ?? []).forEach((x: any) => clientMap.set(keyOf(x), x.client ?? "Sem cliente"));
+          const clientList = [...clientMap.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+          const current = (works.data ?? []).find((x) => x.id === workId);
+          const ck = clientKey || (current ? keyOf(current) : "");
+          const services = (works.data ?? []).filter((x) => keyOf(x) === ck);
+          return (
+            <>
+              <div className="w-full max-w-xs">
+                <Select
+                  value={ck}
+                  onValueChange={(v) => {
+                    setClientKey(v);
+                    const list = (works.data ?? []).filter((x) => keyOf(x) === v);
+                    if (list.length === 1) selectWork(list[0].id);
+                    else setWorkId("");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientList.map(([k, n]) => (
+                      <SelectItem key={k} value={k}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full max-w-xs">
+                <Select value={workId} onValueChange={selectWork} disabled={!ck}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o serviço" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {services.map((x) => (
+                      <SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          );
+        })()}
         {work && (
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Fechamento até:</span>
