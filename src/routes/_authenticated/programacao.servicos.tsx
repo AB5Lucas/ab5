@@ -304,9 +304,11 @@ function ServicesPage() {
       lines.push(`*${w.name}*`, ...list.map((a) => a.collaborators?.full_name ?? "—"), "");
     });
     absentGroups.forEach((g) => lines.push(`*${g.kind}*`, ...g.names, ""));
+    const integNames = (integ.data ?? []).map((p) => p.name.replace(" (Integração)", "")).sort((x, y) => x.localeCompare(y, "pt-BR"));
+    if (integNames.length) lines.push("*Integração*", ...integNames, "");
     return lines.join("\n").trim();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, assigned, clientName, dayLabel, absentGroups.map((g) => g.kind + g.names.join()).join("|")]);
+  }, [visible, assigned, clientName, dayLabel, absentGroups.map((g) => g.kind + g.names.join()).join("|"), integ.data]);
 
   const person = (a: (typeof allocs)[number]) => (
     <li
