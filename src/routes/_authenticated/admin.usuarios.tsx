@@ -1,4 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { deleteUser } from "@/lib/users.functions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,6 +96,18 @@ function UsersPage() {
     onError: (e: Error) => toast.error("Não foi possível atualizar: " + e.message),
   });
 
+  const [deleting, setDeleting] = useState<{ id: string; full_name: string; email: string } | null>(null);
+  const deleteUserFn = useServerFn(deleteUser);
+  const remove = useMutation({
+    mutationFn: (userId: string) => deleteUserFn({ data: { userId } }),
+    onSuccess: () => {
+      toast.success("Usuário excluído");
+      setDeleting(null);
+      queryClient.invalidateQueries({ queryKey: ["users-list"] });
+    },
+    onError: (e: Error) => toast.error("Não foi possível excluir: " + e.message),
+  });
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -103,6 +130,7 @@ function UsersPage() {
               <TableHead>Perfil</TableHead>
               <TableHead>Ativo</TableHead>
               <TableHead>Criado em</TableHead>
+              <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -156,11 +184,33 @@ function UsersPage() {
                 <TableCell className="text-muted-foreground">
                   {new Date(u.created_at).toLocaleDateString("pt-BR")}
                 </TableCell>
+                <TableCell>
+                  {isAdmin && u.id !== user?.id && (
+                    <Button variant="ghost" size="icon" aria-label="Excluir usuário" onClick={() => setDeleting(u)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A conta de "{deleting?.full_name || deleting?.email}" será excluída. A pessoa poderá criar a conta novamente com o mesmo e-mail.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleting && remove.mutate(deleting.id)}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
