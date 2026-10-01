@@ -931,7 +931,7 @@ export function SchedulePlannerBoard({
       toast.success(`${r.name} registrado em ${boxLabelOf(r.boxKey)}`);
       invalidate(r.id);
       if (r.boxKey === "folga") {
-        qc.invalidateQueries({ queryKey: ["schedule-context", date] });
+        qc.invalidateQueries({ queryKey: ["schedule-ctx", date] });
         qc.invalidateQueries({ queryKey: ["days_off"] });
       }
     },
