@@ -122,6 +122,24 @@ function ServicesPage() {
   const works = data.data?.works ?? [];
   const clientName = clients.data?.find((c) => c.id === clientId)?.name ?? "";
   const allocs = data.data?.allocs ?? [];
+  // Pessoas em integração neste cliente no dia também entram no transporte
+  const integ = useQuery({
+    queryKey: ["servicos-integ", clientId, clientName, date],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const m = new Map<string, string>();
+      const { data: ap } = await supabase.from("appointments").select("collaborator_id, collaborators(full_name)")
+        .eq("type", "integracao").eq("client_id", clientId).eq("scheduled_date", date).neq("status", "cancelado");
+      (ap ?? []).forEach((a: any) => m.set(a.collaborator_id, a.collaborators?.full_name ?? "—"));
+      const { data: sched } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
+      if (sched && clientName) {
+        const { data: st } = await supabase.from("daily_status_entries").select("collaborator_id, collaborators(full_name)")
+          .eq("schedule_id", sched.id).eq("box_key", `integracao:${clientName}`);
+        (st ?? []).forEach((a: any) => m.set(a.collaborator_id, a.collaborators?.full_name ?? "—"));
+      }
+      return [...m.entries()].map(([collaborator_id, name]) => ({ collaborator_id, name: `${name} (Integração)` }));
+    },
+  });
   const assigned = useMemo(() => allocs.filter((a) => a.service_assigned), [allocs]);
   const pool = useMemo(() => allocs.filter((a) => !a.service_assigned), [allocs]);
   const filteredPool = useMemo(() => {
@@ -442,7 +460,10 @@ function ServicesPage() {
         clientId={clientId}
         clientName={clientName}
         dayLabel={dayLabel}
-        people={allocs.map((a) => ({ collaborator_id: a.collaborator_id, name: a.collaborators?.full_name ?? "—" }))}
+        people={[
+          ...allocs.map((a) => ({ collaborator_id: a.collaborator_id, name: a.collaborators?.full_name ?? "—" })),
+          ...(integ.data ?? []).filter((p) => !allocs.some((a) => a.collaborator_id === p.collaborator_id)),
+        ]}
       />
     </div>
   );
