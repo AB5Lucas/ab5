@@ -550,7 +550,7 @@ function ServicesPage() {
               </div>
             </header>
             <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
-              {allocs.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Ninguém escalado neste cliente na Programação.</li>}
+              {allocs.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">{isWeekend ? "Ninguém ainda — arraste de Adicionar colaborador para um serviço." : "Ninguém escalado neste cliente na Programação."}</li>}
               {allocs.length > 0 && filteredPool.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Todos já estão em um serviço.</li>}
               {sorted(filteredPool).map(person)}
             </ul>

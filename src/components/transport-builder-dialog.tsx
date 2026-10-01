@@ -109,6 +109,46 @@ export function TransportBuilderDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const isWeekend = [0, 6].includes(new Date(`${date}T12:00:00`).getDay());
+  const [newVeh, setNewVeh] = useState("");
+  const [newDrv, setNewDrv] = useState(NONE);
+  const fleet = useQuery({
+    queryKey: ["transport-builder-fleet", date],
+    enabled: open && isWeekend,
+    queryFn: async () => {
+      const [{ data: v }, { data: used }, { data: sched }] = await Promise.all([
+        supabase.from("vehicles").select("id, plate, brand, model, status").order("plate"),
+        supabase.from("vehicle_schedules").select("vehicle_id, driver_id, clients(name)").eq("schedule_date", date),
+        supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle(),
+      ]);
+      const where = new Map<string, string>();
+      (used ?? []).forEach((u: any) => where.set(u.vehicle_id, u.clients?.name ?? "outro uso"));
+      const busyDrv = new Map<string, string>();
+      (used ?? []).forEach((u: any) => u.driver_id && busyDrv.set(u.driver_id, `dirige outro veículo (${u.clients?.name ?? "—"})`));
+      if (sched) {
+        const { data: al } = await supabase.from("daily_allocations").select("collaborator_id, works(client_id, client)").eq("schedule_id", sched.id);
+        (al ?? []).forEach((a: any) => a.works?.client_id !== clientId && busyDrv.set(a.collaborator_id, `escalado em ${a.works?.client ?? "outra obra"}`));
+      }
+      return {
+        vehicles: (v ?? []).map((x) => ({
+          ...x,
+          why: x.status === "maintenance" || x.status === "inactive" ? "Em manutenção/inativo" : where.has(x.id) ? `Já alocado em ${where.get(x.id)}` : null,
+        })),
+        busyDrv,
+      };
+    },
+  });
+  const addVehicle = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("weekend_add_vehicle", {
+        _client_id: clientId, _date: date, _vehicle_id: newVeh, _driver_id: (newDrv === NONE ? null : newDrv) as string,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Veículo adicionado"); setNewVeh(""); setNewDrv(NONE); refresh(); qc.invalidateQueries({ queryKey: ["transport-builder-fleet"] }); },
+    onError: (e: Error) => { toast.error(e.message); qc.invalidateQueries({ queryKey: ["transport-builder-fleet"] }); },
+  });
+
   const copyPrev = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.rpc("copy_transport_prev", { _client_id: clientId, _date: date });
@@ -195,6 +235,34 @@ export function TransportBuilderDialog({
             <Copy className="h-4 w-4" /> Copiar texto
           </Button>
         </div>
+        {isWeekend && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
+            <span className="text-xs font-semibold uppercase">Adicionar veículo</span>
+            <Select value={newVeh} onValueChange={setNewVeh}>
+              <SelectTrigger className="h-8 w-64 text-xs"><SelectValue placeholder="Veículo" /></SelectTrigger>
+              <SelectContent>
+                {(fleet.data?.vehicles ?? []).map((v) => (
+                  <SelectItem key={v.id} value={v.id} disabled={!!v.why}>
+                    {[v.brand, v.model].filter(Boolean).join(" ")} {v.plate}{v.why ? ` — ${v.why}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={newDrv} onValueChange={setNewDrv}>
+              <SelectTrigger className="h-8 w-64 text-xs"><SelectValue placeholder="Motorista" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>Sem motorista</SelectItem>
+                {drivers.map((d) => {
+                  const why = fleet.data?.busyDrv.get(d.id);
+                  return <SelectItem key={d.id} value={d.id} disabled={!!why}>{d.full_name}{why ? ` — ${why}` : ""}</SelectItem>;
+                })}
+              </SelectContent>
+            </Select>
+            <Button size="sm" disabled={!newVeh || addVehicle.isPending} onClick={() => addVehicle.mutate()}>
+              <Car className="h-4 w-4" /> Adicionar
+            </Button>
+          </div>
+        )}
         <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
           <div className="grid content-start gap-2 sm:grid-cols-2 xl:grid-cols-3">
             <section {...zone(OWN)} className={cn("panel flex h-64 flex-col overflow-hidden", hover === OWN && "ring-2 ring-emerald-500")}>
