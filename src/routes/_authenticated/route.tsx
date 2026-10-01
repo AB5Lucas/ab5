@@ -15,6 +15,13 @@ import { menuUrlFor } from "@/lib/menu";
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
+    // Lê a sessão salva primeiro (não depende de rede) para manter o login ao recarregar.
+    let { data: s } = await supabase.auth.getSession();
+    if (!s.session) {
+      await new Promise((r) => setTimeout(r, 600));
+      ({ data: s } = await supabase.auth.getSession());
+    }
+    if (s.session?.user) return { user: s.session.user };
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth" });
     return { user: data.user };
