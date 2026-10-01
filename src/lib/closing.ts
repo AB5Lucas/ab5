@@ -16,7 +16,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 const statusLabel = (k: string) => (k.startsWith("integracao") ? "Integração" : STATUS_LABEL[k] ?? k);
 
-export type DayRow = { date: string; work: string; status: string; counted: boolean; reason?: string };
+export type DayRow = { date: string; work: string; status: string; counted: boolean; reason?: string | undefined };
 export type VtRow = { date: string; work: string; pays: boolean; value: number };
 export type PrizeRow = { date: string; vehicle: string; work: string; distance: number; value: number };
 export type Adjustment = { id: string; collaborator_id: string; kind: "vt" | "premio"; entry_date: string; description: string | null; amount: number; notes: string | null };
