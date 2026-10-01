@@ -909,6 +909,39 @@ function SignatureBox({ rdoId, kind, title, existing, editable }: { rdoId: strin
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [data, setData] = useState<string | null>(null);
+  const isAb5 = kind === "ab5";
+  const saved = useQuery({
+    queryKey: ["my-saved-signature"],
+    enabled: isAb5,
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return null;
+      return (await supabase.from("user_saved_signatures").select("signer_name, signature_data").eq("user_id", u.user.id).maybeSingle()).data;
+    },
+  });
+  const keep = useMutation({
+    mutationFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const { error } = await supabase.from("user_saved_signatures").upsert(
+        { user_id: u.user!.id, signer_name: existing!.signer_name, signature_data: existing!.signature_data },
+        { onConflict: "user_id" },
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Assinatura guardada para as próximas vezes"); qc.invalidateQueries({ queryKey: ["my-saved-signature"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const useSaved = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("rdo_signatures").upsert(
+        { rdo_id: rdoId, kind, signer_name: saved.data!.signer_name, signature_data: saved.data!.signature_data, signed_at: new Date().toISOString() },
+        { onConflict: "rdo_id,kind" },
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Assinatura aplicada"); qc.invalidateQueries({ queryKey: ["rdo-sigs", rdoId] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const save = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("rdo_signatures").upsert(
@@ -932,10 +965,20 @@ function SignatureBox({ rdoId, kind, title, existing, editable }: { rdoId: strin
           <img src={existing.signature_data} alt={`Assinatura de ${existing.signer_name}`} className="h-32 w-full rounded bg-white object-contain" />
           <p className="text-sm font-medium">{existing.signer_name}</p>
           <p className="text-xs text-muted-foreground">{new Date(existing.signed_at).toLocaleString("pt-BR")}</p>
-          {editable && <Button variant="outline" size="sm" onClick={() => remove.mutate()}>Refazer assinatura</Button>}
+          <div className="flex flex-wrap gap-2">
+            {editable && <Button variant="outline" size="sm" onClick={() => remove.mutate()}>Refazer assinatura</Button>}
+            {isAb5 && saved.data?.signature_data !== existing.signature_data && (
+              <Button variant="outline" size="sm" disabled={keep.isPending} onClick={() => keep.mutate()}>Salvar assinatura para próximas vezes</Button>
+            )}
+          </div>
         </>
       ) : editable ? (
         <>
+          {isAb5 && saved.data && (
+            <Button variant="secondary" className="w-full" disabled={useSaved.isPending} onClick={() => useSaved.mutate()}>
+              Usar minha assinatura salva ({saved.data.signer_name})
+            </Button>
+          )}
           <Input className="h-11" placeholder="Nome do responsável" value={name} onChange={(e) => setName(e.target.value)} />
           <SignaturePad onChange={setData} />
           <Button className="w-full" size="lg" disabled={!name.trim() || !data || save.isPending} onClick={() => save.mutate()}>Salvar assinatura</Button>
