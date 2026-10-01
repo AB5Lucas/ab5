@@ -46,6 +46,14 @@ function ServicesPage() {
   const { user, canWrite } = useCurrentUser();
   const qc = useQueryClient();
   const [date, setDate] = useState(todayISO());
+  // Encarregado entra por padrão no dia seguinte (dia a montar/conferir)
+  const { isForeman, loading: userLoading } = useCurrentUser();
+  const [dateInit, setDateInit] = useState(false);
+  useEffect(() => {
+    if (dateInit || userLoading) return;
+    setDateInit(true);
+    if (isForeman) setDate(addDays(todayISO(), 1));
+  }, [dateInit, userLoading, isForeman]);
   const [clientId, setClientId] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
