@@ -153,7 +153,19 @@ function ResultadoPage() {
   // ---------- Cálculos ----------
   const calc = useMemo(() => {
     if (!work || !data.data) return null;
-    const d = data.data;
+    const raw = data.data;
+    // Fechamento: do início da obra até o último dia do mês selecionado
+    const cut = untilMonth ? `${untilMonth}-31` : "9999-12-31";
+    const okDate = (dt?: string | null) => !dt || dt.slice(0, 10) <= cut;
+    const d = {
+      ...raw,
+      allocs: raw.allocs.filter((a: any) => okDate(a.daily_schedules?.schedule_date)),
+      sibAllocs: raw.sibAllocs.filter((a: any) => okDate(a.daily_schedules?.schedule_date)),
+      rdoWf: raw.rdoWf.filter((r: any) => okDate(r.report_date)),
+      vs: raw.vs.filter((v: any) => okDate(v.schedule_date)),
+      entries: raw.entries.filter((e: any) => okDate(e.entry_date)),
+      progress: raw.progress.filter((p: any) => !untilMonth || String(p.month).slice(0, 7) <= untilMonth),
+    };
     const rate = new Map<string, number>(d.people.map((p: any) => [p.id, Number(p.salary ?? 0)]));
     const pj = new Set<string>(d.people.filter((p: any) => p.contract_type === "pj").map((p: any) => p.id));
     const enc = (id: string) => (pj.has(id) ? 1 : ENCARGOS);
@@ -321,7 +333,7 @@ function ResultadoPage() {
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, siblingCount: d.siblingCount };
-  }, [work, data.data]);
+  }, [work, data.data, untilMonth]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string }[]>([]);
