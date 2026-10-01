@@ -81,6 +81,7 @@ function ResultadoPage() {
   const { canWrite } = useCurrentUser();
   const qc = useQueryClient();
   const [workId, setWorkId] = useState<string>("");
+  const [untilMonth, setUntilMonth] = useState<string>("");
 
   const works = useQuery({
     queryKey: ["works-result"],
@@ -488,6 +489,22 @@ function ResultadoPage() {
             </SelectContent>
           </Select>
         </div>
+        {work && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Fechamento até:</span>
+            <input
+              type="month"
+              value={untilMonth}
+              onChange={(e) => setUntilMonth(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-2"
+            />
+            {untilMonth && (
+              <Button variant="ghost" size="sm" onClick={() => setUntilMonth("")}>
+                Tudo
+              </Button>
+            )}
+          </div>
+        )}
         {work && canWrite && (
           <>
             <Button variant="outline" onClick={() => openEntries("lancamentos")}>
