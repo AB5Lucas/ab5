@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Copy, GripVertical, Plus, Search, SlidersHorizontal, Users } from "lucide-react";
+import { Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Plus, Search, Users } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { TransportBuilderDialog } from "@/components/transport-builder-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -38,11 +40,7 @@ export const Route = createFileRoute("/_authenticated/programacao/servicos")({
 });
 
 const SAVED_CLIENT = "servicos-client";
-const SVC_FILTERS = [
-  { key: "ok", label: "Aptos" },
-  { key: "warn", label: "Com pendência" },
-  { key: "pj_int", label: "Intermitentes/PJs" },
-] as const;
+const POOL = "__pool__";
 
 function ServicesPage() {
   const { user, canWrite } = useCurrentUser();
@@ -55,7 +53,8 @@ function ServicesPage() {
   const [newName, setNewName] = useState("");
   const [search, setSearch] = useState("");
   const [roleSearch, setRoleSearch] = useState("");
-  const [filters, setFilters] = useState<Set<string>>(new Set());
+  const [effOpen, setEffOpen] = useState(false);
+  const [trOpen, setTrOpen] = useState(false);
 
   const clients = useQuery({
     queryKey: ["servicos-clients", user?.id, canWrite],
@@ -98,7 +97,7 @@ function ServicesPage() {
       const allocs = sched && ids.length
         ? (await supabase
             .from("daily_allocations")
-            .select("id, work_id, collaborator_id, position_id, has_pending_requirement, collaborators(full_name, position_id, registration_number, contract_type), positions(name)")
+            .select("id, work_id, collaborator_id, position_id, service_assigned, collaborators(full_name, position_id, registration_number), positions(name)")
             .eq("schedule_id", sched.id)
             .in("work_id", ids)).data ?? []
         : [];
@@ -107,25 +106,66 @@ function ServicesPage() {
   });
 
   const works = data.data?.works ?? [];
+  const clientName = clients.data?.find((c) => c.id === clientId)?.name ?? "";
   const allocs = data.data?.allocs ?? [];
-  const filteredAllocs = useMemo(() => {
+  const assigned = useMemo(() => allocs.filter((a) => a.service_assigned), [allocs]);
+  const pool = useMemo(() => allocs.filter((a) => !a.service_assigned), [allocs]);
+  const filteredPool = useMemo(() => {
     const q = search.trim().toLowerCase();
     const rq = roleSearch.trim().toLowerCase();
-    return allocs.filter((a) => {
+    return pool.filter((a) => {
       const c = a.collaborators;
       if (q && !(c?.full_name ?? "").toLowerCase().includes(q) && !(c?.registration_number ?? "").toLowerCase().includes(q)) return false;
       if (rq && !(a.positions?.name ?? "").toLowerCase().includes(rq)) return false;
-      const isPj = ["pj", "intermitente"].includes((c?.contract_type ?? "").toLowerCase());
-      if (filters.has("warn") && !a.has_pending_requirement) return false;
-      if (filters.has("ok") && a.has_pending_requirement) return false;
-      if (filters.has("pj_int") && !isPj) return false;
       return true;
     });
-  }, [allocs, search, roleSearch, filters]);
-  const shown = useMemo(
-    () => works.filter((w) => w.active || allocs.some((a) => a.work_id === w.id)),
-    [works, allocs],
-  );
+  }, [pool, search, roleSearch]);
+
+  const prefs = useQuery({
+    queryKey: ["service-prefs", user?.id, clientId],
+    enabled: !!user?.id && !!clientId,
+    queryFn: async () => {
+      const { data } = await supabase.from("service_display_prefs").select("hidden_work_ids, work_order").eq("client_id", clientId).maybeSingle();
+      return data ?? { hidden_work_ids: [] as string[], work_order: [] as string[] };
+    },
+  });
+  const hidden = useMemo(() => new Set(prefs.data?.hidden_work_ids ?? []), [prefs.data]);
+  const order = prefs.data?.work_order ?? [];
+  const savePrefs = async (patch: { hidden_work_ids?: string[]; work_order?: string[] }) => {
+    const next = { hidden_work_ids: [...hidden], work_order: order, ...patch };
+    qc.setQueryData(["service-prefs", user?.id, clientId], next);
+    const { error } = await supabase
+      .from("service_display_prefs")
+      .upsert({ user_id: user!.id, client_id: clientId, ...next, updated_at: new Date().toISOString() }, { onConflict: "user_id,client_id" });
+    if (error) toast.error(error.message);
+  };
+  const toggleHidden = (id: string) => {
+    const n = new Set(hidden);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    savePrefs({ hidden_work_ids: [...n] });
+  };
+
+  const shown = useMemo(() => {
+    const rank = (id: string) => { const i = order.indexOf(id); return i < 0 ? 9999 : i; };
+    return works
+      .filter((w) => w.active || allocs.some((a) => a.work_id === w.id && a.service_assigned))
+      .sort((a, b) => rank(a.id) - rank(b.id) || a.name.localeCompare(b.name, "pt-BR"));
+  }, [works, allocs, order]);
+  const visible = useMemo(() => shown.filter((w) => !hidden.has(w.id)), [shown, hidden]);
+  const [orderDrag, setOrderDrag] = useState<string | null>(null);
+  function reorder(targetId: string) {
+    const from = orderDrag;
+    setOrderDrag(null);
+    if (!from || from === targetId) return;
+    const ids = shown.map((w) => w.id).filter((id) => id !== from);
+    ids.splice(ids.indexOf(targetId) + (shown.findIndex((w) => w.id === from) < shown.findIndex((w) => w.id === targetId) ? 1 : 0), 0, from);
+    savePrefs({ work_order: ids });
+  }
+  const dayLabel = useMemo(() => {
+    const [y, m, d] = date.split("-").map(Number);
+    const wd = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"][new Date(y!, m! - 1, d!).getDay()];
+    return `Dia ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")} - ${wd}`;
+  }, [date]);
   const sorted = (list: typeof allocs) =>
     list.slice().sort((a, b) => (a.collaborators?.full_name ?? "").localeCompare(b.collaborators?.full_name ?? "", "pt-BR"));
   const invalidate = () => {
@@ -172,11 +212,35 @@ function ServicesPage() {
     const id = dragId;
     setDragId(null);
     const a = allocs.find((x) => x.id === id);
-    if (!a || a.work_id === workId) return;
+    if (!a) return;
+    if (workId === POOL) {
+      if (a.service_assigned) unassign.mutate(a.id);
+      return;
+    }
+    if (a.service_assigned && a.work_id === workId) return;
     move.mutate({ allocId: a.id, workId });
   }
 
-  const clientName = clients.data?.find((c) => c.id === clientId)?.name ?? "";
+  const unassign = useMutation({
+    mutationFn: async (allocId: string) => {
+      const { error } = await supabase.rpc("unassign_allocation_service", { _alloc_id: allocId });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const effText = useMemo(() => {
+    const lines = [`*${clientName.toUpperCase()} - EFETIVO*`, dayLabel, ""];
+    visible.forEach((w) => {
+      const list = sorted(assigned.filter((a) => a.work_id === w.id));
+      if (!list.length) return;
+      lines.push(`*${w.name}*`, ...list.map((a) => a.collaborators?.full_name ?? "—"), "");
+    });
+    return lines.join("\n").trim();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, assigned, clientName, dayLabel]);
+
   const person = (a: (typeof allocs)[number]) => (
     <li
       key={a.id}
@@ -212,8 +276,36 @@ function ServicesPage() {
             </SelectContent>
           </Select>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" disabled={!clientId}>
+              <ListFilter className="h-4 w-4" /> Serviços
+              {hidden.size > 0 && <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">{visible.length}/{shown.length}</Badge>}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuLabel>Serviços que aparecem</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {shown.map((w) => (
+              <DropdownMenuCheckboxItem
+                key={w.id}
+                checked={!hidden.has(w.id)}
+                onCheckedChange={() => toggleHidden(w.id)}
+                onSelect={(e) => e.preventDefault()}
+              >
+                {w.name}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button variant="outline" disabled={!clientId || copy.isPending} onClick={() => copy.mutate()}>
           <Copy className="h-4 w-4" /> Copiar dia anterior
+        </Button>
+        <Button variant="outline" disabled={!clientId} onClick={() => setEffOpen(true)}>
+          <ClipboardList className="h-4 w-4" /> Montar Efetivo
+        </Button>
+        <Button variant="outline" disabled={!clientId} onClick={() => setTrOpen(true)}>
+          <Car className="h-4 w-4" /> Montar Transporte
         </Button>
         <Button disabled={!clientId} onClick={() => setNewOpen(true)}>
           <Plus className="h-4 w-4" /> Novo Serviço
@@ -224,8 +316,8 @@ function ServicesPage() {
       {clientId && (
         <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
           <div className="grid content-start gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {shown.map((w) => {
-              const list = sorted(allocs.filter((a) => a.work_id === w.id));
+            {visible.map((w) => {
+              const list = sorted(assigned.filter((a) => a.work_id === w.id));
               return (
                 <section
                   key={w.id}
@@ -253,10 +345,15 @@ function ServicesPage() {
               </p>
             )}
           </div>
-          <aside className="panel flex max-h-[75vh] flex-col overflow-hidden">
+          <aside
+            onDragOver={(e) => { e.preventDefault(); setHover(POOL); }}
+            onDragLeave={() => setHover((h) => (h === POOL ? null : h))}
+            onDrop={(e) => { e.preventDefault(); onDropTo(POOL); }}
+            className={cn("panel flex max-h-[75vh] flex-col overflow-hidden", hover === POOL && "ring-2 ring-emerald-500")}
+          >
             <header className="space-y-1.5 border-b border-border bg-secondary/60 px-3 py-2">
-              <p className="font-display text-xs font-semibold uppercase tracking-wide">Escalados no cliente</p>
-              <p className="text-[11px] text-muted-foreground">{allocs.length} colaborador(es) na Programação do dia</p>
+              <p className="font-display text-xs font-semibold uppercase tracking-wide">Sem serviço</p>
+              <p className="text-[11px] text-muted-foreground">{pool.length} de {allocs.length} colaborador(es) ainda sem serviço</p>
               <div className="relative">
                 <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input className="h-7 pl-7 text-xs" placeholder="Buscar colaborador" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -265,43 +362,11 @@ function ServicesPage() {
                 <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input className="h-7 pl-7 text-xs" placeholder="Buscar função" value={roleSearch} onChange={(e) => setRoleSearch(e.target.value)} />
               </div>
-              <div className="flex items-center gap-1.5">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 flex-1 justify-between px-2 text-xs">
-                      <span className="flex items-center gap-1.5"><SlidersHorizontal className="h-3.5 w-3.5" />Condições</span>
-                      {filters.size > 0 && <Badge variant="secondary" className="px-1 py-0 text-[10px]">{filters.size}</Badge>}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-60">
-                    <DropdownMenuLabel>Filtrar colaboradores</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {SVC_FILTERS.map((f) => (
-                      <DropdownMenuCheckboxItem
-                        key={f.key}
-                        checked={filters.has(f.key)}
-                        onCheckedChange={() => setFilters((s) => { const n = new Set(s); if (n.has(f.key)) n.delete(f.key); else n.add(f.key); return n; })}
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        {f.label}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                {filters.size > 0 && (
-                  <button type="button" onClick={() => setFilters(new Set())} className="shrink-0 text-[10px] text-muted-foreground underline">limpar</button>
-                )}
-              </div>
             </header>
             <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
               {allocs.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Ninguém escalado neste cliente na Programação.</li>}
-              {allocs.length > 0 && filteredAllocs.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Nenhum colaborador encontrado.</li>}
-              {sorted(filteredAllocs).map((a) => (
-                <div key={a.id} className="flex items-center">
-                  <div className="flex-1">{person(a)}</div>
-                  <span className="pr-2 text-[10px] text-muted-foreground">{works.find((w) => w.id === a.work_id)?.name}</span>
-                </div>
-              ))}
+              {allocs.length > 0 && filteredPool.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Todos já estão em um serviço.</li>}
+              {sorted(filteredPool).map(person)}
             </ul>
           </aside>
         </div>
@@ -326,6 +391,45 @@ function ServicesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={effOpen} onOpenChange={setEffOpen}>
+        <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
+          <DialogHeader><DialogTitle>Montar Efetivo — {clientName}</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Arraste os serviços para cima ou para baixo para mudar a ordem. A ordem fica salva.</p>
+          <ul className="divide-y divide-border rounded-md border border-border">
+            {visible.map((w) => (
+              <li
+                key={w.id}
+                draggable
+                onDragStart={() => setOrderDrag(w.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); reorder(w.id); }}
+                className="flex cursor-grab items-center gap-2 px-3 py-2 text-sm"
+              >
+                <GripVertical className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1">{w.name}</span>
+                <Badge variant="outline" className="text-[10px]">{assigned.filter((a) => a.work_id === w.id).length}</Badge>
+              </li>
+            ))}
+          </ul>
+          <Textarea readOnly value={effText} rows={12} className="font-mono text-xs" />
+          <DialogFooter>
+            <Button onClick={() => navigator.clipboard.writeText(effText).then(() => toast.success("Efetivo copiado"))}>
+              <Copy className="h-4 w-4" /> Copiar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <TransportBuilderDialog
+        open={trOpen}
+        onOpenChange={setTrOpen}
+        date={date}
+        clientId={clientId}
+        clientName={clientName}
+        dayLabel={dayLabel}
+        people={allocs.map((a) => ({ collaborator_id: a.collaborator_id, name: a.collaborators?.full_name ?? "—" }))}
+      />
     </div>
   );
 }
