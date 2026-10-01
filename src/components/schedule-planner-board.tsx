@@ -674,6 +674,22 @@ export function SchedulePlannerBoard({
 
   /** Quadros exibidos no dia: só os serviços de clientes marcados. */
   const shownWorks = works.filter((w) => !w.client_id || visibleClients.has(w.client_id));
+  /** Uma caixa por cliente: agrupa os serviços do cliente (o serviço de cada pessoa é definido na aba Serviços). */
+  const groups = useMemo(() => {
+    const m = new Map<string, (typeof shownWorks)[number][]>();
+    shownWorks.forEach((w) => {
+      const k = w.client_id ?? w.id;
+      m.set(k, [...(m.get(k) ?? []), w]);
+    });
+    return [...m.entries()]
+      .map(([key, list]) => {
+        const sorted = list.slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+        const rep = sorted.find((x) => x.active) ?? sorted[0]!;
+        return { key, works: sorted, rep, label: rep.clients?.name ?? rep.name };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [works, visibleClients]);
   /**
    * Colaboradores exibidos: os ativos e, além deles, os inativados que já
    * estavam escalados (obra ou caixa) nesta data — some a partir do dia
@@ -1027,6 +1043,37 @@ export function SchedulePlannerBoard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Escolhe o serviço do cliente: mantém o atual, senão o último usado pela pessoa nesse cliente, senão o primeiro ativo. */
+  async function dropOnGroup(p: DragPayload, g: (typeof groups)[number]) {
+    const ids = g.works.map((x) => x.id);
+    const cur = p.allocationId ? rows.find((r) => r.id === p.allocationId) : allocByCollaborator.get(p.collaboratorId);
+    let workId = cur && ids.includes(cur.work_id) ? cur.work_id : null;
+    if (!workId && ids.length > 1) {
+      const { data } = await supabase
+        .from("daily_allocations")
+        .select("work_id")
+        .eq("collaborator_id", p.collaboratorId)
+        .in("work_id", g.works.filter((x) => x.active).map((x) => x.id))
+        .order("created_at", { ascending: false })
+        .limit(1);
+      workId = data?.[0]?.work_id ?? null;
+    }
+    drop.mutate({ ...p, workId: workId ?? g.rep.id });
+  }
+
+  const setGroupVt = useMutation({
+    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
+      const id = await ensureSchedule();
+      const { error } = await supabase
+        .from("schedule_work_vt")
+        .upsert(ids.map((work_id) => ({ schedule_id: id, work_id, pays_vt: value })), { onConflict: "schedule_id,work_id" });
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["work-vt", id] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const removeRow = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("daily_allocations").delete().eq("id", id);
@@ -1306,11 +1353,13 @@ export function SchedulePlannerBoard({
                 : "Nenhum cliente selecionado para este dia. Use o botão \u201cClientes\u201d."}
             </p>
           )}
-          {shownWorks.map((w) => {
+          {groups.map((g) => {
+            const w = g.rep;
+            const ids = new Set(g.works.map((x) => x.id));
             const workRows = rows
               .filter(
                 (r) =>
-                  r.work_id === w.id &&
+                  ids.has(r.work_id) &&
                   matchesRole(r.collaborator_id, r.position_id) &&
                   !appointmentByCollaborator.has(r.collaborator_id) &&
                   !c?.absences.has(r.collaborator_id),
@@ -1331,7 +1380,7 @@ export function SchedulePlannerBoard({
             const isHover = hoverWork === w.id;
             return (
               <section
-                key={w.id}
+                key={g.key}
                 onClick={() => setSelectedWork((s) => (s === w.id ? null : w.id))}
                 onDragOver={(e) => {
                   if (!editable) return;
@@ -1345,7 +1394,7 @@ export function SchedulePlannerBoard({
                   const p = readPayload(e);
                   setDragging(null);
                   if (!p || !editable) return;
-                  drop.mutate({ ...p, workId: w.id });
+                  void dropOnGroup(p, g);
                 }}
                 className={cn(
                   "panel flex h-72 cursor-pointer flex-col overflow-hidden transition",
@@ -1357,10 +1406,10 @@ export function SchedulePlannerBoard({
                 <header className="border-b border-border bg-secondary/60 px-2 py-1.5">
                   <div className="flex items-start gap-1.5">
                     <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
-                      {workLabel(w)}
+                      {g.label}
                     </h2>
                     {(() => {
-                      const occ = (pendingOcc.data ?? []).filter((o) => o.work_id === w.id);
+                      const occ = (pendingOcc.data ?? []).filter((o) => ids.has(o.work_id));
                       if (!occ.length) return null;
                       return (
                         <button
@@ -1382,11 +1431,7 @@ export function SchedulePlannerBoard({
                       aria-label="Copiar mensagem"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const siblings = w.client_id
-                          ? shownWorks.filter((x) => x.client_id === w.client_id && x.id !== w.id)
-                          : [];
-                        if (siblings.length > 0) setCopyAsk({ work: w, siblings });
-                        else copyWorks(w, [w]);
+                        copyWorks(w, g.works);
                       }}
                     >
                       <Copy className="h-3 w-3" />
@@ -1400,7 +1445,7 @@ export function SchedulePlannerBoard({
                       disabled={!editable}
                       title={workPaysVt(w.id) ? "VT: todos recebem (clique para desligar)" : "VT: ninguém recebe (clique para ligar)"}
                       aria-label="Alternar VT da obra"
-                      onClick={(e) => { e.stopPropagation(); toggleWorkVt.mutate(w.id); }}
+                      onClick={(e) => { e.stopPropagation(); setGroupVt.mutate({ ids: g.works.map((x) => x.id), value: !workPaysVt(w.id) }); }}
                       className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${workPaysVt(w.id) ? "bg-success" : "bg-muted-foreground/40"}`}
                     />
                   </div>
@@ -1440,7 +1485,8 @@ export function SchedulePlannerBoard({
                           const payload = readPayload(e);
                           setDragging(null);
                           if (!payload || !editable) return;
-                          drop.mutate({ ...payload, workId: w.id, beforeSort: r.sort_order - 0.5 });
+                          const same = payload.allocationId ? rows.find((x) => x.id === payload.allocationId) : allocByCollaborator.get(payload.collaboratorId);
+                          drop.mutate({ ...payload, workId: same && ids.has(same.work_id) ? same.work_id : r.work_id, beforeSort: r.sort_order - 0.5 });
                         }}
                         className="flex items-center gap-1.5 px-2 py-1 text-xs"
                       >
@@ -1452,7 +1498,7 @@ export function SchedulePlannerBoard({
                           </p>
                         </div>
                         {(() => {
-                          const occ = (pendingOcc.data ?? []).find((o) => o.work_id === w.id && o.collaborator_id === r.collaborator_id);
+                          const occ = (pendingOcc.data ?? []).find((o) => o.work_id === r.work_id && o.collaborator_id === r.collaborator_id);
                           if (!occ) return null;
                           return (
                             <button
@@ -1486,14 +1532,14 @@ export function SchedulePlannerBoard({
                           </Button>
                         )}
                         {(() => {
-                          const vt = r.vt_override ?? defaultAllocVt(w.id, r.collaborator_id);
+                          const vt = r.vt_override ?? defaultAllocVt(r.work_id, r.collaborator_id);
                           return (
                             <button
                               type="button"
                               disabled={!editable}
                               title={`${vt ? "Recebe VT" : "Sem VT"}${r.vt_override !== null && r.vt_override !== undefined ? " (exceção)" : ""}`}
                               aria-label="Alternar VT do colaborador"
-                              onClick={(e) => { e.stopPropagation(); toggleAllocVt.mutate({ id: r.id, workId: w.id, collaboratorId: r.collaborator_id, current: vt }); }}
+                              onClick={(e) => { e.stopPropagation(); toggleAllocVt.mutate({ id: r.id, workId: r.work_id, collaboratorId: r.collaborator_id, current: vt }); }}
                               className={`h-2 w-2 shrink-0 rounded-full ${vt ? "bg-success" : "bg-muted-foreground/40"} ${r.vt_override !== null && r.vt_override !== undefined ? "ring-1 ring-foreground/60" : ""}`}
                             />
                           );

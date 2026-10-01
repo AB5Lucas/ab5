@@ -2328,10 +2328,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_client: { Args: { _client_id: string }; Returns: boolean }
       can_access_rdo: { Args: { _rdo_id: string }; Returns: boolean }
       can_access_work: { Args: { _work_id: string }; Returns: boolean }
       can_edit_rdo: { Args: { _rdo_id: string }; Returns: boolean }
       can_write: { Args: never; Returns: boolean }
+      copy_service_split: {
+        Args: { _client_id: string; _date: string }
+        Returns: number
+      }
+      create_client_service: {
+        Args: { _client_id: string; _name: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2340,6 +2349,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      move_allocation_service: {
+        Args: { _alloc_id: string; _work_id: string }
+        Returns: undefined
+      }
       rdo_add_worker: {
         Args: {
           _collaborator_id: string

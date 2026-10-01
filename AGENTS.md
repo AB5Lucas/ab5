@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 - RDO: tabelas rdos/rdo_workforce/rdo_services/rdo_scaffolds/rdo_media/rdo_signatures ligadas a obra+data; efetivo sincroniza com daily_allocations enquanto rascunho; classificação de ausência move para daily_status_entries (lib/rdo.ts). Por quê: base para fechamento de custos sem duplicar cadastros.
 - Page access: MENU_GROUPS in src/lib/menu.ts is the single menu source; role_page_access (admin-only writes) + useAccess gate sidebar and _authenticated layout. Why: Acessos page must mirror the real menu.
+- Programação shows one box per client; the service of each person is daily_allocations.work_id, set in /programacao/servicos via RPCs (move_allocation_service, copy_service_split, create_client_service) guarded by can_access_client. Why: client-level scheduling without breaking RDO/costs per service.
