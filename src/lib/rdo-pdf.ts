@@ -324,7 +324,7 @@ export async function exportRdoPdf(rdoId: string) {
     doc.setFont("helvetica", "bold");
     doc.text(kind === "ab5" ? "RESPONSÁVEL AB5" : "RESPONSÁVEL CLIENTE", x, y + 32);
     doc.setFont("helvetica", "normal");
-    doc.text(s ? `${s.signer_name} · ${new Date(s.signed_at).toLocaleString("pt-BR")}` : "Não assinado", x, y + 37);
+    doc.text(s ? `${s.signer_name} · ${new Date(s.signed_at).toLocaleString("pt-BR")}` : kind === "client" ? "" : "Não assinado", x, y + 37);
   });
 
   const pages = doc.getNumberOfPages();
