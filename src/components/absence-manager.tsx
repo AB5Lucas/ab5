@@ -5,6 +5,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { useAccess } from "@/hooks/use-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,7 +50,11 @@ export function AbsenceManager({
   extraFieldName?: "document_url" | "reason";
   addLabel: string;
 }) {
-  const { canWrite, isAdmin } = useCurrentUser();
+  const { canWrite: roleWrite, isAdmin } = useCurrentUser();
+  const { canAccess } = useAccess();
+  const pagePath = table === "days_off" ? "/ausencias/folgas" : table === "vacations" ? "/ausencias/ferias" : "/ausencias/atestados";
+  // Quem tem acesso à página (Acessos) pode incluir e editar
+  const canWrite = roleWrite || canAccess(pagePath);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [person, setPerson] = useState("");
