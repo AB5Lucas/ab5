@@ -10,7 +10,6 @@ import {
   FileBarChart,
   Shield,
   ClipboardList,
-  Calculator,
 } from "lucide-react";
 
 export type MenuItem = { title: string; url: string };
@@ -89,9 +88,9 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Vale-Transporte", url: "/beneficios/vale-transporte" },
       { title: "Prêmio de Viagem", url: "/beneficios/premio-viagem" },
       { title: "Prêmio de Motorista", url: "/beneficios/premio-motorista" },
+      { title: "Fechamento", url: "/fechamento" },
     ],
   },
-  { label: "Fechamento", icon: Calculator, items: [{ title: "Fechamento", url: "/fechamento" }] },
   { label: "Externo", icon: ClipboardList, items: [{ title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
   { label: "Relatórios", icon: FileBarChart, items: [{ title: "Relatórios", url: "/relatorios" }] },
   {
