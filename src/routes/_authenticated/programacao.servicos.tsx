@@ -57,25 +57,35 @@ function ServicesPage() {
   const [trOpen, setTrOpen] = useState(false);
 
   const clients = useQuery({
-    queryKey: ["servicos-clients", user?.id, canWrite],
+    queryKey: ["servicos-clients", user?.id, canWrite, date],
     enabled: !!user?.id,
     queryFn: async () => {
+      let list: { id: string; name: string }[];
       if (canWrite) {
         const { data } = await supabase.from("clients").select("id, name").eq("active", true).order("name");
-        return data ?? [];
+        list = data ?? [];
+      } else {
+        const { data: links } = await supabase.from("foreman_works").select("works(client_id, clients(id, name))").eq("user_id", user!.id);
+        const m = new Map<string, string>();
+        (links ?? []).forEach((l) => {
+          const c = l.works?.clients;
+          if (c) m.set(c.id, c.name);
+        });
+        list = [...m.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
       }
-      const { data: links } = await supabase.from("foreman_works").select("works(client_id, clients(id, name))").eq("user_id", user!.id);
-      const m = new Map<string, string>();
-      (links ?? []).forEach((l) => {
-        const c = l.works?.clients;
-        if (c) m.set(c.id, c.name);
-      });
-      return [...m.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      // Apenas clientes com efetivo escalado no dia
+      const { data: sched } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
+      if (!sched) return [];
+      const { data: al } = await supabase.from("daily_allocations").select("works(client_id)").eq("schedule_id", sched.id);
+      const withStaff = new Set((al ?? []).map((a: any) => a.works?.client_id).filter(Boolean));
+      return list.filter((c) => withStaff.has(c.id));
     },
   });
 
   useEffect(() => {
-    if (clientId || !clients.data?.length) return;
+    if (!clients.data) return;
+    if (clientId && clients.data.some((c) => c.id === clientId)) return;
+    if (!clients.data.length) { if (clientId) setClientId(""); return; }
     const saved = typeof window !== "undefined" ? window.localStorage.getItem(SAVED_CLIENT) : null;
     setClientId(clients.data.some((c) => c.id === saved) ? saved! : clients.data[0]!.id);
   }, [clients.data, clientId]);
