@@ -97,7 +97,7 @@ const STATUS_BOXES = [
 const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
 
 /** Caixas alimentadas automaticamente (ausências e agendamentos) — não aparecem no menu. */
-const AUTO_BOX_KEYS = ["aso", "treinamento", "integracao", "folga", "ferias"];
+const AUTO_BOX_KEYS = ["aso", "treinamento", "integracao", "ferias"];
 
 /** Caixas que o usuário liga manualmente pelo botão "Caixas". */
 const MANUAL_BOXES = STATUS_BOXES.filter((b) => !AUTO_BOX_KEYS.includes(b.key)).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
@@ -909,23 +909,53 @@ export function SchedulePlannerBoard({
           { onConflict: "schedule_id,collaborator_id" },
         );
       if (error) throw error;
+      if (boxKey === "folga") {
+        // Cadastra automaticamente a folga do dia na aba Folgas
+        const { data: existing } = await supabase
+          .from("days_off")
+          .select("id")
+          .eq("collaborator_id", collaboratorId)
+          .lte("date", date)
+          .or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`)
+          .limit(1);
+        if (!existing?.length) {
+          const { error: e2 } = await supabase
+            .from("days_off")
+            .insert({ collaborator_id: collaboratorId, date, reason: "Programação" });
+          if (e2) throw e2;
+        }
+      }
       return { id, name, boxKey };
     },
     onSuccess: (r) => {
       toast.success(`${r.name} registrado em ${boxLabelOf(r.boxKey)}`);
       invalidate(r.id);
+      if (r.boxKey === "folga") {
+        qc.invalidateQueries({ queryKey: ["schedule-context", date] });
+        qc.invalidateQueries({ queryKey: ["days_off"] });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const removeEntry = useMutation({
     mutationFn: async (id: string) => {
+      const entry = entries.find((e) => e.id === id);
       const { error } = await supabase.from("daily_status_entries").delete().eq("id", id);
       if (error) throw error;
+      if (entry?.box_key === "folga") {
+        await supabase
+          .from("days_off")
+          .delete()
+          .eq("collaborator_id", entry.collaborator_id)
+          .eq("date", date)
+          .is("end_date", null);
+      }
     },
     onSuccess: () => {
       toast.success("Registro removido da caixa");
       invalidate();
+      qc.invalidateQueries();
     },
     onError: (e: Error) => toast.error(e.message),
   });
