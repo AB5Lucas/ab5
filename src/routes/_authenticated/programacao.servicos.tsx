@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Plus, Search, Users } from "lucide-react";
+import { Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Plus, Search, Users, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { TransportBuilderDialog } from "@/components/transport-builder-dialog";
 import {
@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { addDays, formatBR, todayISO } from "@/lib/scheduling";
+import { addDays, checkAso, checkIntegration, checkRequirements, fetchScheduleContext, formatBR, todayISO, workRequiresIntegration } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/programacao/servicos")({
@@ -43,7 +43,9 @@ const SAVED_CLIENT = "servicos-client";
 const POOL = "__pool__";
 
 function ServicesPage() {
-  const { user, canWrite } = useCurrentUser();
+  const { user, role } = useCurrentUser();
+  // Admin/programador veem todos os clientes; demais só os atribuídos em Usuários
+  const canWrite = role === "admin" || role === "programmer";
   const qc = useQueryClient();
   const [date, setDate] = useState(todayISO());
   // Encarregado entra por padrão no dia seguinte (dia a montar/conferir)
@@ -80,6 +82,14 @@ function ServicesPage() {
           if (c) m.set(c.id, c.name);
         });
         list = [...m.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      }
+      const wd = new Date(`${date}T12:00:00`).getDay();
+      if (wd === 0 || wd === 6) {
+        // Fim de semana: o efetivo é montado aqui, mesmo sem ninguém na Programação
+        const { data: act } = await supabase.from("works").select("client_id").eq("active", true).in("client_id", list.map((c) => c.id));
+        const count = new Map<string, number>();
+        (act ?? []).forEach((w) => w.client_id && count.set(w.client_id, (count.get(w.client_id) ?? 0) + 1));
+        return list.filter((c) => (count.get(c.id) ?? 0) > 1);
       }
       // Apenas clientes com efetivo escalado no dia
       const { data: sched } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
@@ -277,6 +287,14 @@ function ServicesPage() {
     setHover(null);
     const id = dragId;
     setDragId(null);
+    if (id?.startsWith("new:")) {
+      if (workId === POOL) return;
+      const cid = id.slice(4);
+      const why = blockReason(cid, workId);
+      if (why) { toast.error(why); return; }
+      addPerson.mutate({ cid, workId });
+      return;
+    }
     const a = allocs.find((x) => x.id === id);
     if (!a) return;
     if (workId === POOL) {
@@ -286,6 +304,72 @@ function ServicesPage() {
     if (a.service_assigned && a.work_id === workId) return;
     move.mutate({ allocId: a.id, workId });
   }
+
+  const isWeekend = [0, 6].includes(new Date(`${date}T12:00:00`).getDay());
+  const [addSearch, setAddSearch] = useState("");
+  const wctx = useQuery({
+    queryKey: ["servicos-weekend-ctx", date],
+    enabled: isWeekend && !!clientId,
+    queryFn: async () => {
+      const ctx = await fetchScheduleContext(date);
+      const { data: sched } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
+      const busy = new Map<string, string>();
+      if (sched) {
+        const { data: al } = await supabase.from("daily_allocations").select("collaborator_id, works(client_id, client, name)").eq("schedule_id", sched.id);
+        (al ?? []).forEach((a: any) => busy.set(a.collaborator_id, JSON.stringify({ c: a.works?.client_id, n: `${a.works?.client ?? ""} - ${a.works?.name ?? ""}` })));
+      }
+      return { ctx, busy };
+    },
+  });
+  const blockReason = (cid: string, workId: string): string | null => {
+    const w = wctx.data;
+    if (!w) return "Carregando...";
+    const b = w.busy.get(cid);
+    if (b) {
+      const o = JSON.parse(b);
+      if (o.c !== clientId) return `Já escalado em ${o.n} neste dia`;
+    }
+    const ab = w.ctx.absences.get(cid);
+    if (ab) return `De ${ab.toLowerCase()} neste dia`;
+    const integ = checkIntegration(w.ctx, workId, cid, date).status;
+    if (integ === "missing") return "Sem integração para este cliente";
+    if (integ === "expired") return "Integração vencida";
+    if (workRequiresIntegration(w.ctx, workId)) {
+      const aso = checkAso(w.ctx, cid, date).status;
+      if (aso === "missing") return "Sem ASO";
+      if (aso === "expired") return "ASO vencido";
+    }
+    const req = checkRequirements(w.ctx, workId, cid, date).filter((x) => x.blocking);
+    if (req.length) return `Falta: ${req.map((x) => x.label).join(", ")}`;
+    return null;
+  };
+  const candidates = useMemo(() => {
+    if (!isWeekend || !wctx.data) return [];
+    const here = new Set(allocs.map((a) => a.collaborator_id));
+    const q = addSearch.trim().toLowerCase();
+    const ref = visible[0]?.id ?? works[0]?.id ?? "";
+    return wctx.data.ctx.collaborators
+      .filter((c) => !here.has(c.id) && (!q || c.full_name.toLowerCase().includes(q) || (c.registration_number ?? "").toLowerCase().includes(q)))
+      .map((c) => ({ id: c.id, name: c.full_name, why: ref ? blockReason(c.id, ref) : null }))
+      .sort((a, b) => Number(!!a.why) - Number(!!b.why) || a.name.localeCompare(b.name, "pt-BR"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWeekend, wctx.data, allocs, addSearch, visible, works, clientId, date]);
+  const addPerson = useMutation({
+    mutationFn: async ({ cid, workId }: { cid: string; workId: string }) => {
+      const { error } = await supabase.rpc("weekend_add_allocation", { _work_id: workId, _date: date, _collaborator_id: cid });
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["servicos-weekend-ctx"] }); },
+    onError: (e: Error) => { toast.error(e.message); qc.invalidateQueries({ queryKey: ["servicos-weekend-ctx"] }); },
+  });
+  const removeDay = useMutation({
+    mutationFn: async (allocId: string) => {
+      const { error } = await supabase.rpc("weekend_remove_allocation", { _alloc_id: allocId });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Removido do dia"); invalidate(); qc.invalidateQueries({ queryKey: ["servicos-weekend-ctx"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const unassign = useMutation({
     mutationFn: async (allocId: string) => {
@@ -323,6 +407,11 @@ function ServicesPage() {
         <p className="truncate font-medium leading-tight">{a.collaborators?.full_name ?? "—"}</p>
         <p className="truncate text-[10px] leading-tight text-muted-foreground">{a.positions?.name ?? "Sem função"}</p>
       </div>
+      {isWeekend && (
+        <button type="button" aria-label="Remover do dia" title="Remover do dia" className="text-muted-foreground hover:text-destructive" onClick={() => removeDay.mutate(a.id)}>
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </li>
   );
 
@@ -461,10 +550,40 @@ function ServicesPage() {
               </div>
             </header>
             <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
-              {allocs.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Ninguém escalado neste cliente na Programação.</li>}
+              {allocs.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">{isWeekend ? "Ninguém ainda — arraste de Adicionar colaborador para um serviço." : "Ninguém escalado neste cliente na Programação."}</li>}
               {allocs.length > 0 && filteredPool.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Todos já estão em um serviço.</li>}
               {sorted(filteredPool).map(person)}
             </ul>
+            {isWeekend && (
+              <div className="flex max-h-[40vh] min-h-0 flex-col border-t border-border">
+                <div className="space-y-1.5 bg-secondary/60 px-3 py-2">
+                  <p className="font-display text-xs font-semibold uppercase tracking-wide">Adicionar colaborador</p>
+                  <p className="text-[11px] text-muted-foreground">Arraste para um serviço. Bloqueados mostram o motivo.</p>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input className="h-7 pl-7 text-xs" placeholder="Buscar colaborador" value={addSearch} onChange={(e) => setAddSearch(e.target.value)} />
+                  </div>
+                </div>
+                <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
+                  {wctx.isLoading && <li className="px-3 py-4 text-center text-xs text-muted-foreground">Carregando...</li>}
+                  {candidates.map((c) => (
+                    <li
+                      key={c.id}
+                      draggable={!c.why}
+                      onDragStart={(e) => { e.dataTransfer.setData("text/plain", c.id); setDragId(`new:${c.id}`); }}
+                      onDragEnd={() => setDragId(null)}
+                      className={cn("flex items-center gap-1.5 px-2 py-1 text-xs", c.why ? "cursor-not-allowed opacity-60" : "cursor-grab")}
+                    >
+                      <span className={cn("h-2 w-2 shrink-0 rounded-full", c.why ? "bg-destructive" : "bg-emerald-500")} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium leading-tight">{c.name}</p>
+                        {c.why && <p className="truncate text-[10px] leading-tight text-destructive">{c.why}</p>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </aside>
         </div>
       )}
