@@ -104,8 +104,11 @@ const RAW_GROUPS: MenuGroup[] = [
 ];
 
 const byName = (a: string, b: string) => a.localeCompare(b, "pt-BR");
-/** Grupos em ordem alfabética; páginas de cada grupo na ordem original. */
-export const MENU_GROUPS: MenuGroup[] = [...RAW_GROUPS].sort((a, b) => byName(a.label, b.label));
+/** Grupos na ordem original; páginas de cada grupo em ordem alfabética. */
+export const MENU_GROUPS: MenuGroup[] = RAW_GROUPS.map((g) => ({
+  ...g,
+  items: [...g.items].sort((a, b) => byName(a.title, b.title)),
+}));
 
 export const ALL_MENU_URLS = MENU_GROUPS.flatMap((g) => g.items.map((i) => i.url));
 
