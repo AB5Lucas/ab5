@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Copy, GripVertical, Plus, Search, SlidersHorizontal, Users } from "lucide-react";
+import { Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Plus, Search, Users } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { TransportBuilderDialog } from "@/components/transport-builder-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
