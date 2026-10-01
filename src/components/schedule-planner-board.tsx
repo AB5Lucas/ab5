@@ -266,16 +266,17 @@ export function SchedulePlannerBoard({
       return next;
     });
   }
-  const [visibleBoxes, setVisibleBoxes] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
+  const boxesKey = `${BOXES_STORAGE_KEY}:${date}`;
+  const [visibleBoxes, setVisibleBoxes] = useState<Set<string>>(new Set());
+  useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(BOXES_STORAGE_KEY);
+      const raw = window.localStorage.getItem(boxesKey);
       const saved = raw ? (JSON.parse(raw) as string[]) : [];
-      return new Set(saved.filter((k) => !AUTO_BOX_KEYS.includes(k)));
+      setVisibleBoxes(new Set(saved.filter((k) => !AUTO_BOX_KEYS.includes(k))));
     } catch {
-      return new Set();
+      setVisibleBoxes(new Set());
     }
-  });
+  }, [boxesKey]);
 
   function toggleBox(key: string) {
     setVisibleBoxes((prev) => {
@@ -283,7 +284,7 @@ export function SchedulePlannerBoard({
       if (next.has(key)) next.delete(key);
       else next.add(key);
       try {
-        window.localStorage.setItem(BOXES_STORAGE_KEY, JSON.stringify([...next]));
+        window.localStorage.setItem(boxesKey, JSON.stringify([...next]));
       } catch {
         /* ignora */
       }
@@ -809,7 +810,7 @@ export function SchedulePlannerBoard({
     const aso = checkAso(c as ScheduleContext, collaboratorId, date);
 
     const intBad = integ.status === "expired" || integ.status === "missing";
-    const asoBad = requiresInt && (aso.status === "expired" || aso.status === "missing");
+    const asoBad = aso.status === "expired" || (requiresInt && aso.status === "missing");
 
     if (intBad || asoBad) {
       const blockers: string[] = [];
@@ -1108,6 +1109,7 @@ export function SchedulePlannerBoard({
       const inserts = prevRows
         .filter((r) => !c.absences.has(r.collaborator_id))
         .filter((r) => !appointmentByCollaborator.has(r.collaborator_id))
+        .filter((r) => checkAso(c as ScheduleContext, r.collaborator_id, date).status !== "expired")
         .filter((r) => !existing.has(r.collaborator_id))
         .map((r, i) => ({
           schedule_id: id,
