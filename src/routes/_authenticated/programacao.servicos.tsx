@@ -134,13 +134,28 @@ function ServicesPage() {
         ...(vac ?? []).map((v) => v.collaborator_id),
         ...(med ?? []).map((m) => m.collaborator_id),
       ]);
-      return { works: works ?? [], allocs: allocs.filter((a: any) => !away.has(a.collaborator_id)) };
+      const kind = (id: string) =>
+        (med ?? []).some((m) => m.collaborator_id === id) ? "Atestado"
+        : (vac ?? []).some((v) => v.collaborator_id === id) ? "Férias" : "Folga";
+      const absent: { kind: string; name: string }[] = [];
+      const seenA = new Set<string>();
+      allocs.forEach((a: any) => {
+        if (!away.has(a.collaborator_id) || seenA.has(a.collaborator_id)) return;
+        seenA.add(a.collaborator_id);
+        absent.push({ kind: kind(a.collaborator_id), name: a.collaborators?.full_name ?? "—" });
+      });
+      absent.sort((x, y) => x.name.localeCompare(y.name, "pt-BR"));
+      return { works: works ?? [], allocs: allocs.filter((a: any) => !away.has(a.collaborator_id)), absent };
     },
   });
 
   const works = data.data?.works ?? [];
   const clientName = clients.data?.find((c) => c.id === clientId)?.name ?? "";
   const allocs = data.data?.allocs ?? [];
+  const absent = data.data?.absent ?? [];
+  const absentGroups = ["Folga", "Atestado", "Férias"]
+    .map((k) => ({ kind: k, names: absent.filter((a) => a.kind === k).map((a) => a.name) }))
+    .filter((g) => g.names.length);
   // Pessoas em integração neste cliente no dia também entram no transporte
   const integ = useQuery({
     queryKey: ["servicos-integ", clientId, clientName, date],
@@ -288,9 +303,10 @@ function ServicesPage() {
       if (!list.length) return;
       lines.push(`*${w.name}*`, ...list.map((a) => a.collaborators?.full_name ?? "—"), "");
     });
+    absentGroups.forEach((g) => lines.push(`*${g.kind}*`, ...g.names, ""));
     return lines.join("\n").trim();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, assigned, clientName, dayLabel]);
+  }, [visible, assigned, clientName, dayLabel, absentGroups.map((g) => g.kind + g.names.join()).join("|")]);
 
   const person = (a: (typeof allocs)[number]) => (
     <li
@@ -390,6 +406,19 @@ function ServicesPage() {
                 </section>
               );
             })}
+            {absentGroups.map((g) => (
+              <section key={g.kind} className="panel flex h-72 flex-col overflow-hidden">
+                <header className="flex items-center gap-1.5 border-b border-border bg-secondary/60 px-2 py-1.5">
+                  <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
+                    {g.kind} - {clientName}
+                  </h2>
+                  <Badge variant="outline" className="px-1 py-0 text-[10px]"><Users className="mr-0.5 h-2.5 w-2.5" />{g.names.length}</Badge>
+                </header>
+                <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
+                  {g.names.map((n) => <li key={n} className="px-2 py-1.5 text-xs">{n}</li>)}
+                </ul>
+              </section>
+            ))}
             {(integ.data ?? []).length > 0 && (
               <section className="panel flex h-72 flex-col overflow-hidden">
                 <header className="flex items-center gap-1.5 border-b border-border bg-secondary/60 px-2 py-1.5">
