@@ -159,6 +159,17 @@ function ClientsPage() {
       if (editing) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editing.id);
         if (error) throw error;
+        if (Number(editing.distance_km ?? 0) !== Number(payload.distance_km ?? 0)) {
+          await supabase
+            .from("vehicle_schedules")
+            .update({ km: Number(payload.distance_km ?? 0) })
+            .eq("client_id", editing.id)
+            .eq("is_external", false)
+            .eq("is_maintenance", false)
+            .eq("is_suzano_local", false);
+          queryClient.invalidateQueries({ queryKey: ["vehicle-schedules"] });
+          queryClient.invalidateQueries({ queryKey: ["km-report"] });
+        }
       } else {
         const { error } = await supabase.from("clients").insert(payload);
         if (error) throw error;
