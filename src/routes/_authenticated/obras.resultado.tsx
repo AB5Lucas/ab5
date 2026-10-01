@@ -78,16 +78,23 @@ async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ da
 }
 
 function ResultadoPage() {
-  const { canWrite } = useCurrentUser();
+  const { canWrite, role, user } = useCurrentUser();
   const qc = useQueryClient();
   const [workId, setWorkId] = useState<string>("");
   const [untilMonth, setUntilMonth] = useState<string>("");
 
   const works = useQuery({
-    queryKey: ["works-result"],
+    queryKey: ["works-result", role, user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("works").select("*").order("name");
       if (error) throw error;
+      // Coordenador só vê as obras atribuídas a ele na aba Usuários
+      if (role === "coordenador") {
+        const { data: mine } = await supabase.from("foreman_works").select("work_id").eq("user_id", user!.id);
+        const ids = new Set((mine ?? []).map((m) => m.work_id));
+        return data.filter((w) => ids.has(w.id));
+      }
       return data;
     },
   });
