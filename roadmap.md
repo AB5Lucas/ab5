@@ -1,3 +1,4 @@
 - Transporte: finalidade EM OBRA / BACKUP / PESSOAL / VENDEDOR no lugar do cliente; backup pode ficar sem motorista
 - [x] RDO (Externo > Relatório Diário)
 - [x] Encarregado/coordenador veem só suas obras em Serviços e Resultados
+- [ ] Prêmio motorista automático ao adicionar carro no fim de semana (Montar Transporte)
