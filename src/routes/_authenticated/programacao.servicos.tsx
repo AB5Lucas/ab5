@@ -106,6 +106,7 @@ function ServicesPage() {
   });
 
   const works = data.data?.works ?? [];
+  const clientName = clients.data?.find((c) => c.id === clientId)?.name ?? "";
   const allocs = data.data?.allocs ?? [];
   const assigned = useMemo(() => allocs.filter((a) => a.service_assigned), [allocs]);
   const pool = useMemo(() => allocs.filter((a) => !a.service_assigned), [allocs]);
@@ -240,7 +241,6 @@ function ServicesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, assigned, clientName, dayLabel]);
 
-  const clientName = clients.data?.find((c) => c.id === clientId)?.name ?? "";
   const person = (a: (typeof allocs)[number]) => (
     <li
       key={a.id}
