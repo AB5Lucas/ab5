@@ -100,22 +100,47 @@ function ResultadoPage() {
       return data;
     },
   });
-  const work = works.data?.find((w) => w.id === workId);
+  const ALL = "__all__";
+  const isAll = workId === ALL;
+  const groupKey = (x: any) => x.client_id ?? `n:${x.client ?? "Sem cliente"}`;
+  const work = useMemo(() => {
+    const list = works.data ?? [];
+    if (!isAll) return list.find((w) => w.id === workId);
+    const g = list.filter((x) => groupKey(x) === clientKey);
+    if (!g.length) return undefined;
+    const bi: Record<string, number> = {};
+    g.forEach((x: any) => Object.entries(x.budget_items ?? {}).forEach(([k, v]) => (bi[k] = (bi[k] ?? 0) + Number(v ?? 0))));
+    return {
+      ...g[0]!,
+      id: ALL,
+      name: "Todos os serviços (resultado geral)",
+      order_number: g.map((x) => x.order_number).filter(Boolean).join(", "),
+      quote_number: g.map((x) => x.quote_number).filter(Boolean).join(", "),
+      order_value: g.reduce((a, x) => a + Number(x.order_value ?? 0), 0),
+      budget_cost: g.reduce((a, x) => a + Number(x.budget_cost ?? 0), 0),
+      budget_items: bi,
+      orders: g.flatMap((x: any) => (Array.isArray(x.orders) ? x.orders : [])),
+      _ids: g.map((x) => x.id),
+      _orders: Object.fromEntries(g.map((x) => [x.id, Number(x.order_value ?? 0)])),
+    } as any;
+  }, [works.data, workId, clientKey, isAll]);
+  const workIds: string[] = work ? ((work as any)._ids ?? [work.id]) : [];
+  const canEdit = canWrite && !isAll;
 
   const data = useQuery({
-    queryKey: ["work-result", workId, "vt"],
+    queryKey: ["work-result", workId, workIds.join(","), "vt"],
     enabled: !!work,
     queryFn: async () => {
       const w = work!;
       const [allocs, rdoWf, progress, entries, people, siblings, vs, client] = await Promise.all([
         fetchAll<any>((a, b) =>
-          supabase.from("daily_allocations").select("collaborator_id, schedule_id, driver, vt_override, daily_schedules(schedule_date)").eq("work_id", w.id).range(a, b),
+          supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, daily_schedules(schedule_date)").in("work_id", workIds).range(a, b),
         ),
         fetchAll<any>((a, b) =>
-          supabase.from("rdo_workforce").select("collaborator_id, report_date, present, worked_hours").eq("work_id", w.id).range(a, b),
+          supabase.from("rdo_workforce").select("collaborator_id, report_date, present, worked_hours").in("work_id", workIds).range(a, b),
         ),
-        supabase.from("work_progress").select("*").eq("work_id", w.id).order("month"),
-        supabase.from("work_entries").select("*").eq("work_id", w.id).order("entry_date", { ascending: false }),
+        supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
+        supabase.from("work_entries").select("*").in("work_id", workIds).order("entry_date", { ascending: false }),
         fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, city, vt_enabled").range(a, b)),
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
@@ -128,7 +153,7 @@ function ResultadoPage() {
           : Promise.resolve({ data: null as any }),
       ]);
       const [workVt, noVtRows, leaves, vtRules] = await Promise.all([
-        fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, pays_vt").eq("work_id", w.id).range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", workIds).range(a, b)),
         fetchAll<any>((a, b) =>
           supabase.from("daily_status_entries").select("schedule_id, collaborator_id")
             .in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b),
@@ -176,6 +201,7 @@ function ResultadoPage() {
       entries: raw.entries.filter((e: any) => okDate(e.entry_date)),
       progress: raw.progress.filter((p: any) => !untilMonth || String(p.month).slice(0, 7) <= untilMonth),
     };
+    const idSet = new Set(workIds);
     const rate = new Map<string, number>(d.people.map((p: any) => [p.id, Number(p.salary ?? 0)]));
     const pj = new Set<string>(d.people.filter((p: any) => p.contract_type === "pj").map((p: any) => p.id));
     const enc = (id: string) => (pj.has(id) ? 1 : ENCARGOS);
@@ -222,10 +248,10 @@ function ResultadoPage() {
       const dt = a.daily_schedules?.schedule_date as string | undefined;
       if (!dt) continue;
       dayTotal.set(dt, (dayTotal.get(dt) ?? 0) + 1);
-      if (a.work_id === work.id) dayMine.set(dt, (dayMine.get(dt) ?? 0) + 1);
+      if (idSet.has(a.work_id)) dayMine.set(dt, (dayMine.get(dt) ?? 0) + 1);
     }
     for (const v of d.vs) {
-      if (v.work_id && v.work_id !== work.id) continue;
+      if (v.work_id && !idSet.has(v.work_id)) continue;
       const trips = Number(v.trips ?? 1);
       const kmCost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? KM_RATE);
       const t = toll * 2 * trips;
@@ -237,7 +263,7 @@ function ResultadoPage() {
     }
     // VT dos colaboradores escalados neste serviço entra no transporte da obra
     const person = new Map<string, any>(d.people.map((p: any) => [p.id, p]));
-    const workVt = new Map<string, boolean>((d.workVt ?? []).map((r: any) => [r.schedule_id, r.pays_vt]));
+    const workVt = new Map<string, boolean>((d.workVt ?? []).map((r: any) => [`${r.schedule_id}|${r.work_id}`, r.pays_vt]));
     const noVt = new Set<string>((d.noVtRows ?? []).map((r: any) => `${r.schedule_id}|${r.collaborator_id}`));
     const vtDay = (driver: boolean) =>
       (d.vtRules ?? []).reduce((sum: number, r: any) => {
@@ -253,7 +279,7 @@ function ResultadoPage() {
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
-      const base = p?.vt_enabled === false ? false : !!workVt.get(a.schedule_id) || pouso;
+      const base = p?.vt_enabled === false ? false : !!workVt.get(`${a.schedule_id}|${a.work_id}`) || pouso;
       if (!(a.vt_override ?? base)) continue;
       const cost = vtDay(!!a.driver);
       if (!cost) continue;
@@ -268,7 +294,22 @@ function ResultadoPage() {
     for (const e of d.entries) {
       bump(e.entry_date.slice(0, 7), e.category === "faturamento" ? "billing" : "entries", Number(e.amount));
     }
-    const progMap = new Map<string, number>(d.progress.map((p: any) => [String(p.month).slice(0, 7), Number(p.percent)]));
+    let progMap = new Map<string, number>(d.progress.map((p: any) => [String(p.month).slice(0, 7), Number(p.percent)]));
+    if (isAll) {
+      // Andamento geral = média ponderada pelo valor do pedido de cada serviço
+      const ow: Record<string, number> = (work as any)._orders ?? {};
+      const totalOrder = Object.values(ow).reduce((a, b) => a + b, 0);
+      const pm = [...new Set(d.progress.map((p: any) => String(p.month).slice(0, 7)))].sort() as string[];
+      const lastBy = new Map<string, number>();
+      progMap = new Map();
+      for (const ym of pm) {
+        d.progress.filter((p: any) => String(p.month).slice(0, 7) === ym).forEach((p: any) => lastBy.set(p.work_id, Number(p.percent)));
+        const val = totalOrder
+          ? [...lastBy.entries()].reduce((a, [id, pc]) => a + pc * (ow[id] ?? 0), 0) / totalOrder
+          : [...lastBy.values()].reduce((a, b) => a + b, 0) / Math.max(1, workIds.length);
+        progMap.set(ym, val);
+      }
+    }
     const months = [...new Set([...monthly.keys(), ...progMap.keys()])].sort();
     const order = Number(work.order_value ?? 0);
     const budget = Number(work.budget_cost ?? 0);
@@ -343,7 +384,7 @@ function ResultadoPage() {
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, siblingCount: d.siblingCount };
-  }, [work, data.data, untilMonth]);
+  }, [work, data.data, untilMonth, isAll]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string }[]>([]);
@@ -472,20 +513,20 @@ function ResultadoPage() {
     mat.used = mat.budget ? (mat.real / mat.budget) * 100 : mat.real ? 100 : 0;
     return out.filter((i) => i.budget || i.real);
   })();
-  const open = (k: NonNullable<typeof dlg>) => canWrite && setDlg(k);
+  const open = (k: NonNullable<typeof dlg>) => canEdit && setDlg(k);
   const isBilling = dlg === "faturamentos";
   const openEntries = (k: "lancamentos" | "faturamentos") => {
     setEntry((e) => ({ ...e, category: k === "faturamentos" ? "faturamento" : "materiais" }));
     setDlg(k);
   };
-  const clickable = canWrite ? "cursor-pointer rounded-md transition-colors hover:bg-muted/60" : "";
+  const clickable = canEdit ? "cursor-pointer rounded-md transition-colors hover:bg-muted/60" : "";
   const w = work as any;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         {(() => {
-          const keyOf = (x: any) => x.client_id ?? `n:${x.client ?? "Sem cliente"}`;
+          const keyOf = groupKey;
           const clientMap = new Map<string, string>();
           (works.data ?? []).forEach((x: any) => clientMap.set(keyOf(x), x.client ?? "Sem cliente"));
           const clientList = [...clientMap.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
@@ -501,7 +542,7 @@ function ResultadoPage() {
                     setClientKey(v);
                     const list = (works.data ?? []).filter((x) => keyOf(x) === v);
                     if (list.length === 1) selectWork(list[0]!.id);
-                    else setWorkId("");
+                    else setWorkId(ALL);
                   }}
                 >
                   <SelectTrigger>
@@ -520,6 +561,7 @@ function ResultadoPage() {
                     <SelectValue placeholder="Selecione o serviço" />
                   </SelectTrigger>
                   <SelectContent>
+                    {services.length > 1 && <SelectItem value={ALL}>Todos os serviços (geral)</SelectItem>}
                     {services.map((x) => (
                       <SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>
                     ))}
@@ -545,7 +587,7 @@ function ResultadoPage() {
             )}
           </div>
         )}
-        {work && canWrite && (
+        {work && canEdit && (
           <>
             <Button variant="outline" onClick={() => openEntries("lancamentos")}>
               Lançamentos
@@ -585,7 +627,7 @@ function ResultadoPage() {
 
           {/* Linha 1 */}
           <div className="grid gap-6 border-b py-5 xl:grid-cols-[1fr_2fr_1fr]">
-            <div className={`p-3 ${clickable}`} onClick={() => open("cliente")} title={canWrite ? "Clique para editar" : undefined}>
+            <div className={`p-3 ${clickable}`} onClick={() => open("cliente")} title={canEdit ? "Clique para editar" : undefined}>
               <SectionTitle>Dados do Cliente</SectionTitle>
               <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
                 <Lbl>Cliente</Lbl>
@@ -632,7 +674,7 @@ function ResultadoPage() {
               </div>
             </div>
 
-            <div className={`p-3 ${clickable}`} onClick={() => open("andamento")} title={canWrite ? "Clique para lançar o andamento" : undefined}>
+            <div className={`p-3 ${clickable}`} onClick={() => open("andamento")} title={canEdit ? "Clique para lançar o andamento" : undefined}>
               <SectionTitle>Conclusão da Obra</SectionTitle>
               <Gauge value={last?.progress ?? 0} />
             </div>
@@ -659,7 +701,7 @@ function ResultadoPage() {
               )}
             </div>
 
-            <div className={`p-3 ${clickable}`} onClick={() => open("orcamento")} title={canWrite ? "Clique para editar o orçado" : undefined}>
+            <div className={`p-3 ${clickable}`} onClick={() => open("orcamento")} title={canEdit ? "Clique para editar o orçado" : undefined}>
               <SectionTitle>Custos Orçados x Realizado</SectionTitle>
               <table className="mx-auto mt-4 w-full max-w-2xl text-sm">
                 <thead>
