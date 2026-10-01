@@ -1,0 +1,113 @@
+import {
+  LayoutDashboard,
+  CalendarDays,
+  CalendarClock,
+  Users,
+  Building2,
+  Truck,
+  CalendarOff,
+  Wallet,
+  FileBarChart,
+  Shield,
+  ClipboardList,
+} from "lucide-react";
+
+export type MenuItem = { title: string; url: string };
+export type MenuGroup = { label: string; icon: typeof Users; items: MenuItem[] };
+
+/** Menu real do sistema — fonte única para o menu lateral e a página Acessos. */
+export const MENU_GROUPS: MenuGroup[] = [
+  { label: "Dashboard", icon: LayoutDashboard, items: [{ title: "Dashboard", url: "/dashboard" }] },
+  {
+    label: "Planejamento",
+    icon: CalendarDays,
+    items: [
+      { title: "Programação", url: "/programacao/diaria" },
+      { title: "Transporte", url: "/veiculos/transporte" },
+      { title: "Consulta", url: "/consulta" },
+    ],
+  },
+  {
+    label: "Controles",
+    icon: ClipboardList,
+    items: [
+      { title: "Integrações", url: "/obras/integracoes" },
+      { title: "Treinamentos", url: "/treinamentos" },
+      { title: "ASOs", url: "/colaboradores/asos" },
+    ],
+  },
+  {
+    label: "Agendamentos",
+    icon: CalendarClock,
+    items: [
+      { title: "Agendamentos", url: "/agendamentos" },
+      { title: "Conferência", url: "/conferencia" },
+    ],
+  },
+  {
+    label: "Colaboradores",
+    icon: Users,
+    items: [
+      { title: "Colaboradores", url: "/colaboradores" },
+      { title: "Funções", url: "/colaboradores/estrutura" },
+    ],
+  },
+  {
+    label: "Obras",
+    icon: Building2,
+    items: [
+      { title: "Serviços", url: "/obras" },
+      { title: "Resultados", url: "/obras/resultado" },
+      { title: "Clientes", url: "/clientes" },
+      { title: "Requisitos", url: "/obras/requisitos" },
+    ],
+  },
+  {
+    label: "Veículos",
+    icon: Truck,
+    items: [
+      { title: "Frota", url: "/veiculos" },
+      { title: "Relatórios", url: "/veiculos/relatorios" },
+      { title: "Motoristas", url: "/veiculos/motoristas" },
+    ],
+  },
+  {
+    label: "Ausências",
+    icon: CalendarOff,
+    items: [
+      { title: "Férias", url: "/ausencias/ferias" },
+      { title: "Atestados", url: "/ausencias/atestados" },
+      { title: "Folgas", url: "/ausencias/folgas" },
+    ],
+  },
+  {
+    label: "Benefícios",
+    icon: Wallet,
+    items: [
+      { title: "Vale-Transporte", url: "/beneficios/vale-transporte" },
+      { title: "Prêmio de Viagem", url: "/beneficios/premio-viagem" },
+      { title: "Prêmio de Motorista", url: "/beneficios/premio-motorista" },
+    ],
+  },
+  { label: "Externo", icon: ClipboardList, items: [{ title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
+  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Relatórios", url: "/relatorios" }] },
+  {
+    label: "Administração",
+    icon: Shield,
+    items: [
+      { title: "Usuários", url: "/admin/usuarios" },
+      { title: "Auditoria", url: "/admin/auditoria" },
+      { title: "Configurações", url: "/admin/configuracoes" },
+      { title: "Acessos", url: "/admin/acessos" },
+    ],
+  },
+];
+
+export const ALL_MENU_URLS = MENU_GROUPS.flatMap((g) => g.items.map((i) => i.url));
+
+/** Página do menu que "contém" a rota atual (ex.: /programacao/semanal → Programação). */
+export function menuUrlFor(pathname: string): string | null {
+  if (ALL_MENU_URLS.includes(pathname)) return pathname;
+  if (pathname.startsWith("/programacao")) return "/programacao/diaria";
+  return null;
+}
