@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
-import { menuUrlFor } from "@/lib/menu";
+import { menuUrlFor, MENU_GROUPS } from "@/lib/menu";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -38,9 +38,16 @@ function AuthenticatedLayout() {
   const pageUrl = menuUrlFor(pathname);
   const blocked = !accessLoading && !!pageUrl && !canAccess(pageUrl);
   useEffect(() => {
-    if (isForeman && blocked && canAccess("/externo/relatorio-diario"))
+    if (!blocked) return;
+    if (isForeman && canAccess("/externo/relatorio-diario")) {
       navigate({ to: "/externo/relatorio-diario", replace: true });
-  }, [isForeman, blocked, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+      return;
+    }
+    if (pathname === "/dashboard") {
+      const first = MENU_GROUPS.flatMap((g) => g.items).find((i) => canAccess(i.url));
+      if (first) navigate({ to: first.url, replace: true });
+    }
+  }, [isForeman, blocked, pathname, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
