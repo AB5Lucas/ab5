@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, KeyRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const add = (s: string, n: number) => {
@@ -48,7 +50,14 @@ export function VehicleHandover() {
   });
   const list = q.data ?? [];
   return (
-    <div className="panel w-full p-3 text-xs md:w-96">
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm">
+          <KeyRound className="h-4 w-4" /> Trocar
+          {list.length > 0 && <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{list.length}</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-96 p-3 text-xs">
       <p className="mb-1 flex items-center gap-1 font-display font-semibold uppercase tracking-wide">
         <KeyRound className="h-3.5 w-3.5" /> Troca de carros
       </p>
@@ -68,6 +77,7 @@ export function VehicleHandover() {
           ))}
         </ul>
       )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
