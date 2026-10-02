@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buildDistanceLookup } from "@/lib/city-distance";
 
 /** Fechamento: competência = dia 26 do mês anterior até 25 do mês selecionado. */
 export function periodOf(month: string) {

@@ -22,6 +22,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables, Enums } from "@/integrations/supabase/types";
+import { buildDistanceLookup } from "@/lib/city-distance";
 
 export const Route = createFileRoute("/_authenticated/beneficios/premio-viagem")({
   head: () => ({
@@ -182,7 +183,7 @@ function BonusPage() {
         const { data: page, error } = await supabase
           .from("daily_allocations")
           .select(
-            "collaborator_id, schedule_id, collaborators(full_name, registration_number), works(distance_km, clients(distance_km))",
+            "collaborator_id, schedule_id, collaborators(full_name, registration_number, city), works(city, distance_km, clients(city, distance_km))",
           )
           .in("schedule_id", ids)
           .order("id")
@@ -191,20 +192,26 @@ function BonusPage() {
         data.push(...(page ?? []));
         if (!page || page.length < 1000) break;
       }
+      const { data: cityDist } = await supabase.from("city_distances").select("city_a, city_b, km");
+      const distFor = buildDistanceLookup(cityDist ?? []);
 
       return (data ?? []).map((a) => {
         const row = a as unknown as {
           collaborator_id: string;
           schedule_id: string;
-          collaborators: { full_name: string; registration_number: string } | null;
-          works: { distance_km: number | null; clients: { distance_km: number | null } | null } | null;
+          collaborators: { full_name: string; registration_number: string; city: string | null } | null;
+          works: { city: string | null; distance_km: number | null; clients: { city: string | null; distance_km: number | null } | null } | null;
         };
         return {
           collaborator_id: row.collaborator_id,
           schedule_id: row.schedule_id,
           name: row.collaborators?.full_name ?? "—",
           reg: row.collaborators?.registration_number ?? "",
-          distance: Number(row.works?.clients?.distance_km ?? row.works?.distance_km ?? 0),
+          distance: distFor(
+            row.collaborators?.city,
+            row.works?.clients?.city ?? row.works?.city,
+            Number(row.works?.clients?.distance_km ?? row.works?.distance_km ?? 0),
+          ),
         };
       });
     },
