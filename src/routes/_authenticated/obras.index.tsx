@@ -214,7 +214,6 @@ function WorksPage() {
         supervisor_id: ref(form.supervisor_id),
         manager_id: ref(form.manager_id),
         active: form.active,
-        night_shift: form.night_shift,
         notes: nn(form.notes),
       };
 
@@ -481,10 +480,6 @@ function WorksPage() {
             <div className="flex items-center gap-2 sm:col-span-2">
               <Switch checked={form.active} onCheckedChange={(v) => set("active", v)} id="work-active" />
               <Label htmlFor="work-active">Serviço disponível para programação</Label>
-            </div>
-            <div className="flex items-center gap-2 sm:col-span-2">
-              <Switch checked={form.night_shift} onCheckedChange={(v) => set("night_shift", v)} id="work-night" />
-              <Label htmlFor="work-night">Turno noturno (vira a meia-noite — 1 dia de refeição, VT ou Prêmio Viagem)</Label>
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Observações</Label>

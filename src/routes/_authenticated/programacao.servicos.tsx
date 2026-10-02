@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Plus, Search, Users, X } from "lucide-react";
+import { Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Moon, Plus, Search, Users, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { TransportBuilderDialog } from "@/components/transport-builder-dialog";
 import {
@@ -196,6 +196,25 @@ function ServicesPage() {
       return true;
     });
   }, [pool, search, roleSearch]);
+
+  const night = useQuery({
+    queryKey: ["work-night", date],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("schedule_work_night").select("work_id").eq("schedule_date", date);
+      return (data ?? []).map((r: { work_id: string }) => r.work_id);
+    },
+  });
+  const nightSet = useMemo(() => new Set(night.data ?? []), [night.data]);
+  const toggleNight = async (workId: string) => {
+    const on = nightSet.has(workId);
+    const { error } = on
+      ? await (supabase as any).from("schedule_work_night").delete().eq("schedule_date", date).eq("work_id", workId)
+      : await (supabase as any).from("schedule_work_night").insert({ schedule_date: date, work_id: workId });
+    if (error) { toast.error(error.message); return; }
+    toast.success(on ? "Serviço voltou para turno diurno" : "Turno noturno marcado para este dia");
+    qc.invalidateQueries({ queryKey: ["work-night"] });
+    qc.invalidateQueries({ queryKey: ["night-carry"] });
+  };
 
   const prefs = useQuery({
     queryKey: ["service-prefs", user?.id, clientId],
@@ -488,6 +507,15 @@ function ServicesPage() {
                     <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
                       {clientName} - {w.name}
                     </h2>
+                    <button
+                      type="button"
+                      onClick={() => toggleNight(w.id)}
+                      title={nightSet.has(w.id) ? "Turno noturno neste dia (entra hoje, sai amanhã). Clique para voltar a diurno" : "Marcar turno noturno neste dia"}
+                      aria-label="Turno noturno"
+                      className={cn("rounded p-0.5", nightSet.has(w.id) ? "bg-info/15 text-info" : "text-muted-foreground/50 hover:text-foreground")}
+                    >
+                      <Moon className="h-3.5 w-3.5" />
+                    </button>
                     <Badge variant="outline" className="px-1 py-0 text-[10px]"><Users className="mr-0.5 h-2.5 w-2.5" />{list.length}</Badge>
                   </header>
                   <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
