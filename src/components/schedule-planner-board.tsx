@@ -13,6 +13,7 @@ import {
   GripVertical,
   LayoutGrid,
   MapPin,
+  Moon,
   Search,
   SlidersHorizontal,
   Users,
@@ -357,6 +358,25 @@ export function SchedulePlannerBoard({
         .order("sort_order");
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Turno noturno iniciado no dia anterior: aparece hoje como continuação (sem novo VT/refeição/prêmio)
+  const nightCarry = useQuery({
+    queryKey: ["night-carry", date],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("daily_allocations")
+        .select("collaborator_id, collaborators(full_name), works!inner(client_id, night_shift), daily_schedules!inner(schedule_date)")
+        .eq("daily_schedules.schedule_date", addDays(date, -1))
+        .eq("works.night_shift", true);
+      const m = new Map<string, string[]>();
+      for (const a of (data ?? []) as any[]) {
+        const k = a.works?.client_id ?? "";
+        m.set(k, [...(m.get(k) ?? []), a.collaborators?.full_name ?? "—"]);
+      }
+      for (const v of m.values()) v.sort((x, y) => x.localeCompare(y, "pt-BR"));
+      return m;
     },
   });
 
@@ -1553,6 +1573,19 @@ export function SchedulePlannerBoard({
                       .filter(Boolean)
                       .join(" · ") || "Sem cliente vinculado"}
                   </p>
+                  {g.works.some((x: any) => x.night_shift) && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-info">
+                      <Moon className="h-2.5 w-2.5" /> Turno noturno (vira para o dia seguinte)
+                    </p>
+                  )}
+                  {(nightCarry.data?.get(w.client_id ?? "")?.length ?? 0) > 0 && (
+                    <div className="mt-1 rounded border border-info/40 bg-info/10 px-1.5 py-1 text-[10px]">
+                      <p className="flex items-center gap-1 font-medium text-info">
+                        <Moon className="h-2.5 w-2.5" /> Continuação do turno noturno de {formatBR(addDays(date, -1))}
+                      </p>
+                      <p className="text-muted-foreground">{nightCarry.data!.get(w.client_id ?? "")!.join(", ")}</p>
+                    </div>
+                  )}
                   {isHover && blockedTarget && (
                     <p className="mt-0.5 flex items-center gap-1 text-[10px] text-destructive">
                       <Ban className="h-2.5 w-2.5" /> Não é possível soltar aqui

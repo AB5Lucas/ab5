@@ -1395,6 +1395,7 @@ export type Database = {
           report_date: string
           responsible_name: string | null
           schedule_id: string | null
+          shift: string
           status: string
           updated_at: string
           user_id: string | null
@@ -1411,6 +1412,7 @@ export type Database = {
           report_date: string
           responsible_name?: string | null
           schedule_id?: string | null
+          shift?: string
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -1427,6 +1429,7 @@ export type Database = {
           report_date?: string
           responsible_name?: string | null
           schedule_id?: string | null
+          shift?: string
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -2452,6 +2455,7 @@ export type Database = {
           manager_id: string | null
           name: string
           neighborhood: string | null
+          night_shift: boolean
           notes: string | null
           number: string | null
           order_number: string | null
@@ -2487,6 +2491,7 @@ export type Database = {
           manager_id?: string | null
           name: string
           neighborhood?: string | null
+          night_shift?: boolean
           notes?: string | null
           number?: string | null
           order_number?: string | null
@@ -2522,6 +2527,7 @@ export type Database = {
           manager_id?: string | null
           name?: string
           neighborhood?: string | null
+          night_shift?: boolean
           notes?: string | null
           number?: string | null
           order_number?: string | null

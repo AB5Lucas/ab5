@@ -200,9 +200,9 @@ export async function exportRdoPdf(rdoId: string) {
   const work = rdo.works as { name: string; clients: { name: string } | null } | null;
   section("Identificação");
   table(
-    ["RDO Nº", "Obra", "Cliente", "Data", "Responsável"],
-    [18, 52, 42, 25, 45],
-    [[String(rdo.number ?? ""), work?.name ?? "—", work?.clients?.name ?? "—", formatDateBR(rdo.report_date), rdo.responsible_name ?? "—"]],
+    ["RDO Nº", "Obra", "Cliente", "Data", "Turno", "Responsável"],
+[16, 44, 40, 22, 20, 40],
+    [[String(rdo.number ?? ""), work?.name ?? "—", work?.clients?.name ?? "—", formatDateBR(rdo.report_date), rdo.shift === "night" ? "Noturno" : "Diurno", rdo.responsible_name ?? "—"]],
   );
 
   if (rdo.activities?.trim() || (scaffolds ?? []).length) {

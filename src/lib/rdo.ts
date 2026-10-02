@@ -48,12 +48,14 @@ export const RDO_STATUS_LABEL: Record<string, string> = {
   rejected: "Rejeitado",
 };
 
-/** Horas = saída − entrada − intervalo. */
+/** Horas = saída − entrada − intervalo. Saída antes da entrada = virou a meia-noite (turno noturno). */
 export function workedHours(entry?: string | null, exit?: string | null, breakMin = 60) {
   if (!entry || !exit) return 0;
   const [eh, em] = entry.split(":").map(Number);
   const [xh, xm] = exit.split(":").map(Number);
-  const h = (xh! * 60 + xm! - (eh! * 60 + em!) - breakMin) / 60;
+  let span = xh! * 60 + xm! - (eh! * 60 + em!);
+  if (span < 0) span += 24 * 60;
+  const h = (span - breakMin) / 60;
   return Math.max(0, Math.round(h * 100) / 100);
 }
 
