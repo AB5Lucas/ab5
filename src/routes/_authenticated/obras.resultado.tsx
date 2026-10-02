@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { ServiceDaysCalendar } from "@/components/service-days-calendar";
+import { buildDistanceLookup } from "@/lib/city-distance";
 
 export const Route = createFileRoute("/_authenticated/obras/resultado")({
   head: () => ({
@@ -883,7 +884,7 @@ function ResultadoPage() {
                     ))}
                     <TableRow className="font-bold">
                       <TableCell colSpan={7}>Total veículos</TableCell>
-                      <TableCell className="text-right">{brl(calc.tot.transport - calc.vtTotal)}</TableCell>
+                      <TableCell className="text-right">{brl(calc.tot.transport - calc.vtTotal - calc.driverTotal - calc.travelTotal)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -908,8 +909,60 @@ function ResultadoPage() {
                       <TableCell colSpan={2}>Total VT</TableCell>
                       <TableCell className="text-right">{brl(calc.vtTotal)}</TableCell>
                     </TableRow>
+                  </TableBody>
+                </Table>
+                <p className="mb-2 mt-4 text-xs text-muted-foreground">
+                  Prêmio Motorista dos carros com prêmio marcado no Transporte (faixas da aba Prêmio de Motorista), rateado como o veículo.
+                </p>
+                <Table>
+                  <TableBody>
+                    <TableRow className="font-semibold">
+                      <TableCell>Data</TableCell>
+                      <TableCell>Motorista</TableCell>
+                      <TableCell>Veículo</TableCell>
+                      <TableCell className="text-right">KM</TableCell>
+                      <TableCell className="text-right">Prêmio</TableCell>
+                      <TableCell className="text-right">Rateado</TableCell>
+                    </TableRow>
+                    {calc.driverRows.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{fmtDate(r.date)}</TableCell>
+                        <TableCell>{r.driver}</TableCell>
+                        <TableCell>{r.plate}</TableCell>
+                        <TableCell className="text-right">{r.km}</TableCell>
+                        <TableCell className="text-right">{brl(r.amount)}</TableCell>
+                        <TableCell className="text-right">{brl(r.share)}</TableCell>
+                      </TableRow>
+                    ))}
                     <TableRow className="font-bold">
-                      <TableCell colSpan={2}>Total transporte (veículos + VT)</TableCell>
+                      <TableCell colSpan={5}>Total Prêmio Motorista</TableCell>
+                      <TableCell className="text-right">{brl(calc.driverTotal)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+                <p className="mb-2 mt-4 text-xs text-muted-foreground">
+                  Prêmio Viagem dos colaboradores escalados neste serviço (distância da cidade do colaborador até a obra, faixas da aba Prêmio de Viagem).
+                </p>
+                <Table>
+                  <TableBody>
+                    <TableRow className="font-semibold">
+                      <TableCell>Data</TableCell>
+                      <TableCell className="text-right">Colaboradores com prêmio</TableCell>
+                      <TableCell className="text-right">Custo</TableCell>
+                    </TableRow>
+                    {calc.travelRows.map((r) => (
+                      <TableRow key={r.date}>
+                        <TableCell>{fmtDate(r.date)}</TableCell>
+                        <TableCell className="text-right">{r.people}</TableCell>
+                        <TableCell className="text-right">{brl(r.cost)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold">
+                      <TableCell colSpan={2}>Total Prêmio Viagem</TableCell>
+                      <TableCell className="text-right">{brl(calc.travelTotal)}</TableCell>
+                    </TableRow>
+                    <TableRow className="font-bold">
+                      <TableCell colSpan={2}>Total transporte (veículos + VT + prêmios)</TableCell>
                       <TableCell className="text-right">{brl(calc.tot.transport)}</TableCell>
                     </TableRow>
                   </TableBody>
