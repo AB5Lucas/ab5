@@ -895,7 +895,7 @@ export function SchedulePlannerBoard({
     const aso = checkAso(c as ScheduleContext, collaboratorId, date);
 
     const intBad = integ.status === "expired" || integ.status === "missing";
-    const asoBad = aso.status === "expired" || (requiresInt && aso.status === "missing");
+    const asoBad = requiresInt && (aso.status === "expired" || aso.status === "missing");
 
     if (intBad || asoBad) {
       const blockers: string[] = [];
@@ -1195,7 +1195,7 @@ export function SchedulePlannerBoard({
       const inserts = prevRows
         .filter((r) => !c.absences.has(r.collaborator_id))
         .filter((r) => !appointmentByCollaborator.has(r.collaborator_id))
-        .filter((r) => checkAso(c as ScheduleContext, r.collaborator_id, date).status !== "expired")
+        .filter((r) => !workRequiresIntegration(c as ScheduleContext, r.work_id) || checkAso(c as ScheduleContext, r.collaborator_id, date).status !== "expired")
         .filter((r) => !existing.has(r.collaborator_id))
         .map((r, i) => ({
           schedule_id: id,
