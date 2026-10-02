@@ -214,7 +214,6 @@ function WorksPage() {
         supervisor_id: ref(form.supervisor_id),
         manager_id: ref(form.manager_id),
         active: form.active,
-        night_shift: form.night_shift,
         notes: nn(form.notes),
       };
 
