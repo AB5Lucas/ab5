@@ -210,7 +210,7 @@ function ServicesPage() {
     const { error } = on
       ? await (supabase as any).from("schedule_work_night").delete().eq("schedule_date", date).eq("work_id", workId)
       : await (supabase as any).from("schedule_work_night").insert({ schedule_date: date, work_id: workId });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(on ? "Serviço voltou para turno diurno" : "Turno noturno marcado para este dia");
     qc.invalidateQueries({ queryKey: ["work-night"] });
     qc.invalidateQueries({ queryKey: ["night-carry"] });
