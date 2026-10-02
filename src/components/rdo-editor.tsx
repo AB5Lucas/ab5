@@ -42,6 +42,10 @@ import { RDO_STATUS_LABEL, SCAFFOLD_OPS, SERVICE_CATEGORIES, reasonLabel, worked
 import { exportRdoPdf } from "@/lib/rdo-pdf";
 import { useCurrentUser } from "@/hooks/use-auth";
 
+/** Horário padrão do turno noturno (entra num dia, sai no outro). */
+const NIGHT_ENTRY = "21:30";
+const NIGHT_EXIT = "05:30";
+
 const STEPS = ["Efetivo", "Atividades", "Fotos e vídeos", "Observações", "Assinaturas", "Finalizar"] as const;
 
 type WorkRow = {
@@ -398,7 +402,7 @@ function AddWorker({ rdoId, night, work, date, existing }: { rdoId: string; nigh
   );
 }
 
-function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: WorkRow; date: string; rows: TeamRow[]; editable: boolean }) {
+function TeamStep({ rdoId, night, work, date, rows, editable }: { rdoId: string; night?: boolean; work: WorkRow; date: string; rows: TeamRow[]; editable: boolean }) {
   const qc = useQueryClient();
   const [absent, setAbsent] = useState<TeamRow | null>(null);
 
