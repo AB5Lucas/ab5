@@ -1,0 +1,1 @@
+DELETE FROM public.daily_allocations WHERE id IN ('9c6a31ce-e7b3-46de-97ac-872194b0dc33','6cacc68a-b8e9-467a-b184-ae2c51775e6e','b4ecd05a-82e7-4e23-a7ba-7d0111d6f9b1') AND source = 'copied_previous_day';
