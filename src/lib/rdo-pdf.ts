@@ -201,7 +201,7 @@ export async function exportRdoPdf(rdoId: string) {
   section("Identificação");
   table(
     ["RDO Nº", "Obra", "Cliente", "Data", "Turno", "Responsável"],
-...
+[16, 44, 40, 22, 20, 40],
     [[String(rdo.number ?? ""), work?.name ?? "—", work?.clients?.name ?? "—", formatDateBR(rdo.report_date), rdo.shift === "night" ? "Noturno" : "Diurno", rdo.responsible_name ?? "—"]],
   );
 
