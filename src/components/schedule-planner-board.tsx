@@ -611,7 +611,7 @@ export function SchedulePlannerBoard({
         disabled={!editable}
         title={`${label}${exception ? " (exceção)" : ""}`}
         onClick={(e) => { e.stopPropagation(); togglePersonVt.mutate({ key, collaboratorId }); }}
-        className={`h-2 w-2 shrink-0 rounded-full ${on ? "bg-success" : "bg-muted-foreground/40"} ${exception ? "ring-1 ring-foreground/60" : ""}`}
+        className={`h-2 w-2 shrink-0 rounded-full ${on ? "bg-success" : "bg-muted-foreground/40"}`}
       />
     );
   };
@@ -1639,7 +1639,7 @@ export function SchedulePlannerBoard({
                               title={`${vt ? "Recebe VT" : "Sem VT"}${r.vt_override !== null && r.vt_override !== undefined ? " (exceção)" : ""}`}
                               aria-label="Alternar VT do colaborador"
                               onClick={(e) => { e.stopPropagation(); toggleAllocVt.mutate({ id: r.id, workId: r.work_id, collaboratorId: r.collaborator_id, current: vt }); }}
-                              className={`h-2 w-2 shrink-0 rounded-full ${vt ? "bg-success" : "bg-muted-foreground/40"} ${r.vt_override !== null && r.vt_override !== undefined ? "ring-1 ring-foreground/60" : ""}`}
+                              className={`h-2 w-2 shrink-0 rounded-full ${vt ? "bg-success" : "bg-muted-foreground/40"}`}
                             />
                           );
                         })()}
@@ -1653,7 +1653,7 @@ export function SchedulePlannerBoard({
                               title={`${tb ? "Recebe prêmio viagem" : "Sem prêmio viagem"}${exc ? " (exceção)" : ""}`}
                               aria-label="Alternar prêmio viagem do colaborador"
                               onClick={(e) => { e.stopPropagation(); toggleAllocTravel.mutate({ id: r.id, workId: r.work_id, collaboratorId: r.collaborator_id, current: tb }); }}
-                              className={`h-2 w-2 shrink-0 rounded-full ${tb ? "bg-info" : "bg-muted-foreground/40"} ${exc ? "ring-1 ring-foreground/60" : ""}`}
+                              className={`h-2 w-2 shrink-0 rounded-full ${tb ? "bg-info" : "bg-muted-foreground/40"}`}
                             />
                           );
                         })()}
