@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { ServiceDaysCalendar } from "@/components/service-days-calendar";
+import { buildDistanceLookup } from "@/lib/city-distance";
 
 export const Route = createFileRoute("/_authenticated/obras/resultado")({
   head: () => ({
@@ -146,14 +147,14 @@ function ResultadoPage() {
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
-              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, vehicles(km_rate)").eq("client_id", w.client_id!).range(a, b),
+              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, vehicles(km_rate, plate), collaborators(full_name)").eq("client_id", w.client_id!).range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
-          ? supabase.from("clients").select("has_toll, toll_amount").eq("id", w.client_id).maybeSingle()
+          ? supabase.from("clients").select("has_toll, toll_amount, city, distance_km").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
       ]);
-      const [workVt, noVtRows, leaves, vtRules] = await Promise.all([
+      const [workVt, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
         fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", workIds).range(a, b)),
         fetchAll<any>((a, b) =>
           supabase.from("daily_status_entries").select("schedule_id, collaborator_id")
@@ -161,6 +162,9 @@ function ResultadoPage() {
         ),
         fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
         supabase.from("transport_voucher_rules").select("*").eq("active", true),
+        supabase.from("driver_bonus_rules").select("*").eq("active", true),
+        supabase.from("travel_bonus_rules").select("*").eq("active", true),
+        supabase.from("city_distances").select("city_a, city_b, km"),
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
       const sibAllocs = sibIds.length
@@ -182,6 +186,9 @@ function ResultadoPage() {
         noVtRows,
         leaves,
         vtRules: vtRules.data ?? [],
+        dbRules: dbRules.data ?? [],
+        tbRules: tbRules.data ?? [],
+        cityDist: cityDist.data ?? [],
       };
     },
   });
@@ -292,6 +299,46 @@ function ResultadoPage() {
     }
     const vtRows = [...vtByDate.entries()].map(([date, v]) => ({ date, ...v })).sort((x, y) => x.date.localeCompare(y.date));
     const vtTotal = vtRows.reduce((s, r) => s + r.cost, 0);
+    // Prêmio motorista: regras da aba Prêmio de Motorista, rateado como o veículo
+    const inRule = (r: any, km: number) => km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance));
+    const driverRows: { date: string; driver: string; plate: string; km: number; amount: number; share: number }[] = [];
+    for (const v of d.vs) {
+      if (!v.driver_bonus || !v.driver_id || (v.work_id && !idSet.has(v.work_id))) continue;
+      const km = Number(v.km ?? 0);
+      const amount = (d.dbRules ?? []).filter((r: any) => r.calculation_type !== "fixed_monthly" && inRule(r, km)).reduce((s: number, r: any) => s + Number(r.amount), 0);
+      if (!amount) continue;
+      const total = dayTotal.get(v.schedule_date) ?? 0;
+      const mine = dayMine.get(v.schedule_date) ?? 0;
+      const share = v.work_id ? amount : total > 0 ? (amount * mine) / total : amount / d.siblingCount;
+      driverRows.push({ date: v.schedule_date, driver: v.collaborators?.full_name ?? "—", plate: v.vehicles?.plate ?? "—", km, amount, share });
+      bump(v.schedule_date.slice(0, 7), "transport", share);
+    }
+    const driverTotal = driverRows.reduce((s, r) => s + r.share, 0);
+    // Prêmio viagem: distância cidade do colaborador → cidade da obra, regras da aba Prêmio de Viagem
+    const distFor = buildDistanceLookup(d.cityDist ?? []);
+    const travelByDate = new Map<string, { people: number; cost: number }>();
+    const travelSeen = new Set<string>();
+    for (const a of d.allocs) {
+      const date = a.daily_schedules?.schedule_date as string | undefined;
+      if (!date || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      const key = `${a.collaborator_id}|${date}`;
+      if (travelSeen.has(key)) continue;
+      travelSeen.add(key);
+      const r = rdoKey.get(key);
+      if (r && !r.present) continue;
+      const p = person.get(a.collaborator_id);
+      const dist = distFor(p?.city, d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
+      const cost = (d.tbRules ?? []).filter((x: any) => inRule(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0);
+      if (!cost) continue;
+      const t = travelByDate.get(date) ?? { people: 0, cost: 0 };
+      t.people += 1;
+      t.cost += cost;
+      travelByDate.set(date, t);
+      bump(date.slice(0, 7), "transport", cost);
+    }
+    const travelRows = [...travelByDate.entries()].map(([date, v]) => ({ date, ...v })).sort((x, y) => x.date.localeCompare(y.date));
+    const travelTotal = travelRows.reduce((s, r) => s + r.cost, 0);
+    driverRows.sort((a, b) => a.date.localeCompare(b.date));
     for (const e of d.entries) {
       bump(e.entry_date.slice(0, 7), e.category === "faturamento" ? "billing" : "entries", Number(e.amount));
     }
@@ -384,7 +431,7 @@ function ResultadoPage() {
       .map(([id, l]) => ({ id, name: `${names.get(id) ?? "—"}${pj.has(id) ? " (PJ)" : ""}`, rate: rate.get(id) ?? 0, ...l }))
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
-    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, siblingCount: d.siblingCount };
+    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount };
   }, [work, data.data, untilMonth, isAll]);
 
   // ---------- Edição ----------
@@ -837,7 +884,7 @@ function ResultadoPage() {
                     ))}
                     <TableRow className="font-bold">
                       <TableCell colSpan={7}>Total veículos</TableCell>
-                      <TableCell className="text-right">{brl(calc.tot.transport - calc.vtTotal)}</TableCell>
+                      <TableCell className="text-right">{brl(calc.tot.transport - calc.vtTotal - calc.driverTotal - calc.travelTotal)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -862,8 +909,60 @@ function ResultadoPage() {
                       <TableCell colSpan={2}>Total VT</TableCell>
                       <TableCell className="text-right">{brl(calc.vtTotal)}</TableCell>
                     </TableRow>
+                  </TableBody>
+                </Table>
+                <p className="mb-2 mt-4 text-xs text-muted-foreground">
+                  Prêmio Motorista dos carros com prêmio marcado no Transporte (faixas da aba Prêmio de Motorista), rateado como o veículo.
+                </p>
+                <Table>
+                  <TableBody>
+                    <TableRow className="font-semibold">
+                      <TableCell>Data</TableCell>
+                      <TableCell>Motorista</TableCell>
+                      <TableCell>Veículo</TableCell>
+                      <TableCell className="text-right">KM</TableCell>
+                      <TableCell className="text-right">Prêmio</TableCell>
+                      <TableCell className="text-right">Rateado</TableCell>
+                    </TableRow>
+                    {calc.driverRows.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{fmtDate(r.date)}</TableCell>
+                        <TableCell>{r.driver}</TableCell>
+                        <TableCell>{r.plate}</TableCell>
+                        <TableCell className="text-right">{r.km}</TableCell>
+                        <TableCell className="text-right">{brl(r.amount)}</TableCell>
+                        <TableCell className="text-right">{brl(r.share)}</TableCell>
+                      </TableRow>
+                    ))}
                     <TableRow className="font-bold">
-                      <TableCell colSpan={2}>Total transporte (veículos + VT)</TableCell>
+                      <TableCell colSpan={5}>Total Prêmio Motorista</TableCell>
+                      <TableCell className="text-right">{brl(calc.driverTotal)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+                <p className="mb-2 mt-4 text-xs text-muted-foreground">
+                  Prêmio Viagem dos colaboradores escalados neste serviço (distância da cidade do colaborador até a obra, faixas da aba Prêmio de Viagem).
+                </p>
+                <Table>
+                  <TableBody>
+                    <TableRow className="font-semibold">
+                      <TableCell>Data</TableCell>
+                      <TableCell className="text-right">Colaboradores com prêmio</TableCell>
+                      <TableCell className="text-right">Custo</TableCell>
+                    </TableRow>
+                    {calc.travelRows.map((r) => (
+                      <TableRow key={r.date}>
+                        <TableCell>{fmtDate(r.date)}</TableCell>
+                        <TableCell className="text-right">{r.people}</TableCell>
+                        <TableCell className="text-right">{brl(r.cost)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold">
+                      <TableCell colSpan={2}>Total Prêmio Viagem</TableCell>
+                      <TableCell className="text-right">{brl(calc.travelTotal)}</TableCell>
+                    </TableRow>
+                    <TableRow className="font-bold">
+                      <TableCell colSpan={2}>Total transporte (veículos + VT + prêmios)</TableCell>
                       <TableCell className="text-right">{brl(calc.tot.transport)}</TableCell>
                     </TableRow>
                   </TableBody>
