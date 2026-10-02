@@ -112,6 +112,12 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
 
   const create = useMutation({
     mutationFn: async () => {
+      const { data: nw } = await supabase
+        .from("schedule_work_night")
+        .select("id")
+        .eq("schedule_date", date)
+        .eq("work_id", work.id)
+        .maybeSingle();
       const { error } = await supabase.from("rdos").insert({
         work_id: work.id,
         client_id: work.client_id,
@@ -119,7 +125,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
         schedule_id: planned.data?.scheduleId ?? null,
         user_id: user?.id ?? null,
         responsible_name: profile?.full_name || profile?.email || null,
-        shift: (work as { night_shift?: boolean }).night_shift ? "night" : "day",
+        shift: nw ? "night" : "day",
       });
       if (error) throw error;
     },

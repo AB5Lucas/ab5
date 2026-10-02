@@ -362,14 +362,25 @@ export function SchedulePlannerBoard({
   });
 
   // Turno noturno iniciado no dia anterior: aparece hoje como continuação (sem novo VT/refeição/prêmio)
+  const nightToday = useQuery({
+    queryKey: ["work-night", date],
+    queryFn: async () => {
+      const { data } = await supabase.from("schedule_work_night").select("work_id").eq("schedule_date", date);
+      return new Set((data ?? []).map((r) => r.work_id));
+    },
+  });
   const nightCarry = useQuery({
     queryKey: ["night-carry", date],
     queryFn: async () => {
+      const prev = addDays(date, -1);
+      const { data: nw } = await supabase.from("schedule_work_night").select("work_id").eq("schedule_date", prev);
+      const ids = (nw ?? []).map((r) => r.work_id);
+      if (ids.length === 0) return new Map<string, string[]>();
       const { data } = await supabase
         .from("daily_allocations")
-        .select("collaborator_id, collaborators(full_name), works!inner(client_id, night_shift), daily_schedules!inner(schedule_date)")
-        .eq("daily_schedules.schedule_date", addDays(date, -1))
-        .eq("works.night_shift", true);
+        .select("collaborator_id, collaborators(full_name), works!inner(client_id), daily_schedules!inner(schedule_date)")
+        .eq("daily_schedules.schedule_date", prev)
+        .in("work_id", ids);
       const m = new Map<string, string[]>();
       for (const a of (data ?? []) as any[]) {
         const k = a.works?.client_id ?? "";
@@ -1573,7 +1584,7 @@ export function SchedulePlannerBoard({
                       .filter(Boolean)
                       .join(" · ") || "Sem cliente vinculado"}
                   </p>
-                  {g.works.some((x: any) => x.night_shift) && (
+                  {g.works.some((x: any) => nightToday.data?.has(x.id)) && (
                     <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-info">
                       <Moon className="h-2.5 w-2.5" /> Turno noturno (vira para o dia seguinte)
                     </p>
