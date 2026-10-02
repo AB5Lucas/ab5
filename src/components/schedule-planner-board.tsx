@@ -501,7 +501,7 @@ export function SchedulePlannerBoard({
   const workPaysTravel = (workId: string) => workTravel.data?.get(workId) ?? workTravelDefault(workId);
   const defaultAllocTravel = (workId: string, collaboratorId: string) => {
     const t = travelInfo.data;
-    if (!t || t.off.has(collaboratorId) || !workPaysTravel(workId)) return false;
+    if (!t || !workPaysTravel(workId)) return false;
     const w = workOf(workId);
     const km = t.distFor(t.city.get(collaboratorId), w?.clients?.city, Number(w?.clients?.distance_km ?? 0));
     return t.hit(km);
