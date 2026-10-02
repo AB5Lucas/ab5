@@ -360,6 +360,25 @@ export function SchedulePlannerBoard({
     },
   });
 
+  // Turno noturno iniciado no dia anterior: aparece hoje como continuação (sem novo VT/refeição/prêmio)
+  const nightCarry = useQuery({
+    queryKey: ["night-carry", date],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("daily_allocations")
+        .select("collaborator_id, collaborators(full_name), works!inner(client_id, night_shift), daily_schedules!inner(schedule_date)")
+        .eq("daily_schedules.schedule_date", addDays(date, -1))
+        .eq("works.night_shift", true);
+      const m = new Map<string, string[]>();
+      for (const a of (data ?? []) as any[]) {
+        const k = a.works?.client_id ?? "";
+        m.set(k, [...(m.get(k) ?? []), a.collaborators?.full_name ?? "—"]);
+      }
+      for (const v of m.values()) v.sort((x, y) => x.localeCompare(y, "pt-BR"));
+      return m;
+    },
+  });
+
   const pendingOcc = useQuery({
     queryKey: ["rdo-pending", date],
     queryFn: async () => {
