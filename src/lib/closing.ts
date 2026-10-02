@@ -49,7 +49,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
 
   const [allocs, entries, workVt, boxVtR, personVtR, holidays, daysOff, vacations, leaves, rdoWf, vtRules, tbRules, adjs] = await Promise.all([
     ids.length ? all<any>((f, t) => supabase.from("daily_allocations")
-      .select("collaborator_id, schedule_id, work_id, driver, vt_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled), works(name, city, distance_km, clients(name, city, distance_km))")
+      .select("collaborator_id, schedule_id, work_id, driver, vt_override, travel_bonus_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled, travel_bonus_enabled), works(name, city, distance_km, clients(name, city, distance_km))")
       .in("schedule_id", ids).order("id").range(f, t)) : [],
     ids.length ? all<any>((f, t) => supabase.from("daily_status_entries")
       .select("schedule_id, collaborator_id, box_key, collaborators(full_name, registration_number)").in("schedule_id", ids).order("id").range(f, t)) : [],
@@ -68,6 +68,8 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
   ]);
   const { data: cityDist } = await supabase.from("city_distances").select("city_a, city_b, km");
   const distFor = buildDistanceLookup(cityDist ?? []);
+  const { data: trW } = ids.length ? await supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("schedule_id", ids) : { data: [] as any[] };
+  const travelWork = new Map((trW ?? []).map((v: any) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
 
 
   const holiday = new Map((holidays.data ?? []).map((h) => [h.date, h.name]));
@@ -131,7 +133,8 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     const pays = a.vt_override ?? base;
     r.vtRows.push({ date, work, pays: !!pays, value: pays ? perDay(a.driver, 1) : 0 });
     const dist = distFor(cc?.city, a.works?.clients?.city ?? a.works?.city, Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0));
-    const prize = prizeFor(dist);
+    const travelOn = a.travel_bonus_override ?? (cc?.travel_bonus_enabled !== false && (travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? true));
+    const prize = travelOn ? prizeFor(dist) : 0;
     if (prize > 0) r.prizeRows.push({ date, vehicle: a.vehicles?.plate ?? "—", work, distance: dist, value: prize });
   }
   // Dias em quadros (sem obra): aparecem no detalhamento; ASO/Treinamento/Integração podem gerar VT

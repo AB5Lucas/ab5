@@ -464,6 +464,49 @@ export function SchedulePlannerBoard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const workTravel = useQuery({
+    queryKey: ["work-travel", scheduleId],
+    enabled: !!scheduleId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("schedule_work_travel").select("work_id, pays_bonus").eq("schedule_id", scheduleId!);
+      if (error) throw error;
+      return new Map((data ?? []).map((r) => [r.work_id, r.pays_bonus]));
+    },
+  });
+  // Prêmio viagem: por padrão a obra paga; o valor depende da distância (regras da aba Prêmio de Viagem).
+  const workPaysTravel = (workId: string) => workTravel.data?.get(workId) ?? true;
+  const noTravel = useQuery({
+    queryKey: ["no-travel-collabs"],
+    queryFn: async () => {
+      const { data } = await supabase.from("collaborators").select("id").eq("travel_bonus_enabled", false);
+      return new Set((data ?? []).map((r) => r.id));
+    },
+  });
+  const defaultAllocTravel = (workId: string, collaboratorId: string) =>
+    !noTravel.data?.has(collaboratorId) && workPaysTravel(workId);
+  const setGroupTravel = useMutation({
+    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
+      const id = await ensureSchedule();
+      const { error } = await supabase
+        .from("schedule_work_travel")
+        .upsert(ids.map((work_id) => ({ schedule_id: id, work_id, pays_bonus: value })), { onConflict: "schedule_id,work_id" });
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["work-travel", id] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const toggleAllocTravel = useMutation({
+    mutationFn: async ({ id, workId, collaboratorId, current }: { id: string; workId: string; collaboratorId: string; current: boolean }) => {
+      const next = !current;
+      const override = next === defaultAllocTravel(workId, collaboratorId) ? null : next;
+      const { error } = await supabase.from("daily_allocations").update({ travel_bonus_override: override }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const toggleAllocVt = useMutation({
     mutationFn: async ({ id, workId, collaboratorId, current }: { id: string; workId: string; collaboratorId: string; current: boolean }) => {
       const next = !current;
@@ -1120,6 +1163,7 @@ export function SchedulePlannerBoard({
           vehicle_id: r.vehicle_id,
           driver: r.driver,
           vt_override: r.vt_override,
+          travel_bonus_override: r.travel_bonus_override,
           source: "copied_previous_day" as const,
           confirmation_status: "pending" as const,
           has_pending_requirement: checkRequirements(c, r.work_id, r.collaborator_id, date).length > 0,
@@ -1136,6 +1180,11 @@ export function SchedulePlannerBoard({
         if (vtRows.length) await supabase.from("schedule_work_vt").upsert(vtRows, { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
       }
       qc.invalidateQueries({ queryKey: ["work-vt", id] });
+      const { data: prevTr } = await supabase.from("schedule_work_travel").select("work_id, pays_bonus").eq("schedule_id", prevSchedule.id);
+      if (prevTr && prevTr.length) {
+        await supabase.from("schedule_work_travel").upsert(prevTr.map((v) => ({ schedule_id: id, work_id: v.work_id, pays_bonus: v.pays_bonus })), { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
+      }
+      qc.invalidateQueries({ queryKey: ["work-travel", id] });
       const { data: prevBoxVt } = await supabase
         .from("schedule_box_vt")
         .select("box_key, pays_vt")
@@ -1457,6 +1506,7 @@ export function SchedulePlannerBoard({
                       <Users className="mr-0.5 h-2.5 w-2.5" />
                       {workRows.length}
                     </Badge>
+                    <span className="flex shrink-0 flex-col items-center gap-0.5">
                     <button
                       type="button"
                       disabled={!editable}
@@ -1465,6 +1515,15 @@ export function SchedulePlannerBoard({
                       onClick={(e) => { e.stopPropagation(); setGroupVt.mutate({ ids: g.works.map((x) => x.id), value: !workPaysVt(w.id) }); }}
                       className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${workPaysVt(w.id) ? "bg-success" : "bg-muted-foreground/40"}`}
                     />
+                    <button
+                      type="button"
+                      disabled={!editable}
+                      title={workPaysTravel(w.id) ? "Prêmio viagem: ligado (clique para desligar)" : "Prêmio viagem: desligado (clique para ligar)"}
+                      aria-label="Alternar prêmio viagem da obra"
+                      onClick={(e) => { e.stopPropagation(); setGroupTravel.mutate({ ids: g.works.map((x) => x.id), value: !workPaysTravel(w.id) }); }}
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${workPaysTravel(w.id) ? "bg-info" : "bg-muted-foreground/40"}`}
+                    />
+                    </span>
                   </div>
                   <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
                     <MapPin className="h-2.5 w-2.5" />
@@ -1548,6 +1607,7 @@ export function SchedulePlannerBoard({
                             <X className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         )}
+                        <span className="flex shrink-0 flex-col items-center gap-0.5">
                         {(() => {
                           const vt = r.vt_override ?? defaultAllocVt(r.work_id, r.collaborator_id);
                           return (
@@ -1561,6 +1621,21 @@ export function SchedulePlannerBoard({
                             />
                           );
                         })()}
+                        {(() => {
+                          const tb = r.travel_bonus_override ?? defaultAllocTravel(r.work_id, r.collaborator_id);
+                          const exc = r.travel_bonus_override !== null && r.travel_bonus_override !== undefined;
+                          return (
+                            <button
+                              type="button"
+                              disabled={!editable}
+                              title={`${tb ? "Recebe prêmio viagem" : "Sem prêmio viagem"}${exc ? " (exceção)" : ""}`}
+                              aria-label="Alternar prêmio viagem do colaborador"
+                              onClick={(e) => { e.stopPropagation(); toggleAllocTravel.mutate({ id: r.id, workId: r.work_id, collaboratorId: r.collaborator_id, current: tb }); }}
+                              className={`h-2 w-2 shrink-0 rounded-full ${tb ? "bg-info" : "bg-muted-foreground/40"} ${exc ? "ring-1 ring-foreground/60" : ""}`}
+                            />
+                          );
+                        })()}
+                        </span>
                       </li>
                     );
                   })}

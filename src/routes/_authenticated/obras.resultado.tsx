@@ -136,14 +136,14 @@ function ResultadoPage() {
       const w = work!;
       const [allocs, rdoWf, progress, entries, people, siblings, vs, client] = await Promise.all([
         fetchAll<any>((a, b) =>
-          supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, daily_schedules(schedule_date)").in("work_id", workIds).range(a, b),
+          supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", workIds).range(a, b),
         ),
         fetchAll<any>((a, b) =>
           supabase.from("rdo_workforce").select("collaborator_id, report_date, present, worked_hours").in("work_id", workIds).range(a, b),
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
         supabase.from("work_entries").select("*").in("work_id", workIds).order("entry_date", { ascending: false }),
-        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, city, vt_enabled").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, city, vt_enabled, travel_bonus_enabled").range(a, b)),
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
@@ -154,8 +154,9 @@ function ResultadoPage() {
           ? supabase.from("clients").select("has_toll, toll_amount, city, distance_km").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
       ]);
-      const [workVt, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
+      const [workVt, workTravelRows, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
         fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", workIds).range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("work_id", workIds).range(a, b)),
         fetchAll<any>((a, b) =>
           supabase.from("daily_status_entries").select("schedule_id, collaborator_id")
             .in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b),
@@ -183,6 +184,7 @@ function ResultadoPage() {
         vs,
         client: (client as any).data,
         workVt,
+        workTravelRows,
         noVtRows,
         leaves,
         vtRules: vtRules.data ?? [],
@@ -318,6 +320,7 @@ function ResultadoPage() {
     const distFor = buildDistanceLookup(d.cityDist ?? []);
     const travelByDate = new Map<string, { people: number; cost: number }>();
     const travelSeen = new Set<string>();
+    const travelWorkMap = new Map<string, boolean>((d.workTravelRows ?? []).map((v: any) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
     for (const a of d.allocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
       if (!date || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
@@ -327,6 +330,8 @@ function ResultadoPage() {
       const r = rdoKey.get(key);
       if (r && !r.present) continue;
       const p = person.get(a.collaborator_id);
+      const travelOn = a.travel_bonus_override ?? (p?.travel_bonus_enabled !== false && (travelWorkMap.get(`${a.schedule_id}|${a.work_id}`) ?? true));
+      if (!travelOn) continue;
       const dist = distFor(p?.city, d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
       const cost = (d.tbRules ?? []).filter((x: any) => inRule(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0);
       if (!cost) continue;
