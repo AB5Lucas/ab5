@@ -137,10 +137,11 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
   const editable = !!r && (r.status === "draft" || canWrite);
 
   const defaultTimes = useMemo(() => {
+    if (r?.shift === "night") return { entry: NIGHT_ENTRY, exit: NIGHT_EXIT };
     const wd = new Date(date + "T12:00:00").getDay();
     const exit = (wd === 0 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
     return { entry: work.entry_time?.slice(0, 5) ?? "07:00", exit: exit?.slice(0, 5) ?? "17:00" };
-  }, [date, work]);
+  }, [date, work, r?.shift]);
 
   const team = useQuery({
     queryKey: ["rdo-team", r?.id],
@@ -215,7 +216,14 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-display text-sm">RDO Nº {String(r.number ?? "").padStart(4, "0")}</span>
         <Badge variant={r.status === "draft" ? "secondary" : "default"}>{RDO_STATUS_LABEL[r.status] ?? r.status}</Badge>
-        <Select value={r.shift ?? "day"} onValueChange={(v) => updateRdo.mutate({ shift: v })} disabled={!editable}>
+        <Select value={r.shift ?? "day"} onValueChange={async (v) => {
+          updateRdo.mutate({ shift: v });
+          const wd = new Date(date + "T12:00:00").getDay();
+          const dayExit = (wd === 0 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
+          const t = v === "night" ? { entry_time: NIGHT_ENTRY, exit_time: NIGHT_EXIT } : { entry_time: work.entry_time?.slice(0, 5) ?? "07:00", exit_time: dayExit?.slice(0, 5) ?? "17:00" };
+          await supabase.from("rdo_workforce").update(t).eq("rdo_id", r.id);
+          qc.invalidateQueries({ queryKey: ["rdo-team", r.id] });
+        }} disabled={!editable}>
           <SelectTrigger className="h-8 w-auto text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="day">Turno Diurno</SelectItem>
@@ -256,7 +264,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
       )}
 
       <div className="panel p-3 sm:p-4">
-        {step === 0 && <TeamStep rdoId={r.id} work={work} date={date} rows={team.data ?? []} editable={editable} />}
+        {step === 0 && <TeamStep rdoId={r.id} night={r.shift === "night"} work={work} date={date} rows={team.data ?? []} editable={editable} />}
         {step === 1 && (
           <div className="space-y-4">
             <TextStep
@@ -320,7 +328,7 @@ type TeamRow = {
   positions: { name: string } | null;
 };
 
-function AddWorker({ rdoId, work, date, existing }: { rdoId: string; work: WorkRow; date: string; existing: string[] }) {
+function AddWorker({ rdoId, night, work, date, existing }: { rdoId: string; night?: boolean; work: WorkRow; date: string; existing: string[] }) {
   const qc = useQueryClient();
   const { canWrite } = useCurrentUser();
   const [open, setOpen] = useState(false);
@@ -344,8 +352,8 @@ function AddWorker({ rdoId, work, date, existing }: { rdoId: string; work: WorkR
         _rdo_id: rdoId,
         _collaborator_id: p.id,
         _position_id: p.position_id,
-        _entry: work.entry_time?.slice(0, 5) ?? "07:00",
-        _exit: exit?.slice(0, 5) ?? "17:00",
+        _entry: night ? NIGHT_ENTRY : work.entry_time?.slice(0, 5) ?? "07:00",
+        _exit: night ? NIGHT_EXIT : exit?.slice(0, 5) ?? "17:00",
       } as never);
       if (error) throw error;
     },
@@ -426,7 +434,7 @@ function TeamStep({ rdoId, work, date, rows, editable }: { rdoId: string; work: 
           {present.length} presentes de {rows.length} previstos · {total.toFixed(2).replace(".", ",")} h · intervalo 1h
         </p>
       </div>
-      {editable && <AddWorker rdoId={rdoId} work={work} date={date} existing={rows.map((r) => r.collaborator_id)} />}
+      {editable && <AddWorker rdoId={rdoId} night={night} work={work} date={date} existing={rows.map((r) => r.collaborator_id)} />}
       {rows.length === 0 && (
         <p className="py-6 text-center text-sm text-muted-foreground">Ninguém escalado nesta obra na Programação deste dia.</p>
       )}
