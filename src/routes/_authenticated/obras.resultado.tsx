@@ -330,7 +330,7 @@ function ResultadoPage() {
       const r = rdoKey.get(key);
       if (r && !r.present) continue;
       const p = person.get(a.collaborator_id);
-      const travelOn = a.travel_bonus_override ?? (p?.travel_bonus_enabled !== false && (travelWorkMap.get(`${a.schedule_id}|${a.work_id}`) ?? true));
+      const travelOn = a.travel_bonus_override ?? (p?.travel_bonus_enabled !== false && (travelWorkMap.get(`${a.schedule_id}|${a.work_id}`) ?? (d.tbRules ?? []).some((x: any) => inRule(x, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0)))));
       if (!travelOn) continue;
       const dist = distFor(p?.city, d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
       const cost = (d.tbRules ?? []).filter((x: any) => inRule(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0);

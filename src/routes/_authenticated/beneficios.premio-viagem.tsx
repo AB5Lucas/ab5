@@ -198,7 +198,7 @@ function BonusPage() {
       const travelWork = new Map((trW ?? []).map((v) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
 
       return (data ?? []).filter((a: any) =>
-        a.travel_bonus_override ?? (a.collaborators?.travel_bonus_enabled !== false && (travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? true)),
+        a.travel_bonus_override ?? (a.collaborators?.travel_bonus_enabled !== false && (travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? rulesFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)).length > 0)),
       ).map((a) => {
         const row = a as unknown as {
           collaborator_id: string;
