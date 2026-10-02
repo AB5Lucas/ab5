@@ -47,6 +47,7 @@ import {
 } from "@/lib/scheduling";
 import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
+import { buildDistanceLookup } from "@/lib/city-distance";
 import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
 import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
 import {
@@ -473,17 +474,38 @@ export function SchedulePlannerBoard({
       return new Map((data ?? []).map((r) => [r.work_id, r.pays_bonus]));
     },
   });
-  // Prêmio viagem: por padrão a obra paga; o valor depende da distância (regras da aba Prêmio de Viagem).
-  const workPaysTravel = (workId: string) => workTravel.data?.get(workId) ?? true;
-  const noTravel = useQuery({
-    queryKey: ["no-travel-collabs"],
+  // Prêmio viagem: por padrão segue as regras da aba Prêmio de Viagem (distância mínima cadastrada).
+  const travelInfo = useQuery({
+    queryKey: ["travel-info"],
     queryFn: async () => {
-      const { data } = await supabase.from("collaborators").select("id").eq("travel_bonus_enabled", false);
-      return new Set((data ?? []).map((r) => r.id));
+      const [rules, people, dist] = await Promise.all([
+        supabase.from("travel_bonus_rules").select("minimum_distance, maximum_distance").eq("active", true),
+        supabase.from("collaborators").select("id, city, travel_bonus_enabled"),
+        supabase.from("city_distances").select("city_a, city_b, km"),
+      ]);
+      const ranges = (rules.data ?? []).map((r) => ({ min: Number(r.minimum_distance), max: r.maximum_distance === null ? Infinity : Number(r.maximum_distance) }));
+      return {
+        hit: (km: number) => ranges.some((r) => km >= r.min && km <= r.max),
+        city: new Map((people.data ?? []).map((c) => [c.id, c.city])),
+        off: new Set((people.data ?? []).filter((c) => c.travel_bonus_enabled === false).map((c) => c.id)),
+        distFor: buildDistanceLookup(dist.data ?? []),
+      };
     },
   });
-  const defaultAllocTravel = (workId: string, collaboratorId: string) =>
-    !noTravel.data?.has(collaboratorId) && workPaysTravel(workId);
+  const workOf = (workId: string) => ctx.data?.works.find((w) => w.id === workId);
+  const workTravelDefault = (workId: string) => {
+    const t = travelInfo.data;
+    if (!t) return false;
+    return t.hit(Number(workOf(workId)?.clients?.distance_km ?? 0));
+  };
+  const workPaysTravel = (workId: string) => workTravel.data?.get(workId) ?? workTravelDefault(workId);
+  const defaultAllocTravel = (workId: string, collaboratorId: string) => {
+    const t = travelInfo.data;
+    if (!t || t.off.has(collaboratorId) || !workPaysTravel(workId)) return false;
+    const w = workOf(workId);
+    const km = t.distFor(t.city.get(collaboratorId), w?.clients?.city, Number(w?.clients?.distance_km ?? 0));
+    return t.hit(km);
+  };
   const setGroupTravel = useMutation({
     mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
       const id = await ensureSchedule();
