@@ -13,6 +13,7 @@ import {
   GripVertical,
   LayoutGrid,
   MapPin,
+  Moon,
   Search,
   SlidersHorizontal,
   Users,
@@ -1572,6 +1573,19 @@ export function SchedulePlannerBoard({
                       .filter(Boolean)
                       .join(" · ") || "Sem cliente vinculado"}
                   </p>
+                  {g.works.some((x: any) => x.night_shift) && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-info">
+                      <Moon className="h-2.5 w-2.5" /> Turno noturno (vira para o dia seguinte)
+                    </p>
+                  )}
+                  {(nightCarry.data?.get(w.client_id ?? "")?.length ?? 0) > 0 && (
+                    <div className="mt-1 rounded border border-info/40 bg-info/10 px-1.5 py-1 text-[10px]">
+                      <p className="flex items-center gap-1 font-medium text-info">
+                        <Moon className="h-2.5 w-2.5" /> Continuação do turno noturno de {formatBR(addDays(date, -1))}
+                      </p>
+                      <p className="text-muted-foreground">{nightCarry.data!.get(w.client_id ?? "")!.join(", ")}</p>
+                    </div>
+                  )}
                   {isHover && blockedTarget && (
                     <p className="mt-0.5 flex items-center gap-1 text-[10px] text-destructive">
                       <Ban className="h-2.5 w-2.5" /> Não é possível soltar aqui
