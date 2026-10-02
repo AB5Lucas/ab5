@@ -66,9 +66,9 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
               <Calendar
                 mode="single"
                 numberOfMonths={2}
-                defaultMonth={last ? toDate(last) : undefined}
-                selected={picked ? toDate(picked) : undefined}
-                onSelect={(d) => setPicked(d ? iso(d) : null)}
+                {...(last ? { defaultMonth: toDate(last) } : {})}
+                {...(picked ? { selected: toDate(picked) } : {})}
+                onSelect={(d: Date | undefined) => setPicked(d ? iso(d) : null)}
                 modifiers={{ served: single, multi: many }}
                 modifiersClassNames={{
                   served: "bg-primary/20 font-semibold rounded-md",
