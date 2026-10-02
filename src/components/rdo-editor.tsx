@@ -119,6 +119,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
         schedule_id: planned.data?.scheduleId ?? null,
         user_id: user?.id ?? null,
         responsible_name: profile?.full_name || profile?.email || null,
+        shift: (work as { night_shift?: boolean }).night_shift ? "night" : "day",
       });
       if (error) throw error;
     },
@@ -208,6 +209,13 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-display text-sm">RDO Nº {String(r.number ?? "").padStart(4, "0")}</span>
         <Badge variant={r.status === "draft" ? "secondary" : "default"}>{RDO_STATUS_LABEL[r.status] ?? r.status}</Badge>
+        <Select value={r.shift ?? "day"} onValueChange={(v) => updateRdo.mutate({ shift: v })} disabled={!editable}>
+          <SelectTrigger className="h-8 w-auto text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="day">Turno Diurno</SelectItem>
+            <SelectItem value="night">Turno Noturno</SelectItem>
+          </SelectContent>
+        </Select>
         {r.responsible_name && <span className="text-xs text-muted-foreground">Responsável: {r.responsible_name}</span>}
         <Button
           variant="outline"
