@@ -48,7 +48,7 @@ export function VehicleHandover() {
   });
   const list = q.data ?? [];
   return (
-    <div className="panel w-full max-w-sm p-3 text-xs">
+    <div className="panel w-full p-3 text-xs md:w-96">
       <p className="mb-1 flex items-center gap-1 font-display font-semibold uppercase tracking-wide">
         <KeyRound className="h-3.5 w-3.5" /> Troca de carros
       </p>
