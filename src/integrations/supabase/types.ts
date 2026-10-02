@@ -1595,6 +1595,35 @@ export type Database = {
           },
         ]
       }
+      schedule_work_night: {
+        Row: {
+          created_at: string
+          id: string
+          schedule_date: string
+          work_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          schedule_date: string
+          work_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          schedule_date?: string
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_work_night_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_work_travel: {
         Row: {
           created_at: string
