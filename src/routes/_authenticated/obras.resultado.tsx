@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { ServiceDaysCalendar } from "@/components/service-days-calendar";
 
 export const Route = createFileRoute("/_authenticated/obras/resultado")({
   head: () => ({
@@ -568,6 +569,13 @@ function ResultadoPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {ck && (
+                <ServiceDaysCalendar
+                  workIds={workId && workId !== ALL ? [workId] : services.map((x) => x.id)}
+                  names={Object.fromEntries(services.map((x) => [x.id, x.name]))}
+                  multi={!workId || workId === ALL}
+                />
+              )}
             </>
           );
         })()}
