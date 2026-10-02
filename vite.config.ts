@@ -12,4 +12,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    // Pré-empacota o calendário junto com o React para evitar duas cópias do React no preview.
+    optimizeDeps: { include: ["react-day-picker", "date-fns"] },
+  },
 });
