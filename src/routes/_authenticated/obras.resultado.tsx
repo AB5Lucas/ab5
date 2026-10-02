@@ -298,6 +298,46 @@ function ResultadoPage() {
     }
     const vtRows = [...vtByDate.entries()].map(([date, v]) => ({ date, ...v })).sort((x, y) => x.date.localeCompare(y.date));
     const vtTotal = vtRows.reduce((s, r) => s + r.cost, 0);
+    // Prêmio motorista: regras da aba Prêmio de Motorista, rateado como o veículo
+    const inRule = (r: any, km: number) => km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance));
+    const driverRows: { date: string; driver: string; plate: string; km: number; amount: number; share: number }[] = [];
+    for (const v of d.vs) {
+      if (!v.driver_bonus || !v.driver_id || (v.work_id && !idSet.has(v.work_id))) continue;
+      const km = Number(v.km ?? 0);
+      const amount = (d.dbRules ?? []).filter((r: any) => r.calculation_type !== "fixed_monthly" && inRule(r, km)).reduce((s: number, r: any) => s + Number(r.amount), 0);
+      if (!amount) continue;
+      const total = dayTotal.get(v.schedule_date) ?? 0;
+      const mine = dayMine.get(v.schedule_date) ?? 0;
+      const share = v.work_id ? amount : total > 0 ? (amount * mine) / total : amount / d.siblingCount;
+      driverRows.push({ date: v.schedule_date, driver: v.collaborators?.full_name ?? "—", plate: v.vehicles?.plate ?? "—", km, amount, share });
+      bump(v.schedule_date.slice(0, 7), "transport", share);
+    }
+    const driverTotal = driverRows.reduce((s, r) => s + r.share, 0);
+    // Prêmio viagem: distância cidade do colaborador → cidade da obra, regras da aba Prêmio de Viagem
+    const distFor = buildDistanceLookup(d.cityDist ?? []);
+    const travelByDate = new Map<string, { people: number; cost: number }>();
+    const travelSeen = new Set<string>();
+    for (const a of d.allocs) {
+      const date = a.daily_schedules?.schedule_date as string | undefined;
+      if (!date || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      const key = `${a.collaborator_id}|${date}`;
+      if (travelSeen.has(key)) continue;
+      travelSeen.add(key);
+      const r = rdoKey.get(key);
+      if (r && !r.present) continue;
+      const p = person.get(a.collaborator_id);
+      const dist = distFor(p?.city, d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
+      const cost = (d.tbRules ?? []).filter((x: any) => inRule(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0);
+      if (!cost) continue;
+      const t = travelByDate.get(date) ?? { people: 0, cost: 0 };
+      t.people += 1;
+      t.cost += cost;
+      travelByDate.set(date, t);
+      bump(date.slice(0, 7), "transport", cost);
+    }
+    const travelRows = [...travelByDate.entries()].map(([date, v]) => ({ date, ...v })).sort((x, y) => x.date.localeCompare(y.date));
+    const travelTotal = travelRows.reduce((s, r) => s + r.cost, 0);
+    driverRows.sort((a, b) => a.date.localeCompare(b.date));
     for (const e of d.entries) {
       bump(e.entry_date.slice(0, 7), e.category === "faturamento" ? "billing" : "entries", Number(e.amount));
     }
