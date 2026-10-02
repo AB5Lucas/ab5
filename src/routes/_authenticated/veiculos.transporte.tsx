@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VehicleTimeline } from "@/components/vehicle-timeline";
+import { VehicleHandover } from "@/components/vehicle-handover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -88,6 +89,7 @@ function TransportPage() {
       <PageHeader
         title="Transporte"
         description="Programação mensal da frota: motorista, obra/cliente, prêmio de motorista e quilometragem automática."
+        actions={<VehicleHandover />}
       />
       <VehicleTimeline />
     </div>
