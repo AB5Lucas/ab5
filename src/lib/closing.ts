@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buildDistanceLookup } from "@/lib/city-distance";
 
 /** Fechamento: competência = dia 26 do mês anterior até 25 do mês selecionado. */
 export function periodOf(month: string) {
@@ -48,7 +49,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
 
   const [allocs, entries, workVt, boxVtR, personVtR, holidays, daysOff, vacations, leaves, rdoWf, vtRules, tbRules, adjs] = await Promise.all([
     ids.length ? all<any>((f, t) => supabase.from("daily_allocations")
-      .select("collaborator_id, schedule_id, work_id, driver, vt_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled), works(name, distance_km, clients(name, distance_km))")
+      .select("collaborator_id, schedule_id, work_id, driver, vt_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled), works(name, city, distance_km, clients(name, city, distance_km))")
       .in("schedule_id", ids).order("id").range(f, t)) : [],
     ids.length ? all<any>((f, t) => supabase.from("daily_status_entries")
       .select("schedule_id, collaborator_id, box_key, collaborators(full_name, registration_number)").in("schedule_id", ids).order("id").range(f, t)) : [],
@@ -65,6 +66,9 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     supabase.from("travel_bonus_rules").select("*").eq("active", true),
     supabase.from("closing_adjustments").select("*").gte("entry_date", start).lt("entry_date", end).order("entry_date"),
   ]);
+  const { data: cityDist } = await supabase.from("city_distances").select("city_a, city_b, km");
+  const distFor = buildDistanceLookup(cityDist ?? []);
+
 
   const holiday = new Map((holidays.data ?? []).map((h) => [h.date, h.name]));
   const inRange = (d: string, s: string, e: string | null) => d >= s && d <= (e ?? s);
@@ -126,7 +130,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     const base = cc?.vt_enabled === false ? false : (vtWork.get(`${a.schedule_id}|${a.work_id}`) || (cc?.city ?? "").toLowerCase().includes("pouso alegre"));
     const pays = a.vt_override ?? base;
     r.vtRows.push({ date, work, pays: !!pays, value: pays ? perDay(a.driver, 1) : 0 });
-    const dist = Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0);
+    const dist = distFor(cc?.city, a.works?.clients?.city ?? a.works?.city, Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0));
     const prize = prizeFor(dist);
     if (prize > 0) r.prizeRows.push({ date, vehicle: a.vehicles?.plate ?? "—", work, distance: dist, value: prize });
   }
