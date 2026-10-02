@@ -112,7 +112,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data: nw } = await supabase
+      const { data: nw } = await (supabase as any)
         .from("schedule_work_night")
         .select("id")
         .eq("schedule_date", date)

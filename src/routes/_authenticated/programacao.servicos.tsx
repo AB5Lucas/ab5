@@ -200,16 +200,16 @@ function ServicesPage() {
   const night = useQuery({
     queryKey: ["work-night", date],
     queryFn: async () => {
-      const { data } = await supabase.from("schedule_work_night").select("work_id").eq("schedule_date", date);
-      return (data ?? []).map((r) => r.work_id);
+      const { data } = await (supabase as any).from("schedule_work_night").select("work_id").eq("schedule_date", date);
+      return (data ?? []).map((r: { work_id: string }) => r.work_id);
     },
   });
   const nightSet = useMemo(() => new Set(night.data ?? []), [night.data]);
   const toggleNight = async (workId: string) => {
     const on = nightSet.has(workId);
     const { error } = on
-      ? await supabase.from("schedule_work_night").delete().eq("schedule_date", date).eq("work_id", workId)
-      : await supabase.from("schedule_work_night").insert({ schedule_date: date, work_id: workId });
+      ? await (supabase as any).from("schedule_work_night").delete().eq("schedule_date", date).eq("work_id", workId)
+      : await (supabase as any).from("schedule_work_night").insert({ schedule_date: date, work_id: workId });
     if (error) return toast.error(error.message);
     toast.success(on ? "Serviço voltou para turno diurno" : "Turno noturno marcado para este dia");
     qc.invalidateQueries({ queryKey: ["work-night"] });

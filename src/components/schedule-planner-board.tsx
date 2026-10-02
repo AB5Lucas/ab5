@@ -365,16 +365,16 @@ export function SchedulePlannerBoard({
   const nightToday = useQuery({
     queryKey: ["work-night", date],
     queryFn: async () => {
-      const { data } = await supabase.from("schedule_work_night").select("work_id").eq("schedule_date", date);
-      return new Set((data ?? []).map((r) => r.work_id));
+      const { data } = await (supabase as any).from("schedule_work_night").select("work_id").eq("schedule_date", date);
+      return new Set((data ?? []).map((r: { work_id: string }) => r.work_id));
     },
   });
   const nightCarry = useQuery({
     queryKey: ["night-carry", date],
     queryFn: async () => {
       const prev = addDays(date, -1);
-      const { data: nw } = await supabase.from("schedule_work_night").select("work_id").eq("schedule_date", prev);
-      const ids = (nw ?? []).map((r) => r.work_id);
+      const { data: nw } = await (supabase as any).from("schedule_work_night").select("work_id").eq("schedule_date", prev);
+      const ids = (nw ?? []).map((r: { work_id: string }) => r.work_id);
       if (ids.length === 0) return new Map<string, string[]>();
       const { data } = await supabase
         .from("daily_allocations")
@@ -755,7 +755,7 @@ export function SchedulePlannerBoard({
   const c = ctx.data;
   /** Serviços disponíveis + inativos que tiveram gente escalada nesta data. */
   const works = useMemo(() => {
-    const allocated = new Set(rows.map((r) => r.work_id));
+    const allocated = new Set(rows.map((r: { work_id: string }) => r.work_id));
     return (c?.works ?? []).filter((w) => w.active || allocated.has(w.id));
   }, [c, rows]);
   /** Clientes com serviços ativos (lista do botão "Clientes"). */
