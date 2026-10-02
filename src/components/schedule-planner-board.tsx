@@ -1506,6 +1506,7 @@ export function SchedulePlannerBoard({
                       <Users className="mr-0.5 h-2.5 w-2.5" />
                       {workRows.length}
                     </Badge>
+                    <span className="flex shrink-0 flex-col items-center gap-0.5">
                     <button
                       type="button"
                       disabled={!editable}
@@ -1522,6 +1523,7 @@ export function SchedulePlannerBoard({
                       onClick={(e) => { e.stopPropagation(); setGroupTravel.mutate({ ids: g.works.map((x) => x.id), value: !workPaysTravel(w.id) }); }}
                       className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${workPaysTravel(w.id) ? "bg-info" : "bg-muted-foreground/40"}`}
                     />
+                    </span>
                   </div>
                   <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
                     <MapPin className="h-2.5 w-2.5" />
@@ -1605,6 +1607,7 @@ export function SchedulePlannerBoard({
                             <X className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         )}
+                        <span className="flex shrink-0 flex-col items-center gap-0.5">
                         {(() => {
                           const vt = r.vt_override ?? defaultAllocVt(r.work_id, r.collaborator_id);
                           return (
@@ -1632,6 +1635,7 @@ export function SchedulePlannerBoard({
                             />
                           );
                         })()}
+                        </span>
                       </li>
                     );
                   })}
