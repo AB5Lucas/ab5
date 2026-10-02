@@ -183,7 +183,7 @@ function BonusPage() {
         const { data: page, error } = await supabase
           .from("daily_allocations")
           .select(
-            "collaborator_id, schedule_id, collaborators(full_name, registration_number, city), works(city, distance_km, clients(city, distance_km))",
+            "collaborator_id, schedule_id, work_id, travel_bonus_override, collaborators(full_name, registration_number, city, travel_bonus_enabled), works(city, distance_km, clients(city, distance_km))",
           )
           .in("schedule_id", ids)
           .order("id")
@@ -194,8 +194,12 @@ function BonusPage() {
       }
       const { data: cityDist } = await supabase.from("city_distances").select("city_a, city_b, km");
       const distFor = buildDistanceLookup(cityDist ?? []);
+      const { data: trW } = await supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("schedule_id", ids);
+      const travelWork = new Map((trW ?? []).map((v) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
 
-      return (data ?? []).map((a) => {
+      return (data ?? []).filter((a: any) =>
+        a.travel_bonus_override ?? (a.collaborators?.travel_bonus_enabled !== false && (travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? true)),
+      ).map((a) => {
         const row = a as unknown as {
           collaborator_id: string;
           schedule_id: string;
