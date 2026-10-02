@@ -123,7 +123,6 @@ type FormState = {
   status: "active" | "inactive";
   is_driver: boolean;
   vt_enabled: boolean;
-  travel_bonus_enabled: boolean;
   driver_license_category: string;
   driver_license_expiry: string;
   salary: string;
@@ -148,7 +147,6 @@ const emptyForm: FormState = {
   status: "active",
   is_driver: false,
   vt_enabled: true,
-  travel_bonus_enabled: true,
   driver_license_category: "",
   driver_license_expiry: "",
   salary: "",
@@ -174,7 +172,6 @@ function toForm(c: Collaborator): FormState {
     status: c.status,
     is_driver: c.is_driver,
     vt_enabled: (c as { vt_enabled?: boolean | null }).vt_enabled !== false,
-    travel_bonus_enabled: (c as { travel_bonus_enabled?: boolean | null }).travel_bonus_enabled !== false,
     driver_license_category: c.driver_license_category ?? "",
     driver_license_expiry: c.driver_license_expiry ?? "",
     salary: c.salary == null ? "" : Number(c.salary).toFixed(2).replace(".", ","),
@@ -264,7 +261,6 @@ function CollaboratorsPage() {
         status: form.status,
         is_driver: form.is_driver,
         vt_enabled: form.vt_enabled,
-        travel_bonus_enabled: form.travel_bonus_enabled,
         driver_license_category: form.is_driver ? nn(form.driver_license_category) : null,
         driver_license_expiry: form.is_driver ? nn(form.driver_license_expiry) : null,
         notes: nn(form.notes),
@@ -575,10 +571,6 @@ function CollaboratorsPage() {
               <div className="flex items-center gap-3">
                 <Switch id="vt_enabled" checked={form.vt_enabled} onCheckedChange={(v) => set("vt_enabled", v)} />
                 <Label htmlFor="vt_enabled">Vale Transporte</Label>
-              </div>
-              <div className="flex items-center gap-3">
-                <Switch id="travel_bonus" checked={form.travel_bonus_enabled} onCheckedChange={(v) => set("travel_bonus_enabled", v)} />
-                <Label htmlFor="travel_bonus">Prêmio Viagem</Label>
               </div>
             </div>
 
