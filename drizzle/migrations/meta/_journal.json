@@ -8,6 +8,13 @@
       "when": 1790950465847,
       "tag": "0000_travel_bonus_daily_toggle",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790956612991,
+      "tag": "0001_night_shift",
+      "breakpoints": true
     }
   ]
 }
