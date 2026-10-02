@@ -146,14 +146,14 @@ function ResultadoPage() {
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
-              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, vehicles(km_rate)").eq("client_id", w.client_id!).range(a, b),
+              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, vehicles(km_rate, plate), collaborators(full_name)").eq("client_id", w.client_id!).range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
-          ? supabase.from("clients").select("has_toll, toll_amount").eq("id", w.client_id).maybeSingle()
+          ? supabase.from("clients").select("has_toll, toll_amount, city, distance_km").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
       ]);
-      const [workVt, noVtRows, leaves, vtRules] = await Promise.all([
+      const [workVt, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
         fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", workIds).range(a, b)),
         fetchAll<any>((a, b) =>
           supabase.from("daily_status_entries").select("schedule_id, collaborator_id")
@@ -161,6 +161,9 @@ function ResultadoPage() {
         ),
         fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
         supabase.from("transport_voucher_rules").select("*").eq("active", true),
+        supabase.from("driver_bonus_rules").select("*").eq("active", true),
+        supabase.from("travel_bonus_rules").select("*").eq("active", true),
+        supabase.from("city_distances").select("city_a, city_b, km"),
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
       const sibAllocs = sibIds.length
@@ -182,6 +185,9 @@ function ResultadoPage() {
         noVtRows,
         leaves,
         vtRules: vtRules.data ?? [],
+        dbRules: dbRules.data ?? [],
+        tbRules: tbRules.data ?? [],
+        cityDist: cityDist.data ?? [],
       };
     },
   });
