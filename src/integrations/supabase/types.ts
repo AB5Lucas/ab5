@@ -180,6 +180,30 @@ export type Database = {
         }
         Relationships: []
       }
+      city_distances: {
+        Row: {
+          city_a: string
+          city_b: string
+          created_at: string
+          id: string
+          km: number
+        }
+        Insert: {
+          city_a: string
+          city_b: string
+          created_at?: string
+          id?: string
+          km: number
+        }
+        Update: {
+          city_a?: string
+          city_b?: string
+          created_at?: string
+          id?: string
+          km?: number
+        }
+        Relationships: []
+      }
       client_integrations: {
         Row: {
           client_id: string
