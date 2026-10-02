@@ -1088,6 +1088,7 @@ export function SchedulePlannerBoard({
   });
 
 
+  const [confirmCopyPrev, setConfirmCopyPrev] = useState(false);
   const copyPrevious = useMutation({
     mutationFn: async () => {
       if (!c) throw new Error("Carregando dados");
@@ -1233,6 +1234,20 @@ export function SchedulePlannerBoard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog open={confirmCopyPrev} onOpenChange={setConfirmCopyPrev}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Copiar programação do dia anterior?</AlertDialogTitle>
+            <AlertDialogDescription>
+              As pessoas escaladas em {formatDateBR(previousScheduleDay(date))} que ainda não estão neste dia serão adicionadas à programação de {formatDateBR(date)}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button onClick={() => { setConfirmCopyPrev(false); copyPrevious.mutate(); }}>Copiar</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <RdoAbsenceDialog
         open={!!occOpen}
         onOpenChange={(v) => !v && setOccOpen(null)}
@@ -1334,7 +1349,7 @@ export function SchedulePlannerBoard({
             </DropdownMenuContent>
           </DropdownMenu>
           {editable && (
-            <Button size="sm" variant="outline" onClick={() => copyPrevious.mutate()} disabled={copyPrevious.isPending}>
+            <Button size="sm" variant="outline" onClick={() => setConfirmCopyPrev(true)} disabled={copyPrevious.isPending}>
               <Copy className="h-4 w-4" /> Copiar dia anterior
             </Button>
           )}
