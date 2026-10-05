@@ -507,9 +507,11 @@ function IntegrationsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" aria-label="Visualizar" onClick={() => setViewing(r)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <AppointmentDialog
+                        type="integracao"
+                        iconOnly
+                        initialValues={{ collaborator_id: r.collaborator_id, client_id: r.client_id }}
+                      />
                       {canWrite && (
                         <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => openEdit(r)}>
                           <Pencil className="h-4 w-4" />
