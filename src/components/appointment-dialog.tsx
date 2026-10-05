@@ -168,14 +168,18 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
   const filteredPeople = useMemo(() => {
     const q = personQuery.trim().toLowerCase();
     const list = collaborators.data ?? [];
-    if (!q) return list.slice(0, 80);
-    return list
-      .filter(
-        (p) =>
-          p.full_name.toLowerCase().includes(q) || p.registration_number.toLowerCase().includes(q),
-      )
-      .slice(0, 80);
-  }, [collaborators.data, personQuery]);
+    const out = !q
+      ? list.slice(0, 80)
+      : list
+          .filter(
+            (p) =>
+              p.full_name.toLowerCase().includes(q) || p.registration_number.toLowerCase().includes(q),
+          )
+          .slice(0, 80);
+    // Garante que o colaborador já selecionado apareça no campo, mesmo fora dos 80 primeiros
+    const sel = form.collaborator_id && list.find((p) => p.id === form.collaborator_id);
+    return sel && !out.some((p) => p.id === sel.id) ? [sel, ...out] : out;
+  }, [collaborators.data, personQuery, form.collaborator_id]);
 
   const rows = useMemo(() => {
     return (appointments.data ?? []).filter((r) => {
