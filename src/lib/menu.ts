@@ -51,6 +51,7 @@ const RAW_GROUPS: MenuGroup[] = [
     items: [
       { title: "Colaboradores", url: "/colaboradores" },
       { title: "Funções", url: "/colaboradores/estrutura" },
+      { title: "Turnos", url: "/colaboradores/turnos" },
     ],
   },
   {
