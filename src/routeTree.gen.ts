@@ -33,6 +33,7 @@ import { Route as AuthenticatedBeneficiosValeTransporteRouteImport } from './rou
 import { Route as AuthenticatedColaboradoresIndexRouteImport } from './routes/_authenticated/colaboradores.index'
 import { Route as AuthenticatedColaboradoresAsosRouteImport } from './routes/_authenticated/colaboradores.asos'
 import { Route as AuthenticatedColaboradoresEstruturaRouteImport } from './routes/_authenticated/colaboradores.estrutura'
+import { Route as AuthenticatedColaboradoresTurnosRouteImport } from './routes/_authenticated/colaboradores.turnos'
 import { Route as AuthenticatedExternoRelatorioDiarioRouteImport } from './routes/_authenticated/externo.relatorio-diario'
 import { Route as AuthenticatedObrasIndexRouteImport } from './routes/_authenticated/obras.index'
 import { Route as AuthenticatedObrasIntegracoesRouteImport } from './routes/_authenticated/obras.integracoes'
@@ -185,6 +186,12 @@ const AuthenticatedColaboradoresEstruturaRoute =
     path: '/colaboradores/estrutura',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedColaboradoresTurnosRoute =
+  AuthenticatedColaboradoresTurnosRouteImport.update({
+    id: '/colaboradores/turnos',
+    path: '/colaboradores/turnos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedExternoRelatorioDiarioRoute =
   AuthenticatedExternoRelatorioDiarioRouteImport.update({
     id: '/externo/relatorio-diario',
@@ -304,6 +311,7 @@ export interface FileRoutesByFullPath {
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
+  '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
@@ -345,6 +353,7 @@ export interface FileRoutesByTo {
   '/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
+  '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
@@ -388,6 +397,7 @@ export interface FileRoutesById {
   '/_authenticated/beneficios/vale-transporte': typeof AuthenticatedBeneficiosValeTransporteRoute
   '/_authenticated/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/_authenticated/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
+  '/_authenticated/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/_authenticated/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/_authenticated/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/_authenticated/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/beneficios/vale-transporte'
     | '/colaboradores/asos'
     | '/colaboradores/estrutura'
+    | '/colaboradores/turnos'
     | '/externo/relatorio-diario'
     | '/obras/integracoes'
     | '/obras/requisitos'
@@ -472,6 +483,7 @@ export interface FileRouteTypes {
     | '/beneficios/vale-transporte'
     | '/colaboradores/asos'
     | '/colaboradores/estrutura'
+    | '/colaboradores/turnos'
     | '/externo/relatorio-diario'
     | '/obras/integracoes'
     | '/obras/requisitos'
@@ -514,6 +526,7 @@ export interface FileRouteTypes {
     | '/_authenticated/beneficios/vale-transporte'
     | '/_authenticated/colaboradores/asos'
     | '/_authenticated/colaboradores/estrutura'
+    | '/_authenticated/colaboradores/turnos'
     | '/_authenticated/externo/relatorio-diario'
     | '/_authenticated/obras/integracoes'
     | '/_authenticated/obras/requisitos'
@@ -710,6 +723,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedColaboradoresEstruturaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/colaboradores/turnos': {
+      id: '/_authenticated/colaboradores/turnos'
+      path: '/colaboradores/turnos'
+      fullPath: '/colaboradores/turnos'
+      preLoaderRoute: typeof AuthenticatedColaboradoresTurnosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/externo/relatorio-diario': {
       id: '/_authenticated/externo/relatorio-diario'
       path: '/externo/relatorio-diario'
@@ -845,6 +865,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBeneficiosValeTransporteRoute: typeof AuthenticatedBeneficiosValeTransporteRoute
   AuthenticatedColaboradoresAsosRoute: typeof AuthenticatedColaboradoresAsosRoute
   AuthenticatedColaboradoresEstruturaRoute: typeof AuthenticatedColaboradoresEstruturaRoute
+  AuthenticatedColaboradoresTurnosRoute: typeof AuthenticatedColaboradoresTurnosRoute
   AuthenticatedExternoRelatorioDiarioRoute: typeof AuthenticatedExternoRelatorioDiarioRoute
   AuthenticatedObrasIntegracoesRoute: typeof AuthenticatedObrasIntegracoesRoute
   AuthenticatedObrasRequisitosRoute: typeof AuthenticatedObrasRequisitosRoute
@@ -888,6 +909,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedColaboradoresAsosRoute: AuthenticatedColaboradoresAsosRoute,
   AuthenticatedColaboradoresEstruturaRoute:
     AuthenticatedColaboradoresEstruturaRoute,
+  AuthenticatedColaboradoresTurnosRoute: AuthenticatedColaboradoresTurnosRoute,
   AuthenticatedExternoRelatorioDiarioRoute:
     AuthenticatedExternoRelatorioDiarioRoute,
   AuthenticatedObrasIntegracoesRoute: AuthenticatedObrasIntegracoesRoute,
