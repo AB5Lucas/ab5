@@ -59,6 +59,44 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
     return { groups, last };
   }, [q.data, multi]);
   const pickedWorks = picked ? [...(q.data?.get(picked) ?? [])].map((id) => names[id] ?? "—").sort() : [];
+  const day = useQuery({
+    queryKey: ["service-day-summary", workIds.join(","), picked],
+    enabled: !!picked && workIds.length > 0,
+    queryFn: async () => {
+      const ids = new Set(workIds);
+      const { data: ws } = await supabase.from("works").select("client_id").in("id", workIds);
+      const clientId = ws?.find((w) => w.client_id)?.client_id ?? null;
+      const { data: sched } = await supabase.from("daily_schedules").select("id").eq("schedule_date", picked!).maybeSingle();
+      if (!sched) return { people: 0, mo: 0, transport: 0 };
+      const sibIds = clientId ? ((await supabase.from("works").select("id").eq("client_id", clientId)).data ?? []).map((x) => x.id) : workIds;
+      const [allocs, wf, vs, client] = await Promise.all([
+        supabase.from("daily_allocations").select("work_id, collaborator_id, collaborators(salary, contract_type)").eq("schedule_id", sched.id).in("work_id", sibIds),
+        supabase.from("rdo_workforce").select("work_id, collaborator_id, present, worked_hours").eq("report_date", picked!).in("work_id", workIds),
+        clientId ? supabase.from("vehicle_schedules").select("km, trips, work_id, vehicles(km_rate)").eq("schedule_date", picked!).eq("client_id", clientId) : Promise.resolve({ data: [] as any[] }),
+        clientId ? supabase.from("clients").select("has_toll, toll_amount").eq("id", clientId).maybeSingle() : Promise.resolve({ data: null as any }),
+      ]);
+      const all = (allocs.data ?? []) as any[];
+      const mine = all.filter((a) => ids.has(a.work_id));
+      const hrs = new Map<string, number>();
+      for (const r of (wf.data ?? []) as any[]) if (r.present) hrs.set(`${r.work_id}|${r.collaborator_id}`, Number(r.worked_hours ?? 0));
+      let mo = 0;
+      for (const a of mine) {
+        const h = hrs.get(`${a.work_id}|${a.collaborator_id}`) ?? 8;
+        const rate = Number(a.collaborators?.salary ?? 0) * (a.collaborators?.contract_type === "pj" ? 1 : 2.6);
+        mo += h * rate;
+      }
+      const toll = client.data?.has_toll ? Number(client.data.toll_amount ?? 0) : 0;
+      let transport = 0;
+      for (const v of (vs.data ?? []) as any[]) {
+        if (v.work_id && !ids.has(v.work_id)) continue;
+        const trips = Number(v.trips ?? 1);
+        const cost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? 1.35) + toll * 2 * trips;
+        transport += v.work_id ? cost : all.length ? (cost * mine.length) / all.length : cost / Math.max(1, sibIds.length);
+      }
+      return { people: new Set(mine.map((a) => a.collaborator_id)).size, mo, transport };
+    },
+  });
+  const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
     <>
@@ -98,9 +136,21 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
                 <span>{(q.data?.size ?? 0)} dias no total</span>
               </div>
               {picked && (
-                <div className="text-sm">
-                  <b>{picked.split("-").reverse().join("/")}:</b>{" "}
-                  {pickedWorks.length ? pickedWorks.join(", ") : "sem serviço"}
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <b>{picked.split("-").reverse().join("/")}:</b>{" "}
+                    {pickedWorks.length ? pickedWorks.join(", ") : "sem serviço"}
+                  </div>
+                  {day.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Calculando resumo…</p>
+                  ) : day.data && (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="rounded-md border border-border p-2"><div className="text-xs text-muted-foreground">Colaboradores</div><div className="font-semibold">{day.data.people}</div></div>
+                      <div className="rounded-md border border-border p-2"><div className="text-xs text-muted-foreground">Mão de obra</div><div className="font-semibold">{brl(day.data.mo)}</div></div>
+                      <div className="rounded-md border border-border p-2"><div className="text-xs text-muted-foreground">Transporte</div><div className="font-semibold">{brl(day.data.transport)}</div></div>
+                      <div className="rounded-md border border-border p-2"><div className="text-xs text-muted-foreground">Total</div><div className="font-semibold">{brl(day.data.mo + day.data.transport)}</div></div>
+                    </div>
+                  )}
                 </div>
               )}
             </>
