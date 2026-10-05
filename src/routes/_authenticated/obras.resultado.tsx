@@ -500,8 +500,9 @@ function ResultadoPage() {
    * Com andaime e sem ferramentas, o peso de ferramentas vai para andaimes. */
   const applyBdi = () => {
     const BDI = 0.5885;
-    const order = Number((work as any)?.order_value ?? 0);
-    const real = Object.fromEntries((calc?.items ?? []).map((i) => [i.key, i.real])) as Record<string, number>;
+    const order = ordersSum || Number((work as any)?.order_value ?? 0);
+    if (!order) { toast.error("Informe o valor do pedido antes de usar Custos BDI"); return; }
+    const real = Object.fromEntries((calc?.items ?? []).map((i) => [i.key, Number.isFinite(i.real) ? Math.max(0, i.real) : 0])) as Record<string, number>;
     const w: Record<string, number> = { mo: 4, transporte: 2, ferramentas: 1, materiais: 3, andaimes: 0 };
     if ((real["andaimes"] ?? 0) > 0 && !(real["ferramentas"] ?? 0)) { w["andaimes"] = w["ferramentas"]!; w["ferramentas"] = 0; }
     const realTotal = ITEMS.reduce((a, it) => a + (real[it.key] ?? 0), 0);
