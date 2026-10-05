@@ -110,6 +110,12 @@ function ResultadoPage() {
           supabase.from("daily_allocations").select("work_id").in("schedule_id", chunk).order("id").range(a, b));
         rows.forEach((r) => out.add(r.work_id));
       }
+      const [rdoRows, entryRows] = await Promise.all([
+        fetchAll<any>((a, b) => supabase.from("rdos").select("work_id").gte("report_date", periodStart).lte("report_date", periodEnd).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id").gte("entry_date", periodStart).lte("entry_date", periodEnd).order("id").range(a, b)),
+      ]);
+      rdoRows.forEach((r) => r.work_id && out.add(r.work_id));
+      entryRows.forEach((r) => r.work_id && out.add(r.work_id));
       return out;
     },
   });
@@ -130,8 +136,9 @@ function ResultadoPage() {
       return data;
     },
   });
+  // Com período: enquanto carrega, não mostra nada (evita listar todas as obras por engano)
   const visibleWorks = useMemo(
-    () => (hasPeriod && activeIds.data ? (works.data ?? []).filter((w) => activeIds.data!.has(w.id)) : works.data ?? []),
+    () => (hasPeriod ? (activeIds.data ? (works.data ?? []).filter((w) => activeIds.data!.has(w.id)) : []) : works.data ?? []),
     [works.data, activeIds.data, hasPeriod],
   );
   const ALL = "__all__";
