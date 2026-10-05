@@ -222,7 +222,7 @@ function DashboardPage() {
     };
   }, [base.data, period.data, from, to, today]);
 
-  const [dlg, setDlg] = useState<null | "ferias" | "atestados" | "vencimentos" | { client: string; name: string }>(null);
+  const [dlg, setDlg] = useState<null | "ferias" | "atestados" | "ausencias" | "vencimentos" | { client: string; name: string }>(null);
   const loading = base.isLoading || period.isLoading;
   const periodLabel = from === to ? formatDateBR(from) : `${formatDateBR(from)} a ${formatDateBR(to)}`;
 
@@ -347,6 +347,15 @@ function DashboardPage() {
 
       <Dialog open={!!dlg} onOpenChange={(o) => !o && setDlg(null)}>
         <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
+          {calc && dlg === "ausencias" && (
+            <>
+              <DialogHeader><DialogTitle>Ausências — {periodLabel}</DialogTitle></DialogHeader>
+              <p className="text-sm font-semibold uppercase text-primary">Férias ({calc.vac.length})</p>
+              <LeaveTable rows={calc.vac} today={today} />
+              <p className="text-sm font-semibold uppercase text-primary">Atestados ({calc.med.length})</p>
+              <LeaveTable rows={calc.med} today={today} />
+            </>
+          )}
           {calc && dlg === "vencimentos" && <DueDialog expired={calc.expired} upcoming={calc.upcoming} />}
           {calc && (dlg === "ferias" || dlg === "atestados") && (
             <>
