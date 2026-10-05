@@ -128,7 +128,7 @@ function ResultadoPage() {
     queryKey: ["works-result", role, user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      const { data, error } = await supabase.from("works").select("*").order("name");
+      const { data, error } = await supabase.from("works").select("*, clients(name)").order("name");
       if (error) throw error;
       // Coordenador só vê as obras atribuídas a ele na aba Usuários
       if (role === "coordenador" || role === "encarregado") {
@@ -690,7 +690,7 @@ function ResultadoPage() {
         {(() => {
           const keyOf = groupKey;
           const clientMap = new Map<string, string>();
-          visibleWorks.forEach((x: any) => clientMap.set(keyOf(x), x.client ?? "Sem cliente"));
+          visibleWorks.forEach((x: any) => clientMap.set(keyOf(x), x.clients?.name ?? x.client ?? "Sem cliente"));
           const clientList = [...clientMap.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
           const current = visibleWorks.find((x) => x.id === workId);
           const ck0 = clientKey || (current ? keyOf(current) : "");
