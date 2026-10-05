@@ -354,7 +354,7 @@ function ServicesPage() {
     if (integ === "missing") return "Sem integração para este cliente";
     if (integ === "expired") return "Integração vencida";
     if (workRequiresIntegration(w.ctx, workId)) {
-      const aso = checkAso(w.ctx, cid, date).status;
+      const aso = checkAso(w.ctx, cid, date, workId).status;
       if (aso === "missing") return "Sem ASO";
       if (aso === "expired") return "ASO vencido";
     }

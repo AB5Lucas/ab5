@@ -235,18 +235,6 @@ export function checkAso(
 }
 
 
-/** ASO mais recente do colaborador e seu status na data informada. */
-export function checkAso(
-  ctx: ScheduleContext,
-  collaboratorId: string,
-  date: string,
-): { status: AsoStatus; expiresAt: string | null } {
-  const recs = (ctx.asos ?? []).filter((a) => a.collaborator_id === collaboratorId);
-  if (recs.length === 0) return { status: "missing", expiresAt: null };
-  const latest = recs.reduce((a, b) => (b.expires_at > a.expires_at ? b : a));
-  return { status: asoStatusOf(latest.expires_at, date), expiresAt: latest.expires_at };
-}
-
 /** A obra exige integração (e, portanto, ASO válido)? */
 export function workRequiresIntegration(ctx: ScheduleContext, workId: string): boolean {
   const work = ctx.works.find((w) => w.id === workId);
@@ -299,7 +287,8 @@ export function checkRequirements(
         const rec = ctx.collabTrainings.find(
           (t) => t.collaborator_id === collaboratorId && t.training_id === req.requirement_id,
         );
-        ok = !!rec && (!rec.expires_at || rec.expires_at >= date);
+        ok = (!!rec && (!rec.expires_at || rec.expires_at >= date)) ||
+          acceptedForWork(ctx, collaboratorId, `t:${req.requirement_id ?? ""}`, workId);
         break;
       }
       case "position": {
