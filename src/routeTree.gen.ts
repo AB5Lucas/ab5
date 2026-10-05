@@ -44,6 +44,7 @@ import { Route as AuthenticatedProgramacaoHojeRouteImport } from './routes/_auth
 import { Route as AuthenticatedProgramacaoSemanalRouteImport } from './routes/_authenticated/programacao.semanal'
 import { Route as AuthenticatedProgramacaoServicosRouteImport } from './routes/_authenticated/programacao.servicos'
 import { Route as AuthenticatedRelatoriosIndexRouteImport } from './routes/_authenticated/relatorios.index'
+import { Route as AuthenticatedRelatoriosAjustePontoRouteImport } from './routes/_authenticated/relatorios.ajuste-ponto'
 import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authenticated/veiculos.index'
 import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_authenticated/veiculos.motoristas'
 import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
@@ -249,6 +250,12 @@ const AuthenticatedRelatoriosIndexRoute =
     path: '/relatorios/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedRelatoriosAjustePontoRoute =
+  AuthenticatedRelatoriosAjustePontoRouteImport.update({
+    id: '/relatorios/ajuste-ponto',
+    path: '/relatorios/ajuste-ponto',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVeiculosIndexRoute =
   AuthenticatedVeiculosIndexRouteImport.update({
     id: '/veiculos/',
@@ -306,6 +313,7 @@ export interface FileRoutesByFullPath {
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
+  '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
@@ -346,6 +354,7 @@ export interface FileRoutesByTo {
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
+  '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
@@ -388,6 +397,7 @@ export interface FileRoutesById {
   '/_authenticated/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/_authenticated/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/_authenticated/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
+  '/_authenticated/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/_authenticated/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/_authenticated/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
@@ -430,6 +440,7 @@ export interface FileRouteTypes {
     | '/programacao/hoje'
     | '/programacao/semanal'
     | '/programacao/servicos'
+    | '/relatorios/ajuste-ponto'
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
@@ -470,6 +481,7 @@ export interface FileRouteTypes {
     | '/programacao/hoje'
     | '/programacao/semanal'
     | '/programacao/servicos'
+    | '/relatorios/ajuste-ponto'
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
@@ -511,6 +523,7 @@ export interface FileRouteTypes {
     | '/_authenticated/programacao/hoje'
     | '/_authenticated/programacao/semanal'
     | '/_authenticated/programacao/servicos'
+    | '/_authenticated/relatorios/ajuste-ponto'
     | '/_authenticated/veiculos/motoristas'
     | '/_authenticated/veiculos/relatorios'
     | '/_authenticated/veiculos/transporte'
@@ -774,6 +787,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRelatoriosIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/relatorios/ajuste-ponto': {
+      id: '/_authenticated/relatorios/ajuste-ponto'
+      path: '/relatorios/ajuste-ponto'
+      fullPath: '/relatorios/ajuste-ponto'
+      preLoaderRoute: typeof AuthenticatedRelatoriosAjustePontoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/veiculos/': {
       id: '/_authenticated/veiculos/'
       path: '/veiculos'
@@ -834,6 +854,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProgramacaoHojeRoute: typeof AuthenticatedProgramacaoHojeRoute
   AuthenticatedProgramacaoSemanalRoute: typeof AuthenticatedProgramacaoSemanalRoute
   AuthenticatedProgramacaoServicosRoute: typeof AuthenticatedProgramacaoServicosRoute
+  AuthenticatedRelatoriosAjustePontoRoute: typeof AuthenticatedRelatoriosAjustePontoRoute
   AuthenticatedVeiculosMotoristasRoute: typeof AuthenticatedVeiculosMotoristasRoute
   AuthenticatedVeiculosRelatoriosRoute: typeof AuthenticatedVeiculosRelatoriosRoute
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
@@ -878,6 +899,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProgramacaoHojeRoute: AuthenticatedProgramacaoHojeRoute,
   AuthenticatedProgramacaoSemanalRoute: AuthenticatedProgramacaoSemanalRoute,
   AuthenticatedProgramacaoServicosRoute: AuthenticatedProgramacaoServicosRoute,
+  AuthenticatedRelatoriosAjustePontoRoute:
+    AuthenticatedRelatoriosAjustePontoRoute,
   AuthenticatedVeiculosMotoristasRoute: AuthenticatedVeiculosMotoristasRoute,
   AuthenticatedVeiculosRelatoriosRoute: AuthenticatedVeiculosRelatoriosRoute,
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
