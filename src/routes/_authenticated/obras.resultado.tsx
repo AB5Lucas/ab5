@@ -3,7 +3,7 @@ import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -548,10 +548,21 @@ function ResultadoPage() {
     onSuccess: invalidate,
   });
 
+  const [editingId, setEditingId] = useState<string | null>(null);
   const saveEntry = useMutation({
     mutationFn: async () => {
       const amount = num(entry.amount);
       if (!amount) throw new Error("Informe o valor");
+      if (editingId) {
+        const { error } = await supabase.from("work_entries").update({
+          entry_date: entry.date,
+          category: entry.category,
+          description: entry.description.trim() || null,
+          amount,
+        }).eq("id", editingId);
+        if (error) throw error;
+        return;
+      }
       if (isAll) {
         // Rateio proporcional às horas trabalhadas em cada serviço
         const raw = data.data;
@@ -603,7 +614,8 @@ function ResultadoPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Lançamento salvo");
+      toast.success(editingId ? "Lançamento atualizado" : "Lançamento salvo");
+      setEditingId(null);
       setEntry((e) => ({ ...e, description: "", amount: "" }));
       invalidate();
     },
@@ -654,6 +666,7 @@ function ResultadoPage() {
   const isBilling = dlg === "faturamentos";
   const openEntries = (k: "lancamentos" | "faturamentos") => {
     setEntry((e) => ({ ...e, category: k === "faturamentos" ? "faturamento" : "materiais" }));
+    setEditingId(null);
     setDlg(k);
   };
   const clickable = canEdit ? "cursor-pointer rounded-md transition-colors hover:bg-muted/60" : "";
@@ -1137,8 +1150,13 @@ function ResultadoPage() {
               <Input className="w-28" value={progPct} onChange={(e) => setProgPct(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveProgress.mutate()} />
             </div>
             <Button onClick={() => saveProgress.mutate()} disabled={saveProgress.isPending} aria-label="Adicionar andamento">
-              <Plus className="h-4 w-4" />
+              {editingId ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             </Button>
+            {editingId && (
+              <Button variant="ghost" size="icon" aria-label="Cancelar edição" onClick={() => { setEditingId(null); setEntry((x) => ({ ...x, description: "", amount: "" })); }}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
           <Table>
             <TableBody>
@@ -1188,13 +1206,19 @@ function ResultadoPage() {
             <Table>
               <TableBody>
                 {(data.data?.entries ?? []).filter((e: any) => (e.category === "faturamento") === isBilling).map((e: any) => (
-                  <TableRow key={e.id}>
+                  <TableRow key={e.id} className={editingId === e.id ? "bg-muted" : undefined}>
                     <TableCell>{fmtDate(e.entry_date)}</TableCell>
                     {isAll && <TableCell className="text-xs">{works.data?.find((x) => x.id === e.work_id)?.name ?? "—"}</TableCell>}
                     <TableCell>{catLabel(e.category)}</TableCell>
                     <TableCell>{e.description ?? "—"}</TableCell>
                     <TableCell className="text-right">{brl(Number(e.amount))}</TableCell>
-                    <TableCell className="w-10">
+                    <TableCell className="w-20 whitespace-nowrap">
+                      <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => {
+                        setEditingId(e.id);
+                        setEntry({ date: e.entry_date, category: e.category, description: e.description ?? "", amount: Number(e.amount).toFixed(2).replace(".", ",") });
+                      }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => delEntry.mutate(e.id)} aria-label="Excluir">
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
