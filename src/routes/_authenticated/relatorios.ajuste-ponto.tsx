@@ -77,7 +77,7 @@ function Page() {
         let q = supabase
           .from("rdo_workforce")
           .select(
-            "id, report_date, present, entry_time, exit_time, reported_reason, reported_note, final_classification, collaborators(full_name, registration_number), rdos!inner(number, shift, responsible_name, works(name, entry_time, exit_time, exit_time_weekend, clients(name)))",
+            "id, report_date, present, entry_time, exit_time, reported_reason, reported_note, final_classification, collaborators(full_name, registration_number, shift_id), rdos!inner(number, shift, responsible_name, works(name, entry_time, exit_time, exit_time_weekend, clients(name)))",
           )
           .order("report_date", { ascending: false })
           .range(i, i + 999);
@@ -90,21 +90,33 @@ function Page() {
       }
       const { data: adj, error } = await supabase.from("timeclock_adjustments").select("rdo_workforce_id, kind, status, treated_at");
       if (error) throw error;
-      return { wf: out, adj: adj ?? [] };
+      const { data: shifts } = await supabase.from("work_shifts").select("id, is_default, schedule");
+      return { wf: out, adj: adj ?? [], shifts: shifts ?? [] };
     },
   });
 
   const { occs, treated } = useMemo(() => {
     const occs: Occ[] = [];
     const treated = new Map<string, string>();
+    const shiftMap = new Map<string, any>();
+    for (const s of data.data?.shifts ?? []) if (!s.is_default) shiftMap.set(s.id, s.schedule ?? {});
     for (const a of data.data?.adj ?? []) if (a.status === "tratado") treated.set(`${a.rdo_workforce_id}|${a.kind}`, a.treated_at);
     for (const w of data.data?.wf ?? []) {
       const rdo = w.rdos;
       const work = rdo?.works;
-      const night = rdo?.shift === "night" || rdo?.shift === "noturno";
-      const weekend = [0, 6].includes(new Date(w.report_date + "T12:00:00").getDay());
-      const expEntry = night ? "21:30" : work?.entry_time ?? null;
-      const expExit = night ? "05:30" : (weekend && work?.exit_time_weekend) || work?.exit_time || null;
+      const dow = new Date(w.report_date + "T12:00:00").getDay();
+      const weekend = [0, 6].includes(dow);
+      // Colaborador em turno próprio (fora do Padrão): o horário previsto vem do turno dele.
+      const own = w.collaborators?.shift_id ? shiftMap.get(w.collaborators.shift_id) : undefined;
+      const ownDay = own ? own[String(dow)] : undefined;
+      let night = rdo?.shift === "night" || rdo?.shift === "noturno";
+      let expEntry: string | null = night ? "21:30" : work?.entry_time ?? null;
+      let expExit: string | null = night ? "05:30" : (weekend && work?.exit_time_weekend) || work?.exit_time || null;
+      if (own) {
+        expEntry = ownDay?.start ?? null;
+        expExit = ownDay?.end ?? null;
+        night = !!ownDay && (toMin(ownDay.end) ?? 0) < (toMin(ownDay.start) ?? 0);
+      }
       const base = {
         wfId: w.id,
         date: w.report_date,
