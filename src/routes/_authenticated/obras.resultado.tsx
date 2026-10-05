@@ -1121,7 +1121,7 @@ function ResultadoPage() {
               </SelectContent>
             </Select>
             <Input className="min-w-40 flex-1" placeholder="Descrição" value={entry.description} onChange={(e) => setEntry({ ...entry, description: e.target.value })} />
-            <Input className="w-32" placeholder="Valor" value={entry.amount} onChange={(e) => setEntry({ ...entry, amount: e.target.value })} />
+            <Input className="w-32" placeholder="Valor" value={entry.amount} onChange={(e) => setEntry({ ...entry, amount: e.target.value })} onKeyDown={(e) => e.key === "Enter" && saveEntry.mutate()} />
             <Button onClick={() => saveEntry.mutate()} disabled={saveEntry.isPending}>
               <Plus className="h-4 w-4" />
             </Button>
