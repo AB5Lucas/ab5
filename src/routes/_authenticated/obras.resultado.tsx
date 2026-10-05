@@ -1,3 +1,4 @@
+import { Switch } from "@/components/ui/switch";
 import { useMemo, useState } from "react";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { createFileRoute } from "@tanstack/react-router";
@@ -493,6 +494,22 @@ function ResultadoPage() {
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
   const itemsSum = ITEMS.reduce((a, it) => a + num(itemStrs[it.key] ?? ""), 0);
+  const [bdiOn, setBdiOn] = useState(false);
+  /** Custos BDI: total orçado = pedido × 0,5885, dividido 4/2/1/3 (MO/transp./ferram./mat.).
+   * Com custos realizados, os pesos ficam metade padrão e metade proporcional ao realizado.
+   * Com andaime e sem ferramentas, o peso de ferramentas vai para andaimes. */
+  const applyBdi = () => {
+    const BDI = 0.5885;
+    const order = Number((work as any)?.order_value ?? 0);
+    const real = Object.fromEntries((calc?.items ?? []).map((i) => [i.key, i.real])) as Record<string, number>;
+    const w: Record<string, number> = { mo: 4, transporte: 2, ferramentas: 1, materiais: 3, andaimes: 0 };
+    if ((real["andaimes"] ?? 0) > 0 && !(real["ferramentas"] ?? 0)) { w["andaimes"] = w["ferramentas"]!; w["ferramentas"] = 0; }
+    const realTotal = ITEMS.reduce((a, it) => a + (real[it.key] ?? 0), 0);
+    if (realTotal > 0) for (const it of ITEMS) w[it.key] = 0.5 * w[it.key]! + 0.5 * (10 * (real[it.key] ?? 0)) / realTotal;
+    const sumW = ITEMS.reduce((a, it) => a + w[it.key]!, 0) || 1;
+    const total = order * BDI;
+    setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, ((total * w[it.key]!) / sumW).toFixed(2).replace(".", ",")])));
+  };
   const [progMonth, setProgMonth] = useState(new Date().toISOString().slice(0, 7));
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "" });
@@ -1127,11 +1144,14 @@ function ResultadoPage() {
               />
             ))}
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={bdiOn} onCheckedChange={(v) => { setBdiOn(v); if (v) applyBdi(); }} />
+            Custos BDI (pedido × 0,5885) — os valores podem ser ajustados depois
+          </label>
           <p className="text-sm text-muted-foreground">
             Total orçado: <span className="font-semibold text-foreground">{brl(itemsSum)}</span>
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => openEntries("lancamentos")}>Lançar custo realizado</Button>
             <Button onClick={() => saveValues.mutate()} disabled={saveValues.isPending}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
