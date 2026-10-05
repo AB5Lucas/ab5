@@ -24,7 +24,7 @@ export function VehicleHandover() {
       const { data } = await supabase
         .from("vehicle_schedules")
         .select("schedule_date, vehicle_id, driver_id, vehicles(plate, model), collaborators!vehicle_schedules_driver_id_fkey(full_name)")
-        .gte("schedule_date", today)
+        .gte("schedule_date", add(today, -10))
         .lte("schedule_date", add(today, 4));
       const rows = (data ?? []) as any[];
       const at = (v: string, d: string) => rows.find((r) => r.vehicle_id === v && r.schedule_date === d && r.driver_id);
@@ -45,6 +45,28 @@ export function VehicleHandover() {
           date: d,
         });
       }
+      // Carros sem escalação hoje (ex.: pickups paradas) que terão motorista no próximo dia.
+      const vehiclesToday = new Set(rows.filter((r) => r.schedule_date === today && r.driver_id).map((r) => r.vehicle_id));
+      const others = [...new Set(rows.map((r) => r.vehicle_id as string))].filter((v) => !vehiclesToday.has(v));
+      for (const v of others) {
+        let d = add(today, 1);
+        let next = at(v, d);
+        while (!next && (dow(d) === 6 || dow(d) === 0)) {
+          d = add(d, 1);
+          next = at(v, d);
+        }
+        if (!next) continue;
+        const last = rows
+          .filter((r) => r.vehicle_id === v && r.driver_id && r.schedule_date < today)
+          .sort((a, b) => b.schedule_date.localeCompare(a.schedule_date))[0];
+        if (last?.driver_id === next.driver_id) continue;
+        out.push({
+          plate: next.vehicles?.plate ?? "—",
+          from: last ? `${short(last.collaborators?.full_name ?? "—")} (sem escala hoje)` : "Sem escalação",
+          to: short(next.collaborators?.full_name ?? "—"),
+          date: d,
+        });
+      }
       return out.sort((a, b) => a.from.localeCompare(b.from, "pt-BR"));
     },
   });
@@ -53,7 +75,7 @@ export function VehicleHandover() {
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm">
-          <KeyRound className="h-4 w-4" /> Trocar
+          <KeyRound className="h-4 w-4" /> Trocas
           {list.length > 0 && <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{list.length}</span>}
         </Button>
       </PopoverTrigger>
