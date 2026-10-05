@@ -365,14 +365,17 @@ function ServicesPage() {
   const candidates = useMemo(() => {
     if (!isWeekend || !wctx.data) return [];
     const here = new Set(allocs.map((a) => a.collaborator_id));
-    const q = addSearch.trim().toLowerCase();
+    const q = search.trim().toLowerCase();
+    const rq = roleSearch.trim().toLowerCase();
+    const posName = new Map(wctx.data.ctx.positions.map((p) => [p.id, p.name.toLowerCase()]));
     const ref = visible[0]?.id ?? works[0]?.id ?? "";
     return wctx.data.ctx.collaborators
       .filter((c) => !here.has(c.id) && (!q || c.full_name.toLowerCase().includes(q) || (c.registration_number ?? "").toLowerCase().includes(q)))
+      .filter((c) => !rq || (posName.get(c.position_id ?? "") ?? "").includes(rq))
       .map((c) => ({ id: c.id, name: c.full_name, why: ref ? blockReason(c.id, ref) : null }))
       .sort((a, b) => Number(!!a.why) - Number(!!b.why) || a.name.localeCompare(b.name, "pt-BR"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isWeekend, wctx.data, allocs, addSearch, visible, works, clientId, date]);
+  }, [isWeekend, wctx.data, allocs, search, roleSearch, visible, works, clientId, date]);
   const addPerson = useMutation({
     mutationFn: async ({ cid, workId }: { cid: string; workId: string }) => {
       const { error } = await supabase.rpc("weekend_add_allocation", { _work_id: workId, _date: date, _collaborator_id: cid });
@@ -566,8 +569,8 @@ function ServicesPage() {
             className={cn("panel flex max-h-[75vh] flex-col overflow-hidden", hover === POOL && "ring-2 ring-emerald-500")}
           >
             <header className="space-y-1.5 border-b border-border bg-secondary/60 px-3 py-2">
-              <p className="font-display text-xs font-semibold uppercase tracking-wide">Sem serviço</p>
-              <p className="text-[11px] text-muted-foreground">{pool.length} de {allocs.length} colaborador(es) ainda sem serviço</p>
+              <p className="font-display text-xs font-semibold uppercase tracking-wide">Adicionar colaborador</p>
+              <p className="text-[11px] text-muted-foreground">Arraste para um serviço. Bloqueados mostram o motivo.</p>
               <div className="relative">
                 <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input className="h-7 pl-7 text-xs" placeholder="Buscar colaborador" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -578,21 +581,7 @@ function ServicesPage() {
               </div>
             </header>
             <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
-              {allocs.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">{isWeekend ? "Ninguém ainda — arraste de Adicionar colaborador para um serviço." : "Ninguém escalado neste cliente na Programação."}</li>}
-              {allocs.length > 0 && filteredPool.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">Todos já estão em um serviço.</li>}
               {sorted(filteredPool).map(person)}
-            </ul>
-            {isWeekend && (
-              <div className="flex max-h-[40vh] min-h-0 flex-col border-t border-border">
-                <div className="space-y-1.5 bg-secondary/60 px-3 py-2">
-                  <p className="font-display text-xs font-semibold uppercase tracking-wide">Adicionar colaborador</p>
-                  <p className="text-[11px] text-muted-foreground">Arraste para um serviço. Bloqueados mostram o motivo.</p>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input className="h-7 pl-7 text-xs" placeholder="Buscar colaborador" value={addSearch} onChange={(e) => setAddSearch(e.target.value)} />
-                  </div>
-                </div>
-                <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
                   {wctx.isLoading && <li className="px-3 py-4 text-center text-xs text-muted-foreground">Carregando...</li>}
                   {candidates.map((c) => (
                     <li
@@ -609,9 +598,7 @@ function ServicesPage() {
                       </div>
                     </li>
                   ))}
-                </ul>
-              </div>
-            )}
+            </ul>
           </aside>
         </div>
       )}
