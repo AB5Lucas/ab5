@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Moon, Plus, Search, Users, X } from "lucide-react";
+import { ArrowUp, Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Moon, Plus, Search, Users, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { TransportBuilderDialog } from "@/components/transport-builder-dialog";
 import {
@@ -510,6 +510,24 @@ function ServicesPage() {
                     <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
                       {clientName} - {w.name}
                     </h2>
+                    <button
+                      type="button"
+                      disabled={pool.length === 0 || move.isPending}
+                      onClick={async () => {
+                        const ids = pool.map((a) => a.id);
+                        for (const id of ids) {
+                          const { error } = await supabase.rpc("move_allocation_service", { _alloc_id: id, _work_id: w.id });
+                          if (error) { toast.error(error.message); break; }
+                        }
+                        invalidate();
+                        toast.success(`${ids.length} colaborador(es) importados para ${w.name}`);
+                      }}
+                      title={pool.length ? `Importar todo o efetivo sem serviço (${pool.length}) para este serviço` : "Nenhum colaborador sem serviço para importar"}
+                      aria-label="Importar efetivo"
+                      className="rounded p-0.5 text-muted-foreground/60 hover:text-foreground disabled:opacity-30"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => toggleNight(w.id)}
