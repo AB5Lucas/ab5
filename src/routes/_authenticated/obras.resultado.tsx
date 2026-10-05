@@ -61,7 +61,12 @@ const entryItem = (cat: string): ItemKey | null =>
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
-const num = (s: string) => Number(String(s).replace(/\./g, "").replace(",", ".")) || 0;
+const num = (s: string) => {
+  const t = String(s).replace(/[^\d,.-]/g, "");
+  // "1.234,56" → 1234.56 ; "12.5" (sem vírgula) → 12.5
+  const n = t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t;
+  return Number(n) || 0;
+};
 const monthLabel = (ym: string) => {
   const [y, m] = ym.split("-");
   return `${m}/${y}`;
@@ -479,7 +484,7 @@ function ResultadoPage() {
   const [detail, setDetail] = useState<ItemKey | null>(null);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["work-result", workId, "vt"] });
+    qc.invalidateQueries({ queryKey: ["work-result"] });
     qc.invalidateQueries({ queryKey: ["works-result"] });
   };
 
