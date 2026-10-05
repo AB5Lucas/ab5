@@ -1,3 +1,4 @@
+import { laborCost } from "@/lib/labor-cost";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays } from "lucide-react";
@@ -79,11 +80,12 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
       const mine = all.filter((a) => ids.has(a.work_id));
       const hrs = new Map<string, number>();
       for (const r of (wf.data ?? []) as any[]) if (r.present) hrs.set(`${r.work_id}|${r.collaborator_id}`, Number(r.worked_hours ?? 0));
+      const { data: hd } = await supabase.from("holidays").select("date").eq("date", picked!);
+      const hol = new Set<string>((hd ?? []).map((x) => x.date as string));
       let mo = 0;
       for (const a of mine) {
         const h = hrs.get(`${a.work_id}|${a.collaborator_id}`) ?? 8;
-        const rate = Number(a.collaborators?.salary ?? 0) * (a.collaborators?.contract_type === "pj" ? 1 : 2.6);
-        mo += h * rate;
+        mo += laborCost(h, Number(a.collaborators?.salary ?? 0), a.collaborators?.contract_type === "pj", picked!, hol);
       }
       const toll = client.data?.has_toll ? Number(client.data.toll_amount ?? 0) : 0;
       let transport = 0;

@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated/obras/resultado")({
 });
 
 /** Multiplicador de encargos sobre o valor hora do colaborador. */
-const ENCARGOS = 2.6;
+import { laborCost, ENCARGOS } from "@/lib/labor-cost";
 const TAX_RATE = 0.1867; // imposto fixo sobre o valor do pedido
 const KM_RATE = 1.35;
 const DEFAULT_HOURS = 8;
@@ -238,6 +238,10 @@ function ResultadoPage() {
     },
   });
 
+  const holidaysQ = useQuery({
+    queryKey: ["holidays-dates"],
+    queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string),
+  });
   // ---------- Cálculos ----------
   const calc = useMemo(() => {
     if (!work || !data.data) return null;
@@ -274,6 +278,7 @@ function ResultadoPage() {
       l.cost += cost;
       laborBy.set(id, l);
     };
+    const hol = new Set<string>((holidaysQ.data ?? []) as string[]);
     for (const a of d.allocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
       if (!date) continue;
@@ -281,7 +286,7 @@ function ResultadoPage() {
       seen.add(key);
       const r = rdoKey.get(key);
       const hours = r ? (r.present ? Number(r.worked_hours ?? DEFAULT_HOURS) : 0) : DEFAULT_HOURS;
-      const cost = hours * (rate.get(a.collaborator_id) ?? 0) * enc(a.collaborator_id);
+      const cost = laborCost(hours, rate.get(a.collaborator_id) ?? 0, pj.has(a.collaborator_id), date, hol);
       addLabor(a.collaborator_id, hours, cost);
       bump(date.slice(0, 7), "labor", cost);
     }
@@ -289,7 +294,7 @@ function ResultadoPage() {
       const key = `${r.collaborator_id}|${r.report_date}`;
       if (seen.has(key) || !r.present) continue;
       const hours = Number(r.worked_hours ?? 0);
-      const cost = hours * (rate.get(r.collaborator_id) ?? 0) * enc(r.collaborator_id);
+      const cost = laborCost(hours, rate.get(r.collaborator_id) ?? 0, pj.has(r.collaborator_id), r.report_date, hol);
       addLabor(r.collaborator_id, hours, cost);
       bump(r.report_date.slice(0, 7), "labor", cost);
     }
@@ -480,7 +485,7 @@ function ResultadoPage() {
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount };
-  }, [work, data.data, untilMonth, isAll]);
+  }, [work, data.data, untilMonth, isAll, holidaysQ.data]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string }[]>([]);
@@ -923,7 +928,7 @@ function ResultadoPage() {
             {detail === "mo" && calc && (
               <>
                 <p className="mb-2 text-xs text-muted-foreground">
-                  Horas do RDO (ausente = 0h; sem RDO, escalado = {DEFAULT_HOURS}h) × valor hora × {String(ENCARGOS).replace(".", ",")} (encargos; PJ sem encargos).
+                  Horas do RDO (ausente = 0h; sem RDO, escalado = {DEFAULT_HOURS}h) × valor hora × adicional (sábado e hora extra acima de 8h × 1,6; domingo e feriado × 2) × {String(ENCARGOS).replace(".", ",")} (encargos; PJ sem encargos).
                 </p>
                 <Table>
                   <TableBody>
