@@ -109,7 +109,7 @@ export function TransportBuilderDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const isWeekend = [0, 6].includes(new Date(`${date}T12:00:00`).getDay());
+  const isWeekend = true; // montagem liberada em qualquer dia
   const [newVeh, setNewVeh] = useState("");
   const [newDrv, setNewDrv] = useState(NONE);
   const fleet = useQuery({
