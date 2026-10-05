@@ -71,6 +71,10 @@ const monthLabel = (ym: string) => {
   const [y, m] = ym.split("-");
   return `${m}/${y}`;
 };
+const monthEnd = (ym: string) => {
+  const [y, m] = ym.split("-").map(Number);
+  return `${ym}-${String(new Date(y!, m!, 0).getDate()).padStart(2, "0")}`;
+};
 const fmtDate = (iso: string) => iso.split("-").reverse().join("/");
 
 async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
@@ -95,7 +99,7 @@ function ResultadoPage() {
   const untilMonth = toMonth;
   const hasPeriod = !!(fromMonth || toMonth);
   const periodStart = fromMonth ? `${fromMonth}-01` : "0000-01-01";
-  const periodEnd = toMonth ? `${toMonth}-31` : "9999-12-31";
+  const periodEnd = toMonth ? monthEnd(toMonth) : "9999-12-31";
   const activeIds = useQuery({
     queryKey: ["works-active-period", periodStart, periodEnd],
     enabled: hasPeriod,
@@ -239,7 +243,7 @@ function ResultadoPage() {
     if (!work || !data.data) return null;
     const raw = data.data;
     // Fechamento: do início da obra até o último dia do mês selecionado
-    const cut = untilMonth ? `${untilMonth}-31` : "9999-12-31";
+    const cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
     const okDate = (dt?: string | null) => !dt || dt.slice(0, 10) <= cut;
     const d = {
       ...raw,
