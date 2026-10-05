@@ -436,6 +436,7 @@ export type Database = {
           rg: string | null
           salary: number | null
           sector_id: string | null
+          shift_id: string | null
           social_name: string | null
           status: Database["public"]["Enums"]["collaborator_status"]
           supervisor_id: string | null
@@ -465,6 +466,7 @@ export type Database = {
           rg?: string | null
           salary?: number | null
           sector_id?: string | null
+          shift_id?: string | null
           social_name?: string | null
           status?: Database["public"]["Enums"]["collaborator_status"]
           supervisor_id?: string | null
@@ -494,6 +496,7 @@ export type Database = {
           rg?: string | null
           salary?: number | null
           sector_id?: string | null
+          shift_id?: string | null
           social_name?: string | null
           status?: Database["public"]["Enums"]["collaborator_status"]
           supervisor_id?: string | null
@@ -521,6 +524,13 @@ export type Database = {
             columns: ["sector_id"]
             isOneToOne: false
             referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborators_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "work_shifts"
             referencedColumns: ["id"]
           },
           {
@@ -2498,6 +2508,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      work_shifts: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          schedule: Json
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          schedule?: Json
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          schedule?: Json
+          updated_at?: string
+        }
+        Relationships: []
       }
       works: {
         Row: {
