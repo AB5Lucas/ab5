@@ -14,9 +14,9 @@ export function ForemanWorksButton({ userId, name }: { userId: string; name: str
   const [search, setSearch] = useState("");
   const qc = useQueryClient();
 
+  // Carrega já na abertura da página para mostrar os clientes atribuídos sem precisar clicar
   const works = useQuery({
     queryKey: ["fw-works-all"],
-    enabled: open,
     queryFn: async () => {
       const { data } = await supabase.from("works").select("id, client_id, clients(name)");
       return data ?? [];
@@ -57,13 +57,18 @@ export function ForemanWorksButton({ userId, name }: { userId: string; name: str
   });
 
   const list = clients.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
-  const linkedClients = clients.filter((c) => c.workIds.some((id) => linked.data?.has(id))).length;
+  const linkedList = clients.filter((c) => c.workIds.some((id) => linked.data?.has(id)));
 
   return (
     <>
       <Button variant="outline" size="sm" className="mt-1" onClick={() => setOpen(true)}>
-        <Building2 className="h-3.5 w-3.5" /> Clientes{works.data ? ` (${linkedClients})` : ""}
+        <Building2 className="h-3.5 w-3.5" /> Clientes{works.data && linked.data ? ` (${linkedList.length})` : ""}
       </Button>
+      {works.data && linked.data && (
+        <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+          {linkedList.length ? linkedList.map((c) => c.name).join(", ") : "Nenhum cliente atribuído"}
+        </p>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
