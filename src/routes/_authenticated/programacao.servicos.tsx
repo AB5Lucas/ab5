@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { addDays, checkAso, checkIntegration, checkRequirements, fetchScheduleContext, formatBR, todayISO, workRequiresIntegration } from "@/lib/scheduling";
+import { addDays, checkAso, checkIntegration, checkRequirements, fetchScheduleContext, formatBR, pendingForWork, todayISO, workRequiresIntegration } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/programacao/servicos")({
@@ -354,9 +354,9 @@ function ServicesPage() {
     if (integ === "missing") return "Sem integração para este cliente";
     if (integ === "expired") return "Integração vencida";
     if (workRequiresIntegration(w.ctx, workId)) {
-      const aso = checkAso(w.ctx, cid, date).status;
+      const aso = checkAso(w.ctx, cid, date, workId).status;
       if (aso === "missing") return "Sem ASO";
-      if (aso === "expired") return "ASO vencido";
+      if (aso === "expired") return pendingForWork(w.ctx, cid, workId) ? "ASO vencido — aguardando aceite deste cliente na Conferência" : "ASO vencido";
     }
     const req = checkRequirements(w.ctx, workId, cid, date).filter((x) => x.blocking);
     if (req.length) return `Falta: ${req.map((x) => x.label).join(", ")}`;

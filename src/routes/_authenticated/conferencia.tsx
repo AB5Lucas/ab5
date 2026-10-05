@@ -243,6 +243,8 @@ function ConferencePage() {
     onSuccess: () => {
       toast.success("Documento aceito neste cliente");
       invalidate();
+      qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
+      qc.invalidateQueries({ queryKey: ["servicos-weekend-ctx"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

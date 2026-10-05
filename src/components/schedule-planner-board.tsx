@@ -35,6 +35,7 @@ import {
 import {
   addDays,
   checkAso,
+  pendingForWork,
   checkIntegration,
   checkRequirements,
   fetchScheduleContext,
@@ -903,7 +904,7 @@ export function SchedulePlannerBoard({
     const clientName = work?.clients?.name ?? "cliente";
     const integ = checkIntegration(c as ScheduleContext, workId, collaboratorId, date);
     const requiresInt = workRequiresIntegration(c as ScheduleContext, workId);
-    const aso = checkAso(c as ScheduleContext, collaboratorId, date);
+    const aso = checkAso(c as ScheduleContext, collaboratorId, date, workId);
 
     const intBad = integ.status === "expired" || integ.status === "missing";
     const asoBad = requiresInt && (aso.status === "expired" || aso.status === "missing");
@@ -919,6 +920,8 @@ export function SchedulePlannerBoard({
             ? `ASO vencido em ${formatDateBR(aso.expiresAt)}`
             : "Não possui ASO válido",
         );
+      if (asoBad && pendingForWork(c as ScheduleContext, collaboratorId, workId))
+        blockers.push("Documento aguardando aceite deste cliente na Conferência");
       return base({ level: "block", integration: integ.status, aso: aso.status, reasons: blockers });
     }
 
@@ -1206,7 +1209,7 @@ export function SchedulePlannerBoard({
       const inserts = prevRows
         .filter((r) => !c.absences.has(r.collaborator_id))
         .filter((r) => !appointmentByCollaborator.has(r.collaborator_id))
-        .filter((r) => !workRequiresIntegration(c as ScheduleContext, r.work_id) || checkAso(c as ScheduleContext, r.collaborator_id, date).status !== "expired")
+        .filter((r) => !workRequiresIntegration(c as ScheduleContext, r.work_id) || checkAso(c as ScheduleContext, r.collaborator_id, date, r.work_id).status !== "expired")
         .filter((r) => !existing.has(r.collaborator_id))
         .map((r, i) => ({
           schedule_id: id,
