@@ -110,6 +110,12 @@ function ResultadoPage() {
           supabase.from("daily_allocations").select("work_id").in("schedule_id", chunk).order("id").range(a, b));
         rows.forEach((r) => out.add(r.work_id));
       }
+      const [rdoRows, entryRows] = await Promise.all([
+        fetchAll<any>((a, b) => supabase.from("rdos").select("work_id").gte("report_date", periodStart).lte("report_date", periodEnd).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id").gte("entry_date", periodStart).lte("entry_date", periodEnd).order("id").range(a, b)),
+      ]);
+      rdoRows.forEach((r) => r.work_id && out.add(r.work_id));
+      entryRows.forEach((r) => r.work_id && out.add(r.work_id));
       return out;
     },
   });
@@ -130,15 +136,16 @@ function ResultadoPage() {
       return data;
     },
   });
+  // Com período: enquanto carrega, não mostra nada (evita listar todas as obras por engano)
   const visibleWorks = useMemo(
-    () => (hasPeriod && activeIds.data ? (works.data ?? []).filter((w) => activeIds.data!.has(w.id)) : works.data ?? []),
+    () => (hasPeriod ? (activeIds.data ? (works.data ?? []).filter((w) => activeIds.data!.has(w.id)) : []) : works.data ?? []),
     [works.data, activeIds.data, hasPeriod],
   );
   const ALL = "__all__";
   const isAll = workId === ALL;
   const groupKey = (x: any) => x.client_id ?? `n:${x.client ?? "Sem cliente"}`;
   const work = useMemo(() => {
-    const list = works.data ?? [];
+    const list = visibleWorks;
     if (!isAll) return list.find((w) => w.id === workId);
     const g = list.filter((x) => groupKey(x) === clientKey);
     if (!g.length) return undefined;
@@ -157,7 +164,7 @@ function ResultadoPage() {
       _ids: g.map((x) => x.id),
       _orders: Object.fromEntries(g.map((x) => [x.id, Number(x.order_value ?? 0)])),
     } as any;
-  }, [works.data, workId, clientKey, isAll]);
+  }, [visibleWorks, workId, clientKey, isAll]);
   const workIds: string[] = work ? ((work as any)._ids ?? [work.id]) : [];
   const canEdit = canWrite && !isAll;
 
@@ -669,7 +676,8 @@ function ResultadoPage() {
           visibleWorks.forEach((x: any) => clientMap.set(keyOf(x), x.client ?? "Sem cliente"));
           const clientList = [...clientMap.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
           const current = visibleWorks.find((x) => x.id === workId);
-          const ck = clientKey || (current ? keyOf(current) : "");
+          const ck0 = clientKey || (current ? keyOf(current) : "");
+          const ck = clientMap.has(ck0) ? ck0 : "";
           const services = visibleWorks.filter((x) => keyOf(x) === ck);
           return (
             <>
