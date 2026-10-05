@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { formatDateBR } from "@/lib/format";
+import { formatDateBR } from "@/lib/scheduling";
 
 const TYPE_LABEL: Record<string, string> = {
   aso: "ASO",
