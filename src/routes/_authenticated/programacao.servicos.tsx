@@ -84,7 +84,7 @@ function ServicesPage() {
         list = [...m.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
       }
       const wd = new Date(`${date}T12:00:00`).getDay();
-      if (wd === 0 || wd === 6) {
+      if (wd >= 0) {
         // Fim de semana: o efetivo é montado aqui, mesmo sem ninguém na Programação
         const { data: act } = await supabase.from("works").select("client_id").eq("active", true).in("client_id", list.map((c) => c.id));
         const count = new Map<string, number>();
@@ -324,7 +324,7 @@ function ServicesPage() {
     move.mutate({ allocId: a.id, workId });
   }
 
-  const isWeekend = [0, 6].includes(new Date(`${date}T12:00:00`).getDay());
+  const isWeekend = true; // montagem liberada em qualquer dia
   const [addSearch, setAddSearch] = useState("");
   const wctx = useQuery({
     queryKey: ["servicos-weekend-ctx", date],
