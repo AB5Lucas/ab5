@@ -61,7 +61,12 @@ const entryItem = (cat: string): ItemKey | null =>
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
-const num = (s: string) => Number(String(s).replace(/\./g, "").replace(",", ".")) || 0;
+const num = (s: string) => {
+  const t = String(s).replace(/[^\d,.-]/g, "");
+  // "1.234,56" → 1234.56 ; "12.5" (sem vírgula) → 12.5
+  const n = t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t;
+  return Number(n) || 0;
+};
 const monthLabel = (ym: string) => {
   const [y, m] = ym.split("-");
   return `${m}/${y}`;
@@ -479,7 +484,7 @@ function ResultadoPage() {
   const [detail, setDetail] = useState<ItemKey | null>(null);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["work-result", workId, "vt"] });
+    qc.invalidateQueries({ queryKey: ["work-result"] });
     qc.invalidateQueries({ queryKey: ["works-result"] });
   };
 
@@ -1074,9 +1079,11 @@ function ResultadoPage() {
             </div>
             <div className="space-y-1">
               <Label>% acumulado</Label>
-              <Input className="w-28" value={progPct} onChange={(e) => setProgPct(e.target.value)} />
+              <Input className="w-28" value={progPct} onChange={(e) => setProgPct(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveProgress.mutate()} />
             </div>
-            <Button onClick={() => saveProgress.mutate()} disabled={saveProgress.isPending}>Salvar</Button>
+            <Button onClick={() => saveProgress.mutate()} disabled={saveProgress.isPending} aria-label="Adicionar andamento">
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
           <Table>
             <TableBody>
@@ -1114,7 +1121,7 @@ function ResultadoPage() {
               </SelectContent>
             </Select>
             <Input className="min-w-40 flex-1" placeholder="Descrição" value={entry.description} onChange={(e) => setEntry({ ...entry, description: e.target.value })} />
-            <Input className="w-32" placeholder="Valor" value={entry.amount} onChange={(e) => setEntry({ ...entry, amount: e.target.value })} />
+            <Input className="w-32" placeholder="Valor" value={entry.amount} onChange={(e) => setEntry({ ...entry, amount: e.target.value })} onKeyDown={(e) => e.key === "Enter" && saveEntry.mutate()} />
             <Button onClick={() => saveEntry.mutate()} disabled={saveEntry.isPending}>
               <Plus className="h-4 w-4" />
             </Button>
