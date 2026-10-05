@@ -370,7 +370,7 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>;
 }
 
-function Kpi({ icon: Icon, label, value, hint, tone }: { icon: typeof Users; label: string; value: number; hint?: string; tone?: "warning" | "destructive" }) {
+function Kpi({ icon: Icon, label, value, hint, tone }: { icon: typeof Users; label: string; value: number; hint?: string | undefined; tone?: "warning" | "destructive" }) {
   const c = tone === "warning" ? "text-warning" : tone === "destructive" ? "text-destructive" : "text-primary";
   return (
     <div className="flex h-full items-center gap-3 rounded-md border bg-background p-4 transition-colors hover:bg-secondary">
