@@ -313,7 +313,7 @@ function DashboardPage() {
 
             <div className="grid gap-6 pt-5 xl:grid-cols-[2fr_1fr_1fr]">
               <div>
-                <div className="flex items-center justify-between">
+                <div className="flex h-9 items-center justify-between">
                   <SectionTitle>Avisos importantes</SectionTitle>
                   <Button size="sm" variant="outline" onClick={() => setDlg("vencimentos")}>Ver todos</Button>
                 </div>
@@ -401,7 +401,7 @@ function DueCard({ d }: { d: Due }) {
 function LeaveBox({ title, rows, today, onMore }: { title: string; rows: any[]; today: string; onMore: () => void }) {
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex h-9 items-center justify-between">
         <SectionTitle>{title} ({rows.length})</SectionTitle>
         {rows.length > 6 && <Button size="sm" variant="ghost" onClick={onMore}>Ver todos</Button>}
       </div>
