@@ -1079,9 +1079,11 @@ function ResultadoPage() {
             </div>
             <div className="space-y-1">
               <Label>% acumulado</Label>
-              <Input className="w-28" value={progPct} onChange={(e) => setProgPct(e.target.value)} />
+              <Input className="w-28" value={progPct} onChange={(e) => setProgPct(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveProgress.mutate()} />
             </div>
-            <Button onClick={() => saveProgress.mutate()} disabled={saveProgress.isPending}>Salvar</Button>
+            <Button onClick={() => saveProgress.mutate()} disabled={saveProgress.isPending} aria-label="Adicionar andamento">
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
           <Table>
             <TableBody>
