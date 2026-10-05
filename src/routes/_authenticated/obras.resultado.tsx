@@ -171,7 +171,7 @@ function ResultadoPage() {
           supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", workIds).range(a, b),
         ),
         fetchAll<any>((a, b) =>
-          supabase.from("rdo_workforce").select("collaborator_id, report_date, present, worked_hours").in("work_id", workIds).range(a, b),
+          supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours").in("work_id", workIds).range(a, b),
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
         supabase.from("work_entries").select("*").in("work_id", workIds).order("entry_date", { ascending: false }),
@@ -541,6 +541,47 @@ function ResultadoPage() {
     mutationFn: async () => {
       const amount = num(entry.amount);
       if (!amount) throw new Error("Informe o valor");
+      if (isAll) {
+        // Rateio proporcional às horas trabalhadas em cada serviço
+        const raw = data.data;
+        if (!raw) throw new Error("Aguarde o carregamento dos dados");
+        const hours = new Map<string, number>(workIds.map((id) => [id, 0]));
+        const rdo = new Map<string, any>(raw.rdoWf.map((r: any) => [`${r.collaborator_id}|${r.report_date}|${r.work_id}`, r]));
+        const seen = new Set<string>();
+        for (const a of raw.allocs) {
+          const dt = a.daily_schedules?.schedule_date;
+          if (!dt) continue;
+          const k = `${a.collaborator_id}|${dt}|${a.work_id}`;
+          seen.add(k);
+          const r = rdo.get(k);
+          const h = r ? (r.present ? Number(r.worked_hours ?? DEFAULT_HOURS) : 0) : DEFAULT_HOURS;
+          hours.set(a.work_id, (hours.get(a.work_id) ?? 0) + h);
+        }
+        for (const r of raw.rdoWf) {
+          const k = `${r.collaborator_id}|${r.report_date}|${r.work_id}`;
+          if (seen.has(k) || !r.present) continue;
+          hours.set(r.work_id, (hours.get(r.work_id) ?? 0) + Number(r.worked_hours ?? 0));
+        }
+        const total = [...hours.values()].reduce((a, b) => a + b, 0);
+        if (!total) throw new Error("Nenhuma hora trabalhada nos serviços para ratear");
+        const parts = [...hours.entries()].filter(([, h]) => h > 0);
+        let rest = Math.round(amount * 100);
+        const rows = parts.map(([id, h], i) => {
+          const cents = i === parts.length - 1 ? rest : Math.round((amount * 100 * h) / total);
+          rest -= cents;
+          const desc = entry.description.trim();
+          return {
+            work_id: id,
+            entry_date: entry.date,
+            category: entry.category,
+            description: `${desc ? desc + " — " : ""}Rateio ${((h / total) * 100).toFixed(1).replace(".", ",")}% (${Math.round(h)}h)`,
+            amount: cents / 100,
+          };
+        });
+        const { error } = await supabase.from("work_entries").insert(rows);
+        if (error) throw error;
+        return;
+      }
       const { error } = await supabase.from("work_entries").insert({
         work_id: workId,
         entry_date: entry.date,
@@ -675,14 +716,16 @@ function ResultadoPage() {
             </>
           );
         })()}
-        {work && canEdit && (
+        {work && canWrite && (
           <>
-            <Button variant="outline" onClick={() => openEntries("lancamentos")}>
+            <Button variant="outline" onClick={() => openEntries("lancamentos")} title={isAll ? "Valor rateado entre os serviços pelas horas trabalhadas" : undefined}>
               Lançamentos
             </Button>
-            <Button variant="outline" onClick={() => openEntries("faturamentos")}>
-              Faturamentos
-            </Button>
+            {!isAll && (
+              <Button variant="outline" onClick={() => openEntries("faturamentos")}>
+                Faturamentos
+              </Button>
+            )}
           </>
         )}
       </div>
@@ -1108,6 +1151,9 @@ function ResultadoPage() {
           <DialogHeader>
             <DialogTitle>{isBilling ? "Faturamentos" : "Lançamentos"}</DialogTitle>
           </DialogHeader>
+          {isAll && !isBilling && (
+            <p className="text-sm text-muted-foreground">O valor será rateado entre os serviços deste cliente, proporcional às horas trabalhadas em cada um.</p>
+          )}
           <div className="flex flex-wrap items-end gap-2">
             <Input type="date" className="w-40" value={entry.date} onChange={(e) => setEntry({ ...entry, date: e.target.value })} />
             <Select value={entry.category} onValueChange={(v) => setEntry({ ...entry, category: v })} disabled={isBilling}>
@@ -1132,6 +1178,7 @@ function ResultadoPage() {
                 {(data.data?.entries ?? []).filter((e: any) => (e.category === "faturamento") === isBilling).map((e: any) => (
                   <TableRow key={e.id}>
                     <TableCell>{fmtDate(e.entry_date)}</TableCell>
+                    {isAll && <TableCell className="text-xs">{works.data?.find((x) => x.id === e.work_id)?.name ?? "—"}</TableCell>}
                     <TableCell>{catLabel(e.category)}</TableCell>
                     <TableCell>{e.description ?? "—"}</TableCell>
                     <TableCell className="text-right">{brl(Number(e.amount))}</TableCell>
