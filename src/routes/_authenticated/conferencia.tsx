@@ -243,6 +243,7 @@ function ConferencePage() {
     onSuccess: () => {
       toast.success("Documento aceito neste cliente");
       invalidate();
+      qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

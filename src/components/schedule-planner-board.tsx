@@ -35,6 +35,7 @@ import {
 import {
   addDays,
   checkAso,
+  pendingForWork,
   checkIntegration,
   checkRequirements,
   fetchScheduleContext,
@@ -919,6 +920,8 @@ export function SchedulePlannerBoard({
             ? `ASO vencido em ${formatDateBR(aso.expiresAt)}`
             : "Não possui ASO válido",
         );
+      if (asoBad && pendingForWork(c as ScheduleContext, collaboratorId, workId))
+        blockers.push("Documento aguardando aceite deste cliente na Conferência");
       return base({ level: "block", integration: integ.status, aso: aso.status, reasons: blockers });
     }
 
