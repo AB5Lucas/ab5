@@ -1778,6 +1778,44 @@ export type Database = {
           },
         ]
       }
+      timeclock_adjustments: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          rdo_workforce_id: string
+          status: string
+          treated_at: string
+          treated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          rdo_workforce_id: string
+          status?: string
+          treated_at?: string
+          treated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          rdo_workforce_id?: string
+          status?: string
+          treated_at?: string
+          treated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeclock_adjustments_rdo_workforce_id_fkey"
+            columns: ["rdo_workforce_id"]
+            isOneToOne: false
+            referencedRelation: "rdo_workforce"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trainings: {
         Row: {
           active: boolean
