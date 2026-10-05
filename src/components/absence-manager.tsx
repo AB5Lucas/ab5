@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { findDateConflicts } from "@/lib/date-conflicts";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -137,6 +138,18 @@ export function AbsenceManager({
         mode === "single"
           ? { ...base, collaborator_id: person, date: start, end_date: singleEnd || null }
           : { ...base, collaborator_id: person, start_date: start, end_date: end };
+
+      if (table === "days_off" || table === "medical_leaves") {
+        const to = mode === "period" ? end : singleEnd || start;
+        const conflicts = await findDateConflicts(person, start, to, editingId ? { table, id: editingId } : undefined);
+        if (conflicts.length) {
+          const kind = table === "days_off" ? "AVISO" : "ALERTA";
+          const ok = window.confirm(
+            `${kind}: o colaborador já tem algo marcado nessa data:\n\n• ${conflicts.join("\n• ")}\n\nDeseja salvar mesmo assim?`,
+          );
+          if (!ok) throw new Error("Lançamento cancelado por conflito de datas");
+        }
+      }
 
       const { error } = editingId
         ? await supabase.from(table).update(payload as never).eq("id", editingId)
