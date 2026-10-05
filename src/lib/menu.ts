@@ -92,7 +92,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   { label: "Externo", icon: ClipboardList, items: [{ title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
-  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Relatórios", url: "/relatorios" }] },
+  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Relatórios", url: "/relatorios" }, { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }] },
   {
     label: "Administração",
     icon: Shield,

@@ -19,7 +19,6 @@ import { Route as AuthenticatedConferenciaRouteImport } from './routes/_authenti
 import { Route as AuthenticatedConsultaRouteImport } from './routes/_authenticated/consulta'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedFechamentoRouteImport } from './routes/_authenticated/fechamento'
-import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedTreinamentosRouteImport } from './routes/_authenticated/treinamentos'
 import { Route as AuthenticatedAdminAcessosRouteImport } from './routes/_authenticated/admin.acessos'
 import { Route as AuthenticatedAdminAuditoriaRouteImport } from './routes/_authenticated/admin.auditoria'
@@ -44,6 +43,8 @@ import { Route as AuthenticatedProgramacaoHistoricoRouteImport } from './routes/
 import { Route as AuthenticatedProgramacaoHojeRouteImport } from './routes/_authenticated/programacao.hoje'
 import { Route as AuthenticatedProgramacaoSemanalRouteImport } from './routes/_authenticated/programacao.semanal'
 import { Route as AuthenticatedProgramacaoServicosRouteImport } from './routes/_authenticated/programacao.servicos'
+import { Route as AuthenticatedRelatoriosIndexRouteImport } from './routes/_authenticated/relatorios.index'
+import { Route as AuthenticatedRelatoriosAjustePontoRouteImport } from './routes/_authenticated/relatorios.ajuste-ponto'
 import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authenticated/veiculos.index'
 import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_authenticated/veiculos.motoristas'
 import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
@@ -98,11 +99,6 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
 const AuthenticatedFechamentoRoute = AuthenticatedFechamentoRouteImport.update({
   id: '/fechamento',
   path: '/fechamento',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
-  id: '/relatorios',
-  path: '/relatorios',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTreinamentosRoute =
@@ -248,6 +244,18 @@ const AuthenticatedProgramacaoServicosRoute =
     path: '/programacao/servicos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedRelatoriosIndexRoute =
+  AuthenticatedRelatoriosIndexRouteImport.update({
+    id: '/relatorios/',
+    path: '/relatorios/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedRelatoriosAjustePontoRoute =
+  AuthenticatedRelatoriosAjustePontoRouteImport.update({
+    id: '/relatorios/ajuste-ponto',
+    path: '/relatorios/ajuste-ponto',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVeiculosIndexRoute =
   AuthenticatedVeiculosIndexRouteImport.update({
     id: '/veiculos/',
@@ -283,7 +291,6 @@ export interface FileRoutesByFullPath {
   '/consulta': typeof AuthenticatedConsultaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
-  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
@@ -306,11 +313,13 @@ export interface FileRoutesByFullPath {
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
+  '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
   '/obras/': typeof AuthenticatedObrasIndexRoute
+  '/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos/': typeof AuthenticatedVeiculosIndexRoute
 }
 export interface FileRoutesByTo {
@@ -323,7 +332,6 @@ export interface FileRoutesByTo {
   '/consulta': typeof AuthenticatedConsultaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
-  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
@@ -346,11 +354,13 @@ export interface FileRoutesByTo {
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
+  '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/colaboradores': typeof AuthenticatedColaboradoresIndexRoute
   '/obras': typeof AuthenticatedObrasIndexRoute
+  '/relatorios': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos': typeof AuthenticatedVeiculosIndexRoute
 }
 export interface FileRoutesById {
@@ -365,7 +375,6 @@ export interface FileRoutesById {
   '/_authenticated/consulta': typeof AuthenticatedConsultaRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/fechamento': typeof AuthenticatedFechamentoRoute
-  '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/_authenticated/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/_authenticated/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
@@ -388,11 +397,13 @@ export interface FileRoutesById {
   '/_authenticated/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/_authenticated/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/_authenticated/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
+  '/_authenticated/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/_authenticated/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/_authenticated/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/_authenticated/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
   '/_authenticated/obras/': typeof AuthenticatedObrasIndexRoute
+  '/_authenticated/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/_authenticated/veiculos/': typeof AuthenticatedVeiculosIndexRoute
 }
 export interface FileRouteTypes {
@@ -407,7 +418,6 @@ export interface FileRouteTypes {
     | '/consulta'
     | '/dashboard'
     | '/fechamento'
-    | '/relatorios'
     | '/treinamentos'
     | '/admin/acessos'
     | '/admin/auditoria'
@@ -430,11 +440,13 @@ export interface FileRouteTypes {
     | '/programacao/hoje'
     | '/programacao/semanal'
     | '/programacao/servicos'
+    | '/relatorios/ajuste-ponto'
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
     | '/colaboradores/'
     | '/obras/'
+    | '/relatorios/'
     | '/veiculos/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -447,7 +459,6 @@ export interface FileRouteTypes {
     | '/consulta'
     | '/dashboard'
     | '/fechamento'
-    | '/relatorios'
     | '/treinamentos'
     | '/admin/acessos'
     | '/admin/auditoria'
@@ -470,11 +481,13 @@ export interface FileRouteTypes {
     | '/programacao/hoje'
     | '/programacao/semanal'
     | '/programacao/servicos'
+    | '/relatorios/ajuste-ponto'
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
     | '/colaboradores'
     | '/obras'
+    | '/relatorios'
     | '/veiculos'
   id:
     | '__root__'
@@ -488,7 +501,6 @@ export interface FileRouteTypes {
     | '/_authenticated/consulta'
     | '/_authenticated/dashboard'
     | '/_authenticated/fechamento'
-    | '/_authenticated/relatorios'
     | '/_authenticated/treinamentos'
     | '/_authenticated/admin/acessos'
     | '/_authenticated/admin/auditoria'
@@ -511,11 +523,13 @@ export interface FileRouteTypes {
     | '/_authenticated/programacao/hoje'
     | '/_authenticated/programacao/semanal'
     | '/_authenticated/programacao/servicos'
+    | '/_authenticated/relatorios/ajuste-ponto'
     | '/_authenticated/veiculos/motoristas'
     | '/_authenticated/veiculos/relatorios'
     | '/_authenticated/veiculos/transporte'
     | '/_authenticated/colaboradores/'
     | '/_authenticated/obras/'
+    | '/_authenticated/relatorios/'
     | '/_authenticated/veiculos/'
   fileRoutesById: FileRoutesById
 }
@@ -596,13 +610,6 @@ declare module '@tanstack/react-router' {
       path: '/fechamento'
       fullPath: '/fechamento'
       preLoaderRoute: typeof AuthenticatedFechamentoRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/relatorios': {
-      id: '/_authenticated/relatorios'
-      path: '/relatorios'
-      fullPath: '/relatorios'
-      preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/treinamentos': {
@@ -773,6 +780,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProgramacaoServicosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/relatorios/': {
+      id: '/_authenticated/relatorios/'
+      path: '/relatorios'
+      fullPath: '/relatorios/'
+      preLoaderRoute: typeof AuthenticatedRelatoriosIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/relatorios/ajuste-ponto': {
+      id: '/_authenticated/relatorios/ajuste-ponto'
+      path: '/relatorios/ajuste-ponto'
+      fullPath: '/relatorios/ajuste-ponto'
+      preLoaderRoute: typeof AuthenticatedRelatoriosAjustePontoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/veiculos/': {
       id: '/_authenticated/veiculos/'
       path: '/veiculos'
@@ -811,7 +832,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedConsultaRoute: typeof AuthenticatedConsultaRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFechamentoRoute: typeof AuthenticatedFechamentoRoute
-  AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedTreinamentosRoute: typeof AuthenticatedTreinamentosRoute
   AuthenticatedAdminAcessosRoute: typeof AuthenticatedAdminAcessosRoute
   AuthenticatedAdminAuditoriaRoute: typeof AuthenticatedAdminAuditoriaRoute
@@ -834,11 +854,13 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProgramacaoHojeRoute: typeof AuthenticatedProgramacaoHojeRoute
   AuthenticatedProgramacaoSemanalRoute: typeof AuthenticatedProgramacaoSemanalRoute
   AuthenticatedProgramacaoServicosRoute: typeof AuthenticatedProgramacaoServicosRoute
+  AuthenticatedRelatoriosAjustePontoRoute: typeof AuthenticatedRelatoriosAjustePontoRoute
   AuthenticatedVeiculosMotoristasRoute: typeof AuthenticatedVeiculosMotoristasRoute
   AuthenticatedVeiculosRelatoriosRoute: typeof AuthenticatedVeiculosRelatoriosRoute
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
   AuthenticatedColaboradoresIndexRoute: typeof AuthenticatedColaboradoresIndexRoute
   AuthenticatedObrasIndexRoute: typeof AuthenticatedObrasIndexRoute
+  AuthenticatedRelatoriosIndexRoute: typeof AuthenticatedRelatoriosIndexRoute
   AuthenticatedVeiculosIndexRoute: typeof AuthenticatedVeiculosIndexRoute
 }
 
@@ -849,7 +871,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConsultaRoute: AuthenticatedConsultaRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFechamentoRoute: AuthenticatedFechamentoRoute,
-  AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedTreinamentosRoute: AuthenticatedTreinamentosRoute,
   AuthenticatedAdminAcessosRoute: AuthenticatedAdminAcessosRoute,
   AuthenticatedAdminAuditoriaRoute: AuthenticatedAdminAuditoriaRoute,
@@ -878,11 +899,14 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProgramacaoHojeRoute: AuthenticatedProgramacaoHojeRoute,
   AuthenticatedProgramacaoSemanalRoute: AuthenticatedProgramacaoSemanalRoute,
   AuthenticatedProgramacaoServicosRoute: AuthenticatedProgramacaoServicosRoute,
+  AuthenticatedRelatoriosAjustePontoRoute:
+    AuthenticatedRelatoriosAjustePontoRoute,
   AuthenticatedVeiculosMotoristasRoute: AuthenticatedVeiculosMotoristasRoute,
   AuthenticatedVeiculosRelatoriosRoute: AuthenticatedVeiculosRelatoriosRoute,
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
   AuthenticatedColaboradoresIndexRoute: AuthenticatedColaboradoresIndexRoute,
   AuthenticatedObrasIndexRoute: AuthenticatedObrasIndexRoute,
+  AuthenticatedRelatoriosIndexRoute: AuthenticatedRelatoriosIndexRoute,
   AuthenticatedVeiculosIndexRoute: AuthenticatedVeiculosIndexRoute,
 }
 

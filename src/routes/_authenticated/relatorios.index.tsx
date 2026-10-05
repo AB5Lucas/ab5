@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const Route = createFileRoute("/_authenticated/relatorios")({
+export const Route = createFileRoute("/_authenticated/relatorios/")({
   head: () => ({
     meta: [
       { title: "Relatórios | Programação Operacional" },
