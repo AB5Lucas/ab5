@@ -145,7 +145,7 @@ function ResultadoPage() {
   const isAll = workId === ALL;
   const groupKey = (x: any) => x.client_id ?? `n:${x.client ?? "Sem cliente"}`;
   const work = useMemo(() => {
-    const list = works.data ?? [];
+    const list = visibleWorks;
     if (!isAll) return list.find((w) => w.id === workId);
     const g = list.filter((x) => groupKey(x) === clientKey);
     if (!g.length) return undefined;
@@ -164,7 +164,7 @@ function ResultadoPage() {
       _ids: g.map((x) => x.id),
       _orders: Object.fromEntries(g.map((x) => [x.id, Number(x.order_value ?? 0)])),
     } as any;
-  }, [works.data, workId, clientKey, isAll]);
+  }, [visibleWorks, workId, clientKey, isAll]);
   const workIds: string[] = work ? ((work as any)._ids ?? [work.id]) : [];
   const canEdit = canWrite && !isAll;
 
