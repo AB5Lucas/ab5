@@ -68,7 +68,7 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
       const { data: ws } = await supabase.from("works").select("client_id").in("id", workIds);
       const clientId = ws?.find((w) => w.client_id)?.client_id ?? null;
       const { data: sched } = await supabase.from("daily_schedules").select("id").eq("schedule_date", picked!).maybeSingle();
-      if (!sched) return { people: 0, mo: 0, transport: 0 };
+      if (!sched) return { people: 0, mo: 0, transport: 0, vt: 0 };
       const sibIds = clientId ? ((await supabase.from("works").select("id").eq("client_id", clientId)).data ?? []).map((x) => x.id) : workIds;
       const [allocs, wf, vs, client] = await Promise.all([
         supabase.from("daily_allocations").select("work_id, collaborator_id, collaborators(salary, contract_type)").eq("schedule_id", sched.id).in("work_id", sibIds),
@@ -95,7 +95,32 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
         const cost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? 1.35) + toll * 2 * trips;
         transport += v.work_id ? cost : all.length ? (cost * mine.length) / all.length : cost / Math.max(1, sibIds.length);
       }
-      return { people: new Set(mine.map((a) => a.collaborator_id)).size, mo, transport };
+      // VT do dia: mesma regra da tela de Resultados
+      const [wvt, novt, lv, rules, mineFull] = await Promise.all([
+        supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", sched.id).in("work_id", workIds),
+        supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]),
+        supabase.from("medical_leaves").select("collaborator_id").lte("start_date", picked!).gte("end_date", picked!),
+        supabase.from("transport_voucher_rules").select("*").eq("active", true),
+        supabase.from("daily_allocations").select("work_id, collaborator_id, vt_override, driver, collaborators(city, vt_enabled)").eq("schedule_id", sched.id).in("work_id", workIds),
+      ]);
+      const payVt = new Map<string, boolean>(((wvt.data ?? []) as any[]).map((r) => [r.work_id, !!r.pays_vt]));
+      const skip = new Set<string>([...((novt.data ?? []) as any[]), ...((lv.data ?? []) as any[])].map((r) => r.collaborator_id));
+      const vtDay = (driver: boolean) =>
+        ((rules.data ?? []) as any[]).reduce((s, r) => {
+          if (driver ? !r.applies_to_drivers : !r.applies_to_collaborators) return s;
+          if (r.calculation_type === "fixed_monthly") return s;
+          return s + Number(r.amount) * (r.calculation_type === "round_trip" ? 2 : 1);
+        }, 0);
+      let vt = 0;
+      for (const a of (mineFull.data ?? []) as any[]) {
+        if (skip.has(a.collaborator_id)) continue;
+        const pouso = String(a.collaborators?.city ?? "").toLowerCase().includes("pouso alegre");
+        const base = a.collaborators?.vt_enabled === false ? false : !!payVt.get(a.work_id) || pouso;
+        if (!(a.vt_override ?? base)) continue;
+        vt += vtDay(!!a.driver);
+      }
+      transport += vt;
+      return { people: new Set(mine.map((a) => a.collaborator_id)).size, mo, transport, vt };
     },
   });
   const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -149,7 +174,7 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                       <div className="rounded-md border border-border p-2"><div className="text-xs text-muted-foreground">Colaboradores</div><div className="font-semibold">{day.data.people}</div></div>
                       <div className="rounded-md border border-border p-2"><div className="text-xs text-muted-foreground">Mão de obra</div><div className="font-semibold">{brl(day.data.mo)}</div></div>
-                      <div className="rounded-md border border-border p-2"><div className="text-xs text-muted-foreground">Transporte</div><div className="font-semibold">{brl(day.data.transport)}</div></div>
+                      <div className="rounded-md border border-border p-2"><div className="text-xs text-muted-foreground">Transporte</div><div className="font-semibold">{brl(day.data.transport)}</div>{day.data.vt > 0 && <div className="text-xs text-muted-foreground">inclui VT {brl(day.data.vt)}</div>}</div>
                       <div className="rounded-md border border-border p-2"><div className="text-xs text-muted-foreground">Total</div><div className="font-semibold">{brl(day.data.mo + day.data.transport)}</div></div>
                     </div>
                   )}
