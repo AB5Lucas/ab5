@@ -485,7 +485,7 @@ function ResultadoPage() {
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount };
-  }, [work, data.data, untilMonth, isAll]);
+  }, [work, data.data, untilMonth, isAll, holidaysQ.data]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string }[]>([]);
@@ -928,7 +928,7 @@ function ResultadoPage() {
             {detail === "mo" && calc && (
               <>
                 <p className="mb-2 text-xs text-muted-foreground">
-                  Horas do RDO (ausente = 0h; sem RDO, escalado = {DEFAULT_HOURS}h) × valor hora × {String(ENCARGOS).replace(".", ",")} (encargos; PJ sem encargos).
+                  Horas do RDO (ausente = 0h; sem RDO, escalado = {DEFAULT_HOURS}h) × valor hora × adicional (sábado e hora extra acima de 8h × 1,6; domingo e feriado × 2) × {String(ENCARGOS).replace(".", ",")} (encargos; PJ sem encargos).
                 </p>
                 <Table>
                   <TableBody>
