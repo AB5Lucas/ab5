@@ -676,7 +676,8 @@ function ResultadoPage() {
           visibleWorks.forEach((x: any) => clientMap.set(keyOf(x), x.client ?? "Sem cliente"));
           const clientList = [...clientMap.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
           const current = visibleWorks.find((x) => x.id === workId);
-          const ck = clientKey || (current ? keyOf(current) : "");
+          const ck0 = clientKey || (current ? keyOf(current) : "");
+          const ck = clientMap.has(ck0) ? ck0 : "";
           const services = visibleWorks.filter((x) => keyOf(x) === ck);
           return (
             <>
