@@ -153,6 +153,24 @@ export async function fetchScheduleContext(date: string) {
     supabase.from("asos").select("collaborator_id, exam_date, expires_at"),
   ]);
 
+  // Aceites parciais da Conferência: documento aceito por um cliente libera só aquele cliente.
+  const confChecks = await supabase
+    .from("conference_checks")
+    .select("client_id, approved, conference_items!inner(collaborator_id, type, training_id, status)");
+  const conferenceAccepted = new Set<string>();
+  const conferencePending = new Set<string>();
+  for (const r of (confChecks.data ?? []) as unknown as {
+    client_id: string;
+    approved: boolean;
+    conference_items: { collaborator_id: string; type: string; training_id: string | null; status: string } | null;
+  }[]) {
+    const it = r.conference_items;
+    if (!it || it.status === "concluido") continue;
+    const kind = String(it.type).toLowerCase().includes("aso") ? "aso" : `t:${it.training_id ?? ""}`;
+    const key = `${it.collaborator_id}|${kind}|${r.client_id}`;
+    (r.approved ? conferenceAccepted : conferencePending).add(key);
+  }
+
   const absences = new Map<string, string>();
   (vacations.data ?? []).forEach((v) => absences.set(v.collaborator_id, "Férias"));
   (leaves.data ?? []).forEach((v) => absences.set(v.collaborator_id, "Atestado"));
@@ -175,8 +193,47 @@ export async function fetchScheduleContext(date: string) {
     holiday: holidays.data?.[0]?.name ?? null,
     integrations: (integrations.data ?? []) as Integration[],
     asos: (asos.data ?? []) as Aso[],
+    conferenceAccepted,
+    conferencePending,
   };
 }
+
+/** Documento aceito na Conferência para o cliente do serviço (ainda não concluída). */
+export function acceptedForWork(
+  ctx: ScheduleContext,
+  collaboratorId: string,
+  kind: "aso" | `t:${string}`,
+  workId?: string | null,
+): boolean {
+  if (!workId) return false;
+  const clientId = ctx.works.find((w) => w.id === workId)?.client_id;
+  if (!clientId) return false;
+  return (ctx.conferenceAccepted ?? new Set()).has(`${collaboratorId}|${kind}|${clientId}`);
+}
+
+/** Documento aguardando aceite deste cliente na Conferência. */
+export function pendingForWork(ctx: ScheduleContext, collaboratorId: string, workId?: string | null): boolean {
+  const clientId = workId ? ctx.works.find((w) => w.id === workId)?.client_id : null;
+  if (!clientId) return false;
+  for (const k of ctx.conferencePending ?? []) if (k.startsWith(`${collaboratorId}|`) && k.endsWith(`|${clientId}`)) return true;
+  return false;
+}
+
+/** ASO mais recente do colaborador e seu status na data informada (considera aceite por cliente). */
+export function checkAso(
+  ctx: ScheduleContext,
+  collaboratorId: string,
+  date: string,
+  workId?: string | null,
+): { status: AsoStatus; expiresAt: string | null } {
+  const recs = (ctx.asos ?? []).filter((a) => a.collaborator_id === collaboratorId);
+  const latest = recs.length ? recs.reduce((a, b) => (b.expires_at > a.expires_at ? b : a)) : null;
+  const status = latest ? asoStatusOf(latest.expires_at, date) : "missing";
+  if ((status === "expired" || status === "missing") && acceptedForWork(ctx, collaboratorId, "aso", workId))
+    return { status: "valid", expiresAt: latest?.expires_at ?? null };
+  return { status, expiresAt: latest?.expires_at ?? null };
+}
+
 
 /** ASO mais recente do colaborador e seu status na data informada. */
 export function checkAso(
