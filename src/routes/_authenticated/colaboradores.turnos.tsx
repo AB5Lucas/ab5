@@ -65,12 +65,12 @@ function Page() {
 
   const save = async () => {
     if (!edit) return;
-    if (!edit.name.trim()) return toast.error("Informe o nome do turno");
+    if (!edit.name.trim()) { toast.error("Informe o nome do turno"); return; }
     const payload = { name: edit.name.trim(), schedule: edit.schedule as any };
     const { error } = edit.id
       ? await supabase.from("work_shifts").update(payload).eq("id", edit.id)
       : await supabase.from("work_shifts").insert(payload);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Turno salvo");
     setEdit(null);
     refresh();
@@ -79,7 +79,7 @@ function Page() {
   const remove = async (s: Shift) => {
     if (!confirm(`Excluir o turno ${s.name}? Os colaboradores voltam para o turno Padrão.`)) return;
     const { error } = await supabase.from("work_shifts").delete().eq("id", s.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     refresh();
   };
 
@@ -170,7 +170,6 @@ function Page() {
       {members && (
         <MembersDialog
           shift={members}
-          defaultId={def?.id}
           canWrite={canWrite}
           collabs={collabs.data ?? []}
           onClose={() => setMembers(null)}
@@ -181,7 +180,7 @@ function Page() {
   );
 }
 
-function MembersDialog({ shift, canWrite, collabs, onClose, onSaved }: { shift: Shift; defaultId?: string; canWrite: boolean; collabs: any[]; onClose: () => void; onSaved: () => void }) {
+function MembersDialog({ shift, canWrite, collabs, onClose, onSaved }: { shift: Shift; canWrite: boolean; collabs: any[]; onClose: () => void; onSaved: () => void }) {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const list = useMemo(() => {
@@ -195,7 +194,7 @@ function MembersDialog({ shift, canWrite, collabs, onClose, onSaved }: { shift: 
     setBusy(c.id);
     const { error } = await supabase.from("collaborators").update({ shift_id: on ? shift.id : null }).eq("id", c.id);
     setBusy(null);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     onSaved();
   };
 
