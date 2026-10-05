@@ -364,7 +364,7 @@ export function SchedulePlannerBoard({
 
   // Turno noturno iniciado no dia anterior: aparece hoje como continuação (sem novo VT/refeição/prêmio)
   const nightToday = useQuery({
-    queryKey: ["work-night", date],
+    queryKey: ["work-night", date, "set"],
     queryFn: async () => {
       const { data } = await (supabase as any).from("schedule_work_night").select("work_id").eq("schedule_date", date);
       return new Set((data ?? []).map((r: { work_id: string }) => r.work_id));
@@ -1587,7 +1587,7 @@ export function SchedulePlannerBoard({
                       .filter(Boolean)
                       .join(" · ") || "Sem cliente vinculado"}
                   </p>
-                  {g.works.some((x: any) => nightToday.data?.has(x.id)) && (
+                  {g.works.some((x: any) => nightToday.data instanceof Set && nightToday.data.has(x.id)) && (
                     <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-info">
                       <Moon className="h-2.5 w-2.5" /> Turno noturno (vira para o dia seguinte)
                     </p>
