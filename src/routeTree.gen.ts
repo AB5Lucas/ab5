@@ -19,7 +19,6 @@ import { Route as AuthenticatedConferenciaRouteImport } from './routes/_authenti
 import { Route as AuthenticatedConsultaRouteImport } from './routes/_authenticated/consulta'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedFechamentoRouteImport } from './routes/_authenticated/fechamento'
-import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedTreinamentosRouteImport } from './routes/_authenticated/treinamentos'
 import { Route as AuthenticatedAdminAcessosRouteImport } from './routes/_authenticated/admin.acessos'
 import { Route as AuthenticatedAdminAuditoriaRouteImport } from './routes/_authenticated/admin.auditoria'
@@ -44,6 +43,7 @@ import { Route as AuthenticatedProgramacaoHistoricoRouteImport } from './routes/
 import { Route as AuthenticatedProgramacaoHojeRouteImport } from './routes/_authenticated/programacao.hoje'
 import { Route as AuthenticatedProgramacaoSemanalRouteImport } from './routes/_authenticated/programacao.semanal'
 import { Route as AuthenticatedProgramacaoServicosRouteImport } from './routes/_authenticated/programacao.servicos'
+import { Route as AuthenticatedRelatoriosIndexRouteImport } from './routes/_authenticated/relatorios.index'
 import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authenticated/veiculos.index'
 import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_authenticated/veiculos.motoristas'
 import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
@@ -98,11 +98,6 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
 const AuthenticatedFechamentoRoute = AuthenticatedFechamentoRouteImport.update({
   id: '/fechamento',
   path: '/fechamento',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
-  id: '/relatorios',
-  path: '/relatorios',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTreinamentosRoute =
@@ -248,6 +243,12 @@ const AuthenticatedProgramacaoServicosRoute =
     path: '/programacao/servicos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedRelatoriosIndexRoute =
+  AuthenticatedRelatoriosIndexRouteImport.update({
+    id: '/relatorios/',
+    path: '/relatorios/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVeiculosIndexRoute =
   AuthenticatedVeiculosIndexRouteImport.update({
     id: '/veiculos/',
@@ -283,7 +284,6 @@ export interface FileRoutesByFullPath {
   '/consulta': typeof AuthenticatedConsultaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
-  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
@@ -311,6 +311,7 @@ export interface FileRoutesByFullPath {
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
   '/obras/': typeof AuthenticatedObrasIndexRoute
+  '/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos/': typeof AuthenticatedVeiculosIndexRoute
 }
 export interface FileRoutesByTo {
@@ -323,7 +324,6 @@ export interface FileRoutesByTo {
   '/consulta': typeof AuthenticatedConsultaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
-  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
@@ -351,6 +351,7 @@ export interface FileRoutesByTo {
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/colaboradores': typeof AuthenticatedColaboradoresIndexRoute
   '/obras': typeof AuthenticatedObrasIndexRoute
+  '/relatorios': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos': typeof AuthenticatedVeiculosIndexRoute
 }
 export interface FileRoutesById {
@@ -365,7 +366,6 @@ export interface FileRoutesById {
   '/_authenticated/consulta': typeof AuthenticatedConsultaRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/fechamento': typeof AuthenticatedFechamentoRoute
-  '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/_authenticated/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/_authenticated/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
@@ -393,6 +393,7 @@ export interface FileRoutesById {
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/_authenticated/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
   '/_authenticated/obras/': typeof AuthenticatedObrasIndexRoute
+  '/_authenticated/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/_authenticated/veiculos/': typeof AuthenticatedVeiculosIndexRoute
 }
 export interface FileRouteTypes {
@@ -407,7 +408,6 @@ export interface FileRouteTypes {
     | '/consulta'
     | '/dashboard'
     | '/fechamento'
-    | '/relatorios'
     | '/treinamentos'
     | '/admin/acessos'
     | '/admin/auditoria'
@@ -435,6 +435,7 @@ export interface FileRouteTypes {
     | '/veiculos/transporte'
     | '/colaboradores/'
     | '/obras/'
+    | '/relatorios/'
     | '/veiculos/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -447,7 +448,6 @@ export interface FileRouteTypes {
     | '/consulta'
     | '/dashboard'
     | '/fechamento'
-    | '/relatorios'
     | '/treinamentos'
     | '/admin/acessos'
     | '/admin/auditoria'
@@ -475,6 +475,7 @@ export interface FileRouteTypes {
     | '/veiculos/transporte'
     | '/colaboradores'
     | '/obras'
+    | '/relatorios'
     | '/veiculos'
   id:
     | '__root__'
@@ -488,7 +489,6 @@ export interface FileRouteTypes {
     | '/_authenticated/consulta'
     | '/_authenticated/dashboard'
     | '/_authenticated/fechamento'
-    | '/_authenticated/relatorios'
     | '/_authenticated/treinamentos'
     | '/_authenticated/admin/acessos'
     | '/_authenticated/admin/auditoria'
@@ -516,6 +516,7 @@ export interface FileRouteTypes {
     | '/_authenticated/veiculos/transporte'
     | '/_authenticated/colaboradores/'
     | '/_authenticated/obras/'
+    | '/_authenticated/relatorios/'
     | '/_authenticated/veiculos/'
   fileRoutesById: FileRoutesById
 }
@@ -596,13 +597,6 @@ declare module '@tanstack/react-router' {
       path: '/fechamento'
       fullPath: '/fechamento'
       preLoaderRoute: typeof AuthenticatedFechamentoRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/relatorios': {
-      id: '/_authenticated/relatorios'
-      path: '/relatorios'
-      fullPath: '/relatorios'
-      preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/treinamentos': {
@@ -773,6 +767,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProgramacaoServicosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/relatorios/': {
+      id: '/_authenticated/relatorios/'
+      path: '/relatorios'
+      fullPath: '/relatorios/'
+      preLoaderRoute: typeof AuthenticatedRelatoriosIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/veiculos/': {
       id: '/_authenticated/veiculos/'
       path: '/veiculos'
@@ -811,7 +812,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedConsultaRoute: typeof AuthenticatedConsultaRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFechamentoRoute: typeof AuthenticatedFechamentoRoute
-  AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedTreinamentosRoute: typeof AuthenticatedTreinamentosRoute
   AuthenticatedAdminAcessosRoute: typeof AuthenticatedAdminAcessosRoute
   AuthenticatedAdminAuditoriaRoute: typeof AuthenticatedAdminAuditoriaRoute
@@ -839,6 +839,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
   AuthenticatedColaboradoresIndexRoute: typeof AuthenticatedColaboradoresIndexRoute
   AuthenticatedObrasIndexRoute: typeof AuthenticatedObrasIndexRoute
+  AuthenticatedRelatoriosIndexRoute: typeof AuthenticatedRelatoriosIndexRoute
   AuthenticatedVeiculosIndexRoute: typeof AuthenticatedVeiculosIndexRoute
 }
 
@@ -849,7 +850,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConsultaRoute: AuthenticatedConsultaRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFechamentoRoute: AuthenticatedFechamentoRoute,
-  AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedTreinamentosRoute: AuthenticatedTreinamentosRoute,
   AuthenticatedAdminAcessosRoute: AuthenticatedAdminAcessosRoute,
   AuthenticatedAdminAuditoriaRoute: AuthenticatedAdminAuditoriaRoute,
@@ -883,6 +883,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
   AuthenticatedColaboradoresIndexRoute: AuthenticatedColaboradoresIndexRoute,
   AuthenticatedObrasIndexRoute: AuthenticatedObrasIndexRoute,
+  AuthenticatedRelatoriosIndexRoute: AuthenticatedRelatoriosIndexRoute,
   AuthenticatedVeiculosIndexRoute: AuthenticatedVeiculosIndexRoute,
 }
 
