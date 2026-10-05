@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -507,9 +507,11 @@ function IntegrationsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" aria-label="Visualizar" onClick={() => setViewing(r)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <AppointmentDialog
+                        type="integracao"
+                        iconOnly
+                        initialValues={{ collaborator_id: r.collaborator_id, client_id: r.client_id }}
+                      />
                       {canWrite && (
                         <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => openEdit(r)}>
                           <Pencil className="h-4 w-4" />

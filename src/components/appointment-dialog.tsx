@@ -72,7 +72,14 @@ const emptyForm = (): FormState => ({
   notes: "",
 });
 
-export function AppointmentDialog({ type }: { type: AppointmentType }) {
+type AppointmentDialogProps = {
+  type: AppointmentType;
+  /** Mostra só um ícone de calendário (para usar na linha de um colaborador). */
+  iconOnly?: boolean;
+  initialValues?: Partial<Pick<FormState, "collaborator_id" | "training_id" | "client_id">>;
+};
+
+export function AppointmentDialog({ type, iconOnly, initialValues }: AppointmentDialogProps) {
   const { canWrite, isAdmin } = useCurrentUser();
   const qc = useQueryClient();
 
@@ -260,9 +267,25 @@ export function AppointmentDialog({ type }: { type: AppointmentType }) {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <CalendarClock className="h-4 w-4" /> Agendamento
-      </Button>
+      {iconOnly ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Agendar"
+          title="Agendar"
+          onClick={() => {
+            setForm({ ...emptyForm(), ...initialValues });
+            setFPerson(initialValues?.collaborator_id ?? "all");
+            setOpen(true);
+          }}
+        >
+          <CalendarClock className="h-4 w-4" />
+        </Button>
+      ) : (
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          <CalendarClock className="h-4 w-4" /> Agendamento
+        </Button>
+      )}
 
       <Dialog
         open={open}

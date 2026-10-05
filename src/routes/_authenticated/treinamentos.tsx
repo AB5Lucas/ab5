@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -198,6 +198,7 @@ function TrainingsPage() {
   const [rTraining, setRTraining] = useState("");
   const [rDate, setRDate] = useState(today());
   const [rDoc, setRDoc] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "valid" | "expiring" | "expired">("all");
   const [personSearch, setPersonSearch] = useState("");
   const [trainingIds, setTrainingIds] = useState<string[]>([]);
@@ -208,6 +209,20 @@ function TrainingsPage() {
       if (!rTraining) throw new Error("Selecione o treinamento");
       const training = (trainings.data ?? []).find((t) => t.id === rTraining);
       const expires = training?.validity_months ? addMonths(rDate, training.validity_months) : null;
+      if (editingId) {
+        const { error } = await supabase
+          .from("collaborator_trainings")
+          .update({
+            collaborator_id: rPerson,
+            training_id: rTraining,
+            completed_at: rDate,
+            expires_at: expires,
+            document_url: rDoc.trim() || null,
+          })
+          .eq("id", editingId);
+        if (error) throw error;
+        return;
+      }
       const { error } = await upsertTrainingRecord({
         collaborator_id: rPerson,
         training_id: rTraining,
@@ -218,8 +233,9 @@ function TrainingsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Treinamento registrado.");
+      toast.success(editingId ? "Registro atualizado." : "Treinamento registrado.");
       setOpen(false);
+      setEditingId(null);
       setRPerson("");
       setRTraining("");
       setRDate(today());
@@ -429,7 +445,7 @@ function TrainingsPage() {
                   <TableHead className="hidden md:table-cell">Realizado</TableHead>
                   <TableHead className="hidden md:table-cell">Vencimento</TableHead>
                   <TableHead>Situação</TableHead>
-                  <TableHead className="w-16" />
+                  <TableHead className="w-32" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -457,12 +473,36 @@ function TrainingsPage() {
                             {STATUS_LABEL[st]}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                          <AppointmentDialog
+                            type="treinamento"
+                            iconOnly
+                            initialValues={{ collaborator_id: r.collaborator_id, training_id: r.training_id }}
+                          />
+                          {canWrite && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Editar"
+                              onClick={() => {
+                                setEditingId(r.id);
+                                setRPerson(r.collaborator_id);
+                                setRTraining(r.training_id);
+                                setRDate(r.completed_at);
+                                setRDoc(r.document_url ?? "");
+                                setOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
                           {isAdmin && (
                             <Button variant="ghost" size="icon" aria-label="Remover registro" onClick={() => removeRecord.mutate(r.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -543,10 +583,10 @@ function TrainingsPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); setRPerson(""); setRTraining(""); setRDate(today()); setRDoc(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Registrar treinamento</DialogTitle>
+            <DialogTitle>{editingId ? "Editar treinamento" : "Registrar treinamento"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
             <div className="space-y-1">
@@ -585,7 +625,7 @@ function TrainingsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={() => addRecord.mutate()} disabled={addRecord.isPending || !canWrite}>
-              {addRecord.isPending ? "Salvando..." : "Registrar"}
+              {addRecord.isPending ? "Salvando..." : editingId ? "Salvar" : "Registrar"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -417,6 +417,7 @@ function AsosPage() {
                   <TableCell>{statusBadge(asoStatusOf(r.expires_at, today))}</TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
+                      <AppointmentDialog type="aso" iconOnly initialValues={{ collaborator_id: r.collaborator_id }} />
                       {canWrite && (
                         <Button size="icon" variant="ghost" onClick={() => openEdit(r)} aria-label="Editar">
                           <Pencil className="h-4 w-4" />
