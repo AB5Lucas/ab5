@@ -84,7 +84,30 @@ function ResultadoPage() {
   const qc = useQueryClient();
   const [workId, setWorkId] = useState<string>("");
   const [clientKey, setClientKey] = useState<string>("");
-  const [untilMonth, setUntilMonth] = useState<string>("");
+  const [fromMonth, setFromMonth] = useState<string>("");
+  const [toMonth, setToMonth] = useState<string>("");
+  // Cálculos consideram tudo até o fim do período escolhido
+  const untilMonth = toMonth;
+  const hasPeriod = !!(fromMonth || toMonth);
+  const periodStart = fromMonth ? `${fromMonth}-01` : "0000-01-01";
+  const periodEnd = toMonth ? `${toMonth}-31` : "9999-12-31";
+  const activeIds = useQuery({
+    queryKey: ["works-active-period", periodStart, periodEnd],
+    enabled: hasPeriod,
+    queryFn: async () => {
+      const scheds = await fetchAll<any>((a, b) =>
+        supabase.from("daily_schedules").select("id").gte("schedule_date", periodStart).lte("schedule_date", periodEnd).order("id").range(a, b));
+      const ids = scheds.map((x) => x.id);
+      const out = new Set<string>();
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200);
+        const rows = await fetchAll<any>((a, b) =>
+          supabase.from("daily_allocations").select("work_id").in("schedule_id", chunk).order("id").range(a, b));
+        rows.forEach((r) => out.add(r.work_id));
+      }
+      return out;
+    },
+  });
 
   const works = useQuery({
     queryKey: ["works-result", role, user?.id],
@@ -102,6 +125,10 @@ function ResultadoPage() {
       return data;
     },
   });
+  const visibleWorks = useMemo(
+    () => (hasPeriod && activeIds.data ? (works.data ?? []).filter((w) => activeIds.data!.has(w.id)) : works.data ?? []),
+    [works.data, activeIds.data, hasPeriod],
+  );
   const ALL = "__all__";
   const isAll = workId === ALL;
   const groupKey = (x: any) => x.client_id ?? `n:${x.client ?? "Sem cliente"}`;
@@ -577,15 +604,27 @@ function ResultadoPage() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Período:</span>
+        <input type="month" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2" aria-label="Mês inicial" />
+        <span className="text-muted-foreground">até</span>
+        <input type="month" value={toMonth} onChange={(e) => setToMonth(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2" aria-label="Mês final" />
+        {hasPeriod && (
+          <Button variant="ghost" size="sm" onClick={() => { setFromMonth(""); setToMonth(""); }}>Limpar (todas as obras)</Button>
+        )}
+        <span className="text-muted-foreground">
+          {hasPeriod ? (activeIds.isLoading ? "Buscando obras do período…" : `${visibleWorks.length} serviço(s) com programação no período`) : "Sem período: mostrando todas as obras"}
+        </span>
+      </div>
       <div className="flex flex-wrap items-center gap-3">
         {(() => {
           const keyOf = groupKey;
           const clientMap = new Map<string, string>();
-          (works.data ?? []).forEach((x: any) => clientMap.set(keyOf(x), x.client ?? "Sem cliente"));
+          visibleWorks.forEach((x: any) => clientMap.set(keyOf(x), x.client ?? "Sem cliente"));
           const clientList = [...clientMap.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
-          const current = (works.data ?? []).find((x) => x.id === workId);
+          const current = visibleWorks.find((x) => x.id === workId);
           const ck = clientKey || (current ? keyOf(current) : "");
-          const services = (works.data ?? []).filter((x) => keyOf(x) === ck);
+          const services = visibleWorks.filter((x) => keyOf(x) === ck);
           return (
             <>
               <div className="w-full max-w-xs">
@@ -593,7 +632,7 @@ function ResultadoPage() {
                   value={ck}
                   onValueChange={(v) => {
                     setClientKey(v);
-                    const list = (works.data ?? []).filter((x) => keyOf(x) === v);
+                    const list = visibleWorks.filter((x) => keyOf(x) === v);
                     if (list.length === 1) selectWork(list[0]!.id);
                     else setWorkId(ALL);
                   }}
@@ -631,22 +670,6 @@ function ResultadoPage() {
             </>
           );
         })()}
-        {work && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Fechamento até:</span>
-            <input
-              type="month"
-              value={untilMonth}
-              onChange={(e) => setUntilMonth(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-2"
-            />
-            {untilMonth && (
-              <Button variant="ghost" size="sm" onClick={() => setUntilMonth("")}>
-                Tudo
-              </Button>
-            )}
-          </div>
-        )}
         {work && canEdit && (
           <>
             <Button variant="outline" onClick={() => openEntries("lancamentos")}>
