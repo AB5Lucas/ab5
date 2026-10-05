@@ -311,7 +311,7 @@ function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid gap-6 pt-5 xl:grid-cols-[2fr_1fr_1fr]">
+            <div className="grid gap-6 pt-5 xl:grid-cols-2">
               <div>
                 <div className="flex h-9 items-center justify-between">
                   <SectionTitle>Avisos importantes</SectionTitle>
@@ -330,8 +330,16 @@ function DashboardPage() {
                   </div>
                 </div>
               </div>
-              <LeaveBox title="Férias" rows={calc.vac} today={today} onMore={() => setDlg("ferias")} />
-              <LeaveBox title="Atestados" rows={calc.med} today={today} onMore={() => setDlg("atestados")} />
+              <div>
+                <div className="flex h-9 items-center justify-between">
+                  <SectionTitle>Ausências</SectionTitle>
+                  <Button size="sm" variant="outline" onClick={() => setDlg("ausencias")}>Ver todos</Button>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <LeaveBox title="Férias" rows={calc.vac} today={today} />
+                  <LeaveBox title="Atestados" rows={calc.med} today={today} />
+                </div>
+              </div>
             </div>
           </>
         )}
@@ -398,14 +406,11 @@ function DueCard({ d }: { d: Due }) {
   );
 }
 
-function LeaveBox({ title, rows, today, onMore }: { title: string; rows: any[]; today: string; onMore: () => void }) {
+function LeaveBox({ title, rows, today }: { title: string; rows: any[]; today: string }) {
   return (
-    <div>
-      <div className="flex h-9 items-center justify-between">
-        <SectionTitle>{title} ({rows.length})</SectionTitle>
-        {rows.length > 6 && <Button size="sm" variant="ghost" onClick={onMore}>Ver todos</Button>}
-      </div>
-      <div className="mt-3 space-y-2">
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase text-primary">{title} ({rows.length})</p>
+      <div className="space-y-2">
         {rows.slice(0, 6).map((r) => (
           <div key={r.collaborator_id} className="rounded-md border bg-background px-3 py-2">
             <p className="text-sm font-semibold">{r.name} {r.reg && <span className="text-xs font-normal text-muted-foreground">#{r.reg}</span>}</p>
