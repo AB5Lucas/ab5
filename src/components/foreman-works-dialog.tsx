@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Building2 } from "lucide-react";
@@ -58,6 +58,18 @@ export function ForemanWorksButton({ userId, name }: { userId: string; name: str
 
   const list = clients.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
   const linkedList = clients.filter((c) => c.workIds.some((id) => linked.data?.has(id)));
+
+  // Cliente atribuído vale para todos os serviços dele: completa os que faltarem ao carregar
+  const missing = linkedList.flatMap((c) => c.workIds.filter((id) => !linked.data?.has(id)));
+  const missingKey = missing.join(",");
+  useEffect(() => {
+    if (!missing.length) return;
+    void supabase
+      .from("foreman_works")
+      .insert(missing.map((work_id) => ({ user_id: userId, work_id })))
+      .then(() => qc.invalidateQueries({ queryKey: ["fw-linked", userId] }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingKey, userId]);
 
   return (
     <>
