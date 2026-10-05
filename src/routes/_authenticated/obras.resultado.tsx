@@ -503,7 +503,7 @@ function ResultadoPage() {
     const order = Number((work as any)?.order_value ?? 0);
     const real = Object.fromEntries((calc?.items ?? []).map((i) => [i.key, i.real])) as Record<string, number>;
     const w: Record<string, number> = { mo: 4, transporte: 2, ferramentas: 1, materiais: 3, andaimes: 0 };
-    if ((real.andaimes ?? 0) > 0 && !(real.ferramentas ?? 0)) { w.andaimes = w.ferramentas!; w.ferramentas = 0; }
+    if ((real["andaimes"] ?? 0) > 0 && !(real["ferramentas"] ?? 0)) { w["andaimes"] = w["ferramentas"]!; w["ferramentas"] = 0; }
     const realTotal = ITEMS.reduce((a, it) => a + (real[it.key] ?? 0), 0);
     if (realTotal > 0) for (const it of ITEMS) w[it.key] = 0.5 * w[it.key]! + 0.5 * (10 * (real[it.key] ?? 0)) / realTotal;
     const sumW = ITEMS.reduce((a, it) => a + w[it.key]!, 0) || 1;
