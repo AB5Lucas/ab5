@@ -674,18 +674,6 @@ function ResultadoPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Período:</span>
-        <input type="month" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2" aria-label="Mês inicial" />
-        <span className="text-muted-foreground">até</span>
-        <input type="month" value={toMonth} onChange={(e) => setToMonth(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2" aria-label="Mês final" />
-        {hasPeriod && (
-          <Button variant="ghost" size="sm" onClick={() => { setFromMonth(""); setToMonth(""); }}>Limpar (todas as obras)</Button>
-        )}
-        <span className="text-muted-foreground">
-          {hasPeriod ? (activeIds.isLoading ? "Buscando obras do período…" : `${visibleWorks.length} serviço(s) com programação no período`) : "Sem período: mostrando todas as obras"}
-        </span>
-      </div>
       <div className="flex flex-wrap items-center gap-3">
         {(() => {
           const keyOf = groupKey;
@@ -730,6 +718,15 @@ function ResultadoPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Período:</span>
+                <input type="month" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2" aria-label="Mês inicial" title={hasPeriod ? (activeIds.isLoading ? "Buscando obras do período…" : `${visibleWorks.length} serviço(s) com programação no período`) : "Sem período: mostrando todas as obras"} />
+                <span className="text-muted-foreground">até</span>
+                <input type="month" value={toMonth} onChange={(e) => setToMonth(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2" aria-label="Mês final" />
+                {hasPeriod && (
+                  <Button variant="ghost" size="sm" onClick={() => { setFromMonth(""); setToMonth(""); }}>Limpar</Button>
+                )}
               </div>
               {ck && (
                 <ServiceDaysCalendar
