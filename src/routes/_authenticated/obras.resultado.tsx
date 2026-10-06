@@ -558,7 +558,7 @@ function ResultadoPage() {
     }
     const monthBars = rows.map((r) => {
       const pm = perMonth.get(r.ym)!;
-      return { label: r.label, ...pm, materiais: pm.materiais + pm.ferramentas };
+      return { label: r.label, ...pm, materiais: pm.materiais + pm.ferramentas + pm.andaimes };
     });
     const bi = ((work as any).budget_items ?? {}) as Record<string, number>;
     const items = ITEMS.map((it) => {
@@ -916,7 +916,7 @@ function ResultadoPage() {
     const out: { key: string; label: string; budget: number; real: number; used: number }[] = [];
     const mat = { key: "materiais", label: "Materiais", budget: 0, real: 0, used: 0 };
     for (const i of src) {
-      if (i.key === "materiais" || i.key === "ferramentas") {
+      if (i.key === "materiais" || i.key === "ferramentas" || i.key === "andaimes") {
         mat.budget += i.budget;
         mat.real += i.real;
         if (!out.includes(mat)) out.push(mat);
