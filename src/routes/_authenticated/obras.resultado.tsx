@@ -705,7 +705,7 @@ function ResultadoPage() {
     return { ...calcBase, items, budget, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
   }, [calcBase, hhBudget, hhPeriodValue, isAll]);
   /** Contrato: custo orçado e conclusão = faturamentos lançados ÷ meses do contrato. */
-  const calc = useMemo(() => {
+  const calcCt = useMemo(() => {
     const w = hhSavedWork;
     if (!calcHH || isAll || !w?.contract_enabled) return calcHH;
     const f = contractFraction(calcHH.billingCount, Number(w.contract_months ?? 12));
@@ -720,7 +720,35 @@ function ResultadoPage() {
     const fullBudget = calcHH.items.reduce((a, i) => a + i.budget, 0);
     return { ...calcHH, items, budget, last, budgetMarginPct: order ? ((order - order * TAX_RATE - fullBudget) / order) * 100 : 0 };
   }, [calcHH, hhSavedWork, isAll]);
+  /** Locação: orçado de andaime = faturado acumulado × média dos % mensais (gasto andaime ÷ faturado do mês). */
+  const rentalInfo = useMemo(() => {
+    const w = hhSavedWork;
+    if (!calcCt || isAll || !w?.rental_enabled || !data.data) return null;
+    const cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
+    const bill = new Map<string, number>();
+    const scaf = new Map<string, number>();
+    for (const e of data.data.entries as any[]) {
+      if (e.entry_date > cut) continue;
+      const ym = e.entry_date.slice(0, 7);
+      if (e.category === "faturamento") bill.set(ym, (bill.get(ym) ?? 0) + Number(e.amount));
+      else if (e.category === "andaimes") scaf.set(ym, (scaf.get(ym) ?? 0) + Number(e.amount));
+    }
+    const months = [...bill.entries()].filter(([, v]) => v > 0).sort(([a], [b]) => a.localeCompare(b));
+    if (!months.length) return null;
+    const rows = months.map(([ym, b]) => ({ ym, billed: b, spent: scaf.get(ym) ?? 0, pct: (scaf.get(ym) ?? 0) / b }));
+    const avg = rows.reduce((a, r) => a + r.pct, 0) / rows.length;
+    const billed = rows.reduce((a, r) => a + r.billed, 0);
+    return { rows, avg, budget: billed * avg };
+  }, [calcCt, hhSavedWork, isAll, data.data, untilMonth]);
+  const calc = useMemo(() => {
+    if (!calcCt || !rentalInfo) return calcCt;
+    const items = calcCt.items.map((i) =>
+      i.key === "andaimes" ? { ...i, budget: rentalInfo.budget, used: rentalInfo.budget ? (i.real / rentalInfo.budget) * 100 : i.real ? 100 : 0 } : i,
+    );
+    return { ...calcCt, items, budget: items.reduce((a, i) => a + i.budget, 0) };
+  }, [calcCt, rentalInfo]);
   const [ctOn, setCtOn] = useState(false);
+  const [rtOn, setRtOn] = useState(false);
   const [ctMonths, setCtMonths] = useState("12");
   const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
@@ -764,6 +792,7 @@ function ResultadoPage() {
           order_value: ordersSum,
           hh_enabled: hhOn,
           contract_enabled: ctOn,
+          rental_enabled: rtOn,
           contract_months: Math.max(1, parseInt(ctMonths) || 12),
           hh_rates: Object.fromEntries(Object.entries(hhRates).map(([k, v]) => [k, num(v)]).filter(([, v]) => v)),
           order_number: list.map((o) => o.number.trim()).filter(Boolean).join(" / ") || null,
@@ -898,6 +927,7 @@ function ResultadoPage() {
     setQuoteNo(w?.quote_number ?? "");
     setHhOn(!!w?.hh_enabled);
     setCtOn(!!w?.contract_enabled);
+    setRtOn(!!w?.rental_enabled);
     setCtMonths(String(w?.contract_months ?? 12));
     setHhRates(Object.fromEntries(Object.entries((w?.hh_rates ?? {}) as Record<string, number>).map(([k, v]) => [k, f(v)])));
     const bi = (w?.budget_items ?? {}) as Record<string, number>;
@@ -1358,6 +1388,9 @@ function ResultadoPage() {
                     meses
                   </div>
                 )}
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Switch checked={rtOn} onCheckedChange={setRtOn} /> Locação
+                </label>
               </div>
               {hhOn && (
                 <Button type="button" size="sm" variant="outline" onClick={() => setHhDlg(true)}>Valores</Button>
