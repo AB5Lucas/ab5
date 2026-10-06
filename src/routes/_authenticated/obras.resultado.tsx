@@ -496,7 +496,7 @@ function ResultadoPage() {
   const [hhRates, setHhRates] = useState<Record<string, string>>({});
   const [hhDlg, setHhDlg] = useState(false);
   const hhRaw = useQuery({
-    queryKey: ["hh-hours", workId],
+    queryKey: ["hh-hours-raw", workId],
     enabled: !!workId && workId !== "__all__" && hhOn,
     queryFn: async () => {
       const [{ data: wf, error }, { data: pos }] = await Promise.all([
@@ -513,7 +513,7 @@ function ResultadoPage() {
     },
   });
   const aggHH = (from: string, to: string) => {
-    if (!hhRaw.data) return undefined;
+    if (!hhRaw.data || !Array.isArray(hhRaw.data.rows)) return undefined;
     const hours = new Map<string, number>();
     for (const r of hhRaw.data.rows) if (r.date >= from && r.date <= to) hours.set(r.pid, (hours.get(r.pid) ?? 0) + r.h);
     return [...hours.entries()]
