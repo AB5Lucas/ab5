@@ -491,7 +491,8 @@ function ResultadoPage() {
       .map(([id, l]) => ({ id, name: `${names.get(id) ?? "—"}${pj.has(id) ? " (PJ)" : ""}`, rate: rate.get(id) ?? 0, ...l }))
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
-    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount };
+    const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
+    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
   }, [work, data.data, untilMonth, isAll, holidaysQ.data]);
 
   // ---------- Edição ----------
@@ -606,7 +607,7 @@ function ResultadoPage() {
     for (const n of perDay.values()) transporte += Math.ceil(n / cap) * carDay;
     return { mo, transporte };
   }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd, holidaysQ.data]);
-  const calc = useMemo(() => {
+  const calcHH = useMemo(() => {
     if (!calcBase || !hhBudget || isAll) return calcBase;
     const items = calcBase.items.map((i) => {
       const b = i.key === "mo" ? hhBudget.mo : i.key === "transporte" ? hhBudget.transporte : i.budget;
@@ -616,6 +617,22 @@ function ResultadoPage() {
     const order = hhPeriodValue ?? calcBase.order;
     return { ...calcBase, items, budget, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
   }, [calcBase, hhBudget, hhPeriodValue, isAll]);
+  /** Contrato: custo orçado e conclusão = faturamentos lançados ÷ meses do contrato. */
+  const calc = useMemo(() => {
+    const w = hhSavedWork;
+    if (!calcHH || isAll || !w?.contract_enabled) return calcHH;
+    const f = contractFraction(calcHH.billingCount, Number(w.contract_months ?? 12));
+    const items = calcHH.items.map((i) => {
+      const b = i.budget * f;
+      return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
+    });
+    const budget = items.reduce((a, i) => a + i.budget, 0);
+    const order = calcHH.order;
+    const last = calcHH.last ? { ...calcHH.last, progress: f * 100 } : calcHH.last;
+    return { ...calcHH, items, budget, last, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
+  }, [calcHH, hhSavedWork, isAll]);
+  const [ctOn, setCtOn] = useState(false);
+  const [ctMonths, setCtMonths] = useState("12");
   const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
@@ -657,6 +674,8 @@ function ResultadoPage() {
           orders: list.map((o) => ({ number: o.number.trim(), value: hhOn ? 0 : num(o.value) })),
           order_value: ordersSum,
           hh_enabled: hhOn,
+          contract_enabled: ctOn,
+          contract_months: Math.max(1, parseInt(ctMonths) || 12),
           hh_rates: Object.fromEntries(Object.entries(hhRates).map(([k, v]) => [k, num(v)]).filter(([, v]) => v)),
           order_number: list.map((o) => o.number.trim()).filter(Boolean).join(" / ") || null,
           quote_number: quoteNo.trim() || null,
@@ -789,6 +808,8 @@ function ResultadoPage() {
     setOrderList(ol.length ? ol.map((o) => ({ number: String(o.number ?? ""), value: f(o.value) })) : [{ number: "", value: "" }]);
     setQuoteNo(w?.quote_number ?? "");
     setHhOn(!!w?.hh_enabled);
+    setCtOn(!!w?.contract_enabled);
+    setCtMonths(String(w?.contract_months ?? 12));
     setHhRates(Object.fromEntries(Object.entries((w?.hh_rates ?? {}) as Record<string, number>).map(([k, v]) => [k, f(v)])));
     const bi = (w?.budget_items ?? {}) as Record<string, number>;
     setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, f(bi[it.key])])));
@@ -1235,9 +1256,20 @@ function ResultadoPage() {
           <div className="grid gap-3">
             <Field label="Nº Orç. AB5" value={quoteNo} onChange={setQuoteNo} />
             <div className="flex items-center justify-between gap-2 rounded-md border p-2">
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <Switch checked={hhOn} onCheckedChange={setHhOn} /> HH
-              </label>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Switch checked={hhOn} onCheckedChange={setHhOn} /> Hora Homem
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Switch checked={ctOn} onCheckedChange={setCtOn} /> Contrato
+                </label>
+                {ctOn && (
+                  <div className="flex items-center gap-1 text-sm">
+                    <Input className="h-8 w-16" inputMode="numeric" value={ctMonths} onChange={(e) => setCtMonths(e.target.value.replace(/\D/g, ""))} aria-label="Meses do contrato" />
+                    meses
+                  </div>
+                )}
+              </div>
               {hhOn && (
                 <Button type="button" size="sm" variant="outline" onClick={() => setHhDlg(true)}>Valores</Button>
               )}
