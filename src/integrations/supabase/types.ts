@@ -2573,6 +2573,7 @@ export type Database = {
           order_value: number
           orders: Json
           quote_number: string | null
+          rental_enabled: boolean
           start_date: string | null
           state: string | null
           status: Database["public"]["Enums"]["work_status"]
@@ -2613,6 +2614,7 @@ export type Database = {
           order_value?: number
           orders?: Json
           quote_number?: string | null
+          rental_enabled?: boolean
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]
@@ -2653,6 +2655,7 @@ export type Database = {
           order_value?: number
           orders?: Json
           quote_number?: string | null
+          rental_enabled?: boolean
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]

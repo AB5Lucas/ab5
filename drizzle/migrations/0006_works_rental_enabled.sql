@@ -1,0 +1,1 @@
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS rental_enabled boolean NOT NULL DEFAULT false;

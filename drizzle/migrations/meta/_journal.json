@@ -43,6 +43,13 @@
       "when": 1791294206740,
       "tag": "0005_works_contract",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791315168296,
+      "tag": "0006_works_rental_enabled",
+      "breakpoints": true
     }
   ]
 }
