@@ -1,6 +1,6 @@
 import { Switch } from "@/components/ui/switch";
 import { useEffect, useMemo, useState } from "react";
-import { workedHours } from "@/lib/rdo";
+import { workedHours, positionLabel } from "@/lib/rdo";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -542,6 +542,72 @@ function ResultadoPage() {
       qc.invalidateQueries({ queryKey: ["work-result"] });
     });
   }, [hhData.data, workId, works.data]);
+
+  // HH: custo orçado de MO e transporte proporcional às horas/dias dos RDOs
+  const hhRefs = useQuery({
+    queryKey: ["hh-budget-refs", hhSavedWork?.client_id ?? null],
+    enabled: !!hhSavedWork?.hh_enabled,
+    queryFn: async () => {
+      const [pos, col, veh, cli] = await Promise.all([
+        supabase.from("positions").select("id, name"),
+        supabase.from("collaborators").select("position_id, salary").eq("status", "active"),
+        supabase.from("vehicles").select("passenger_capacity, km_rate, status"),
+        hhSavedWork?.client_id
+          ? supabase.from("clients").select("distance_km, has_toll, toll_amount").eq("id", hhSavedWork.client_id).maybeSingle()
+          : Promise.resolve({ data: null as any }),
+      ]);
+      return { pos: pos.data ?? [], col: col.data ?? [], veh: veh.data ?? [], cli: cli.data };
+    },
+  });
+  const hhBudget = useMemo(() => {
+    if (!hhSavedWork?.hh_enabled || !hhRaw.data || !Array.isArray(hhRaw.data.rows) || !hhRefs.data) return null;
+    const { pos, col, veh, cli } = hhRefs.data;
+    const base = (n: string) => positionLabel(n)?.toLowerCase() ?? n.toLowerCase();
+    const level = (n: string) => Number(/n\s*\.?\s*([1-4])\s*$/i.exec(n)?.[1] ?? 0);
+    const maxSal = new Map<string, number>();
+    for (const c of col) if (c.position_id) maxSal.set(c.position_id, Math.max(maxSal.get(c.position_id) ?? 0, Number(c.salary ?? 0)));
+    // Valor hora orçado = maior salário do nível mais alto (com salário) da mesma função
+    const rateFor = new Map<string, number>();
+    const posName = new Map(pos.map((p) => [p.id, p.name]));
+    const rateOf = (pid: string) => {
+      if (rateFor.has(pid)) return rateFor.get(pid)!;
+      const n = posName.get(pid);
+      let r = 0;
+      if (n) {
+        const fam = pos.filter((p) => base(p.name) === base(n) && (maxSal.get(p.id) ?? 0) > 0);
+        fam.sort((a, b) => level(b.name) - level(a.name) || (maxSal.get(b.id) ?? 0) - (maxSal.get(a.id) ?? 0));
+        r = fam[0] ? maxSal.get(fam[0].id)! : maxSal.get(pid) ?? 0;
+      }
+      rateFor.set(pid, r);
+      return r;
+    };
+    const rows = hhRaw.data.rows.filter((r) => r.date >= periodStart && r.date <= periodEnd);
+    const hol = new Set<string>();
+    let mo = 0;
+    const perDay = new Map<string, number>();
+    for (const r of rows) {
+      mo += laborCost(r.h, rateOf(r.pid), false, r.date, hol);
+      perDay.set(r.date, (perDay.get(r.date) ?? 0) + 1);
+    }
+    const caps = veh.filter((v) => v.status !== "inactive" && Number(v.passenger_capacity) > 0).map((v) => Number(v.passenger_capacity)).sort((a, b) => a - b);
+    const cap = caps.length ? caps[Math.floor(caps.length / 2)]! : 7;
+    const km = Number(cli?.distance_km ?? 0);
+    const toll = cli?.has_toll ? Number(cli.toll_amount ?? 0) : 0;
+    const carDay = km * 2 * 1.35 + toll * 2; // ida e volta + pedágio
+    let transporte = 0;
+    for (const n of perDay.values()) transporte += Math.ceil(n / cap) * carDay;
+    return { mo, transporte };
+  }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd]);
+  const calc = useMemo(() => {
+    if (!calcBase || !hhBudget || isAll) return calcBase;
+    const items = calcBase.items.map((i) => {
+      const b = i.key === "mo" ? hhBudget.mo : i.key === "transporte" ? hhBudget.transporte : i.budget;
+      return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
+    });
+    const budget = items.reduce((a, i) => a + i.budget, 0);
+    const order = hhPeriodValue ?? calcBase.order;
+    return { ...calcBase, items, budget, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
+  }, [calcBase, hhBudget, hhPeriodValue, isAll]);
   const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
