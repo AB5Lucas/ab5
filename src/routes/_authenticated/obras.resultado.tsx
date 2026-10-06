@@ -490,7 +490,31 @@ function ResultadoPage() {
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string }[]>([]);
-  const ordersSum = orderList.reduce((a, o) => a + num(o.value), 0);
+  // HH: valor do pedido = horas dos RDOs × valor cobrado por hora da função
+  const [hhOn, setHhOn] = useState(false);
+  const [hhRates, setHhRates] = useState<Record<string, string>>({});
+  const [hhDlg, setHhDlg] = useState(false);
+  const hhData = useQuery({
+    queryKey: ["hh-hours", workId],
+    enabled: !!workId && workId !== "__all__" && hhOn,
+    queryFn: async () => {
+      const [{ data: wf, error }, { data: pos }] = await Promise.all([
+        supabase.from("rdo_workforce").select("position_id, entry_time, exit_time, break_minutes, worked_hours, present, collaborators(position_id)").eq("work_id", workId).eq("present", true),
+        supabase.from("positions").select("id, name").order("name"),
+      ]);
+      if (error) throw error;
+      const hours = new Map<string, number>();
+      for (const w of wf ?? []) {
+        const pid = w.position_id ?? (w as any).collaborators?.position_id ?? "none";
+        const h = w.worked_hours != null ? Number(w.worked_hours) : workedHours(w.entry_time, w.exit_time, w.break_minutes ?? 60);
+        hours.set(pid, (hours.get(pid) ?? 0) + h);
+      }
+      const names = new Map((pos ?? []).map((p) => [p.id, p.name]));
+      return [...hours.entries()].map(([id, h]) => ({ id, name: id === "none" ? "Sem função" : names.get(id) ?? "—", hours: h })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    },
+  });
+  const hhValue = (hhData.data ?? []).reduce((a, r) => a + r.hours * num(hhRates[r.id] ?? ""), 0);
+  const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
   const itemsSum = ITEMS.reduce((a, it) => a + num(itemStrs[it.key] ?? ""), 0);
@@ -528,8 +552,10 @@ function ResultadoPage() {
       const { error } = await supabase
         .from("works")
         .update({
-          orders: list.map((o) => ({ number: o.number.trim(), value: num(o.value) })),
+          orders: list.map((o) => ({ number: o.number.trim(), value: hhOn ? 0 : num(o.value) })),
           order_value: ordersSum,
+          hh_enabled: hhOn,
+          hh_rates: Object.fromEntries(Object.entries(hhRates).map(([k, v]) => [k, num(v)]).filter(([, v]) => v)),
           order_number: list.map((o) => o.number.trim()).filter(Boolean).join(" / ") || null,
           quote_number: quoteNo.trim() || null,
           budget_cost: itemsSum,
