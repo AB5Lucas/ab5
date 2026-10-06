@@ -404,6 +404,12 @@ function ResultadoPage() {
       bump(e.entry_date.slice(0, 7), e.category === "faturamento" ? "billing" : "entries", Number(e.amount));
     }
     let progMap = new Map<string, number>(d.progress.map((p: any) => [String(p.month).slice(0, 7), Number(p.percent)]));
+    if (!isAll && (work as any).contract_enabled) {
+      // Contrato: andamento mensal automático = faturamentos acumulados ÷ meses
+      const bills = d.entries.filter((e: any) => e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)).sort();
+      progMap = new Map();
+      bills.forEach((ym: string, i: number) => progMap.set(ym, contractFraction(i + 1, Number((work as any).contract_months ?? 12)) * 100));
+    }
     if (isAll) {
       // Andamento geral = média ponderada pelo valor do pedido de cada serviço
       const ow: Record<string, number> = (work as any)._orders ?? {};
