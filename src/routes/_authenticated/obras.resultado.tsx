@@ -545,7 +545,7 @@ function ResultadoPage() {
 
   // HH: custo orçado de MO e transporte proporcional às horas/dias dos RDOs
   const hhRefs = useQuery({
-    queryKey: ["hh-budget-refs", hhSavedWork?.client_id ?? null],
+    queryKey: ["hh-budget-refs-v2", hhSavedWork?.client_id ?? null],
     enabled: !!hhSavedWork?.hh_enabled,
     queryFn: async () => {
       const [pos, col, veh, dbr, cli] = await Promise.all([
@@ -566,16 +566,16 @@ function ResultadoPage() {
     const base = (n: string) => positionLabel(n)?.toLowerCase() ?? n.toLowerCase();
     const level = (n: string) => Number(/n\s*\.?\s*([1-4])\s*$/i.exec(n)?.[1] ?? 0);
     const maxSal = new Map<string, number>();
-    for (const c of col) if (c.position_id) maxSal.set(c.position_id, Math.max(maxSal.get(c.position_id) ?? 0, Number(c.salary ?? 0)));
+    for (const c of col ?? []) if (c.position_id) maxSal.set(c.position_id, Math.max(maxSal.get(c.position_id) ?? 0, Number(c.salary ?? 0)));
     // Valor hora orçado = maior salário do nível mais alto (com salário) da mesma função
     const rateFor = new Map<string, number>();
-    const posName = new Map(pos.map((p) => [p.id, p.name]));
+    const posName = new Map((pos ?? []).map((p) => [p.id, p.name]));
     const rateOf = (pid: string) => {
       if (rateFor.has(pid)) return rateFor.get(pid)!;
       const n = posName.get(pid);
       let r = 0;
       if (n) {
-        const fam = pos.filter((p) => base(p.name) === base(n) && (maxSal.get(p.id) ?? 0) > 0);
+        const fam = (pos ?? []).filter((p) => base(p.name) === base(n) && (maxSal.get(p.id) ?? 0) > 0);
         fam.sort((a, b) => level(b.name) - level(a.name) || (maxSal.get(b.id) ?? 0) - (maxSal.get(a.id) ?? 0));
         r = fam[0] ? maxSal.get(fam[0].id)! : maxSal.get(pid) ?? 0;
       }
@@ -590,12 +590,12 @@ function ResultadoPage() {
       mo += laborCost(r.h, rateOf(r.pid), false, r.date, hol);
       perDay.set(r.date, (perDay.get(r.date) ?? 0) + 1);
     }
-    const caps = veh.filter((v) => v.status !== "inactive" && Number(v.passenger_capacity) > 0).map((v) => Number(v.passenger_capacity)).sort((a, b) => a - b);
+    const caps = (veh ?? []).filter((v) => v.status !== "inactive" && Number(v.passenger_capacity) > 0).map((v) => Number(v.passenger_capacity)).sort((a, b) => a - b);
     const cap = caps.length ? caps[Math.floor(caps.length / 2)]! : 7;
     const km = Number(cli?.distance_km ?? 0);
     const toll = cli?.has_toll ? Number(cli.toll_amount ?? 0) : 0;
     // ida e volta + pedágio + prêmio motorista (regras por distância)
-    const bonus = (dbr as any[]).filter((r) => r.calculation_type !== "fixed_monthly" && km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance))).reduce((s, r) => s + Number(r.amount), 0);
+    const bonus = ((dbr ?? []) as any[]).filter((r) => r.calculation_type !== "fixed_monthly" && km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance))).reduce((s, r) => s + Number(r.amount), 0);
     const carDay = km * 2 * 1.35 + toll * 2 + bonus;
     let transporte = 0;
     for (const n of perDay.values()) transporte += Math.ceil(n / cap) * carDay;
