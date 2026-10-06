@@ -412,6 +412,8 @@ function ResultadoPage() {
       for (const { id, date } of days.values()) {
         const wd = new Date(`${date}T12:00:00`).getDay();
         const hours = wd >= 1 && wd <= 4 ? 9 : 8;
+        const shareF = shareOf(date);
+        if (!shareF) continue;
         const mo = hours * (rate.get(id) ?? 0) * enc(id) * shareF;
         const p = person.get(id);
         const vt = p?.vt_enabled === false ? 0 : vtCost * shareF;
