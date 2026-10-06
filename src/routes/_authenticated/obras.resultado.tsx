@@ -381,10 +381,21 @@ function ResultadoPage() {
     // rateado entre os serviços do cliente pelas horas trabalhadas (RDO)
     const integTravel = new Map<string, number>();
     {
-      const sibRdo = (raw.sibRdo ?? []).filter((r: any) => okDate(r.report_date) && r.present);
-      const allH = sibRdo.reduce((s: number, r: any) => s + Number(r.worked_hours ?? 0), 0);
-      const myH = sibRdo.filter((r: any) => idSet.has(r.work_id)).reduce((s: number, r: any) => s + Number(r.worked_hours ?? 0), 0);
-      const shareF = allH > 0 ? myH / allH : workIds.length / Math.max(1, d.siblingCount);
+      // Rateio por mês: só serviços com horas de RDO no mês da integração recebem parte.
+      const allByM = new Map<string, number>();
+      const myByM = new Map<string, number>();
+      for (const r of raw.sibRdo ?? []) {
+        if (!r.present || !r.report_date) continue;
+        const m = String(r.report_date).slice(0, 7);
+        const h = Number(r.worked_hours ?? 0);
+        allByM.set(m, (allByM.get(m) ?? 0) + h);
+        if (idSet.has(r.work_id)) myByM.set(m, (myByM.get(m) ?? 0) + h);
+      }
+      const shareOf = (date: string) => {
+        const m = date.slice(0, 7);
+        const all = allByM.get(m) ?? 0;
+        return all > 0 ? (myByM.get(m) ?? 0) / all : 0;
+      };
       const days = new Map<string, { id: string; date: string }>();
       for (const a of raw.integAppts ?? []) {
         if (a.status === "cancelled" || a.status === "canceled") continue;
@@ -401,6 +412,8 @@ function ResultadoPage() {
       for (const { id, date } of days.values()) {
         const wd = new Date(`${date}T12:00:00`).getDay();
         const hours = wd >= 1 && wd <= 4 ? 9 : 8;
+        const shareF = shareOf(date);
+        if (!shareF) continue;
         const mo = hours * (rate.get(id) ?? 0) * enc(id) * shareF;
         const p = person.get(id);
         const vt = p?.vt_enabled === false ? 0 : vtCost * shareF;
