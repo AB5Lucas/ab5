@@ -101,7 +101,8 @@ function ResultadoPage() {
   // Cálculos consideram tudo até o fim do período escolhido
   const untilMonth = toMonth;
   const hasPeriod = !!(fromMonth || toMonth);
-  const periodStart = fromMonth ? `${fromMonth}-01` : "0000-01-01";
+  // Sem mês inicial: desde o começo da obra
+  const periodStart = fromMonth ? `${fromMonth}-01` : "1900-01-01";
   const periodEnd = toMonth ? monthEnd(toMonth) : "9999-12-31";
   const activeIds = useQuery({
     queryKey: ["works-active-period", periodStart, periodEnd],
@@ -197,7 +198,7 @@ function ResultadoPage() {
             )
           : Promise.resolve([] as any[]),
         w.client_id
-          ? supabase.from("clients").select("has_toll, toll_amount, city, distance_km").eq("id", w.client_id).maybeSingle()
+          ? supabase.from("clients").select("name, has_toll, toll_amount, city, distance_km").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
       ]);
       const [workVt, workTravelRows, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
@@ -214,14 +215,35 @@ function ResultadoPage() {
         supabase.from("city_distances").select("city_a, city_b, km"),
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
-      const sibAllocs = sibIds.length
-        ? await fetchAll<any>((a, b) =>
-            supabase.from("daily_allocations").select("work_id, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
-          )
-        : [];
+      const clientName = (client as any).data?.name as string | undefined;
+      const [sibAllocs, sibRdo, integAppts, integBoxes] = await Promise.all([
+        sibIds.length
+          ? fetchAll<any>((a, b) =>
+              supabase.from("daily_allocations").select("work_id, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
+            )
+          : Promise.resolve([] as any[]),
+        sibIds.length
+          ? fetchAll<any>((a, b) =>
+              supabase.from("rdo_workforce").select("work_id, report_date, present, worked_hours").in("work_id", sibIds).range(a, b),
+            )
+          : Promise.resolve([] as any[]),
+        w.client_id
+          ? fetchAll<any>((a, b) =>
+              supabase.from("appointments").select("collaborator_id, scheduled_date, completed_date, status").eq("type", "integracao").eq("client_id", w.client_id!).range(a, b),
+            )
+          : Promise.resolve([] as any[]),
+        clientName
+          ? fetchAll<any>((a, b) =>
+              supabase.from("daily_status_entries").select("collaborator_id, daily_schedules(schedule_date)").eq("box_key", `integracao:${clientName}`).range(a, b),
+            )
+          : Promise.resolve([] as any[]),
+      ]);
       return {
         allocs,
         sibAllocs,
+        sibRdo,
+        integAppts,
+        integBoxes,
         rdoWf,
         progress: progress.data ?? [],
         entries: entries.data ?? [],
@@ -355,6 +377,46 @@ function ResultadoPage() {
       vtByDate.set(date, v);
       bump(date.slice(0, 7), "transport", cost);
     }
+    // Integração no cliente: dia de integração (seg–qui 9h, sex 8h) × valor hora × encargos + VT + prêmio viagem,
+    // rateado entre os serviços do cliente pelas horas trabalhadas (RDO)
+    const integTravel = new Map<string, number>();
+    {
+      const sibRdo = (raw.sibRdo ?? []).filter((r: any) => okDate(r.report_date) && r.present);
+      const allH = sibRdo.reduce((s: number, r: any) => s + Number(r.worked_hours ?? 0), 0);
+      const myH = sibRdo.filter((r: any) => idSet.has(r.work_id)).reduce((s: number, r: any) => s + Number(r.worked_hours ?? 0), 0);
+      const shareF = allH > 0 ? myH / allH : workIds.length / Math.max(1, d.siblingCount);
+      const days = new Map<string, { id: string; date: string }>();
+      for (const a of raw.integAppts ?? []) {
+        if (a.status === "cancelled" || a.status === "canceled") continue;
+        const dt = String(a.completed_date ?? a.scheduled_date ?? "").slice(0, 10);
+        if (dt && okDate(dt)) days.set(`${a.collaborator_id}|${dt}`, { id: a.collaborator_id, date: dt });
+      }
+      for (const e of raw.integBoxes ?? []) {
+        const dt = e.daily_schedules?.schedule_date as string | undefined;
+        if (dt && okDate(dt)) days.set(`${e.collaborator_id}|${dt}`, { id: e.collaborator_id, date: dt });
+      }
+      const rIn = (r: any, km: number) => km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance));
+      const distF = buildDistanceLookup(d.cityDist ?? []);
+      const vtCost = vtDay(false);
+      for (const { id, date } of days.values()) {
+        const wd = new Date(`${date}T12:00:00`).getDay();
+        const hours = wd >= 1 && wd <= 4 ? 9 : 8;
+        const mo = hours * (rate.get(id) ?? 0) * enc(id) * shareF;
+        const p = person.get(id);
+        const vt = p?.vt_enabled === false ? 0 : vtCost * shareF;
+        const dist = distF(p?.city, d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
+        const tb = p?.travel_bonus_enabled === false ? 0
+          : (d.tbRules ?? []).filter((x: any) => rIn(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0) * shareF;
+        if (mo) { addLabor(id, hours * shareF, mo); bump(date.slice(0, 7), "labor", mo); }
+        if (vt) {
+          const v = vtByDate.get(date) ?? { people: 0, cost: 0 };
+          v.cost += vt;
+          vtByDate.set(date, v);
+          bump(date.slice(0, 7), "transport", vt);
+        }
+        if (tb) { integTravel.set(date, (integTravel.get(date) ?? 0) + tb); bump(date.slice(0, 7), "transport", tb); }
+      }
+    }
     const vtRows = [...vtByDate.entries()].map(([date, v]) => ({ date, ...v })).sort((x, y) => x.date.localeCompare(y.date));
     const vtTotal = vtRows.reduce((s, r) => s + r.cost, 0);
     // Prêmio motorista: regras da aba Prêmio de Motorista, rateado como o veículo
@@ -396,6 +458,11 @@ function ResultadoPage() {
       t.cost += cost;
       travelByDate.set(date, t);
       bump(date.slice(0, 7), "transport", cost);
+    }
+    for (const [date, c] of integTravel) {
+      const t = travelByDate.get(date) ?? { people: 0, cost: 0 };
+      t.cost += c;
+      travelByDate.set(date, t);
     }
     const travelRows = [...travelByDate.entries()].map(([date, v]) => ({ date, ...v })).sort((x, y) => x.date.localeCompare(y.date));
     const travelTotal = travelRows.reduce((s, r) => s + r.cost, 0);
