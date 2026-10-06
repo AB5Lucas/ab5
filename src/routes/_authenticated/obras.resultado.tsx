@@ -495,26 +495,40 @@ function ResultadoPage() {
   const [hhOn, setHhOn] = useState(false);
   const [hhRates, setHhRates] = useState<Record<string, string>>({});
   const [hhDlg, setHhDlg] = useState(false);
-  const hhData = useQuery({
+  const hhRaw = useQuery({
     queryKey: ["hh-hours", workId],
     enabled: !!workId && workId !== "__all__" && hhOn,
     queryFn: async () => {
       const [{ data: wf, error }, { data: pos }] = await Promise.all([
-        supabase.from("rdo_workforce").select("position_id, entry_time, exit_time, break_minutes, worked_hours, present, collaborators(position_id)").eq("work_id", workId).eq("present", true),
+        supabase.from("rdo_workforce").select("report_date, position_id, entry_time, exit_time, break_minutes, worked_hours, present, collaborators(position_id)").eq("work_id", workId).eq("present", true),
         supabase.from("positions").select("id, name").order("name"),
       ]);
       if (error) throw error;
-      const hours = new Map<string, number>();
-      for (const w of wf ?? []) {
-        const pid = w.position_id ?? (w as any).collaborators?.position_id ?? "none";
-        const h = w.worked_hours != null ? Number(w.worked_hours) : workedHours(w.entry_time, w.exit_time, w.break_minutes ?? 60);
-        hours.set(pid, (hours.get(pid) ?? 0) + h);
-      }
-      const names = new Map((pos ?? []).map((p) => [p.id, p.name]));
-      return [...hours.entries()].map(([id, h]) => ({ id, name: id === "none" ? "Sem função" : names.get(id) ?? "—", hours: h })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      const rows = (wf ?? []).map((w) => ({
+        date: w.report_date as string,
+        pid: (w.position_id ?? (w as any).collaborators?.position_id ?? "none") as string,
+        h: w.worked_hours != null ? Number(w.worked_hours) : workedHours(w.entry_time, w.exit_time, w.break_minutes ?? 60),
+      }));
+      return { rows, names: new Map((pos ?? []).map((p) => [p.id, p.name])) };
     },
   });
+  const aggHH = (from: string, to: string) => {
+    if (!hhRaw.data) return undefined;
+    const hours = new Map<string, number>();
+    for (const r of hhRaw.data.rows) if (r.date >= from && r.date <= to) hours.set(r.pid, (hours.get(r.pid) ?? 0) + r.h);
+    return [...hours.entries()]
+      .map(([id, h]) => ({ id, name: id === "none" ? "Sem função" : hhRaw.data!.names.get(id) ?? "—", hours: h }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  };
+  // Total (valor salvo do pedido) e só do período filtrado (exibição)
+  const hhData = { data: useMemo(() => aggHH("0000-01-01", "9999-12-31"), [hhRaw.data]), isLoading: hhRaw.isLoading };
+  const hhPeriodRows = useMemo(() => aggHH(periodStart, periodEnd), [hhRaw.data, periodStart, periodEnd]);
   const hhValue = (hhData.data ?? []).reduce((a, r) => a + r.hours * num(hhRates[r.id] ?? ""), 0);
+  const hhSavedWork = works.data?.find((x) => x.id === workId) as any;
+  const hhPeriodValue =
+    hhSavedWork?.hh_enabled && hasPeriod && hhPeriodRows
+      ? hhPeriodRows.reduce((a, r) => a + r.hours * Number((hhSavedWork.hh_rates ?? {})[r.id] ?? 0), 0)
+      : null;
   // Ao entrar num serviço HH: recalcula o pedido com as horas atuais dos RDOs e os valores salvos
   useEffect(() => {
     const w = works.data?.find((x) => x.id === workId) as any;
@@ -708,7 +722,7 @@ function ResultadoPage() {
 
   const last = calc?.last;
   const billed = last?.billing ?? 0;
-  const order = calc?.order ?? 0;
+  const order = hhPeriodValue ?? calc?.order ?? 0;
   const budgetMargin = order - order * TAX_RATE - (calc?.budget ?? 0);
   const realMargin = (last?.revenue ?? 0) * (1 - TAX_RATE) - (last?.cost ?? 0);
   const totBudget = calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0;
