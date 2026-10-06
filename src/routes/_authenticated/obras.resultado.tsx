@@ -101,7 +101,8 @@ function ResultadoPage() {
   // Cálculos consideram tudo até o fim do período escolhido
   const untilMonth = toMonth;
   const hasPeriod = !!(fromMonth || toMonth);
-  const periodStart = fromMonth ? `${fromMonth}-01` : "0000-01-01";
+  // Sem mês inicial: desde o começo da obra
+  const periodStart = fromMonth ? `${fromMonth}-01` : "1900-01-01";
   const periodEnd = toMonth ? monthEnd(toMonth) : "9999-12-31";
   const activeIds = useQuery({
     queryKey: ["works-active-period", periodStart, periodEnd],
@@ -197,7 +198,7 @@ function ResultadoPage() {
             )
           : Promise.resolve([] as any[]),
         w.client_id
-          ? supabase.from("clients").select("has_toll, toll_amount, city, distance_km").eq("id", w.client_id).maybeSingle()
+          ? supabase.from("clients").select("name, has_toll, toll_amount, city, distance_km").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
       ]);
       const [workVt, workTravelRows, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
@@ -214,14 +215,35 @@ function ResultadoPage() {
         supabase.from("city_distances").select("city_a, city_b, km"),
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
-      const sibAllocs = sibIds.length
-        ? await fetchAll<any>((a, b) =>
-            supabase.from("daily_allocations").select("work_id, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
-          )
-        : [];
+      const clientName = (client as any).data?.name as string | undefined;
+      const [sibAllocs, sibRdo, integAppts, integBoxes] = await Promise.all([
+        sibIds.length
+          ? fetchAll<any>((a, b) =>
+              supabase.from("daily_allocations").select("work_id, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
+            )
+          : Promise.resolve([] as any[]),
+        sibIds.length
+          ? fetchAll<any>((a, b) =>
+              supabase.from("rdo_workforce").select("work_id, report_date, present, worked_hours").in("work_id", sibIds).range(a, b),
+            )
+          : Promise.resolve([] as any[]),
+        w.client_id
+          ? fetchAll<any>((a, b) =>
+              supabase.from("appointments").select("collaborator_id, scheduled_date, completed_date, status").eq("type", "integracao").eq("client_id", w.client_id!).range(a, b),
+            )
+          : Promise.resolve([] as any[]),
+        clientName
+          ? fetchAll<any>((a, b) =>
+              supabase.from("daily_status_entries").select("collaborator_id, daily_schedules(schedule_date)").eq("box_key", `integracao:${clientName}`).range(a, b),
+            )
+          : Promise.resolve([] as any[]),
+      ]);
       return {
         allocs,
         sibAllocs,
+        sibRdo,
+        integAppts,
+        integBoxes,
         rdoWf,
         progress: progress.data ?? [],
         entries: entries.data ?? [],
