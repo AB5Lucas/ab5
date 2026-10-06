@@ -2549,6 +2549,8 @@ export type Database = {
           client: string | null
           client_id: string | null
           code: string | null
+          contract_enabled: boolean
+          contract_months: number
           created_at: string
           distance_km: number | null
           entry_time: string | null
@@ -2587,6 +2589,8 @@ export type Database = {
           client?: string | null
           client_id?: string | null
           code?: string | null
+          contract_enabled?: boolean
+          contract_months?: number
           created_at?: string
           distance_km?: number | null
           entry_time?: string | null
@@ -2625,6 +2629,8 @@ export type Database = {
           client?: string | null
           client_id?: string | null
           code?: string | null
+          contract_enabled?: boolean
+          contract_months?: number
           created_at?: string
           distance_km?: number | null
           entry_time?: string | null

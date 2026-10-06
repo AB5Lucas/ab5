@@ -1,0 +1,1 @@
+ALTER TABLE public.works ADD COLUMN IF NOT EXISTS contract_enabled boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS contract_months integer NOT NULL DEFAULT 12;

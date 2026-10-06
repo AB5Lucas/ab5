@@ -36,6 +36,13 @@
       "when": 1791284885403,
       "tag": "0004_works_hh",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791294206740,
+      "tag": "0005_works_contract",
+      "breakpoints": true
     }
   ]
 }
