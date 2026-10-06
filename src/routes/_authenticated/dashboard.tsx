@@ -267,7 +267,7 @@ function DashboardPage() {
               <Kpi icon={UserCheck} label="Colaboradores alocados" value={calc.allocated} hint={calc.total ? `${Math.round((calc.allocated / calc.total) * 100)}% do quadro` : undefined} />
               <button className="text-left" onClick={() => setDlg("ferias")}><Kpi icon={CalendarOff} label="Em férias" value={calc.vac.length} tone="warning" /></button>
               <button className="text-left" onClick={() => setDlg("atestados")}><Kpi icon={Stethoscope} label={preset === "hoje" ? "Atestados hoje" : "Atestados"} value={calc.med.length} tone="destructive" /></button>
-              <button className="text-left" onClick={() => setDlg("vencimentos")}><Kpi icon={AlertTriangle} label="Pendências (vencidos e 30 dias)" value={calc.pend} tone="destructive" /></button>
+              <button className="text-left" onClick={() => setDlg("vencimentos")}><Kpi icon={AlertTriangle} label="Pendências" value={calc.pend} tone="destructive" /></button>
             </div>
 
             <div className="grid gap-6 border-b py-5 xl:grid-cols-2">
