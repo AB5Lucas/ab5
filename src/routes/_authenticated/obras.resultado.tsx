@@ -716,7 +716,9 @@ function ResultadoPage() {
     const budget = items.reduce((a, i) => a + i.budget, 0);
     const order = calcHH.order;
     const last = calcHH.last ? { ...calcHH.last, progress: f * 100 } : calcHH.last;
-    return { ...calcHH, items, budget, last, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
+    // Margem orçada do contrato: sempre pelo total (pedido cheio × custo orçado cheio), não acompanha a conclusão.
+    const fullBudget = calcHH.items.reduce((a, i) => a + i.budget, 0);
+    return { ...calcHH, items, budget, last, budgetMarginPct: order ? ((order - order * TAX_RATE - fullBudget) / order) * 100 : 0 };
   }, [calcHH, hhSavedWork, isAll]);
   const [ctOn, setCtOn] = useState(false);
   const [ctMonths, setCtMonths] = useState("12");
