@@ -1,3 +1,4 @@
+import { contractFraction } from "@/lib/contract";
 import { Switch } from "@/components/ui/switch";
 import { useEffect, useMemo, useState } from "react";
 import { workedHours, positionLabel } from "@/lib/rdo";
