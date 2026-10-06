@@ -582,7 +582,7 @@ function ResultadoPage() {
       return r;
     };
     const rows = hhRaw.data.rows.filter((r) => r.date >= periodStart && r.date <= periodEnd);
-    const hol = new Set<string>();
+    const hol = new Set<string>((holidaysQ.data ?? []) as string[]);
     let mo = 0;
     const perDay = new Map<string, number>();
     for (const r of rows) {
@@ -597,7 +597,7 @@ function ResultadoPage() {
     let transporte = 0;
     for (const n of perDay.values()) transporte += Math.ceil(n / cap) * carDay;
     return { mo, transporte };
-  }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd]);
+  }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd, holidaysQ.data]);
   const calc = useMemo(() => {
     if (!calcBase || !hhBudget || isAll) return calcBase;
     const items = calcBase.items.map((i) => {
