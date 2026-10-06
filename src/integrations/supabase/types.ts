@@ -2556,6 +2556,8 @@ export type Database = {
           exit_time: string | null
           exit_time_weekend: string | null
           expected_end_date: string | null
+          hh_enabled: boolean
+          hh_rates: Json
           id: string
           latitude: number | null
           longitude: number | null
@@ -2592,6 +2594,8 @@ export type Database = {
           exit_time?: string | null
           exit_time_weekend?: string | null
           expected_end_date?: string | null
+          hh_enabled?: boolean
+          hh_rates?: Json
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -2628,6 +2632,8 @@ export type Database = {
           exit_time?: string | null
           exit_time_weekend?: string | null
           expected_end_date?: string | null
+          hh_enabled?: boolean
+          hh_rates?: Json
           id?: string
           latitude?: number | null
           longitude?: number | null
