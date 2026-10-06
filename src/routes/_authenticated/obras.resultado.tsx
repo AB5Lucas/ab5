@@ -249,7 +249,12 @@ function ResultadoPage() {
     if (!work || !data.data) return null;
     const raw = data.data;
     // Fechamento: do início da obra até o último dia do mês selecionado
-    const cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
+    let cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
+    // HH: realizado (MO e transporte) só até o último RDO
+    if (!isAll && (work as any).hh_enabled) {
+      const lastRdo = raw.rdoWf.reduce((m: string, r: any) => (r.report_date > m ? r.report_date : m), "");
+      if (lastRdo && lastRdo < cut) cut = lastRdo;
+    }
     const okDate = (dt?: string | null) => !dt || dt.slice(0, 10) <= cut;
     const d = {
       ...raw,
