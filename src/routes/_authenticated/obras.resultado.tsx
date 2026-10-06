@@ -1,5 +1,5 @@
 import { Switch } from "@/components/ui/switch";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { workedHours } from "@/lib/rdo";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { createFileRoute } from "@tanstack/react-router";
@@ -515,6 +515,19 @@ function ResultadoPage() {
     },
   });
   const hhValue = (hhData.data ?? []).reduce((a, r) => a + r.hours * num(hhRates[r.id] ?? ""), 0);
+  // Ao entrar num serviço HH: recalcula o pedido com as horas atuais dos RDOs e os valores salvos
+  useEffect(() => {
+    const w = works.data?.find((x) => x.id === workId) as any;
+    if (!w?.hh_enabled || !hhData.data) return;
+    const rates = (w.hh_rates ?? {}) as Record<string, number>;
+    const v = Math.round(hhData.data.reduce((a, r) => a + r.hours * Number(rates[r.id] ?? 0), 0) * 100) / 100;
+    if (Math.abs(v - Number(w.order_value ?? 0)) < 0.01) return;
+    void supabase.from("works").update({ order_value: v }).eq("id", w.id).then(({ error }) => {
+      if (error) return;
+      qc.invalidateQueries({ queryKey: ["works-result"] });
+      qc.invalidateQueries({ queryKey: ["work-result"] });
+    });
+  }, [hhData.data, workId, works.data]);
   const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
