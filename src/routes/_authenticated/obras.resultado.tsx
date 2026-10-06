@@ -686,6 +686,8 @@ function ResultadoPage() {
     const ol = Array.isArray(w?.orders) ? (w.orders as any[]) : [];
     setOrderList(ol.length ? ol.map((o) => ({ number: String(o.number ?? ""), value: f(o.value) })) : [{ number: "", value: "" }]);
     setQuoteNo(w?.quote_number ?? "");
+    setHhOn(!!w?.hh_enabled);
+    setHhRates(Object.fromEntries(Object.entries((w?.hh_rates ?? {}) as Record<string, number>).map(([k, v]) => [k, f(v)])));
     const bi = (w?.budget_items ?? {}) as Record<string, number>;
     setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, f(bi[it.key])])));
   };
@@ -1130,6 +1132,14 @@ function ResultadoPage() {
           </DialogHeader>
           <div className="grid gap-3">
             <Field label="Nº Orç. AB5" value={quoteNo} onChange={setQuoteNo} />
+            <div className="flex items-center justify-between gap-2 rounded-md border p-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Switch checked={hhOn} onCheckedChange={setHhOn} /> HH
+              </label>
+              {hhOn && (
+                <Button type="button" size="sm" variant="outline" onClick={() => setHhDlg(true)}>Valores</Button>
+              )}
+            </div>
             <div className="flex items-center justify-between">
               <Label>Pedidos</Label>
               <Button type="button" size="sm" variant="outline" onClick={() => setOrderList((l) => [...l, { number: "", value: "" }])}>
@@ -1139,17 +1149,38 @@ function ResultadoPage() {
             {orderList.map((o, i) => (
               <div key={i} className="flex items-center gap-2">
                 <Input placeholder="Nº Pedido" value={o.number} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))} />
-                <Input className="w-40" placeholder="Valor (R$)" value={o.value} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
+                {!hhOn && (
+                  <Input className="w-40" placeholder="Valor (R$)" value={o.value} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
+                )}
                 <Button type="button" variant="ghost" size="icon" aria-label="Remover" onClick={() => setOrderList((l) => l.filter((_, j) => j !== i))}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
             ))}
             <p className="text-sm text-muted-foreground">
-              Valor do pedido (soma): <span className="font-semibold text-foreground">{brl(ordersSum)}</span>
+              {hhOn ? "Valor do pedido (horas dos RDOs × valor por função)" : "Valor do pedido (soma)"}: <span className="font-semibold text-foreground">{brl(ordersSum)}</span>
             </p>
             <p className="text-xs text-muted-foreground">O valor faturado vem do botão Faturamentos.</p>
           </div>
+          <Dialog open={hhDlg} onOpenChange={setHhDlg}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Valor cobrado por hora (HH)</DialogTitle></DialogHeader>
+              {hhData.isLoading && <p className="text-sm text-muted-foreground">Carregando horas dos RDOs...</p>}
+              {!hhData.isLoading && !(hhData.data ?? []).length && <p className="text-sm text-muted-foreground">Nenhuma hora apontada em RDO neste serviço.</p>}
+              <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+                {(hhData.data ?? []).map((r) => (
+                  <div key={r.id} className="grid grid-cols-[1fr_70px_110px_110px] items-center gap-2 text-sm">
+                    <span>{r.name}</span>
+                    <span className="text-right text-muted-foreground">{r.hours.toFixed(1).replace(".", ",")}h</span>
+                    <Input placeholder="R$/h" value={hhRates[r.id] ?? ""} onChange={(e) => setHhRates((m) => ({ ...m, [r.id]: e.target.value }))} />
+                    <span className="text-right">{brl(r.hours * num(hhRates[r.id] ?? ""))}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm">Total: <span className="font-semibold">{brl(hhValue)}</span></p>
+              <DialogFooter><Button onClick={() => setHhDlg(false)}>OK</Button></DialogFooter>
+            </DialogContent>
+          </Dialog>
           <DialogFooter>
             <Button onClick={() => saveValues.mutate()} disabled={saveValues.isPending}>Salvar</Button>
           </DialogFooter>
