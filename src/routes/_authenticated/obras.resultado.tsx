@@ -548,20 +548,21 @@ function ResultadoPage() {
     queryKey: ["hh-budget-refs", hhSavedWork?.client_id ?? null],
     enabled: !!hhSavedWork?.hh_enabled,
     queryFn: async () => {
-      const [pos, col, veh, cli] = await Promise.all([
+      const [pos, col, veh, dbr, cli] = await Promise.all([
         supabase.from("positions").select("id, name"),
         supabase.from("collaborators").select("position_id, salary").eq("status", "active"),
         supabase.from("vehicles").select("passenger_capacity, km_rate, status"),
+        supabase.from("driver_bonus_rules").select("*").eq("active", true),
         hhSavedWork?.client_id
           ? supabase.from("clients").select("distance_km, has_toll, toll_amount").eq("id", hhSavedWork.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
       ]);
-      return { pos: pos.data ?? [], col: col.data ?? [], veh: veh.data ?? [], cli: cli.data };
+      return { pos: pos.data ?? [], col: col.data ?? [], veh: veh.data ?? [], dbr: dbr.data ?? [], cli: cli.data };
     },
   });
   const hhBudget = useMemo(() => {
     if (!hhSavedWork?.hh_enabled || !hhRaw.data || !Array.isArray(hhRaw.data.rows) || !hhRefs.data) return null;
-    const { pos, col, veh, cli } = hhRefs.data;
+    const { pos, col, veh, dbr, cli } = hhRefs.data;
     const base = (n: string) => positionLabel(n)?.toLowerCase() ?? n.toLowerCase();
     const level = (n: string) => Number(/n\s*\.?\s*([1-4])\s*$/i.exec(n)?.[1] ?? 0);
     const maxSal = new Map<string, number>();
@@ -593,7 +594,9 @@ function ResultadoPage() {
     const cap = caps.length ? caps[Math.floor(caps.length / 2)]! : 7;
     const km = Number(cli?.distance_km ?? 0);
     const toll = cli?.has_toll ? Number(cli.toll_amount ?? 0) : 0;
-    const carDay = km * 2 * 1.35 + toll * 2; // ida e volta + pedágio
+    // ida e volta + pedágio + prêmio motorista (regras por distância)
+    const bonus = (dbr as any[]).filter((r) => r.calculation_type !== "fixed_monthly" && km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance))).reduce((s, r) => s + Number(r.amount), 0);
+    const carDay = km * 2 * 1.35 + toll * 2 + bonus;
     let transporte = 0;
     for (const n of perDay.values()) transporte += Math.ceil(n / cap) * carDay;
     return { mo, transporte };
