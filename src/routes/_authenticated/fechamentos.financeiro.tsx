@@ -109,7 +109,7 @@ function FinanceiroPage() {
         ? contractFraction((raw.entries as any[]).filter((e) => e.category === "faturamento" && e.entry_date.slice(0, 7) <= lastYm).length, Number(w.contract_months ?? 12)) * 100
         : full.rows.filter((r) => r.ym <= lastYm).pop()?.progress ?? 0;
       const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
-      const g = by.get(key) ?? { name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] };
+      const g = by.get(key) ?? { name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as Line[] };
       g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: billed ? (margin / billed) * 100 : 0, total: totalMargin(w, full), full, raw });
       by.set(key, g);
     });

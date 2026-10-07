@@ -36,6 +36,7 @@ import { Route as AuthenticatedColaboradoresEstruturaRouteImport } from './route
 import { Route as AuthenticatedColaboradoresTurnosRouteImport } from './routes/_authenticated/colaboradores.turnos'
 import { Route as AuthenticatedExternoRelatorioDiarioRouteImport } from './routes/_authenticated/externo.relatorio-diario'
 import { Route as AuthenticatedFechamentosFinanceiroRouteImport } from './routes/_authenticated/fechamentos.financeiro'
+import { Route as AuthenticatedFechamentosSuzanoRouteImport } from './routes/_authenticated/fechamentos.suzano'
 import { Route as AuthenticatedObrasIndexRouteImport } from './routes/_authenticated/obras.index'
 import { Route as AuthenticatedObrasIntegracoesRouteImport } from './routes/_authenticated/obras.integracoes'
 import { Route as AuthenticatedObrasRequisitosRouteImport } from './routes/_authenticated/obras.requisitos'
@@ -205,6 +206,12 @@ const AuthenticatedFechamentosFinanceiroRoute =
     path: '/fechamentos/financeiro',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFechamentosSuzanoRoute =
+  AuthenticatedFechamentosSuzanoRouteImport.update({
+    id: '/fechamentos/suzano',
+    path: '/fechamentos/suzano',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedObrasIndexRoute = AuthenticatedObrasIndexRouteImport.update({
   id: '/obras/',
   path: '/obras/',
@@ -321,6 +328,7 @@ export interface FileRoutesByFullPath {
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
+  '/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
   '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
@@ -364,6 +372,7 @@ export interface FileRoutesByTo {
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
+  '/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
   '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
@@ -409,6 +418,7 @@ export interface FileRoutesById {
   '/_authenticated/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/_authenticated/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/_authenticated/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
+  '/_authenticated/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
   '/_authenticated/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/_authenticated/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
   '/_authenticated/obras/resultado': typeof AuthenticatedObrasResultadoRoute
@@ -454,6 +464,7 @@ export interface FileRouteTypes {
     | '/colaboradores/turnos'
     | '/externo/relatorio-diario'
     | '/fechamentos/financeiro'
+    | '/fechamentos/suzano'
     | '/obras/integracoes'
     | '/obras/requisitos'
     | '/obras/resultado'
@@ -497,6 +508,7 @@ export interface FileRouteTypes {
     | '/colaboradores/turnos'
     | '/externo/relatorio-diario'
     | '/fechamentos/financeiro'
+    | '/fechamentos/suzano'
     | '/obras/integracoes'
     | '/obras/requisitos'
     | '/obras/resultado'
@@ -541,6 +553,7 @@ export interface FileRouteTypes {
     | '/_authenticated/colaboradores/turnos'
     | '/_authenticated/externo/relatorio-diario'
     | '/_authenticated/fechamentos/financeiro'
+    | '/_authenticated/fechamentos/suzano'
     | '/_authenticated/obras/integracoes'
     | '/_authenticated/obras/requisitos'
     | '/_authenticated/obras/resultado'
@@ -757,6 +770,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFechamentosFinanceiroRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/fechamentos/suzano': {
+      id: '/_authenticated/fechamentos/suzano'
+      path: '/fechamentos/suzano'
+      fullPath: '/fechamentos/suzano'
+      preLoaderRoute: typeof AuthenticatedFechamentosSuzanoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/obras/': {
       id: '/_authenticated/obras/'
       path: '/obras'
@@ -888,6 +908,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedColaboradoresTurnosRoute: typeof AuthenticatedColaboradoresTurnosRoute
   AuthenticatedExternoRelatorioDiarioRoute: typeof AuthenticatedExternoRelatorioDiarioRoute
   AuthenticatedFechamentosFinanceiroRoute: typeof AuthenticatedFechamentosFinanceiroRoute
+  AuthenticatedFechamentosSuzanoRoute: typeof AuthenticatedFechamentosSuzanoRoute
   AuthenticatedObrasIntegracoesRoute: typeof AuthenticatedObrasIntegracoesRoute
   AuthenticatedObrasRequisitosRoute: typeof AuthenticatedObrasRequisitosRoute
   AuthenticatedObrasResultadoRoute: typeof AuthenticatedObrasResultadoRoute
@@ -935,6 +956,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedExternoRelatorioDiarioRoute,
   AuthenticatedFechamentosFinanceiroRoute:
     AuthenticatedFechamentosFinanceiroRoute,
+  AuthenticatedFechamentosSuzanoRoute: AuthenticatedFechamentosSuzanoRoute,
   AuthenticatedObrasIntegracoesRoute: AuthenticatedObrasIntegracoesRoute,
   AuthenticatedObrasRequisitosRoute: AuthenticatedObrasRequisitosRoute,
   AuthenticatedObrasResultadoRoute: AuthenticatedObrasResultadoRoute,

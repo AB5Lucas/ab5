@@ -103,7 +103,7 @@ function ClosingPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Fechamento" description={`Competência ${monthLabel(month)} — de ${brFull(start)} a ${brFull(endLabel)}.`} />
+      <PageHeader title="Premiações" description={`Competência ${monthLabel(month)} — de ${brFull(start)} a ${brFull(endLabel)}.`} />
       <div className="panel flex flex-wrap items-end gap-3 p-3">
         <div className="flex items-end gap-1">
           <Button variant="outline" onClick={() => setMonth(shift(month, -1))}><ChevronLeft className="h-4 w-4" /> Anterior</Button>
