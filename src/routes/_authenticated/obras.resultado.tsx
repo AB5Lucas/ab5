@@ -1012,6 +1012,13 @@ function ResultadoPage() {
   const order = monthlyInfo ? monthlyInfo.order : hhPeriodValue ?? calc?.order ?? 0;
   const budgetMargin = order - order * TAX_RATE - (calc?.budget ?? 0);
   const realMargin = (last?.revenue ?? 0) * (1 - TAX_RATE) - (last?.cost ?? 0);
+  // Margens fixas (independentes do filtro de período)
+  const fullOrder = monthlyInfo
+    ? ((Array.isArray((work as any)?.orders) ? (work as any).orders : []) as any[]).reduce((a, o) => a + Number(o.value ?? 0), 0)
+    : Number((work as any)?.order_value ?? 0) || order;
+  const fixedBudgetPct = calc?.budgetMarginPct ?? 0;
+  const fixedBudget = { margin: fullOrder * (fixedBudgetPct / 100), pct: fixedBudgetPct };
+  const fixedReal = totalReal ?? { margin: realMargin, pct: last?.marginPct ?? 0 };
   const totBudget = calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0;
   const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
   const barItems = (() => {
@@ -1294,18 +1301,18 @@ function ResultadoPage() {
                 <p className="border-b pb-1 text-sm italic text-muted-foreground">Orçado</p>
                 <p className="border-b pb-1" />
                 <p className="border-b pb-1 text-sm italic text-muted-foreground">Realizado</p>
-                <p className="pt-6 text-sm">{brl(budgetMargin)}</p>
+                <p className="pt-6 text-sm">{brl(fixedBudget.margin)}</p>
                 <div className="row-span-2 mx-4 w-px bg-border" />
-                <p className={`pt-6 text-sm ${realMargin < 0 ? "text-destructive" : ""}`}>{brl(realMargin)}</p>
-                <p className="pt-4 text-lg">{pct(calc?.budgetMarginPct ?? 0)}</p>
-                <p className={`pt-4 text-lg ${(last?.marginPct ?? 0) < 0 ? "text-destructive" : ""}`}>{pct(last?.marginPct ?? 0)}</p>
+                <p className={`pt-6 text-sm ${fixedReal.margin < 0 ? "text-destructive" : ""}`}>{brl(fixedReal.margin)}</p>
+                <p className="pt-4 text-lg">{pct(fixedBudget.pct)}</p>
+                <p className={`pt-4 text-lg ${fixedReal.pct < 0 ? "text-destructive" : ""}`}>{pct(fixedReal.pct)}</p>
               </div>
-              {totalReal && (
+              {monthlyInfo && hasPeriod && (
                 <div className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-center">
-                  <SectionTitle>Margem Total</SectionTitle>
-                  <div className={`flex items-baseline justify-center gap-4 pt-2 ${totalReal.margin < 0 ? "text-destructive" : ""}`}>
-                    <span className="text-sm">{brl(totalReal.margin)}</span>
-                    <span className="text-lg">{pct(totalReal.pct)}</span>
+                  <SectionTitle>Margem Mensal</SectionTitle>
+                  <div className={`flex items-baseline justify-center gap-4 pt-2 ${realMargin < 0 ? "text-destructive" : ""}`}>
+                    <span className="text-sm">{brl(realMargin)}</span>
+                    <span className="text-lg">{pct(last?.marginPct ?? 0)}</span>
                   </div>
                 </div>
               )}
