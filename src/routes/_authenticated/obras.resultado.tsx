@@ -1290,10 +1290,12 @@ function ResultadoPage() {
                 <p className={`pt-4 text-lg ${(last?.marginPct ?? 0) < 0 ? "text-destructive" : ""}`}>{pct(last?.marginPct ?? 0)}</p>
               </div>
               {totalReal && (
-                <div className="mt-3 rounded-md border bg-muted/30 px-3 py-1.5 text-center">
+                <div className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-center">
                   <SectionTitle>Margem Total</SectionTitle>
-                  <p className={`pt-1 text-sm leading-tight ${totalReal.margin < 0 ? "text-destructive" : ""}`}>{brl(totalReal.margin)}</p>
-                  <p className={`text-lg leading-tight ${totalReal.pct < 0 ? "text-destructive" : ""}`}>{pct(totalReal.pct)}</p>
+                  <div className={`flex items-baseline justify-center gap-4 pt-2 ${totalReal.margin < 0 ? "text-destructive" : ""}`}>
+                    <span className="text-sm">{brl(totalReal.margin)}</span>
+                    <span className="text-lg">{pct(totalReal.pct)}</span>
+                  </div>
                 </div>
               )}
             </div>
