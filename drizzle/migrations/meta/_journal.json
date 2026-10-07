@@ -57,6 +57,13 @@
       "when": 1791391102607,
       "tag": "0007_works_monthly_enabled",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791396192356,
+      "tag": "0008_work_entries_split_group",
+      "breakpoints": true
     }
   ]
 }
