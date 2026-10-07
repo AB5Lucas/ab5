@@ -275,7 +275,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       // Rateio por mês: só serviços com horas de RDO no mês da integração recebem parte.
       const allByM = new Map<string, number>();
       const myByM = new Map<string, number>();
-      for (const r of raw.sibRdo ?? []) {
+      for (const r of d.sibRdo ?? []) {
         if (!r.present || !r.report_date) continue;
         const m = String(r.report_date).slice(0, 7);
         const h = Number(r.worked_hours ?? 0);
