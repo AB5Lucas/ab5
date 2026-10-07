@@ -471,3 +471,55 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
 }
+
+/** Custos orçados ajustados como em Resultados (Contrato, Locação, Mensal). HH usa o orçado salvo. */
+export function adjustedItems(work: any, base: NonNullable<ReturnType<typeof buildBase>>, raw: any) {
+  let items = base.items.map((i) => ({ ...i }));
+  if (work.contract_enabled) {
+    const f = contractFraction(base.billingCount, Number(work.contract_months ?? 12));
+    items = items.map((i) => ({ ...i, budget: i.budget * f }));
+  }
+  if (work.rental_enabled) {
+    const bill = new Map<string, number>();
+    const scaf = new Map<string, number>();
+    for (const e of raw.entries as any[]) {
+      const ym = e.entry_date.slice(0, 7);
+      if (e.category === "faturamento") bill.set(ym, (bill.get(ym) ?? 0) + Number(e.amount));
+      else if (e.category === "andaimes") scaf.set(ym, (scaf.get(ym) ?? 0) + Number(e.amount));
+    }
+    const ms = [...bill.entries()].filter(([, v]) => v > 0);
+    if (ms.length) {
+      const avg = ms.reduce((a, [ym, b]) => a + (scaf.get(ym) ?? 0) / b, 0) / ms.length;
+      const billed = ms.reduce((a, [, b]) => a + b, 0);
+      items = items.map((i) => (i.key === "andaimes" ? { ...i, budget: billed * avg } : i));
+    }
+  }
+  if (work.monthly_enabled) {
+    const total = ((Array.isArray(work.orders) ? work.orders : []) as any[]).reduce((a, o) => a + Number(o.value ?? 0), 0);
+    const pctBy: Partial<Record<ItemKey, number>> = { mo: 0.5, transporte: 0.1, materiais: 0.03 };
+    items = items.map((i) => ({ ...i, budget: total * (pctBy[i.key as ItemKey] ?? 0) }));
+  }
+  return items.map((i) => ({ ...i, used: i.budget ? (i.real / i.budget) * 100 : i.real ? 100 : 0 }));
+}
+
+/** Margem total (acumulada) como em Resultados. */
+export function totalMargin(work: any, full: NonNullable<ReturnType<typeof buildBase>>) {
+  if (!full.last) return { margin: 0, pct: 0 };
+  if (work.monthly_enabled) {
+    const list = ((Array.isArray(work.orders) ? work.orders : []) as any[]).filter((o) => o.date);
+    const months = new Set(list.map((o) => String(o.date).slice(0, 7)));
+    const revenue = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
+    const cost = full.rows.filter((r) => months.has(r.ym)).reduce((a, r) => a + r.monthCost, 0);
+    const margin = revenue * (1 - TAX_RATE) - cost;
+    return { margin, pct: revenue ? (margin / revenue) * 100 : 0 };
+  }
+  const margin = full.last.revenue * (1 - TAX_RATE) - full.last.cost;
+  return { margin, pct: full.last.revenue ? (margin / full.last.revenue) * 100 : 0 };
+}
+
+/** Andamento (%) até o mês informado, como em Resultados. */
+export function progressUntil(work: any, full: NonNullable<ReturnType<typeof buildBase>>, untilYm: string) {
+  if (work.contract_enabled) return contractFraction(full.billingCount, Number(work.contract_months ?? 12)) * 100;
+  const r = full.rows.filter((x) => x.ym <= untilYm).pop();
+  return r?.progress ?? 0;
+}
