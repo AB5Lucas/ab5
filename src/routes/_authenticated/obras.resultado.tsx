@@ -509,12 +509,15 @@ function ResultadoPage() {
         progMap.set(ym, val);
       }
     }
-    const months = [...new Set([...monthly.keys(), ...progMap.keys()])].sort();
+    const months = [...new Set([...monthly.keys(), ...progMap.keys()])].filter((ym) => !fromMonth || ym >= fromMonth).sort();
     const order = Number(work.order_value ?? 0);
     const budget = Number(work.budget_cost ?? 0);
     const budgetMarginPct = order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0;
+    // Com mês inicial: receita só do avanço dentro do período (desconta o andamento anterior)
+    const pStart = fromMonth || "";
+    const basePct = pStart ? [...progMap.entries()].filter(([ym]) => ym < pStart).sort(([a], [b]) => a.localeCompare(b)).pop()?.[1] ?? 0 : 0;
     let accCost = 0;
-    let lastPct = 0;
+    let lastPct = basePct;
     let accBilling = 0;
     const rows = months.map((ym) => {
       const m = monthly.get(ym) ?? { labor: 0, transport: 0, entries: 0, billing: 0 };
@@ -522,7 +525,7 @@ function ResultadoPage() {
       accBilling += m.billing;
       const prev = lastPct;
       if (progMap.has(ym)) lastPct = progMap.get(ym)!;
-      const revenue = (order * lastPct) / 100;
+      const revenue = (order * Math.max(0, lastPct - basePct)) / 100;
       const margin = revenue - revenue * TAX_RATE - accCost;
       const marginPct = revenue ? (margin / revenue) * 100 : 0;
       return {
@@ -1425,7 +1428,7 @@ function ResultadoPage() {
             <div className="flex items-center justify-between gap-2 rounded-md border p-2">
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-2 text-sm font-medium">
-                  <Switch checked={hhOn} onCheckedChange={setHhOn} /> Hora Homem
+                  <Switch checked={hhOn} onCheckedChange={setHhOn} /> HH
                 </label>
                 <label className="flex items-center gap-2 text-sm font-medium">
                   <Switch checked={ctOn} onCheckedChange={setCtOn} /> Contrato
