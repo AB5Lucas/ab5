@@ -772,7 +772,14 @@ function ResultadoPage() {
     });
     const budget = items.reduce((a, i) => a + i.budget, 0);
     const order = monthlyInfo.order;
-    return { ...calcRt, items, budget, order, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
+    // Receita realizada também só sobre o pedido do período
+    const rows = calcRt.rows.map((r) => {
+      const revenue = r.revenue * monthlyInfo.f;
+      const margin = revenue - revenue * TAX_RATE - r.cost;
+      return { ...r, revenue, margin, marginPct: revenue ? (margin / revenue) * 100 : 0, consumed: budget ? (r.cost / budget) * 100 : 0 };
+    });
+    const last = rows.length ? { ...rows[rows.length - 1]!, progress: calcRt.last?.progress ?? rows[rows.length - 1]!.progress } : calcRt.last;
+    return { ...calcRt, items, budget, order, rows, last, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
   }, [calcRt, monthlyInfo]);
   const [ctOn, setCtOn] = useState(false);
   const [rtOn, setRtOn] = useState(false);
