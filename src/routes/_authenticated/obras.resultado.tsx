@@ -274,7 +274,7 @@ function ResultadoPage() {
     queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string),
   });
   // ---------- Cálculos ----------
-  const calcBase = useMemo(() => {
+  const buildBase = (fromMonth: string, untilMonth: string) => {
     if (!work || !data.data) return null;
     const raw = data.data;
     // Fechamento: do início da obra até o último dia do mês selecionado
@@ -594,7 +594,18 @@ function ResultadoPage() {
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
-  }, [work, data.data, untilMonth, fromMonth, isAll, holidaysQ.data]);
+  };
+  const calcBase = useMemo(() => buildBase(fromMonth, untilMonth), [work, data.data, untilMonth, fromMonth, isAll, holidaysQ.data]);
+  // Margem realizada total da obra (sem filtro), para o card discreto
+  const totalReal = useMemo(() => {
+    if (!hasPeriod) return null;
+    const b = buildBase("", "");
+    if (!b?.last) return null;
+    const active = b.rows.filter((r) => r.monthCost || r.monthBilling || r.advance).length;
+    if (active < 2) return null;
+    const margin = b.last.revenue * (1 - TAX_RATE) - b.last.cost;
+    return { margin, pct: b.last.revenue ? (margin / b.last.revenue) * 100 : 0 };
+  }, [work, data.data, hasPeriod, isAll, holidaysQ.data]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string; date?: string }[]>([]);
@@ -1278,6 +1289,13 @@ function ResultadoPage() {
                 <p className="pt-4 text-lg">{pct(calc?.budgetMarginPct ?? 0)}</p>
                 <p className={`pt-4 text-lg ${(last?.marginPct ?? 0) < 0 ? "text-destructive" : ""}`}>{pct(last?.marginPct ?? 0)}</p>
               </div>
+              {totalReal && (
+                <div className="mx-auto mt-4 w-fit rounded-md border bg-muted/40 px-4 py-2 text-center">
+                  <p className="text-xs italic text-muted-foreground">Margem realizada total da obra</p>
+                  <p className={`text-sm font-semibold ${totalReal.margin < 0 ? "text-destructive" : ""}`}>{brl(totalReal.margin)}</p>
+                  <p className={`text-xs ${totalReal.pct < 0 ? "text-destructive" : "text-muted-foreground"}`}>{pct(totalReal.pct)}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
