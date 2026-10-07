@@ -605,15 +605,13 @@ function ResultadoPage() {
     if (!isAll && w?.monthly_enabled) {
       // Mensal: só meses com pedido entram (receita = pedidos, custo = custos desses meses)
       const list = (Array.isArray(w.orders) ? w.orders : []) as any[];
-      const months = new Set(list.filter((o) => o.date).map((o) => String(o.date).slice(0, 7)));
+      if (!months.size) return null;
       if (months.size < 2) return null;
       const revenue = list.filter((o) => o.date).reduce((a, o) => a + Number(o.value ?? 0), 0);
       const cost = b.rows.filter((r: any) => months.has(String(r.ym).slice(0, 7))).reduce((a: number, r: any) => a + Number(r.monthCost ?? 0), 0);
       const margin = revenue * (1 - TAX_RATE) - cost;
       return { margin, pct: revenue ? (margin / revenue) * 100 : 0 };
     }
-    const active = b.rows.filter((r) => r.monthCost || r.monthBilling || r.advance).length;
-    if (active < 2) return null;
     const margin = b.last.revenue * (1 - TAX_RATE) - b.last.cost;
     return { margin, pct: b.last.revenue ? (margin / b.last.revenue) * 100 : 0 };
   }, [work, data.data, hasPeriod, isAll, holidaysQ.data]);
