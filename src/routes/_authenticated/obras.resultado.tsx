@@ -474,7 +474,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   const saveEntry = useMutation({
     mutationFn: async () => {
       const amount = num(entry.amount);
-      if (!amount) throw new Error("Informe o valor");
+      // Faturamento pode ser 0 (ex.: mês de contrato sem cobrança); demais lançamentos exigem valor
+      if (String(entry.amount ?? "").trim() === "" || (!amount && entry.category !== "faturamento")) throw new Error("Informe o valor");
       if (editingId) {
         const { error } = await supabase.from("work_entries").update({
           entry_date: entry.date,
