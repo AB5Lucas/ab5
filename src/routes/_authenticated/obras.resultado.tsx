@@ -278,7 +278,9 @@ function ResultadoPage() {
       const lastRdo = raw.rdoWf.reduce((m: string, r: any) => (r.report_date > m ? r.report_date : m), "");
       if (lastRdo && lastRdo < cut) cut = lastRdo;
     }
-    const okDate = (dt?: string | null) => !dt || dt.slice(0, 10) <= cut;
+    // Com mês inicial: só o que estiver dentro do período; sem mês inicial: desde o começo da obra
+    const from = fromMonth ? `${fromMonth}-01` : "";
+    const okDate = (dt?: string | null) => !dt || (dt.slice(0, 10) <= cut && dt.slice(0, 10) >= from);
     const d = {
       ...raw,
       allocs: raw.allocs.filter((a: any) => okDate(a.daily_schedules?.schedule_date)),
