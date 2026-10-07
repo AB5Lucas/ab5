@@ -93,7 +93,7 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
         if (v.work_id && !ids.has(v.work_id)) continue;
         const trips = Number(v.trips ?? 1);
         const cost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? 1.35) + toll * 2 * trips;
-        transport += v.work_id ? cost : all.length ? (cost * mine.length) / all.length : cost / Math.max(1, sibIds.length);
+        transport += v.work_id ? cost : all.length ? (cost * mine.length) / all.length : 0;
       }
       // VT do dia: mesma regra da tela de Resultados
       const [wvt, novt, lv, rules, mineFull] = await Promise.all([
