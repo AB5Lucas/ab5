@@ -19,9 +19,9 @@ import { loadClosing, periodOf, type Adjustment, type ClosingRow } from "@/lib/c
 export const Route = createFileRoute("/_authenticated/fechamento")({
   head: () => ({
     meta: [
-      { title: "Fechamento | AB5 Hub" },
+      { title: "Premiações | AB5 Hub" },
       { name: "description", content: "Fechamento mensal de refeições, vale-transporte e prêmio viagem por colaborador." },
-      { property: "og:title", content: "Fechamento | AB5 Hub" },
+      { property: "og:title", content: "Premiações | AB5 Hub" },
       { property: "og:description", content: "Consolidação mensal de refeições, VT e prêmio viagem." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -103,7 +103,7 @@ function ClosingPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Fechamento" description={`Competência ${monthLabel(month)} — de ${brFull(start)} a ${brFull(endLabel)}.`} />
+      <PageHeader title="Premiações" description={`Competência ${monthLabel(month)} — de ${brFull(start)} a ${brFull(endLabel)}.`} />
       <div className="panel flex flex-wrap items-end gap-3 p-3">
         <div className="flex items-end gap-1">
           <Button variant="outline" onClick={() => setMonth(shift(month, -1))}><ChevronLeft className="h-4 w-4" /> Anterior</Button>

@@ -365,6 +365,35 @@ export type Database = {
           },
         ]
       }
+      closing_foreman_priority: {
+        Row: {
+          collaborator_id: string
+          created_at: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          collaborator_id: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          collaborator_id?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closing_foreman_priority_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: true
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collaborator_trainings: {
         Row: {
           collaborator_id: string

@@ -89,7 +89,15 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Vale-Transporte", url: "/beneficios/vale-transporte" },
       { title: "Prêmio de Viagem", url: "/beneficios/premio-viagem" },
       { title: "Prêmio de Motorista", url: "/beneficios/premio-motorista" },
-      { title: "Fechamento", url: "/fechamento" },
+    ],
+  },
+  {
+    label: "Fechamentos",
+    icon: Wallet,
+    items: [
+      { title: "Financeiro", url: "/fechamentos/financeiro" },
+      { title: "Premiações", url: "/fechamento" },
+      { title: "Suzano", url: "/fechamentos/suzano" },
     ],
   },
   { label: "Externo", icon: ClipboardList, items: [{ title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
