@@ -132,6 +132,20 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
 
 export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[] };
 
+/** Contrato: work_id → último dia do mês do último faturamento (custos depois disso não entram). */
+export function contractCutoffs(work: any, entries: any[], isAll: boolean, allWorks?: any[]) {
+  const contracts = new Set<string>(
+    isAll ? (allWorks ?? []).filter((x: any) => x.contract_enabled).map((x: any) => x.id) : work?.contract_enabled ? [work.id] : [],
+  );
+  const last = new Map<string, string>();
+  for (const e of entries ?? []) {
+    if (e.category !== "faturamento" || !contracts.has(e.work_id)) continue;
+    const ym = String(e.entry_date).slice(0, 7);
+    if (ym > (last.get(e.work_id) ?? "")) last.set(e.work_id, ym);
+  }
+  return new Map([...last].map(([k, ym]) => [k, monthEnd(ym)]));
+}
+
 /** Cálculo base (custos realizados, andamento, receita e margem por mês). */
 export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: string, opts: BaseOpts) {
   if (!work || !raw) return null;
@@ -146,14 +160,22 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     // Com mês inicial: só o que estiver dentro do período; sem mês inicial: desde o começo da obra
     const from = fromMonth ? `${fromMonth}-01` : "";
     const okDate = (dt?: string | null) => !dt || (dt.slice(0, 10) <= cut && dt.slice(0, 10) >= from);
+    // Contrato: custos só até o fim do mês do último faturamento do serviço
+    const contractCut = contractCutoffs(work, raw.entries, isAll, opts.allWorks);
+    const okW = (wid: string | null | undefined, dt?: string | null) => {
+      if (!okDate(dt)) return false;
+      const c = wid ? contractCut.get(wid) : undefined;
+      return !c || !dt || dt.slice(0, 10) <= c;
+    };
     const d = {
       ...raw,
-      allocs: raw.allocs.filter((a: any) => okDate(a.daily_schedules?.schedule_date)),
-      sibAllocs: raw.sibAllocs.filter((a: any) => okDate(a.daily_schedules?.schedule_date)),
-      rdoWf: raw.rdoWf.filter((r: any) => okDate(r.report_date)),
+      allocs: raw.allocs.filter((a: any) => okW(a.work_id, a.daily_schedules?.schedule_date)),
+      sibAllocs: raw.sibAllocs.filter((a: any) => okW(a.work_id, a.daily_schedules?.schedule_date)),
+      rdoWf: raw.rdoWf.filter((r: any) => okW(r.work_id, r.report_date)),
+      sibRdo: (raw.sibRdo ?? []).filter((r: any) => okW(r.work_id, r.report_date)),
       // Carros "Suzano Local" (sem cliente) entram só nos serviços da Suzano
-      vs: raw.vs.filter((v: any) => okDate(v.schedule_date) && (!v.is_suzano_local || /suzano/i.test(String(raw.client?.name ?? "")))),
-      entries: raw.entries.filter((e: any) => okDate(e.entry_date)),
+      vs: raw.vs.filter((v: any) => okW(v.work_id, v.schedule_date) && (!v.is_suzano_local || /suzano/i.test(String(raw.client?.name ?? "")))),
+      entries: raw.entries.filter((e: any) => e.category === "faturamento" ? okDate(e.entry_date) : okW(e.work_id, e.entry_date)),
       progress: raw.progress.filter((p: any) => !untilMonth || String(p.month).slice(0, 7) <= untilMonth),
     };
     const idSet = new Set(workIds);
