@@ -1,7 +1,6 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { contractFraction } from "@/lib/contract";
-import { adjustedItems, buildBase, fetchAll, loadWorkData, monthEnd, totalMargin } from "@/lib/results-engine";
+import { ResultadoPage } from "./obras.resultado";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { buildBase, fetchAll, loadWorkData, monthEnd, totalMargin } from "@/lib/results-engine";
 
 export const Route = createFileRoute("/_authenticated/fechamentos/financeiro")({
   head: () => ({
@@ -41,6 +43,12 @@ function FinanceiroPage() {
   const [year, setYear] = useState(String(now.getFullYear()));
   const [months, setMonths] = useState<number[]>([now.getMonth() + 1]);
   const [detail, setDetail] = useState<Line | null>(null);
+  // Clientes ocultos (salvos no navegador); padrão: todos visíveis
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => {
+    try { setHidden(JSON.parse(localStorage.getItem("fin-hidden-clients") ?? "[]")); } catch { /* ignore */ }
+  }, []);
+  const saveHidden = (h: string[]) => { setHidden(h); localStorage.setItem("fin-hidden-clients", JSON.stringify(h)); };
   const yms = useMemo(() => [...months].sort((a, b) => a - b).map((m) => `${year}-${String(m).padStart(2, "0")}`), [year, months]);
   const start = yms.length ? `${yms[0]}-01` : `${year}-01-01`;
   const end = yms.length ? monthEnd(yms[yms.length - 1]!) : `${year}-12-31`;
@@ -85,7 +93,7 @@ function FinanceiroPage() {
 
   const groups = useMemo(() => {
     const sel = new Set(yms);
-    const by = new Map<string, { name: string; lines: Line[] }>();
+    const by = new Map<string, { key: string; name: string; lines: Line[] }>();
     list.forEach((w: any, i: number) => {
       const raw = raws[i]?.data;
       if (!raw) return;
@@ -109,14 +117,16 @@ function FinanceiroPage() {
         ? contractFraction((raw.entries as any[]).filter((e) => e.category === "faturamento" && e.entry_date.slice(0, 7) <= lastYm).length, Number(w.contract_months ?? 12)) * 100
         : full.rows.filter((r) => r.ym <= lastYm).pop()?.progress ?? 0;
       const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
-      const g = by.get(key) ?? { name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as Line[] };
+      const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as Line[] };
       g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: billed ? (margin / billed) * 100 : 0, total: totalMargin(w, full), full, raw });
       by.set(key, g);
     });
     return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [list, raws, yms, year, holidays.data, works.data]);
 
-  const sum = (f: (l: Line) => number) => groups.reduce((a, g) => a + g.lines.reduce((b, l) => b + f(l), 0), 0);
+  const allGroups = groups;
+  const shown = useMemo(() => allGroups.filter((g) => !hidden.includes(g.key)), [allGroups, hidden]);
+  const sum = (f: (l: Line) => number) => shown.reduce((a, g) => a + g.lines.reduce((b, l) => b + f(l), 0), 0);
   const tBilled = sum((l) => l.billed);
   const tMargin = sum((l) => l.margin);
   const toggle = (m: number) => setMonths((s) => (s.includes(m) ? s.filter((x) => x !== m) : [...s, m]));
@@ -144,6 +154,33 @@ function FinanceiroPage() {
             </Button>
           </div>
         </div>
+        <div>
+          <Label>Clientes</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="block">
+                {hidden.filter((k) => allGroups.some((g) => g.key === k)).length ? `${allGroups.filter((g) => !hidden.includes(g.key)).length} de ${allGroups.length}` : "Todos"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-2" align="start">
+              <div className="mb-2 flex justify-between">
+                <Button size="sm" variant="ghost" onClick={() => saveHidden([])}>Todos</Button>
+                <Button size="sm" variant="ghost" onClick={() => saveHidden([...new Set([...hidden, ...allGroups.map((g) => g.key)])])}>Nenhum</Button>
+              </div>
+              <div className="max-h-72 space-y-1 overflow-y-auto">
+                {allGroups.map((g) => (
+                  <label key={g.key} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                    <Checkbox
+                      checked={!hidden.includes(g.key)}
+                      onCheckedChange={(c) => saveHidden(c ? hidden.filter((k) => k !== g.key) : [...hidden, g.key])}
+                    />
+                    {g.name}
+                  </label>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       <div className="panel overflow-x-auto">
@@ -166,7 +203,7 @@ function FinanceiroPage() {
             {!months.length && <TableRow><TableCell colSpan={10} className="text-muted-foreground">Selecione ao menos um mês.</TableCell></TableRow>}
             {months.length > 0 && loading && <TableRow><TableCell colSpan={10}>Carregando...</TableCell></TableRow>}
             {months.length > 0 && !loading && !groups.length && <TableRow><TableCell colSpan={10} className="text-muted-foreground">Nenhuma movimentação no período.</TableCell></TableRow>}
-            {months.length > 0 && groups.map((g) => (
+            {months.length > 0 && shown.map((g) => (
               <Fragment key={g.name}>
                 <TableRow className="bg-muted/40">
                   <TableCell colSpan={10} className="font-display font-semibold uppercase tracking-wide">{g.name}</TableCell>
@@ -188,7 +225,7 @@ function FinanceiroPage() {
               </Fragment>
             ))}
           </TableBody>
-          {groups.length > 0 && months.length > 0 && (
+          {shown.length > 0 && months.length > 0 && (
             <TableFooter>
               <TableRow>
                 <TableCell>Total</TableCell>
@@ -212,63 +249,11 @@ function FinanceiroPage() {
 }
 
 function DetailDialog({ line, onClose }: { line: Line | null; onClose: () => void }) {
-  const items = line ? adjustedItems(line.work, line.full, line.raw) : [];
-  const chart = line ? line.full.rows.map((r: any) => ({ label: r.label, andamento: Number(r.progress.toFixed(2)) })) : [];
-  const tb = items.reduce((a, i) => a + i.budget, 0);
-  const tr = items.reduce((a, i) => a + i.real, 0);
   return (
     <Dialog open={!!line} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-[98vw] w-[98vw] h-[96vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{line?.work.clients?.name ?? line?.work.client} — {line?.work.name}</DialogTitle></DialogHeader>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="panel p-3">
-            <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Andamento mensal</p>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={chart}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="label" fontSize={11} />
-                <YAxis fontSize={11} domain={[0, 100]} unit="%" />
-                <Tooltip formatter={(v: number) => pct(v)} />
-                <Legend />
-                <Bar dataKey="andamento" name="Andamento" fill="var(--color-primary)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="panel overflow-x-auto p-3">
-            <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Custos orçados x realizados</p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead className="text-right">Orçado</TableHead>
-                  <TableHead className="text-right">Realizado</TableHead>
-                  <TableHead className="text-right">Diferença</TableHead>
-                  <TableHead className="text-right">% Realizado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((i) => (
-                  <TableRow key={i.key}>
-                    <TableCell>{i.label}</TableCell>
-                    <TableCell className="text-right">{brl(i.budget)}</TableCell>
-                    <TableCell className="text-right">{brl(i.real)}</TableCell>
-                    <TableCell className={`text-right ${i.budget - i.real < 0 ? "text-destructive" : ""}`}>{brl(i.budget - i.real)}</TableCell>
-                    <TableCell className="text-right">{pct(i.used)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell>Total</TableCell>
-                  <TableCell className="text-right">{brl(tb)}</TableCell>
-                  <TableCell className="text-right">{brl(tr)}</TableCell>
-                  <TableCell className="text-right">{brl(tb - tr)}</TableCell>
-                  <TableCell className="text-right">{pct(tb ? (tr / tb) * 100 : 0)}</TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          </div>
-        </div>
+        {line && <ResultadoPage key={line.work.id} initialWorkId={line.work.id} />}
       </DialogContent>
     </Dialog>
   );

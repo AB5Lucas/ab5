@@ -61,7 +61,6 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Serviços", url: "/obras" },
       { title: "Resultados", url: "/obras/resultado" },
       { title: "Clientes", url: "/clientes" },
-      { title: "Requisitos", url: "/obras/requisitos" },
     ],
   },
   {

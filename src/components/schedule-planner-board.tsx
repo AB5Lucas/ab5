@@ -2093,16 +2093,6 @@ export function SchedulePlannerBoard({
                           >
                             {ev.aso ? ASO_LABEL[ev.aso] : "ASO"}
                           </Badge>
-                          <Badge
-                            variant={ev.reqBlocked ? "destructive" : ev.reqIssues > 0 ? "secondary" : "outline"}
-                            className="px-1 py-0 text-[9px]"
-                          >
-                            {ev.reqBlocked
-                              ? "Requisito bloqueante"
-                              : ev.reqIssues > 0
-                                ? `${ev.reqIssues} requisito(s) pendente(s)`
-                                : "Requisitos OK"}
-                          </Badge>
                         </div>
                       )}
                       {ev.reasons.length > 0 && (

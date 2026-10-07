@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Pencil, Plus, Search, Trash2, ClipboardList, Building2 } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -270,11 +270,6 @@ function WorksPage() {
             <Button variant="outline" size="sm" asChild>
               <Link to="/clientes">
                 <Building2 className="h-4 w-4" /> Clientes
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/obras/requisitos">
-                <ClipboardList className="h-4 w-4" /> Requisitos
               </Link>
             </Button>
             {canWrite && (

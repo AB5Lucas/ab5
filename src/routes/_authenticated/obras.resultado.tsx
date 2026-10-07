@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/obras/resultado")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: ResultadoPage,
+  component: () => <ResultadoPage />,
 });
 
 /** Multiplicador de encargos sobre o valor hora do colaborador. */
@@ -61,7 +61,7 @@ const num = (s: string) => {
 const fmtDate = (iso: string) => iso.split("-").reverse().join("/");
 
 
-function ResultadoPage() {
+export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}) {
   const { canWrite, role, user } = useCurrentUser();
   const qc = useQueryClient();
   const [workId, setWorkId] = useState<string>("");
@@ -572,6 +572,15 @@ function ResultadoPage() {
     const bi = (w?.budget_items ?? {}) as Record<string, number>;
     setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, f(bi[it.key])])));
   };
+
+  useEffect(() => {
+    if (!initialWorkId || workId || !works.data?.length) return;
+    const w0 = works.data.find((x: any) => x.id === initialWorkId) as any;
+    if (!w0) return;
+    setClientKey(groupKey(w0));
+    selectWork(initialWorkId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialWorkId, works.data]);
 
   const last = calc?.last;
   const billed = last?.billing ?? 0;
