@@ -35,6 +35,7 @@ import { Route as AuthenticatedColaboradoresAsosRouteImport } from './routes/_au
 import { Route as AuthenticatedColaboradoresEstruturaRouteImport } from './routes/_authenticated/colaboradores.estrutura'
 import { Route as AuthenticatedColaboradoresTurnosRouteImport } from './routes/_authenticated/colaboradores.turnos'
 import { Route as AuthenticatedExternoRelatorioDiarioRouteImport } from './routes/_authenticated/externo.relatorio-diario'
+import { Route as AuthenticatedFechamentosFinanceiroRouteImport } from './routes/_authenticated/fechamentos.financeiro'
 import { Route as AuthenticatedObrasIndexRouteImport } from './routes/_authenticated/obras.index'
 import { Route as AuthenticatedObrasIntegracoesRouteImport } from './routes/_authenticated/obras.integracoes'
 import { Route as AuthenticatedObrasRequisitosRouteImport } from './routes/_authenticated/obras.requisitos'
@@ -198,6 +199,12 @@ const AuthenticatedExternoRelatorioDiarioRoute =
     path: '/externo/relatorio-diario',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFechamentosFinanceiroRoute =
+  AuthenticatedFechamentosFinanceiroRouteImport.update({
+    id: '/fechamentos/financeiro',
+    path: '/fechamentos/financeiro',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedObrasIndexRoute = AuthenticatedObrasIndexRouteImport.update({
   id: '/obras/',
   path: '/obras/',
@@ -313,6 +320,7 @@ export interface FileRoutesByFullPath {
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
+  '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
   '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
@@ -355,6 +363,7 @@ export interface FileRoutesByTo {
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
+  '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
   '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
@@ -399,6 +408,7 @@ export interface FileRoutesById {
   '/_authenticated/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/_authenticated/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/_authenticated/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
+  '/_authenticated/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/_authenticated/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/_authenticated/obras/requisitos': typeof AuthenticatedObrasRequisitosRoute
   '/_authenticated/obras/resultado': typeof AuthenticatedObrasResultadoRoute
@@ -443,6 +453,7 @@ export interface FileRouteTypes {
     | '/colaboradores/estrutura'
     | '/colaboradores/turnos'
     | '/externo/relatorio-diario'
+    | '/fechamentos/financeiro'
     | '/obras/integracoes'
     | '/obras/requisitos'
     | '/obras/resultado'
@@ -485,6 +496,7 @@ export interface FileRouteTypes {
     | '/colaboradores/estrutura'
     | '/colaboradores/turnos'
     | '/externo/relatorio-diario'
+    | '/fechamentos/financeiro'
     | '/obras/integracoes'
     | '/obras/requisitos'
     | '/obras/resultado'
@@ -528,6 +540,7 @@ export interface FileRouteTypes {
     | '/_authenticated/colaboradores/estrutura'
     | '/_authenticated/colaboradores/turnos'
     | '/_authenticated/externo/relatorio-diario'
+    | '/_authenticated/fechamentos/financeiro'
     | '/_authenticated/obras/integracoes'
     | '/_authenticated/obras/requisitos'
     | '/_authenticated/obras/resultado'
@@ -737,6 +750,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedExternoRelatorioDiarioRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/fechamentos/financeiro': {
+      id: '/_authenticated/fechamentos/financeiro'
+      path: '/fechamentos/financeiro'
+      fullPath: '/fechamentos/financeiro'
+      preLoaderRoute: typeof AuthenticatedFechamentosFinanceiroRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/obras/': {
       id: '/_authenticated/obras/'
       path: '/obras'
@@ -867,6 +887,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedColaboradoresEstruturaRoute: typeof AuthenticatedColaboradoresEstruturaRoute
   AuthenticatedColaboradoresTurnosRoute: typeof AuthenticatedColaboradoresTurnosRoute
   AuthenticatedExternoRelatorioDiarioRoute: typeof AuthenticatedExternoRelatorioDiarioRoute
+  AuthenticatedFechamentosFinanceiroRoute: typeof AuthenticatedFechamentosFinanceiroRoute
   AuthenticatedObrasIntegracoesRoute: typeof AuthenticatedObrasIntegracoesRoute
   AuthenticatedObrasRequisitosRoute: typeof AuthenticatedObrasRequisitosRoute
   AuthenticatedObrasResultadoRoute: typeof AuthenticatedObrasResultadoRoute
@@ -912,6 +933,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedColaboradoresTurnosRoute: AuthenticatedColaboradoresTurnosRoute,
   AuthenticatedExternoRelatorioDiarioRoute:
     AuthenticatedExternoRelatorioDiarioRoute,
+  AuthenticatedFechamentosFinanceiroRoute:
+    AuthenticatedFechamentosFinanceiroRoute,
   AuthenticatedObrasIntegracoesRoute: AuthenticatedObrasIntegracoesRoute,
   AuthenticatedObrasRequisitosRoute: AuthenticatedObrasRequisitosRoute,
   AuthenticatedObrasResultadoRoute: AuthenticatedObrasResultadoRoute,

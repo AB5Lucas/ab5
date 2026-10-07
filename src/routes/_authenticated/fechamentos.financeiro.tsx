@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -93,9 +93,8 @@ function FinanceiroPage() {
       if (!full) return;
       let mo = 0, transport = 0, materials = 0, billed = 0;
       for (const r of full.rows) if (sel.has(r.ym)) { mo += r.labor; transport += r.transport; }
-      const cut = (full as any).cutDate as string | undefined;
       for (const e of raw.entries as any[]) {
-        if (!sel.has(e.entry_date.slice(0, 7)) || (cut && e.entry_date > cut)) continue;
+        if (!sel.has(e.entry_date.slice(0, 7))) continue;
         const v = Number(e.amount);
         if (e.category === "faturamento") billed += v;
         else if (e.category === "mao_obra") mo += v;
@@ -168,8 +167,8 @@ function FinanceiroPage() {
             {months.length > 0 && loading && <TableRow><TableCell colSpan={10}>Carregando...</TableCell></TableRow>}
             {months.length > 0 && !loading && !groups.length && <TableRow><TableCell colSpan={10} className="text-muted-foreground">Nenhuma movimentação no período.</TableCell></TableRow>}
             {months.length > 0 && groups.map((g) => (
-              <>
-                <TableRow key={`c-${g.name}`} className="bg-muted/40">
+              <Fragment key={g.name}>
+                <TableRow className="bg-muted/40">
                   <TableCell colSpan={10} className="font-display font-semibold uppercase tracking-wide">{g.name}</TableCell>
                 </TableRow>
                 {g.lines.map((l) => (
@@ -186,7 +185,7 @@ function FinanceiroPage() {
                     <TableCell className={`text-right ${l.total.margin < 0 ? "text-destructive" : ""}`}>{brl(l.total.margin)} <span className="text-xs text-muted-foreground">({pct(l.total.pct)})</span></TableCell>
                   </TableRow>
                 ))}
-              </>
+              </Fragment>
             ))}
           </TableBody>
           {groups.length > 0 && months.length > 0 && (
