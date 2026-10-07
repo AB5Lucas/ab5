@@ -745,15 +745,35 @@ function ResultadoPage() {
     const billed = rows.reduce((a, r) => a + r.billed, 0);
     return { rows, avg, budget: billed * avg };
   }, [calcCt, hhSavedWork, isAll, data.data, untilMonth]);
-  const calc = useMemo(() => {
+  const calcRt = useMemo(() => {
     if (!calcCt || !rentalInfo) return calcCt;
     const items = calcCt.items.map((i) =>
       i.key === "andaimes" ? { ...i, budget: rentalInfo.budget, used: rentalInfo.budget ? (i.real / rentalInfo.budget) * 100 : i.real ? 100 : 0 } : i,
     );
     return { ...calcCt, items, budget: items.reduce((a, i) => a + i.budget, 0) };
   }, [calcCt, rentalInfo]);
+  /** Mensal: com período, pedido = soma dos pedidos com data no período; orçado proporcional a esse valor. */
+  const monthlyInfo = useMemo(() => {
+    const w = hhSavedWork;
+    if (!calcRt || isAll || !w?.monthly_enabled || !hasPeriod) return null;
+    const list = (Array.isArray(w.orders) ? w.orders : []) as any[];
+    const total = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
+    const order = list.filter((o) => o.date && o.date >= periodStart && o.date <= periodEnd).reduce((a, o) => a + Number(o.value ?? 0), 0);
+    return { order, f: total ? order / total : 0 };
+  }, [calcRt, hhSavedWork, isAll, hasPeriod, periodStart, periodEnd]);
+  const calc = useMemo(() => {
+    if (!calcRt || !monthlyInfo) return calcRt;
+    const items = calcRt.items.map((i) => {
+      const b = i.budget * monthlyInfo.f;
+      return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
+    });
+    const budget = items.reduce((a, i) => a + i.budget, 0);
+    const order = monthlyInfo.order;
+    return { ...calcRt, items, budget, order, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
+  }, [calcRt, monthlyInfo]);
   const [ctOn, setCtOn] = useState(false);
   const [rtOn, setRtOn] = useState(false);
+  const [moOn, setMoOn] = useState(false);
   const [ctMonths, setCtMonths] = useState("12");
   const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
@@ -941,7 +961,7 @@ function ResultadoPage() {
 
   const last = calc?.last;
   const billed = last?.billing ?? 0;
-  const order = hhPeriodValue ?? calc?.order ?? 0;
+  const order = monthlyInfo ? monthlyInfo.order : hhPeriodValue ?? calc?.order ?? 0;
   const budgetMargin = order - order * TAX_RATE - (calc?.budget ?? 0);
   const realMargin = (last?.revenue ?? 0) * (1 - TAX_RATE) - (last?.cost ?? 0);
   const totBudget = calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0;

@@ -2564,6 +2564,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           manager_id: string | null
+          monthly_enabled: boolean
           name: string
           neighborhood: string | null
           night_shift: boolean
@@ -2605,6 +2606,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           manager_id?: string | null
+          monthly_enabled?: boolean
           name: string
           neighborhood?: string | null
           night_shift?: boolean
@@ -2646,6 +2648,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           manager_id?: string | null
+          monthly_enabled?: boolean
           name?: string
           neighborhood?: string | null
           night_shift?: boolean
