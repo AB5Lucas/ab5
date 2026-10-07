@@ -2397,6 +2397,9 @@ export type Database = {
           description: string | null
           entry_date: string
           id: string
+          split_group: string | null
+          split_note: string | null
+          split_total: number | null
           updated_at: string
           work_id: string
         }
@@ -2407,6 +2410,9 @@ export type Database = {
           description?: string | null
           entry_date: string
           id?: string
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
           updated_at?: string
           work_id: string
         }
@@ -2417,6 +2423,9 @@ export type Database = {
           description?: string | null
           entry_date?: string
           id?: string
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
           updated_at?: string
           work_id?: string
         }
