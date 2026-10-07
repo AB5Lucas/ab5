@@ -1132,7 +1132,12 @@ function ResultadoPage() {
                 <Lbl>Obra</Lbl>
                 <span className="text-xs uppercase">{w.name}</span>
                 <Lbl>Nº Pedido</Lbl>
-                <span>{w.order_number || "—"}</span>
+                <span>
+                  {(() => {
+                    const n = Array.isArray(w.orders) ? w.orders.length : 0;
+                    return n > 1 ? `${n} pedidos` : w.order_number || "—";
+                  })()}
+                </span>
                 <Lbl>Nº Orç. AB5</Lbl>
                 <span>{w.quote_number || "—"}</span>
                 <Lbl>Valor Faturado</Lbl>
@@ -1477,6 +1482,7 @@ function ResultadoPage() {
                 <Plus className="h-4 w-4" /> Adicionar pedido
               </Button>
             </div>
+            <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
             {orderList.map((o, i) => (
               <div key={i} className="flex items-center gap-2">
                 <Input placeholder="Nº Pedido" value={o.number} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))} />
@@ -1491,6 +1497,7 @@ function ResultadoPage() {
                 </Button>
               </div>
             ))}
+            </div>
             <p className="text-sm text-muted-foreground">
               {hhOn ? "Valor do pedido (horas dos RDOs × valor por função)" : "Valor do pedido (soma)"}: <span className="font-semibold text-foreground">{brl(ordersSum)}</span>
             </p>
