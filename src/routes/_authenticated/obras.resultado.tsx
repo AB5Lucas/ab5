@@ -601,7 +601,7 @@ function ResultadoPage() {
     if (!hasPeriod) return null;
     const b = buildBase("", "");
     if (!b?.last) return null;
-    const w: any = hhSavedWork;
+    const w: any = work;
     if (!isAll && w?.monthly_enabled) {
       // Mensal: só meses com pedido entram (receita = pedidos, custo = custos desses meses)
       const list = (Array.isArray(w.orders) ? w.orders : []) as any[];
@@ -616,7 +616,7 @@ function ResultadoPage() {
     if (active < 2) return null;
     const margin = b.last.revenue * (1 - TAX_RATE) - b.last.cost;
     return { margin, pct: b.last.revenue ? (margin / b.last.revenue) * 100 : 0 };
-  }, [work, data.data, hasPeriod, isAll, holidaysQ.data, hhSavedWork]);
+  }, [work, data.data, hasPeriod, isAll, holidaysQ.data]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string; date?: string }[]>([]);
