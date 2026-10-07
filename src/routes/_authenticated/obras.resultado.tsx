@@ -613,10 +613,11 @@ function ResultadoPage() {
   const calcBase = useMemo(() => buildBase(fromMonth, untilMonth), [work, data.data, untilMonth, fromMonth, isAll, holidaysQ.data, works.data]);
   // Margem realizada total da obra (sem filtro), para o card discreto
   const totalReal = useMemo(() => {
-    if (!hasPeriod) return null;
+    const w: any = work;
+    const mensal = !isAll && w?.monthly_enabled;
+    if (!hasPeriod && !mensal) return null;
     const b = buildBase("", "");
     if (!b?.last) return null;
-    const w: any = work;
     if (!isAll && w?.monthly_enabled) {
       // Mensal: só meses com pedido entram (receita = pedidos, custo = custos desses meses)
       const list = (Array.isArray(w.orders) ? w.orders : []) as any[];
