@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { toast } from "sonner";
-import { HardHat } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,7 +114,7 @@ function AuthPage() {
       <div className="panel w-full max-w-md p-6">
         <div className="mb-6 flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <HardHat className="h-5 w-5" />
+            <CalendarDays className="h-5 w-5" />
           </span>
           <div>
             <h1 className="font-display text-xl font-semibold uppercase tracking-wide">

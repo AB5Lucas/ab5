@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { HardHat, CalendarRange, Users, Truck } from "lucide-react";
+import { CalendarDays, CalendarRange, Users, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/use-auth";
 
@@ -36,7 +36,7 @@ function Home() {
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <HardHat className="h-5 w-5" />
+            <CalendarDays className="h-5 w-5" />
           </span>
           <span className="font-display text-sm uppercase tracking-widest">Programação Operacional</span>
         </div>
