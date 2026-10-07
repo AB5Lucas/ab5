@@ -1289,6 +1289,13 @@ function ResultadoPage() {
                 <p className="pt-4 text-lg">{pct(calc?.budgetMarginPct ?? 0)}</p>
                 <p className={`pt-4 text-lg ${(last?.marginPct ?? 0) < 0 ? "text-destructive" : ""}`}>{pct(last?.marginPct ?? 0)}</p>
               </div>
+              {totalReal && (
+                <div className="mx-auto mt-4 w-fit rounded-md border bg-muted/40 px-4 py-2 text-center">
+                  <p className="text-xs italic text-muted-foreground">Margem realizada total da obra</p>
+                  <p className={`text-sm font-semibold ${totalReal.margin < 0 ? "text-destructive" : ""}`}>{brl(totalReal.margin)}</p>
+                  <p className={`text-xs ${totalReal.pct < 0 ? "text-destructive" : "text-muted-foreground"}`}>{pct(totalReal.pct)}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
