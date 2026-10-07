@@ -9,7 +9,7 @@ export const CONFIG_ROLES: AppRole[] = ["admin", "coordenador", "encarregado", "
 export function defaultAllowed(role: AppRole, url: string) {
   if (role === "encarregado") return url.startsWith("/externo");
   if (role === "coordenador") return false;
-  if (url === "/admin/acessos") return role === "admin";
+  if (url === "/admin/acessos" || url === "/fechamentos/financeiro") return role === "admin";
   return true;
 }
 
