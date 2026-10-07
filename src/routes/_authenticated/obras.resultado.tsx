@@ -448,8 +448,12 @@ function ResultadoPage() {
     // Prêmio motorista: regras da aba Prêmio de Motorista, rateado como o veículo
     const inRule = (r: any, km: number) => km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance));
     const driverRows: { date: string; driver: string; plate: string; km: number; amount: number; share: number }[] = [];
+    const bonusSeen = new Set<string>(); // 1 prêmio por motorista por dia, mesmo com várias viagens
     for (const v of d.vs) {
       if (!v.driver_bonus || !v.driver_id || (v.work_id && !idSet.has(v.work_id))) continue;
+      const bk = `${v.driver_id}|${v.schedule_date}`;
+      if (bonusSeen.has(bk)) continue;
+      bonusSeen.add(bk);
       const km = Number(v.km ?? 0);
       const amount = (d.dbRules ?? []).filter((r: any) => r.calculation_type !== "fixed_monthly" && inRule(r, km)).reduce((s: number, r: any) => s + Number(r.amount), 0);
       if (!amount) continue;
