@@ -1433,7 +1433,7 @@ function ResultadoPage() {
               </>
             )}
             {detail && (
-              <EntryList entries={(data.data?.entries ?? []).filter((e: any) => entryItem(e.category) === detail)} />
+              <EntryList entries={(data.data?.entries ?? []).filter((e: any) => entryItem(e.category) === detail && e.entry_date >= periodStart && e.entry_date <= periodEnd)} />
             )}
           </div>
         </DialogContent>
