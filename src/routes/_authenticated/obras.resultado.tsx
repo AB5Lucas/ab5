@@ -532,6 +532,7 @@ function ResultadoPage() {
         cost: accCost,
         monthCost: m.labor + m.transport + m.entries,
         labor: m.labor,
+        monthBilling: m.billing,
         transport: m.transport,
         others: m.entries,
         margin,
@@ -560,7 +561,7 @@ function ResultadoPage() {
     }
     const monthBars = rows.map((r) => {
       const pm = perMonth.get(r.ym)!;
-      return { label: r.label, ...pm, materiais: pm.materiais + pm.ferramentas + pm.andaimes };
+      return { label: r.label, ...pm, materiais: pm.materiais + pm.ferramentas + pm.andaimes, faturamento: r.monthBilling };
     });
     const bi = ((work as any).budget_items ?? {}) as Record<string, number>;
     const items = ITEMS.map((it) => {
@@ -1109,7 +1110,28 @@ function ResultadoPage() {
                       <CartesianGrid vertical={false} className="stroke-border" />
                       <XAxis dataKey="label" fontSize={11} />
                       <YAxis fontSize={11} tickFormatter={(v: number) => brl(v)} width={100} />
-                      <Tooltip formatter={(v: number) => brl(v)} />
+                      <Tooltip
+                        content={({ active, payload, label }: any) => {
+                          if (!active || !payload?.length) return null;
+                          const p = payload[0].payload;
+                          const empty = !p.mo && !p.materiais && !p.transporte;
+                          if (empty && !p.faturamento) return null;
+                          return (
+                            <div className="rounded-md border bg-popover p-2 text-xs text-popover-foreground shadow">
+                              <p className="mb-1 font-medium">{label}</p>
+                              {empty ? (
+                                <p>Faturamento: {brl(p.faturamento)}</p>
+                              ) : (
+                                payload.map((it: any) => (
+                                  <p key={it.dataKey} style={{ color: it.color }}>
+                                    {it.name}: {brl(Number(it.value ?? 0))}
+                                  </p>
+                                ))
+                              )}
+                            </div>
+                          );
+                        }}
+                      />
                       <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
                       <Bar dataKey="mo" name="R$ Total MO" fill="var(--primary)" />
                       <Bar dataKey="materiais" name="R$ Total Materiais" fill="var(--muted-foreground)" />
