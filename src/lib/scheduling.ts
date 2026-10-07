@@ -186,7 +186,7 @@ export async function fetchScheduleContext(date: string) {
     positions: positions.data ?? [],
     vehicles: vehicles.data ?? [],
     baseTeams: (baseTeams.data ?? []).filter((b) => !b.end_date || b.end_date >= date),
-    requirements: (requirements.data ?? []) as Requirement[],
+    requirements: [] as Requirement[], // aba Requisitos removida
     trainings: trainings.data ?? [],
     collabTrainings: collabTrainings.data ?? [],
     absences,

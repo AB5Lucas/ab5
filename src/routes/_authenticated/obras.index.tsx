@@ -272,11 +272,6 @@ function WorksPage() {
                 <Building2 className="h-4 w-4" /> Clientes
               </Link>
             </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/obras/requisitos">
-                <ClipboardList className="h-4 w-4" /> Requisitos
-              </Link>
-            </Button>
             {canWrite && (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4" /> Novo serviço
