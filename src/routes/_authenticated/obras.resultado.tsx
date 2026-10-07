@@ -588,7 +588,7 @@ function ResultadoPage() {
   }, [work, data.data, untilMonth, fromMonth, isAll, holidaysQ.data]);
 
   // ---------- Edição ----------
-  const [orderList, setOrderList] = useState<{ number: string; value: string }[]>([]);
+  const [orderList, setOrderList] = useState<{ number: string; value: string; date?: string }[]>([]);
   // HH: valor do pedido = horas dos RDOs × valor cobrado por hora da função
   const [hhOn, setHhOn] = useState(false);
   const [hhRates, setHhRates] = useState<Record<string, string>>({});
@@ -745,15 +745,35 @@ function ResultadoPage() {
     const billed = rows.reduce((a, r) => a + r.billed, 0);
     return { rows, avg, budget: billed * avg };
   }, [calcCt, hhSavedWork, isAll, data.data, untilMonth]);
-  const calc = useMemo(() => {
+  const calcRt = useMemo(() => {
     if (!calcCt || !rentalInfo) return calcCt;
     const items = calcCt.items.map((i) =>
       i.key === "andaimes" ? { ...i, budget: rentalInfo.budget, used: rentalInfo.budget ? (i.real / rentalInfo.budget) * 100 : i.real ? 100 : 0 } : i,
     );
     return { ...calcCt, items, budget: items.reduce((a, i) => a + i.budget, 0) };
   }, [calcCt, rentalInfo]);
+  /** Mensal: com período, pedido = soma dos pedidos com data no período; orçado proporcional a esse valor. */
+  const monthlyInfo = useMemo(() => {
+    const w = hhSavedWork;
+    if (!calcRt || isAll || !w?.monthly_enabled || !hasPeriod) return null;
+    const list = (Array.isArray(w.orders) ? w.orders : []) as any[];
+    const total = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
+    const order = list.filter((o) => o.date && o.date >= periodStart && o.date <= periodEnd).reduce((a, o) => a + Number(o.value ?? 0), 0);
+    return { order, f: total ? order / total : 0 };
+  }, [calcRt, hhSavedWork, isAll, hasPeriod, periodStart, periodEnd]);
+  const calc = useMemo(() => {
+    if (!calcRt || !monthlyInfo) return calcRt;
+    const items = calcRt.items.map((i) => {
+      const b = i.budget * monthlyInfo.f;
+      return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
+    });
+    const budget = items.reduce((a, i) => a + i.budget, 0);
+    const order = monthlyInfo.order;
+    return { ...calcRt, items, budget, order, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
+  }, [calcRt, monthlyInfo]);
   const [ctOn, setCtOn] = useState(false);
   const [rtOn, setRtOn] = useState(false);
+  const [moOn, setMoOn] = useState(false);
   const [ctMonths, setCtMonths] = useState("12");
   const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
@@ -793,11 +813,12 @@ function ResultadoPage() {
       const { error } = await supabase
         .from("works")
         .update({
-          orders: list.map((o) => ({ number: o.number.trim(), value: hhOn ? 0 : num(o.value) })),
+          orders: list.map((o) => ({ number: o.number.trim(), value: hhOn ? 0 : num(o.value), ...(moOn && o.date ? { date: o.date } : {}) })),
           order_value: ordersSum,
           hh_enabled: hhOn,
           contract_enabled: ctOn,
           rental_enabled: rtOn,
+          monthly_enabled: moOn,
           contract_months: Math.max(1, parseInt(ctMonths) || 12),
           hh_rates: Object.fromEntries(Object.entries(hhRates).map(([k, v]) => [k, num(v)]).filter(([, v]) => v)),
           order_number: list.map((o) => o.number.trim()).filter(Boolean).join(" / ") || null,
@@ -928,11 +949,12 @@ function ResultadoPage() {
     const w = works.data?.find((x) => x.id === id) as any;
     const f = (v: unknown) => (Number(v ?? 0) ? Number(v).toFixed(2).replace(".", ",") : "");
     const ol = Array.isArray(w?.orders) ? (w.orders as any[]) : [];
-    setOrderList(ol.length ? ol.map((o) => ({ number: String(o.number ?? ""), value: f(o.value) })) : [{ number: "", value: "" }]);
+    setOrderList(ol.length ? ol.map((o) => ({ number: String(o.number ?? ""), value: f(o.value), date: o.date ? String(o.date) : "" })) : [{ number: "", value: "" }]);
     setQuoteNo(w?.quote_number ?? "");
     setHhOn(!!w?.hh_enabled);
     setCtOn(!!w?.contract_enabled);
     setRtOn(!!w?.rental_enabled);
+    setMoOn(!!w?.monthly_enabled);
     setCtMonths(String(w?.contract_months ?? 12));
     setHhRates(Object.fromEntries(Object.entries((w?.hh_rates ?? {}) as Record<string, number>).map(([k, v]) => [k, f(v)])));
     const bi = (w?.budget_items ?? {}) as Record<string, number>;
@@ -941,7 +963,7 @@ function ResultadoPage() {
 
   const last = calc?.last;
   const billed = last?.billing ?? 0;
-  const order = hhPeriodValue ?? calc?.order ?? 0;
+  const order = monthlyInfo ? monthlyInfo.order : hhPeriodValue ?? calc?.order ?? 0;
   const budgetMargin = order - order * TAX_RATE - (calc?.budget ?? 0);
   const realMargin = (last?.revenue ?? 0) * (1 - TAX_RATE) - (last?.cost ?? 0);
   const totBudget = calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0;
@@ -1417,6 +1439,9 @@ function ResultadoPage() {
                 <label className="flex items-center gap-2 text-sm font-medium">
                   <Switch checked={rtOn} onCheckedChange={setRtOn} /> Locação
                 </label>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Switch checked={moOn} onCheckedChange={setMoOn} /> Mensal
+                </label>
               </div>
               {hhOn && (
                 <Button type="button" size="sm" variant="outline" onClick={() => setHhDlg(true)}>Valores</Button>
@@ -1431,6 +1456,9 @@ function ResultadoPage() {
             {orderList.map((o, i) => (
               <div key={i} className="flex items-center gap-2">
                 <Input placeholder="Nº Pedido" value={o.number} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))} />
+                {moOn && (
+                  <Input className="w-40" type="date" aria-label="Data do pedido" value={o.date ?? ""} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)))} />
+                )}
                 {!hhOn && (
                   <Input className="w-40" placeholder="Valor (R$)" value={o.value} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
                 )}
