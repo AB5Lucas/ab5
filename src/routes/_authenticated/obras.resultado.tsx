@@ -517,7 +517,7 @@ function ResultadoPage() {
     const pStart = fromMonth || "";
     const basePct = pStart ? [...progMap.entries()].filter(([ym]) => ym < pStart).sort(([a], [b]) => a.localeCompare(b)).pop()?.[1] ?? 0 : 0;
     let accCost = 0;
-    let lastPct = 0;
+    let lastPct = basePct;
     let accBilling = 0;
     const rows = months.map((ym) => {
       const m = monthly.get(ym) ?? { labor: 0, transport: 0, entries: 0, billing: 0 };
