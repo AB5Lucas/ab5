@@ -594,7 +594,18 @@ function ResultadoPage() {
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
-  }, [work, data.data, untilMonth, fromMonth, isAll, holidaysQ.data]);
+  };
+  const calcBase = useMemo(() => buildBase(fromMonth, untilMonth), [work, data.data, untilMonth, fromMonth, isAll, holidaysQ.data]);
+  // Margem realizada total da obra (sem filtro), para o card discreto
+  const totalReal = useMemo(() => {
+    if (!hasPeriod) return null;
+    const b = buildBase("", "");
+    if (!b?.last) return null;
+    const active = b.rows.filter((r) => r.monthCost || r.monthBilling || r.advance).length;
+    if (active < 2) return null;
+    const margin = b.last.revenue * (1 - TAX_RATE) - b.last.cost;
+    return { margin, pct: b.last.revenue ? (margin / b.last.revenue) * 100 : 0 };
+  }, [work, data.data, hasPeriod, isAll, holidaysQ.data]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string; date?: string }[]>([]);
