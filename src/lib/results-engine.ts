@@ -97,7 +97,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           : Promise.resolve([] as any[]),
         w.client_id
           ? fetchAll<any>((a, b) =>
-              supabase.from("appointments").select("collaborator_id, scheduled_date, completed_date, status").eq("type", "integracao").eq("client_id", w.client_id!).range(a, b),
+              supabase.from("appointments").select("collaborator_id, scheduled_date, completed_date, status, pays_transport_voucher").eq("type", "integracao").eq("client_id", w.client_id!).range(a, b),
             )
           : Promise.resolve([] as any[]),
         clientName
@@ -265,27 +265,27 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         const all = allByM.get(m) ?? 0;
         return all > 0 ? (myByM.get(m) ?? 0) / all : 0;
       };
-      const days = new Map<string, { id: string; date: string }>();
+      const days = new Map<string, { id: string; date: string; paysVt: boolean }>();
       for (const a of raw.integAppts ?? []) {
         if (a.status === "cancelled" || a.status === "canceled") continue;
         const dt = String(a.completed_date ?? a.scheduled_date ?? "").slice(0, 10);
-        if (dt && okDate(dt)) days.set(`${a.collaborator_id}|${dt}`, { id: a.collaborator_id, date: dt });
+        if (dt && okDate(dt)) days.set(`${a.collaborator_id}|${dt}`, { id: a.collaborator_id, date: dt, paysVt: a.pays_transport_voucher !== false });
       }
       for (const e of raw.integBoxes ?? []) {
         const dt = e.daily_schedules?.schedule_date as string | undefined;
-        if (dt && okDate(dt)) days.set(`${e.collaborator_id}|${dt}`, { id: e.collaborator_id, date: dt });
+        if (dt && okDate(dt) && !days.has(`${e.collaborator_id}|${dt}`)) days.set(`${e.collaborator_id}|${dt}`, { id: e.collaborator_id, date: dt, paysVt: true });
       }
       const rIn = (r: any, km: number) => km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance));
       const distF = buildDistanceLookup(d.cityDist ?? []);
       const vtCost = vtDay(false);
-      for (const { id, date } of days.values()) {
+      for (const { id, date, paysVt } of days.values()) {
         const wd = new Date(`${date}T12:00:00`).getDay();
         const hours = wd >= 1 && wd <= 4 ? 9 : 8;
         const shareF = shareOf(date);
         if (!shareF) continue;
         const mo = hours * (rate.get(id) ?? 0) * enc(id) * shareF;
         const p = person.get(id);
-        const vt = p?.vt_enabled === false ? 0 : vtCost * shareF;
+        const vt = !paysVt || p?.vt_enabled === false ? 0 : vtCost * shareF;
         const dist = distF(p?.city, d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
         const tb = p?.travel_bonus_enabled === false ? 0
           : (d.tbRules ?? []).filter((x: any) => rIn(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0) * shareF;
@@ -293,6 +293,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         if (vt) {
           const v = vtByDate.get(date) ?? { people: 0, cost: 0 };
           v.cost += vt;
+          v.people += 1;
           vtByDate.set(date, v);
           bump(date.slice(0, 7), "transport", vt);
         }
