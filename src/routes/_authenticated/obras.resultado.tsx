@@ -203,7 +203,7 @@ function ResultadoPage() {
         w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
-              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, vehicles(km_rate, plate), collaborators(full_name)").eq("client_id", w.client_id!).range(a, b),
+              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, vehicles(km_rate, plate), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
@@ -295,7 +295,8 @@ function ResultadoPage() {
       allocs: raw.allocs.filter((a: any) => okDate(a.daily_schedules?.schedule_date)),
       sibAllocs: raw.sibAllocs.filter((a: any) => okDate(a.daily_schedules?.schedule_date)),
       rdoWf: raw.rdoWf.filter((r: any) => okDate(r.report_date)),
-      vs: raw.vs.filter((v: any) => okDate(v.schedule_date)),
+      // Carros "Suzano Local" (sem cliente) entram só nos serviços da Suzano
+      vs: raw.vs.filter((v: any) => okDate(v.schedule_date) && (!v.is_suzano_local || /suzano/i.test(String(raw.client?.name ?? "")))),
       entries: raw.entries.filter((e: any) => okDate(e.entry_date)),
       progress: raw.progress.filter((p: any) => !untilMonth || String(p.month).slice(0, 7) <= untilMonth),
     };
@@ -353,7 +354,7 @@ function ResultadoPage() {
       if (v.work_id && !idSet.has(v.work_id)) continue;
       const trips = Number(v.trips ?? 1);
       const kmCost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? KM_RATE);
-      const t = toll * 2 * trips;
+      const t = v.is_suzano_local ? 0 : toll * 2 * trips;
       const total = dayTotal.get(v.schedule_date) ?? 0;
       const mine = dayMine.get(v.schedule_date) ?? 0;
       const share = v.work_id ? kmCost + t : total > 0 ? ((kmCost + t) * mine) / total : 0;
