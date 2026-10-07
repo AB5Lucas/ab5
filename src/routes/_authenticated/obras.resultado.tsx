@@ -1290,7 +1290,7 @@ function ResultadoPage() {
                 <p className={`pt-4 text-lg ${(last?.marginPct ?? 0) < 0 ? "text-destructive" : ""}`}>{pct(last?.marginPct ?? 0)}</p>
               </div>
               {totalReal && (
-                <div className="mt-6 text-center">
+                <div className="mt-6 rounded-md border bg-muted/30 p-3 text-center">
                   <SectionTitle>Margem Total</SectionTitle>
                   <p className={`pt-4 text-sm ${totalReal.margin < 0 ? "text-destructive" : ""}`}>{brl(totalReal.margin)}</p>
                   <p className={`pt-4 text-lg ${totalReal.pct < 0 ? "text-destructive" : ""}`}>{pct(totalReal.pct)}</p>
