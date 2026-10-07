@@ -610,7 +610,7 @@ function ResultadoPage() {
     const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
   };
-  const calcBase = useMemo(() => buildBase(fromMonth, untilMonth), [work, data.data, untilMonth, fromMonth, isAll, holidaysQ.data]);
+  const calcBase = useMemo(() => buildBase(fromMonth, untilMonth), [work, data.data, untilMonth, fromMonth, isAll, holidaysQ.data, works.data]);
   // Margem realizada total da obra (sem filtro), para o card discreto
   const totalReal = useMemo(() => {
     if (!hasPeriod) return null;
