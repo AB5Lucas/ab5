@@ -1,4 +1,5 @@
 import { contractFraction } from "@/lib/contract";
+import { resplitClient, splitDesc } from "@/lib/resplit";
 import { Switch } from "@/components/ui/switch";
 import { useEffect, useMemo, useState } from "react";
 import { workedHours, positionLabel } from "@/lib/rdo";
@@ -921,16 +922,20 @@ function ResultadoPage() {
         if (!total) throw new Error("Nenhuma hora trabalhada nos serviços para ratear");
         const parts = [...hours.entries()].filter(([, h]) => h > 0);
         let rest = Math.round(amount * 100);
+        const gid = crypto.randomUUID();
+        const desc = entry.description.trim();
         const rows = parts.map(([id, h], i) => {
           const cents = i === parts.length - 1 ? rest : Math.round((amount * 100 * h) / total);
           rest -= cents;
-          const desc = entry.description.trim();
           return {
             work_id: id,
             entry_date: entry.date,
             category: entry.category,
-            description: `${desc ? desc + " — " : ""}Rateio ${((h / total) * 100).toFixed(1).replace(".", ",")}% (${Math.round(h)}h)`,
+            description: splitDesc(desc, (h / total) * 100, h),
             amount: cents / 100,
+            split_group: gid,
+            split_total: amount,
+            split_note: desc || null,
           };
         });
         const { error } = await supabase.from("work_entries").insert(rows);
