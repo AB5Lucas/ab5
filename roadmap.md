@@ -2,4 +2,4 @@
 - [x] RDO (Externo > Relatório Diário)
 - [x] Encarregado/coordenador veem só suas obras em Serviços e Resultados
 - [x] Prêmio motorista automático ao adicionar carro no fim de semana (Montar Transporte)
-- [ ] Remover aba Requisitos e suas dependências
+- [x] Remover aba Requisitos e suas dependências
