@@ -1,5 +1,6 @@
 import { contractFraction } from "@/lib/contract";
 import { resplitClient, splitDesc } from "@/lib/resplit";
+const RESPLIT_AT = new Map<string, number>();
 import { Switch } from "@/components/ui/switch";
 import { useEffect, useMemo, useState } from "react";
 import { workedHours, positionLabel } from "@/lib/rdo";
@@ -180,10 +181,12 @@ function ResultadoPage() {
   const data = useQuery({
     queryKey: ["work-result", workId, workIds.join(","), "vt"],
     enabled: !!work,
+    staleTime: 60_000,
     queryFn: async () => {
       const w = work!;
       // Rateios vigentes: refaz pelas horas atuais (inclui serviços novos com horas no mês)
-      if (canWrite && w.client_id) {
+      if (canWrite && w.client_id && Date.now() - (RESPLIT_AT.get(w.client_id) ?? 0) > 5 * 60_000) {
+        RESPLIT_AT.set(w.client_id, Date.now());
         const { data: sib } = await supabase.from("works").select("id").eq("client_id", w.client_id);
         await resplitClient((sib ?? []).map((x) => x.id)).catch(() => false);
       }
