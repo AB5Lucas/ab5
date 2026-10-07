@@ -181,6 +181,11 @@ function ResultadoPage() {
     enabled: !!work,
     queryFn: async () => {
       const w = work!;
+      // Rateios vigentes: refaz pelas horas atuais (inclui serviços novos com horas no mês)
+      if (canWrite && w.client_id) {
+        const { data: sib } = await supabase.from("works").select("id").eq("client_id", w.client_id);
+        await resplitClient((sib ?? []).map((x) => x.id)).catch(() => false);
+      }
       const [allocs, rdoWf, progress, entries, people, siblings, vs, client] = await Promise.all([
         fetchAll<any>((a, b) =>
           supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", workIds).range(a, b),
