@@ -755,19 +755,23 @@ function ResultadoPage() {
     );
     return { ...calcCt, items, budget: items.reduce((a, i) => a + i.budget, 0) };
   }, [calcCt, rentalInfo]);
-  /** Mensal: com período, pedido = soma dos pedidos com data no período; orçado proporcional a esse valor. */
+  /** Mensal: pedido = soma dos pedidos com data no período (sem período = todos); orçado = % fixo do pedido. */
   const monthlyInfo = useMemo(() => {
     const w = hhSavedWork;
-    if (!calcRt || isAll || !w?.monthly_enabled || !hasPeriod) return null;
+    if (!calcRt || isAll || !w?.monthly_enabled) return null;
     const list = (Array.isArray(w.orders) ? w.orders : []) as any[];
     const total = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
-    const order = list.filter((o) => o.date && o.date >= periodStart && o.date <= periodEnd).reduce((a, o) => a + Number(o.value ?? 0), 0);
+    const order = hasPeriod
+      ? list.filter((o) => o.date && o.date >= periodStart && o.date <= periodEnd).reduce((a, o) => a + Number(o.value ?? 0), 0)
+      : total;
     return { order, f: total ? order / total : 0 };
   }, [calcRt, hhSavedWork, isAll, hasPeriod, periodStart, periodEnd]);
   const calc = useMemo(() => {
     if (!calcRt || !monthlyInfo) return calcRt;
+    // Mensal: MO 50%, Transporte 10%, Materiais 3% do pedido do período
+    const pctBy: Partial<Record<ItemKey, number>> = { mo: 0.5, transporte: 0.1, materiais: 0.03 };
     const items = calcRt.items.map((i) => {
-      const b = i.budget * monthlyInfo.f;
+      const b = monthlyInfo.order * (pctBy[i.key as ItemKey] ?? 0);
       return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
     });
     const budget = items.reduce((a, i) => a + i.budget, 0);
