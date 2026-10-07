@@ -507,11 +507,23 @@ function ResultadoPage() {
       // Andamento geral = média ponderada pelo valor do pedido de cada serviço
       const ow: Record<string, number> = (work as any)._orders ?? {};
       const totalOrder = Object.values(ow).reduce((a, b) => a + b, 0);
-      const pm = [...new Set(d.progress.map((p: any) => String(p.month).slice(0, 7)))].sort() as string[];
+      // Serviços Contrato: andamento vem dos faturamentos (não da tabela manual)
+      const ctWorks = new Map<string, number>(
+        (works.data ?? []).filter((x: any) => workIds.includes(x.id) && x.contract_enabled).map((x: any) => [x.id, Number(x.contract_months ?? 12)]),
+      );
+      const progEv: { ym: string; id: string; pc: number }[] = d.progress
+        .filter((p: any) => !ctWorks.has(p.work_id))
+        .map((p: any) => ({ ym: String(p.month).slice(0, 7), id: p.work_id, pc: Number(p.percent) }));
+      for (const [id, months] of ctWorks) {
+        const bills = d.entries.filter((e: any) => e.work_id === id && e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)).sort();
+        bills.forEach((ym: string, i: number) => progEv.push({ ym, id, pc: contractFraction(i + 1, months) * 100 }));
+      }
+      progEv.sort((a, b) => a.ym.localeCompare(b.ym));
+      const pm = [...new Set(progEv.map((p) => p.ym))];
       const lastBy = new Map<string, number>();
       progMap = new Map();
       for (const ym of pm) {
-        d.progress.filter((p: any) => String(p.month).slice(0, 7) === ym).forEach((p: any) => lastBy.set(p.work_id, Number(p.percent)));
+        progEv.filter((p) => p.ym === ym).forEach((p) => lastBy.set(p.id, p.pc));
         const val = totalOrder
           ? [...lastBy.entries()].reduce((a, [id, pc]) => a + pc * (ow[id] ?? 0), 0) / totalOrder
           : [...lastBy.values()].reduce((a, b) => a + b, 0) / Math.max(1, workIds.length);
