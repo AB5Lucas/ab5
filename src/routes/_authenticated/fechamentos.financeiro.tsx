@@ -237,7 +237,15 @@ function FinanceiroPage() {
                 <TableCell className="text-right">{brl(tMargin)}</TableCell>
                 <TableCell />
                 <TableCell className="text-right">{pct(tBilled ? (tMargin / tBilled) * 100 : 0)}</TableCell>
-                <TableCell />
+                <TableCell className="text-right">
+                  {(() => {
+                    const ls = shown.flatMap((g) => g.lines);
+                    const n = ls.length || 1;
+                    const m = ls.reduce((a, l) => a + l.total.margin, 0) / n;
+                    const p = ls.reduce((a, l) => a + l.total.pct, 0) / n;
+                    return <>Média: {brl(m)} <span className="text-xs text-muted-foreground">({pct(p)})</span></>;
+                  })()}
+                </TableCell>
               </TableRow>
             </TableFooter>
           )}
