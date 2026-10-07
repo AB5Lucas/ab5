@@ -274,7 +274,7 @@ function ResultadoPage() {
     queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string),
   });
   // ---------- Cálculos ----------
-  const calcBase = useMemo(() => {
+  const buildBase = (fromMonth: string, untilMonth: string) => {
     if (!work || !data.data) return null;
     const raw = data.data;
     // Fechamento: do início da obra até o último dia do mês selecionado
