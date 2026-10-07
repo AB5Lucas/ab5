@@ -345,7 +345,8 @@ function ResultadoPage() {
       const t = toll * 2 * trips;
       const total = dayTotal.get(v.schedule_date) ?? 0;
       const mine = dayMine.get(v.schedule_date) ?? 0;
-      const share = v.work_id ? kmCost + t : total > 0 ? ((kmCost + t) * mine) / total : (kmCost + t) / d.siblingCount;
+      const share = v.work_id ? kmCost + t : total > 0 ? ((kmCost + t) * mine) / total : 0;
+      if (!share) continue;
       transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share, mine, total, direct: !!v.work_id });
       bump(v.schedule_date.slice(0, 7), "transport", share);
     }
@@ -442,7 +443,8 @@ function ResultadoPage() {
       if (!amount) continue;
       const total = dayTotal.get(v.schedule_date) ?? 0;
       const mine = dayMine.get(v.schedule_date) ?? 0;
-      const share = v.work_id ? amount : total > 0 ? (amount * mine) / total : amount / d.siblingCount;
+      const share = v.work_id ? amount : total > 0 ? (amount * mine) / total : 0;
+      if (!share) continue;
       driverRows.push({ date: v.schedule_date, driver: v.collaborators?.full_name ?? "—", plate: v.vehicles?.plate ?? "—", km, amount, share });
       bump(v.schedule_date.slice(0, 7), "transport", share);
     }
@@ -1247,7 +1249,7 @@ function ResultadoPage() {
             {detail === "transporte" && calc && (
               <>
                 <p className="mb-2 text-xs text-muted-foreground">
-                  (KM ida × 2 × viagens × R$ {KM_RATE.toFixed(2).replace(".", ",")}) + (pedágio × 2 × viagens), rateado entre os {calc.siblingCount} serviço(s) do mesmo cliente proporcional aos colaboradores escalados no dia (sem ninguém escalado, divisão igual). Veículos com valor de KM próprio (ex.: Mercedes L1218 a R$ 5,00) escalados direto no serviço entram 100% neste serviço. Transporte de terceiros vem dos lançamentos.
+                  (KM ida × 2 × viagens × R$ {KM_RATE.toFixed(2).replace(".", ",")}) + (pedágio × 2 × viagens), rateado entre os {calc.siblingCount} serviço(s) do mesmo cliente proporcional aos colaboradores escalados no dia (serviço sem efetivo no dia não recebe custo). Veículos com valor de KM próprio (ex.: Mercedes L1218 a R$ 5,00) escalados direto no serviço entram 100% neste serviço. Transporte de terceiros vem dos lançamentos.
                 </p>
                 <Table>
                   <TableBody>
