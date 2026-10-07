@@ -138,7 +138,7 @@ export async function fetchScheduleContext(date: string) {
     supabase.from("positions").select("id, name").order("name"),
     supabase.from("vehicles").select("id, plate, model, passenger_capacity, status").order("plate"),
     supabase.from("work_base_teams").select("*").eq("active", true).lte("start_date", date),
-    supabase.from("work_requirements").select("*").eq("active", true),
+    Promise.resolve({ data: [] }),
     supabase.from("trainings").select("id, name, validity_months"),
     supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at"),
     supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date),
