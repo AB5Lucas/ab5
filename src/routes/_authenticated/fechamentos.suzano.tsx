@@ -18,9 +18,9 @@ import { fetchAll, monthEnd } from "@/lib/results-engine";
 export const Route = createFileRoute("/_authenticated/fechamentos/suzano")({
   head: () => ({
     meta: [
-      { title: "Fechamento Suzano | AB5 Hub" },
+      { title: "Acompanhamento | AB5 Hub" },
       { name: "description", content: "Apontamentos e produtividade de andaimes da Suzano a partir dos RDOs." },
-      { property: "og:title", content: "Fechamento Suzano | AB5 Hub" },
+      { property: "og:title", content: "Acompanhamento | AB5 Hub" },
       { property: "og:description", content: "Apontamentos por dia e produtividade m³ por pessoa." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -60,7 +60,7 @@ function SuzanoPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Suzano" description="Fechamento a partir dos RDOs do serviço selecionado." />
+      <PageHeader title="Acompanhamento" description="Fechamento a partir dos RDOs do serviço selecionado." />
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <Label>Ano</Label>
@@ -330,18 +330,18 @@ const norm = (t: string) => t.replace(/\s+/g, "").toLowerCase();
 
 function Pedidos() {
   const q = useQuery({
-    queryKey: ["suzano-orders-v2"],
+    queryKey: ["orders-all-v3"],
     queryFn: async () => {
-      const { data: ws } = await supabase.from("works").select("id, name, orders, clients!inner(name)").ilike("clients.name", "%suzano%");
+      const { data: ws } = await supabase.from("works").select("id, name, orders, client_id, clients(name)");
       const ids = (ws ?? []).map((w: any) => w.id);
       const fat = ids.length ? (await supabase.from("work_entries").select("work_id, description, amount, entry_date").eq("category", "faturamento").in("work_id", ids)).data ?? [] : [];
       // Pedidos com o mesmo número viram uma linha só: valores somados e meses listados
-      const groups = new Map<string, { key: string; number: string; works: Set<string>; workIds: Set<string>; dates: string[]; total: number; billed: number }>();
+      const groups = new Map<string, { key: string; num: string; client: string; number: string; works: Set<string>; workIds: Set<string>; dates: string[]; total: number; billed: number }>();
       for (const w of (ws ?? []) as any[]) {
         for (const [i, o] of ((Array.isArray(w.orders) ? w.orders : []) as any[]).entries()) {
           const num = String(o.number ?? "").trim();
-          const k = num ? norm(num) : `${w.id}-${i}`;
-          const g = groups.get(k) ?? { key: k, number: num || "—", works: new Set<string>(), workIds: new Set<string>(), dates: [], total: 0, billed: 0 };
+          const k = `${w.client_id}|${num ? norm(num) : `${w.id}-${i}`}`;
+          const g = groups.get(k) ?? { key: k, num: norm(num), client: w.clients?.name ?? "—", number: num || "—", works: new Set<string>(), workIds: new Set<string>(), dates: [], total: 0, billed: 0 };
           g.works.add(w.name); g.workIds.add(w.id);
           if (o.date) g.dates.push(o.date);
           g.total += Number(o.value ?? 0);
@@ -349,10 +349,10 @@ function Pedidos() {
         }
       }
       const rows = [...groups.values()].map((g) => {
-        const hits = g.number !== "—" ? fat.filter((e: any) => g.workIds.has(e.work_id) && norm(e.description ?? "").includes(g.key)) : [];
+        const hits = g.number !== "—" ? fat.filter((e: any) => g.workIds.has(e.work_id) && norm(e.description ?? "").includes(g.num)) : [];
         const dates = g.dates.length ? g.dates : hits.map((e: any) => e.entry_date as string).slice(0, 1);
         const months = [...new Set(dates.map((d) => d.slice(0, 7)))].sort();
-        return { key: g.key, number: g.number, work: [...g.works].join(", "), workIds: [...g.workIds], date: months[0] ?? "", months, total: g.total, billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) };
+        return { key: g.key, client: g.client, number: g.number, work: [...g.works].join(", "), workIds: [...g.workIds], date: months[0] ?? "", months, total: g.total, billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) };
       });
       return rows.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
     },
@@ -363,6 +363,8 @@ function Pedidos() {
   const [fNum, setFNum] = useState("");
   const [fMonth, setFMonth] = useState("");
   const [fSt, setFSt] = useState("all");
+  const [fCli, setFCli] = useState("all");
+  const clients = [...new Set((q.data ?? []).map((r) => r.client))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const { canWrite } = useCurrentUser();
   const [sel, setSel] = useState<any>(null);
   const [fd, setFd] = useState({ date: new Date().toISOString().slice(0, 10), amount: "", workId: "" });
@@ -377,12 +379,19 @@ function Pedidos() {
       });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Faturamento lançado"); setSel(null); qc.invalidateQueries({ queryKey: ["suzano-orders-v2"] }); },
+    onSuccess: () => { toast.success("Faturamento lançado"); setSel(null); qc.invalidateQueries({ queryKey: ["orders-all-v3"] }); },
     onError: (e: any) => toast.error(e.message),
   });
   return (
     <div className="panel overflow-x-auto">
       <div className="flex flex-wrap items-end gap-3 p-3">
+        <div>
+          <Label>Cliente</Label>
+          <Select value={fCli} onValueChange={setFCli}>
+            <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">Todos</SelectItem>{clients.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
         <div><Label>Nº do pedido</Label><input className="flex h-9 w-48 rounded-md border border-input bg-background px-3 text-sm" value={fNum} onChange={(e) => setFNum(e.target.value)} placeholder="Buscar" /></div>
         <div><Label>Mês</Label><input type="month" className="flex h-9 w-44 rounded-md border border-input bg-background px-3 text-sm" value={fMonth} onChange={(e) => setFMonth(e.target.value)} /></div>
         <div>
@@ -395,7 +404,7 @@ function Pedidos() {
             </SelectContent>
           </Select>
         </div>
-        {(fNum || fMonth || fSt !== "all") && <Button variant="ghost" onClick={() => { setFNum(""); setFMonth(""); setFSt("all"); }}>Limpar</Button>}
+        {(fNum || fMonth || fSt !== "all" || fCli !== "all") && <Button variant="ghost" onClick={() => { setFNum(""); setFMonth(""); setFSt("all"); setFCli("all"); }}>Limpar</Button>}
       </div>
       <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
         <DialogContent className="max-w-sm">
@@ -419,24 +428,25 @@ function Pedidos() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Pedido</TableHead><TableHead>Serviço</TableHead><TableHead>Mês</TableHead>
+            <TableHead>Pedido</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço</TableHead><TableHead>Mês</TableHead>
             <TableHead className="text-right">Valor total</TableHead><TableHead className="text-right">Valor faturado</TableHead>
             <TableHead className="text-right">% Faturado</TableHead><TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {q.isLoading && <TableRow><TableCell colSpan={7}>Carregando...</TableCell></TableRow>}
-          {!q.isLoading && !q.data?.length && <TableRow><TableCell colSpan={7} className="text-muted-foreground">Nenhum pedido na Suzano.</TableCell></TableRow>}
+          {q.isLoading && <TableRow><TableCell colSpan={8}>Carregando...</TableCell></TableRow>}
+          {!q.isLoading && !q.data?.length && <TableRow><TableCell colSpan={8} className="text-muted-foreground">Nenhum pedido encontrado.</TableCell></TableRow>}
           {(q.data ?? []).filter((r) => {
             const p = r.total ? (r.billed / r.total) * 100 : 0;
             const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
-            return (!fNum || norm(r.number).includes(norm(fNum))) && (!fMonth || r.months.includes(fMonth)) && (fSt === "all" || st === fSt);
+            return (!fNum || norm(r.number).includes(norm(fNum))) && (!fMonth || r.months.includes(fMonth)) && (fSt === "all" || st === fSt) && (fCli === "all" || r.client === fCli);
           }).map((r) => {
             const p = r.total ? (r.billed / r.total) * 100 : 0;
             const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
             return (
               <TableRow key={r.key}>
                 <TableCell className="font-medium">{r.number}</TableCell>
+                <TableCell>{r.client}</TableCell>
                 <TableCell>{r.work}</TableCell>
                 <TableCell>{mon(r.months)}</TableCell>
                 <TableCell className="text-right">{brl(r.total)}</TableCell>
