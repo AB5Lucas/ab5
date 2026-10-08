@@ -127,7 +127,7 @@ function ClosingPage() {
               {head("reg", "Matrícula")}
               {head("name", "Nome completo")}
               {head("meals", "Quantidade de refeição", true)}
-              {head("vt", "Valor pago de Vale Transporte", true)}
+              {head("vt", "Vale Transporte + Prêmio Motorista", true)}
               {head("prize", "Valor pago de Prêmio Viagem", true)}
             </TableRow>
           </TableHeader>

@@ -151,6 +151,33 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     const units = (e.box_key === "aso" ? 1 : 0) + (on ? 1 : 0);
     if (units) r.vtRows.push({ date, work: label, pays: true, value: perDay(false, units) });
   }
+  // Prêmio Motorista: 1 por dia dirigido (faixa pela km do dia), somado ao VT
+  const [{ data: vsch }, { data: dbr }] = await Promise.all([
+    supabase.from("vehicle_schedules").select("driver_id, schedule_date, km, collaborators(full_name, registration_number)")
+      .gte("schedule_date", start).lt("schedule_date", end).eq("driver_bonus", true).eq("is_external", false),
+    supabase.from("driver_bonus_rules").select("*").eq("active", true),
+  ]);
+  const dDays = new Map<string, { c: any; days: Map<string, number> }>();
+  for (const v of (vsch ?? []) as any[]) {
+    if (!v.driver_id) continue;
+    const e = dDays.get(v.driver_id) ?? { c: v.collaborators, days: new Map<string, number>() };
+    e.days.set(v.schedule_date, (e.days.get(v.schedule_date) ?? 0) + (Number(v.km ?? 0) || 0));
+    dDays.set(v.driver_id, e);
+  }
+  for (const [id, e] of dDays) {
+    const r = get(id, e.c);
+    const fixed = new Set<string>();
+    for (const [date, km] of e.days) {
+      let val = 0;
+      for (const rule of (dbr ?? []) as any[]) {
+        const max = rule.maximum_distance === null ? Infinity : Number(rule.maximum_distance);
+        if (km < Number(rule.minimum_distance ?? 0) || km > max) continue;
+        if (rule.calculation_type === "fixed_monthly") { if (fixed.has(rule.id)) continue; fixed.add(rule.id); }
+        val += Number(rule.amount);
+      }
+      if (val) r.vtRows.push({ date, work: "Prêmio Motorista", pays: true, value: val });
+    }
+  }
   for (const adj of (adjs.data ?? []) as Adjustment[]) {
     const r = rows.get(adj.collaborator_id) ?? get(adj.collaborator_id, null);
     r.adjustments.push(adj);
@@ -165,12 +192,12 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     r.days.sort((a, b) => a.date.localeCompare(b.date));
     r.vtRows.sort((a, b) => a.date.localeCompare(b.date));
     r.prizeRows.sort((a, b) => a.date.localeCompare(b.date));
-    const vtDays = r.vtRows.filter((v) => v.pays).length;
+    const vtDays = r.vtRows.filter((v) => v.pays && v.work !== "Prêmio Motorista").length;
     r.vtAuto = r.vtRows.reduce((s, v) => s + v.value, 0) + (vtDays ? monthly(driver) : 0);
     r.prizeAuto = r.prizeRows.reduce((s, v) => s + v.value, 0);
     r.vtManual = r.adjustments.filter((a) => a.kind === "vt").reduce((s, a) => s + Number(a.amount), 0);
     r.prizeManual = r.adjustments.filter((a) => a.kind === "premio").reduce((s, a) => s + Number(a.amount), 0);
     return r;
-  }).filter((r) => r.days.length || r.adjustments.length)
+  }).filter((r) => r.days.length || r.adjustments.length || r.vtRows.length)
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
