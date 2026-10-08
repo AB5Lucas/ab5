@@ -379,7 +379,7 @@ function Pedidos() {
               <TableRow key={r.key}>
                 <TableCell className="font-medium">{r.number}</TableCell>
                 <TableCell>{r.work}</TableCell>
-                <TableCell>{mon(r.date)}</TableCell>
+                <TableCell>{mon(r.months)}</TableCell>
                 <TableCell className="text-right">{brl(r.total)}</TableCell>
                 <TableCell className="text-right">{brl(r.billed)}</TableCell>
                 <TableCell className="text-right">{n2(p)}%</TableCell>
