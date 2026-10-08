@@ -219,7 +219,7 @@ function FinanceiroPage() {
                     <TableCell className={`text-right font-medium ${l.margin < 0 ? "text-destructive" : ""}`}>{brl(l.margin)}</TableCell>
                     <TableCell className="text-right">{pct(l.progress)}</TableCell>
                     <TableCell className={`text-right ${l.monthPct < 0 ? "text-destructive" : ""}`}>{pct(l.monthPct)}</TableCell>
-                    <TableCell className={`text-right ${l.total.margin < 0 ? "text-destructive" : ""}`}>{brl(l.total.margin)} <span className="text-xs text-muted-foreground">({pct(l.total.pct)})</span></TableCell>
+                    <TableCell className={`text-right ${l.total.margin < 0 ? "text-destructive" : ""}`}><span className="text-base font-semibold">{pct(l.total.pct)}</span> <span className="text-xs text-muted-foreground">({brl(l.total.margin)})</span></TableCell>
                   </TableRow>
                 ))}
               </Fragment>
@@ -243,7 +243,7 @@ function FinanceiroPage() {
                     const n = ls.length || 1;
                     const m = ls.reduce((a, l) => a + l.total.margin, 0) / n;
                     const p = ls.reduce((a, l) => a + l.total.pct, 0) / n;
-                    return <>Média: {brl(m)} <span className="text-xs text-muted-foreground">({pct(p)})</span></>;
+                    void m; return pct(p);
                   })()}
                 </TableCell>
               </TableRow>
