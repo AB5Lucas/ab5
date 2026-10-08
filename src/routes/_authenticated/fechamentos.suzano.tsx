@@ -335,19 +335,30 @@ function Pedidos() {
       const { data: ws } = await supabase.from("works").select("id, name, orders, clients!inner(name)").ilike("clients.name", "%suzano%");
       const ids = (ws ?? []).map((w: any) => w.id);
       const fat = ids.length ? (await supabase.from("work_entries").select("work_id, description, amount, entry_date").eq("category", "faturamento").in("work_id", ids)).data ?? [] : [];
-      const rows: { key: string; number: string; work: string; date: string; total: number; billed: number }[] = [];
+      // Pedidos com o mesmo número viram uma linha só: valores somados e meses listados
+      const groups = new Map<string, { key: string; number: string; works: Set<string>; workIds: Set<string>; dates: string[]; total: number; billed: number }>();
       for (const w of (ws ?? []) as any[]) {
         for (const [i, o] of ((Array.isArray(w.orders) ? w.orders : []) as any[]).entries()) {
           const num = String(o.number ?? "").trim();
-          const hits = num ? fat.filter((e: any) => e.work_id === w.id && norm(e.description ?? "").includes(norm(num))) : [];
-          const first = hits.map((e: any) => e.entry_date as string).sort()[0] ?? "";
-          rows.push({ key: `${w.id}-${i}`, number: num || "—", work: w.name, date: o.date ?? first, total: Number(o.value ?? 0), billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) });
+          const k = num ? norm(num) : `${w.id}-${i}`;
+          const g = groups.get(k) ?? { key: k, number: num || "—", works: new Set<string>(), workIds: new Set<string>(), dates: [], total: 0, billed: 0 };
+          g.works.add(w.name); g.workIds.add(w.id);
+          if (o.date) g.dates.push(o.date);
+          g.total += Number(o.value ?? 0);
+          groups.set(k, g);
         }
       }
+      const rows = [...groups.values()].map((g) => {
+        const hits = g.number !== "—" ? fat.filter((e: any) => g.workIds.has(e.work_id) && norm(e.description ?? "").includes(g.key)) : [];
+        const dates = g.dates.length ? g.dates : hits.map((e: any) => e.entry_date as string).slice(0, 1);
+        const months = [...new Set(dates.map((d) => d.slice(0, 7)))].sort();
+        return { key: g.key, number: g.number, work: [...g.works].join(", "), date: months[0] ?? "", months, total: g.total, billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) };
+      });
       return rows.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
     },
   });
-  const mon = (d: string) => (d ? `${MONTHS[Number(d.slice(5, 7)) - 1]}/${d.slice(0, 4)}` : "—");
+  const mon1 = (d: string) => `${MONTHS[Number(d.slice(5, 7)) - 1]}/${d.slice(0, 4)}`;
+  const mon = (ms: string[]) => (ms.length ? ms.map(mon1).join(", ") : "—");
   return (
     <div className="panel overflow-x-auto">
       <Table>
