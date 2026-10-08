@@ -99,8 +99,7 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Acompanhamento", url: "/fechamentos/suzano" },
     ],
   },
-  { label: "Externo", icon: ClipboardList, items: [{ title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
-  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Relatórios", url: "/relatorios" }, { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }] },
+  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Alocações", url: "/relatorios" }, { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
   {
     label: "Administração",
     icon: Shield,
