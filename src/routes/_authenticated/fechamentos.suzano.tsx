@@ -330,7 +330,7 @@ const norm = (t: string) => t.replace(/\s+/g, "").toLowerCase();
 
 function Pedidos() {
   const q = useQuery({
-    queryKey: ["suzano-orders"],
+    queryKey: ["suzano-orders-v2"],
     queryFn: async () => {
       const { data: ws } = await supabase.from("works").select("id, name, orders, clients!inner(name)").ilike("clients.name", "%suzano%");
       const ids = (ws ?? []).map((w: any) => w.id);
@@ -358,7 +358,7 @@ function Pedidos() {
     },
   });
   const mon1 = (d: string) => `${MONTHS[Number(d.slice(5, 7)) - 1]}/${d.slice(0, 4)}`;
-  const mon = (ms: string[]) => (ms.length ? ms.map(mon1).join(", ") : "—");
+  const mon = (ms?: string[]) => (ms?.length ? ms.map(mon1).join(", ") : "—");
   return (
     <div className="panel overflow-x-auto">
       <Table>
