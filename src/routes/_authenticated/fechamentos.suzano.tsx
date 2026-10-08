@@ -360,6 +360,9 @@ function Pedidos() {
   const mon1 = (d: string) => `${MONTHS[Number(d.slice(5, 7)) - 1]}/${d.slice(0, 4)}`;
   const mon = (ms?: string[]) => (ms?.length ? ms.map(mon1).join(", ") : "—");
   const qc = useQueryClient();
+  const [fNum, setFNum] = useState("");
+  const [fMonth, setFMonth] = useState("");
+  const [fSt, setFSt] = useState("all");
   const { canWrite } = useCurrentUser();
   const [sel, setSel] = useState<any>(null);
   const [fd, setFd] = useState({ date: new Date().toISOString().slice(0, 10), amount: "", workId: "" });
@@ -379,6 +382,21 @@ function Pedidos() {
   });
   return (
     <div className="panel overflow-x-auto">
+      <div className="flex flex-wrap items-end gap-3 p-3">
+        <div><Label>Nº do pedido</Label><input className="flex h-9 w-48 rounded-md border border-input bg-background px-3 text-sm" value={fNum} onChange={(e) => setFNum(e.target.value)} placeholder="Buscar" /></div>
+        <div><Label>Mês</Label><input type="month" className="flex h-9 w-44 rounded-md border border-input bg-background px-3 text-sm" value={fMonth} onChange={(e) => setFMonth(e.target.value)} /></div>
+        <div>
+          <Label>Status</Label>
+          <Select value={fSt} onValueChange={setFSt}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem><SelectItem value="Em aberto">Em aberto</SelectItem>
+              <SelectItem value="Parcial">Parcial</SelectItem><SelectItem value="Faturado">Faturado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(fNum || fMonth || fSt !== "all") && <Button variant="ghost" onClick={() => { setFNum(""); setFMonth(""); setFSt("all"); }}>Limpar</Button>}
+      </div>
       <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Lançar faturamento – Pedido {sel?.number}</DialogTitle></DialogHeader>
@@ -409,7 +427,11 @@ function Pedidos() {
         <TableBody>
           {q.isLoading && <TableRow><TableCell colSpan={7}>Carregando...</TableCell></TableRow>}
           {!q.isLoading && !q.data?.length && <TableRow><TableCell colSpan={7} className="text-muted-foreground">Nenhum pedido na Suzano.</TableCell></TableRow>}
-          {(q.data ?? []).map((r) => {
+          {(q.data ?? []).filter((r) => {
+            const p = r.total ? (r.billed / r.total) * 100 : 0;
+            const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
+            return (!fNum || norm(r.number).includes(norm(fNum))) && (!fMonth || r.months.includes(fMonth)) && (fSt === "all" || st === fSt);
+          }).map((r) => {
             const p = r.total ? (r.billed / r.total) * 100 : 0;
             const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
             return (
