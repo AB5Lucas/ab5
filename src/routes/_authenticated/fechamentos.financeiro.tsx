@@ -183,9 +183,9 @@ function FinanceiroPage() {
         </div>
       </div>
 
-      <div className="panel overflow-x-auto">
-        <Table>
-          <TableHeader>
+      <div className="panel max-h-[calc(100vh-13rem)] overflow-auto">
+        <table className="w-full caption-bottom text-sm">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-sm">
             <TableRow>
               <TableHead>Serviço</TableHead>
               <TableHead className="text-right">Valor faturado</TableHead>
@@ -249,7 +249,7 @@ function FinanceiroPage() {
               </TableRow>
             </TableFooter>
           )}
-        </Table>
+        </table>
       </div>
       <DetailDialog line={detail} onClose={() => setDetail(null)} />
     </div>
