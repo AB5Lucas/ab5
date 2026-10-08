@@ -352,15 +352,52 @@ function Pedidos() {
         const hits = g.number !== "—" ? fat.filter((e: any) => g.workIds.has(e.work_id) && norm(e.description ?? "").includes(g.key)) : [];
         const dates = g.dates.length ? g.dates : hits.map((e: any) => e.entry_date as string).slice(0, 1);
         const months = [...new Set(dates.map((d) => d.slice(0, 7)))].sort();
-        return { key: g.key, number: g.number, work: [...g.works].join(", "), date: months[0] ?? "", months, total: g.total, billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) };
+        return { key: g.key, number: g.number, work: [...g.works].join(", "), workIds: [...g.workIds], date: months[0] ?? "", months, total: g.total, billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) };
       });
       return rows.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
     },
   });
   const mon1 = (d: string) => `${MONTHS[Number(d.slice(5, 7)) - 1]}/${d.slice(0, 4)}`;
   const mon = (ms?: string[]) => (ms?.length ? ms.map(mon1).join(", ") : "—");
+  const qc = useQueryClient();
+  const { canWrite } = useCurrentUser();
+  const [sel, setSel] = useState<any>(null);
+  const [fd, setFd] = useState({ date: new Date().toISOString().slice(0, 10), amount: "", workId: "" });
+  const save = useMutation({
+    mutationFn: async () => {
+      const amount = Number(fd.amount.replace(/\./g, "").replace(",", "."));
+      if (fd.amount.trim() === "" || isNaN(amount)) throw new Error("Informe o valor");
+      if (!fd.date) throw new Error("Informe a data");
+      const { error } = await supabase.from("work_entries").insert({
+        work_id: fd.workId || sel.workIds[0], entry_date: fd.date, category: "faturamento",
+        description: `Pedido ${sel.number}`, amount,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Faturamento lançado"); setSel(null); qc.invalidateQueries({ queryKey: ["suzano-orders-v2"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
   return (
     <div className="panel overflow-x-auto">
+      <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Lançar faturamento – Pedido {sel?.number}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            {sel?.workIds.length > 1 && (
+              <div>
+                <Label>Serviço</Label>
+                <Select value={fd.workId || sel.workIds[0]} onValueChange={(v) => setFd({ ...fd, workId: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{sel.workIds.map((id: string, i: number) => <SelectItem key={id} value={id}>{sel.work.split(", ")[i] ?? id}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
+            <div><Label>Data</Label><input type="date" className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={fd.date} onChange={(e) => setFd({ ...fd, date: e.target.value })} /></div>
+            <div><Label>Valor (R$)</Label><input inputMode="decimal" className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={fd.amount} onChange={(e) => setFd({ ...fd, amount: e.target.value })} placeholder="0,00" /></div>
+            <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>Salvar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Table>
         <TableHeader>
           <TableRow>
@@ -381,7 +418,11 @@ function Pedidos() {
                 <TableCell>{r.work}</TableCell>
                 <TableCell>{mon(r.months)}</TableCell>
                 <TableCell className="text-right">{brl(r.total)}</TableCell>
-                <TableCell className="text-right">{brl(r.billed)}</TableCell>
+                <TableCell className="text-right">
+                  {canWrite ? (
+                    <button type="button" className="underline decoration-dotted hover:text-primary" onClick={() => { setFd({ date: new Date().toISOString().slice(0, 10), amount: "", workId: "" }); setSel(r); }}>{brl(r.billed)}</button>
+                  ) : brl(r.billed)}
+                </TableCell>
                 <TableCell className="text-right">{n2(p)}%</TableCell>
                 <TableCell className={st === "Faturado" ? "text-primary" : st === "Em aberto" ? "text-destructive" : ""}>{st}</TableCell>
               </TableRow>
