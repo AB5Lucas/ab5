@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { contractFraction } from "@/lib/contract";
 import { ResultadoPage } from "./obras.resultado";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -183,9 +183,9 @@ function FinanceiroPage() {
         </div>
       </div>
 
-      <div className="panel overflow-x-auto">
-        <Table>
-          <TableHeader>
+      <div className="panel max-h-[calc(100vh-13rem)] overflow-auto">
+        <table className="w-full caption-bottom text-sm">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-sm">
             <TableRow>
               <TableHead>Serviço</TableHead>
               <TableHead className="text-right">Valor faturado</TableHead>
@@ -249,7 +249,7 @@ function FinanceiroPage() {
               </TableRow>
             </TableFooter>
           )}
-        </Table>
+        </table>
       </div>
       <DetailDialog line={detail} onClose={() => setDetail(null)} />
     </div>
