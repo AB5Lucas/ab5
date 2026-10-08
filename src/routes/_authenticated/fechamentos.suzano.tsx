@@ -38,14 +38,15 @@ function useFilters() {
   const [year, setYear] = useState(String(now.getFullYear()));
   const [month, setMonth] = useState(String(now.getMonth() + 1));
   const [workId, setWorkId] = useState("");
-  return { year, setYear, month, setMonth, workId, setWorkId };
+  const [clientId, setClientId] = useState("all");
+  return { year, setYear, month, setMonth, workId, setWorkId, clientId, setClientId };
 }
 
 function SuzanoPage() {
   const f = useFilters();
   const works = useQuery({
     queryKey: ["suzano-works"],
-    queryFn: async () => (await supabase.from("works").select("id, name, clients(name)").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("works").select("id, name, client_id, clients(name)").order("name")).data ?? [],
   });
   // Padrão: Contrato Andaimes
   useEffect(() => {
@@ -56,6 +57,8 @@ function SuzanoPage() {
   const ym = `${f.year}-${f.month.padStart(2, "0")}`;
   const start = `${ym}-01`;
   const end = monthEnd(ym);
+  const clientOpts = [...new Map((works.data ?? []).filter((w: any) => w.clients?.name).map((w: any) => [w.client_id, w.clients.name] as [string, string])).entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+  const wid = f.workId === "all" ? "" : f.workId;
   const years = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 3 + i));
 
   return (
@@ -76,12 +79,23 @@ function SuzanoPage() {
             <SelectContent>{MONTHS.map((m, i) => <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+        <div>
+          <Label>Cliente</Label>
+          <Select value={f.clientId} onValueChange={(v) => { f.setClientId(v); f.setWorkId("all"); }}>
+            <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {clientOpts.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="min-w-[280px]">
           <Label>Serviço</Label>
           <Select value={f.workId} onValueChange={f.setWorkId}>
             <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
             <SelectContent>
-              {(works.data ?? []).map((w: any) => (
+              <SelectItem value="all">Todos</SelectItem>
+              {(works.data ?? []).filter((w: any) => f.clientId === "all" || w.client_id === f.clientId).map((w: any) => (
                 <SelectItem key={w.id} value={w.id}>{w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}</SelectItem>
               ))}
             </SelectContent>
@@ -94,9 +108,9 @@ function SuzanoPage() {
           <TabsTrigger value="produtividade">Produtividade</TabsTrigger>
           <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
         </TabsList>
-        <TabsContent value="pedidos"><Pedidos /></TabsContent>
-        <TabsContent value="apontamentos"><Apontamentos workId={f.workId} start={start} end={end} ym={ym} /></TabsContent>
-        <TabsContent value="produtividade"><Produtividade workId={f.workId} start={start} end={end} /></TabsContent>
+        <TabsContent value="pedidos"><Pedidos clientId={f.clientId} workId={wid} /></TabsContent>
+        <TabsContent value="apontamentos"><Apontamentos workId={wid} start={start} end={end} ym={ym} /></TabsContent>
+        <TabsContent value="produtividade"><Produtividade workId={wid} start={start} end={end} /></TabsContent>
       </Tabs>
     </div>
   );
@@ -328,7 +342,7 @@ function Produtividade({ workId, start, end }: { workId: string; start: string; 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const norm = (t: string) => t.replace(/\s+/g, "").toLowerCase();
 
-function Pedidos() {
+function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
   const q = useQuery({
     queryKey: ["orders-all-v3"],
     queryFn: async () => {
@@ -336,12 +350,12 @@ function Pedidos() {
       const ids = (ws ?? []).map((w: any) => w.id);
       const fat = ids.length ? (await supabase.from("work_entries").select("work_id, description, amount, entry_date").eq("category", "faturamento").in("work_id", ids)).data ?? [] : [];
       // Pedidos com o mesmo número viram uma linha só: valores somados e meses listados
-      const groups: Map<string, { key: string; num: string; client: string; number: string; works: Set<string>; workIds: Set<string>; dates: string[]; total: number; billed: number }> = new Map();
+      const groups: Map<string, { key: string; num: string; client: string; clientId: string; number: string; works: Set<string>; workIds: Set<string>; dates: string[]; total: number; billed: number }> = new Map();
       for (const w of ((ws ?? []) as any[])) {
         for (const [i, o] of ((Array.isArray(w.orders) ? w.orders : []) as any[]).entries()) {
           const num = String(o.number ?? "").trim();
           const k = `${w.client_id}|${num ? norm(num) : `${w.id}-${i}`}`;
-          const g = groups.get(k) ?? { key: k, num: norm(num), client: w.clients?.name ?? "—", number: num || "—", works: new Set<string>(), workIds: new Set<string>(), dates: [] as string[], total: 0, billed: 0 };
+          const g = groups.get(k) ?? { key: k, num: norm(num), client: w.clients?.name ?? "—", clientId: w.client_id, number: num || "—", works: new Set<string>(), workIds: new Set<string>(), dates: [] as string[], total: 0, billed: 0 };
           g.works.add(w.name); g.workIds.add(w.id);
           if (o.date) g.dates.push(o.date);
           g.total += Number(o.value ?? 0);
@@ -352,7 +366,7 @@ function Pedidos() {
         const hits = g.number !== "—" ? fat.filter((e: any) => g.workIds.has(e.work_id) && norm(e.description ?? "").includes(g.num)) : [];
         const dates = g.dates.length ? g.dates : hits.map((e: any) => e.entry_date as string).slice(0, 1);
         const months = [...new Set(dates.map((d) => d.slice(0, 7)))].sort();
-        return { key: g.key, client: g.client, number: g.number, work: [...g.works].join(", "), workIds: [...g.workIds], date: months[0] ?? "", months, total: g.total, billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) };
+        return { key: g.key, client: g.client, clientId: g.clientId, number: g.number, work: [...g.works].join(", "), workIds: [...g.workIds], date: months[0] ?? "", months, total: g.total, billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) };
       });
       return rows.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
     },
@@ -363,8 +377,6 @@ function Pedidos() {
   const [fNum, setFNum] = useState("");
   const [fMonth, setFMonth] = useState("");
   const [fSt, setFSt] = useState("all");
-  const [fCli, setFCli] = useState("all");
-  const clients = [...new Set((q.data ?? []).map((r) => r.client))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const { canWrite } = useCurrentUser();
   const [sel, setSel] = useState<any>(null);
   const [fd, setFd] = useState({ date: new Date().toISOString().slice(0, 10), amount: "", workId: "" });
@@ -385,13 +397,6 @@ function Pedidos() {
   return (
     <div className="panel overflow-x-auto">
       <div className="flex flex-wrap items-end gap-3 p-3">
-        <div>
-          <Label>Cliente</Label>
-          <Select value={fCli} onValueChange={setFCli}>
-            <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="all">Todos</SelectItem>{clients.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
         <div><Label>Nº do pedido</Label><input className="flex h-9 w-48 rounded-md border border-input bg-background px-3 text-sm" value={fNum} onChange={(e) => setFNum(e.target.value)} placeholder="Buscar" /></div>
         <div><Label>Mês</Label><input type="month" className="flex h-9 w-44 rounded-md border border-input bg-background px-3 text-sm" value={fMonth} onChange={(e) => setFMonth(e.target.value)} /></div>
         <div>
@@ -404,7 +409,7 @@ function Pedidos() {
             </SelectContent>
           </Select>
         </div>
-        {(fNum || fMonth || fSt !== "all" || fCli !== "all") && <Button variant="ghost" onClick={() => { setFNum(""); setFMonth(""); setFSt("all"); setFCli("all"); }}>Limpar</Button>}
+        {(fNum || fMonth || fSt !== "all") && <Button variant="ghost" onClick={() => { setFNum(""); setFMonth(""); setFSt("all"); }}>Limpar</Button>}
       </div>
       <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
         <DialogContent className="max-w-sm">
@@ -439,7 +444,7 @@ function Pedidos() {
           {(q.data ?? []).filter((r) => {
             const p = r.total ? (r.billed / r.total) * 100 : 0;
             const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
-            return (!fNum || norm(r.number).includes(norm(fNum))) && (!fMonth || r.months.includes(fMonth)) && (fSt === "all" || st === fSt) && (fCli === "all" || r.client === fCli);
+            return (!fNum || norm(r.number).includes(norm(fNum))) && (!fMonth || r.months.includes(fMonth)) && (fSt === "all" || st === fSt) && (clientId === "all" || r.clientId === clientId) && (!workId || r.workIds.includes(workId));
           }).map((r) => {
             const p = r.total ? (r.billed / r.total) * 100 : 0;
             const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
