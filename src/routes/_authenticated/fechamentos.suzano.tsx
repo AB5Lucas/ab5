@@ -341,7 +341,7 @@ function Pedidos() {
         for (const [i, o] of ((Array.isArray(w.orders) ? w.orders : []) as any[]).entries()) {
           const num = String(o.number ?? "").trim();
           const k = `${w.client_id}|${num ? norm(num) : `${w.id}-${i}`}`;
-          const g = groups.get(k) ?? { key: k, num: norm(num), client: w.clients?.name ?? "—", number: num || "—", works: new Set<string>(), workIds: new Set<string>(), dates: [], total: 0, billed: 0 };
+          const g = groups.get(k) ?? { key: k, num: norm(num), client: w.clients?.name ?? "—", number: num || "—", works: new Set<string>(), workIds: new Set<string>(), dates: [] as string[], total: 0, billed: 0 };
           g.works.add(w.name); g.workIds.add(w.id);
           if (o.date) g.dates.push(o.date);
           g.total += Number(o.value ?? 0);
