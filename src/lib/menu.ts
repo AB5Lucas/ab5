@@ -96,7 +96,7 @@ const RAW_GROUPS: MenuGroup[] = [
     items: [
       { title: "Financeiro", url: "/fechamentos/financeiro" },
       { title: "Premiações", url: "/fechamento" },
-      { title: "Suzano", url: "/fechamentos/suzano" },
+      { title: "Acompanhamento", url: "/fechamentos/suzano" },
     ],
   },
   { label: "Externo", icon: ClipboardList, items: [{ title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
