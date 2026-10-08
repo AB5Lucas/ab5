@@ -219,7 +219,7 @@ function FinanceiroPage() {
                     <TableCell className={`text-right font-medium ${l.margin < 0 ? "text-destructive" : ""}`}>{brl(l.margin)}</TableCell>
                     <TableCell className="text-right">{pct(l.progress)}</TableCell>
                     <TableCell className={`text-right ${l.monthPct < 0 ? "text-destructive" : ""}`}>{pct(l.monthPct)}</TableCell>
-                    <TableCell className={`text-right ${l.total.margin < 0 ? "text-destructive" : ""}`}><span className="text-base">{pct(l.total.pct)}</span> <span className="text-xs text-muted-foreground">({brl(l.total.margin)})</span></TableCell>
+                    <TableCell className={`text-right ${l.total.margin < 0 ? "text-destructive" : ""}`}><span>{pct(l.total.pct)}</span> <span className="text-xs text-muted-foreground">({brl(l.total.margin)})</span></TableCell>
                   </TableRow>
                 ))}
               </Fragment>
