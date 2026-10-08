@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
@@ -38,7 +38,7 @@ function useFilters() {
   const [year, setYear] = useState(String(now.getFullYear()));
   const [month, setMonth] = useState(String(now.getMonth() + 1));
   const [workId, setWorkId] = useState("");
-  const [clientId, setClientId] = useState("all");
+  const [clientId, setClientId] = useState("");
   return { year, setYear, month, setMonth, workId, setWorkId, clientId, setClientId };
 }
 
@@ -48,12 +48,6 @@ function SuzanoPage() {
     queryKey: ["suzano-works"],
     queryFn: async () => (await supabase.from("works").select("id, name, client_id, clients(name)").order("name")).data ?? [],
   });
-  // Padrão: Contrato Andaimes
-  useEffect(() => {
-    if (f.workId || !works.data?.length) return;
-    const d = works.data.find((w: any) => /contrato andaimes/i.test(w.name)) ?? works.data[0];
-    if (d) f.setWorkId(d.id);
-  }, [works.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const ym = `${f.year}-${f.month.padStart(2, "0")}`;
   const start = `${ym}-01`;
   const end = monthEnd(ym);
@@ -81,8 +75,8 @@ function SuzanoPage() {
         </div>
         <div>
           <Label>Cliente</Label>
-          <Select value={f.clientId} onValueChange={(v) => { f.setClientId(v); f.setWorkId("all"); }}>
-            <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+          <Select value={f.clientId} onValueChange={(v) => { f.setClientId(v); f.setWorkId(""); }}>
+            <SelectTrigger className="w-56"><SelectValue placeholder="Selecione" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               {clientOpts.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
@@ -95,7 +89,7 @@ function SuzanoPage() {
             <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {(works.data ?? []).filter((w: any) => f.clientId === "all" || w.client_id === f.clientId).map((w: any) => (
+              {(works.data ?? []).filter((w: any) => !f.clientId || f.clientId === "all" || w.client_id === f.clientId).map((w: any) => (
                 <SelectItem key={w.id} value={w.id}>{w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}</SelectItem>
               ))}
             </SelectContent>
@@ -444,7 +438,7 @@ function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
           {(q.data ?? []).filter((r) => {
             const p = r.total ? (r.billed / r.total) * 100 : 0;
             const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
-            return (!fNum || norm(r.number).includes(norm(fNum))) && (!fMonth || r.months.includes(fMonth)) && (fSt === "all" || st === fSt) && (clientId === "all" || r.clientId === clientId) && (!workId || r.workIds.includes(workId));
+            return (!fNum || norm(r.number).includes(norm(fNum))) && (!fMonth || r.months.includes(fMonth)) && (fSt === "all" || st === fSt) && (!clientId || clientId === "all" || r.clientId === clientId) && (!workId || r.workIds.includes(workId));
           }).map((r) => {
             const p = r.total ? (r.billed / r.total) * 100 : 0;
             const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
