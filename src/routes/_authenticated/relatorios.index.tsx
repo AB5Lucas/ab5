@@ -13,9 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 export const Route = createFileRoute("/_authenticated/relatorios/")({
   head: () => ({
     meta: [
-      { title: "Relatórios | Programação Operacional" },
+      { title: "Alocações | Programação Operacional" },
       { name: "description", content: "Relatórios de alocação por obra, por colaborador e de ausências, com exportação em CSV." },
-      { property: "og:title", content: "Relatórios | Programação Operacional" },
+      { property: "og:title", content: "Alocações | Programação Operacional" },
       { property: "og:description", content: "Relatórios de alocação por obra, por colaborador e de ausências, com exportação em CSV." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -179,7 +179,7 @@ function Page() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Relatórios"
+        title="Alocações"
         description="Consolidação da programação e das ausências no período selecionado."
       />
 
