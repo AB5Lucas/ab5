@@ -148,9 +148,9 @@ function Apontamentos({ workId, start, end, ym }: { workId: string; start: strin
         date,
         name: r.collaborators?.full_name ?? "—",
         cpf: r.collaborators?.cpf ?? "",
-        role: isTst(r) ? "TST" : r === boss ? "Encarregado" : "Montador",
+        role: isTst(r) ? "TST" : r === boss ? "ENCARREGADO" : "MONTADOR DE ANDAIME",
       }));
-      const rank = (x: { role: string }) => (x.role === "Encarregado" ? 0 : x.role === "Montador" ? 1 : 2);
+      const rank = (x: { role: string }) => (x.role === "ENCARREGADO" ? 0 : x.role === "MONTADOR DE ANDAIME" ? 1 : 2);
       list.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "pt-BR"));
       out.push(...list);
     }
