@@ -336,8 +336,8 @@ function Pedidos() {
       const ids = (ws ?? []).map((w: any) => w.id);
       const fat = ids.length ? (await supabase.from("work_entries").select("work_id, description, amount, entry_date").eq("category", "faturamento").in("work_id", ids)).data ?? [] : [];
       // Pedidos com o mesmo número viram uma linha só: valores somados e meses listados
-      const groups = new Map<string, { key: string; num: string; client: string; number: string; works: Set<string>; workIds: Set<string>; dates: string[]; total: number; billed: number }>();
-      for (const w of (ws ?? []) as any[]) {
+      const groups: Map<string, { key: string; num: string; client: string; number: string; works: Set<string>; workIds: Set<string>; dates: string[]; total: number; billed: number }> = new Map();
+      for (const w of ((ws ?? []) as any[])) {
         for (const [i, o] of ((Array.isArray(w.orders) ? w.orders : []) as any[]).entries()) {
           const num = String(o.number ?? "").trim();
           const k = `${w.client_id}|${num ? norm(num) : `${w.id}-${i}`}`;
