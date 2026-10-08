@@ -92,7 +92,9 @@ function SuzanoPage() {
         <TabsList>
           <TabsTrigger value="apontamentos">Apontamentos</TabsTrigger>
           <TabsTrigger value="produtividade">Produtividade</TabsTrigger>
+          <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
         </TabsList>
+        <TabsContent value="pedidos"><Pedidos /></TabsContent>
         <TabsContent value="apontamentos"><Apontamentos workId={f.workId} start={start} end={end} ym={ym} /></TabsContent>
         <TabsContent value="produtividade"><Produtividade workId={f.workId} start={start} end={end} /></TabsContent>
       </Tabs>
@@ -286,7 +288,8 @@ function Produtividade({ workId, start, end }: { workId: string; start: string; 
       const date = s.rdos?.report_date as string;
       const vol = Number(s.length_m ?? 0) * Number(s.width_m ?? 0) * Number(s.height_m ?? 0) * Number(s.quantity ?? 1);
       const people = perDay.get(date)?.size ?? 0;
-      return { id: s.id, date, op: s.operation, l: Number(s.length_m ?? 0), w: Number(s.width_m ?? 0), h: Number(s.height_m ?? 0), vol, people, prod: people ? vol / people : 0 };
+      const ord = [s.notes, s.location, s.scaffold_type].map((t) => /ORDEM\s*[:nº°#-]*\s*(\S+)/i.exec(t ?? "")?.[1]).find(Boolean) ?? "";
+      return { id: s.id, date, ord, op: s.operation, l: Number(s.length_m ?? 0), w: Number(s.width_m ?? 0), h: Number(s.height_m ?? 0), vol, people, prod: people ? vol / people : 0 };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
   return (
@@ -294,18 +297,19 @@ function Produtividade({ workId, start, end }: { workId: string; start: string; 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Data</TableHead><TableHead>Montagem / Desmontagem</TableHead>
+            <TableHead>Data</TableHead><TableHead>Ordem</TableHead><TableHead>Atividade</TableHead>
             <TableHead className="text-right">Comprimento (m)</TableHead><TableHead className="text-right">Largura (m)</TableHead>
             <TableHead className="text-right">Altura (m)</TableHead><TableHead className="text-right">Volume (m³)</TableHead>
             <TableHead className="text-right">Pessoas no dia</TableHead><TableHead className="text-right">Produtividade (m³/pessoa)</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {scaf.isLoading && <TableRow><TableCell colSpan={8}>Carregando...</TableCell></TableRow>}
-          {!scaf.isLoading && !rows.length && <TableRow><TableCell colSpan={8} className="text-muted-foreground">Nenhum andaime registrado nos RDOs do período.</TableCell></TableRow>}
+          {scaf.isLoading && <TableRow><TableCell colSpan={9}>Carregando...</TableCell></TableRow>}
+          {!scaf.isLoading && !rows.length && <TableRow><TableCell colSpan={9} className="text-muted-foreground">Nenhum andaime registrado nos RDOs do período.</TableCell></TableRow>}
           {rows.map((r) => (
             <TableRow key={r.id}>
               <TableCell>{br(r.date)}</TableCell>
+              <TableCell>{r.ord || "—"}</TableCell>
               <TableCell>{r.op === "desmontagem" ? "Desmontagem" : "Montagem"}</TableCell>
               <TableCell className="text-right">{n2(r.l)}</TableCell>
               <TableCell className="text-right">{n2(r.w)}</TableCell>
@@ -315,6 +319,63 @@ function Produtividade({ workId, start, end }: { workId: string; start: string; 
               <TableCell className="text-right font-medium">{n2(r.prod)} m³/pessoa</TableCell>
             </TableRow>
           ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const norm = (t: string) => t.replace(/\s+/g, "").toLowerCase();
+
+function Pedidos() {
+  const q = useQuery({
+    queryKey: ["suzano-orders"],
+    queryFn: async () => {
+      const { data: ws } = await supabase.from("works").select("id, name, orders, clients!inner(name)").ilike("clients.name", "%suzano%");
+      const ids = (ws ?? []).map((w: any) => w.id);
+      const fat = ids.length ? (await supabase.from("work_entries").select("work_id, description, amount, entry_date").eq("category", "faturamento").in("work_id", ids)).data ?? [] : [];
+      const rows: { key: string; number: string; work: string; date: string; total: number; billed: number }[] = [];
+      for (const w of (ws ?? []) as any[]) {
+        for (const [i, o] of ((Array.isArray(w.orders) ? w.orders : []) as any[]).entries()) {
+          const num = String(o.number ?? "").trim();
+          const hits = num ? fat.filter((e: any) => e.work_id === w.id && norm(e.description ?? "").includes(norm(num))) : [];
+          const first = hits.map((e: any) => e.entry_date as string).sort()[0] ?? "";
+          rows.push({ key: `${w.id}-${i}`, number: num || "—", work: w.name, date: o.date ?? first, total: Number(o.value ?? 0), billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) });
+        }
+      }
+      return rows.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
+    },
+  });
+  const mon = (d: string) => (d ? `${MONTHS[Number(d.slice(5, 7)) - 1]}/${d.slice(0, 4)}` : "—");
+  return (
+    <div className="panel overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Pedido</TableHead><TableHead>Serviço</TableHead><TableHead>Mês</TableHead>
+            <TableHead className="text-right">Valor total</TableHead><TableHead className="text-right">Valor faturado</TableHead>
+            <TableHead className="text-right">% Faturado</TableHead><TableHead>Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {q.isLoading && <TableRow><TableCell colSpan={7}>Carregando...</TableCell></TableRow>}
+          {!q.isLoading && !q.data?.length && <TableRow><TableCell colSpan={7} className="text-muted-foreground">Nenhum pedido na Suzano.</TableCell></TableRow>}
+          {(q.data ?? []).map((r) => {
+            const p = r.total ? (r.billed / r.total) * 100 : 0;
+            const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
+            return (
+              <TableRow key={r.key}>
+                <TableCell className="font-medium">{r.number}</TableCell>
+                <TableCell>{r.work}</TableCell>
+                <TableCell>{mon(r.date)}</TableCell>
+                <TableCell className="text-right">{brl(r.total)}</TableCell>
+                <TableCell className="text-right">{brl(r.billed)}</TableCell>
+                <TableCell className="text-right">{n2(p)}%</TableCell>
+                <TableCell className={st === "Faturado" ? "text-primary" : st === "Em aberto" ? "text-destructive" : ""}>{st}</TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
