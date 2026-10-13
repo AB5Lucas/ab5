@@ -409,7 +409,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   };
   const [progMonth, setProgMonth] = useState(new Date().toISOString().slice(0, 7));
   const [progPct, setProgPct] = useState("");
-  const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "" });
+  const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "", competence: "" });
+  const [compOpen, setCompOpen] = useState(false);
   const [dlg, setDlg] = useState<null | "cliente" | "orcamento" | "andamento" | "lancamentos" | "faturamentos">(null);
   const [detail, setDetail] = useState<ItemKey | null>(null);
 
@@ -485,7 +486,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
           category: entry.category,
           description: entry.description.trim() || null,
           amount,
-        }).eq("id", editingId);
+          competence_month: entry.category === "faturamento" && entry.competence && entry.competence !== entry.date.slice(0, 7) ? entry.competence : null,
+        } as any).eq("id", editingId);
         if (error) throw error;
         return;
       }
@@ -540,7 +542,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
         category: entry.category,
         description: entry.description.trim() || null,
         amount,
-      });
+        competence_month: entry.category === "faturamento" && entry.competence && entry.competence !== entry.date.slice(0, 7) ? entry.competence : null,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
