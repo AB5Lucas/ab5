@@ -114,7 +114,12 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         integBoxes,
         rdoWf,
         progress: progress.data ?? [],
-        entries: entries.data ?? [],
+        // Faturamento com mês de competência: cálculos usam a competência; doc_date guarda a data real
+        entries: (entries.data ?? []).map((e: any) =>
+          e.category === "faturamento" && e.competence_month && e.competence_month !== String(e.entry_date).slice(0, 7)
+            ? { ...e, doc_date: e.entry_date, entry_date: `${e.competence_month}-01` }
+            : e,
+        ),
         people,
         siblingCount: Math.max(1, (siblings as any).data?.length ?? 1),
         vs,
