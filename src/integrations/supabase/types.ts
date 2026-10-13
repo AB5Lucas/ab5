@@ -2422,6 +2422,7 @@ export type Database = {
         Row: {
           amount: number
           category: string
+          competence_month: string | null
           created_at: string
           description: string | null
           entry_date: string
@@ -2435,6 +2436,7 @@ export type Database = {
         Insert: {
           amount?: number
           category: string
+          competence_month?: string | null
           created_at?: string
           description?: string | null
           entry_date: string
@@ -2448,6 +2450,7 @@ export type Database = {
         Update: {
           amount?: number
           category?: string
+          competence_month?: string | null
           created_at?: string
           description?: string | null
           entry_date?: string

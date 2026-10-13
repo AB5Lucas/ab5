@@ -1,0 +1,1 @@
+ALTER TABLE public.work_entries ADD COLUMN IF NOT EXISTS competence_month text;

@@ -85,6 +85,13 @@
       "when": 1791902027952,
       "tag": "0011_rdo_media_read_by_rdo_access",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791909662971,
+      "tag": "0012_work_entries_competence",
+      "breakpoints": true
     }
   ]
 }
