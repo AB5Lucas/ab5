@@ -71,6 +71,13 @@
       "when": 1791414543776,
       "tag": "0009_suzano_foreman_priority",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791898787551,
+      "tag": "0010_restrict_open_reads_to_active_users",
+      "breakpoints": true
     }
   ]
 }
