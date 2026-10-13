@@ -125,14 +125,14 @@ function FinanceiroPage() {
         const rev = ((Array.isArray(w.orders) ? w.orders : []) as any[])
           .filter((o) => o?.date && sel.has(String(o.date).slice(0, 7)))
           .reduce((a, o) => a + Number(o.value ?? 0), 0);
-        const m = rev * (1 - TAX_RATE) - (mo + transport + materials);
+        const m = rev * (1 - FIN_TAX) - (mo + transport + materials);
         total = { margin: m, pct: rev ? (m / rev) * 100 : 0 };
       }
       g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: billed ? (margin / billed) * 100 : 0, total, full, raw });
       by.set(key, g);
     });
     return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [list, raws, yms, year, holidays.data, works.data]);
+  }, [list, raws, yms, year, months.length, holidays.data, works.data]);
 
   const allGroups = groups;
   const shown = useMemo(() => allGroups.filter((g) => !hidden.includes(g.key)), [allGroups, hidden]);
