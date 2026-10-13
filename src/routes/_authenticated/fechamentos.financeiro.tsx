@@ -118,7 +118,8 @@ function FinanceiroPage() {
         : full.rows.filter((r) => r.ym <= lastYm).pop()?.progress ?? 0;
       const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
       const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as Line[] };
-      g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: billed ? (margin / billed) * 100 : 0, total: totalMargin(w, full), full, raw });
+      const upto = buildBase(w, raw, "", lastYm, { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [] }) ?? full;
+      g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: billed ? (margin / billed) * 100 : 0, total: totalMargin(w, upto), full, raw });
       by.set(key, g);
     });
     return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));

@@ -162,6 +162,19 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const okDate = (dt?: string | null) => !dt || (dt.slice(0, 10) <= cut && dt.slice(0, 10) >= from);
     // Contrato: custos só até o fim do mês do último faturamento do serviço
     const contractCut = contractCutoffs(work, raw.entries, isAll, opts.allWorks);
+    // Demais serviços: custos só até o fim do mês do último andamento (% conclusão) apontado
+    {
+      const byId = new Map<string, any>((isAll ? opts.allWorks ?? [] : [work]).map((x: any) => [x.id, x]));
+      const lastProg = new Map<string, string>();
+      for (const p of raw.progress ?? []) {
+        const ym = String(p.month).slice(0, 7);
+        if (untilMonth && ym > untilMonth) continue;
+        const w = byId.get(p.work_id);
+        if (!w || w.contract_enabled || w.hh_enabled || contractCut.has(p.work_id)) continue;
+        if (ym > (lastProg.get(p.work_id) ?? "")) lastProg.set(p.work_id, ym);
+      }
+      for (const [k, ym] of lastProg) contractCut.set(k, monthEnd(ym));
+    }
     const okW = (wid: string | null | undefined, dt?: string | null) => {
       if (!okDate(dt)) return false;
       const c = wid ? contractCut.get(wid) : undefined;
