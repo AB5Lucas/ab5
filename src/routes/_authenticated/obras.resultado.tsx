@@ -370,15 +370,18 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     });
     const budget = items.reduce((a, i) => a + i.budget, 0);
     const order = monthlyInfo.order;
-    // Receita realizada também só sobre o pedido do período
+    // Mensal com período: receita = soma dos pedidos datados no período (até o mês da linha), sem avanço de andamento
+    const list = (Array.isArray(hhSavedWork?.orders) ? hhSavedWork.orders : []) as any[];
     const rows = calcRt.rows.map((r) => {
-      const revenue = r.revenue * monthlyInfo.f;
+      const revenue = hasPeriod
+        ? list.filter((o) => o.date && o.date >= periodStart && String(o.date).slice(0, 7) <= r.ym).reduce((a, o) => a + Number(o.value ?? 0), 0)
+        : r.revenue * monthlyInfo.f;
       const margin = revenue - revenue * TAX_RATE - r.cost;
       return { ...r, revenue, margin, marginPct: revenue ? (margin / revenue) * 100 : 0, consumed: budget ? (r.cost / budget) * 100 : 0 };
     });
     const last = rows.length ? { ...rows[rows.length - 1]!, progress: calcRt.last?.progress ?? rows[rows.length - 1]!.progress } : calcRt.last;
     return { ...calcRt, items, budget, order, rows, last, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
-  }, [calcRt, monthlyInfo]);
+  }, [calcRt, monthlyInfo, hhSavedWork, hasPeriod, periodStart]);
   const [ctOn, setCtOn] = useState(false);
   const [rtOn, setRtOn] = useState(false);
   const [moOn, setMoOn] = useState(false);
