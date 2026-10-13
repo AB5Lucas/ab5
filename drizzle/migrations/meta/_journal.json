@@ -78,6 +78,13 @@
       "when": 1791898787551,
       "tag": "0010_restrict_open_reads_to_active_users",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791902027952,
+      "tag": "0011_rdo_media_read_by_rdo_access",
+      "breakpoints": true
     }
   ]
 }
