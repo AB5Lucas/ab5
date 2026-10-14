@@ -8,7 +8,7 @@ import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Trash2, Plus, Pencil, Check, X } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X, CalendarDays } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -549,7 +549,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     onSuccess: () => {
       toast.success(editingId ? "Lançamento atualizado" : "Lançamento salvo");
       setEditingId(null);
-      setEntry((e) => ({ ...e, description: "", amount: "" }));
+      setEntry((e) => ({ ...e, description: "", amount: "", competence: "" }));
+      setCompOpen(false);
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
