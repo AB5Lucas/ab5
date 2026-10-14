@@ -260,8 +260,8 @@ export function useProdRows(workId: string, start: string, end: string) {
       return { id: s.id, date, ord, op: s.operation, l: Number(s.length_m ?? 0), w: Number(s.width_m ?? 0), h: Number(s.height_m ?? 0), vol, people, prod: people ? vol / people : 0 };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
-  const ppl = new Set<string>();
-  for (const r of rows) for (const id of perDay.get(r.date) ?? []) ppl.add(id);
+  // Pessoa-dia: cada dia trabalhado conta (5 dias = 5), só dias com andaime lançado
+  const ppl = { size: [...new Set(rows.map((r) => r.date))].reduce((s, d) => s + (perDay.get(d)?.size ?? 0), 0) };
   const totalVol = rows.reduce((s, r) => s + r.vol, 0);
   return { rows, loading: scaf.isLoading, totalVol, people: ppl.size, prod: ppl.size ? totalVol / ppl.size : 0 };
 }
