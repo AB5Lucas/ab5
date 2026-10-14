@@ -1,0 +1,1 @@
+ALTER TABLE public.client_integrations ADD COLUMN IF NOT EXISTS documentation boolean NOT NULL DEFAULT false;
