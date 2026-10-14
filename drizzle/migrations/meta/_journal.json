@@ -92,6 +92,13 @@
       "when": 1791909662971,
       "tag": "0012_work_entries_competence",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791973435208,
+      "tag": "0013_andaimes_fase1",
+      "breakpoints": true
     }
   ]
 }
