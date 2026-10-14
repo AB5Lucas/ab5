@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Network } from "lucide-react";
+import { ChevronDown, Network } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,11 +16,27 @@ import {
 import { MENU_GROUPS } from "@/lib/menu";
 import { useAccess } from "@/hooks/use-access";
 
+const STORAGE_KEY = "sidebar-closed-groups";
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { canAccess, loading } = useAccess();
+  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      setClosed(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}"));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const toggle = (label: string) =>
+    setClosed((prev) => {
+      const next = { ...prev, [label]: !prev[label] };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
   const visible = loading
     ? []
     : MENU_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canAccess(i.url)) })).filter((g) => g.items.length);
@@ -43,8 +60,21 @@ export function AppSidebar() {
       <SidebarContent>
         {visible.map((group) => (
           <SidebarGroup key={group.label}>
-            {!collapsed && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
-            <SidebarGroupContent>
+            {!collapsed && (
+              <SidebarGroupLabel asChild>
+                <button
+                  type="button"
+                  onClick={() => toggle(group.label)}
+                  className="flex w-full items-center gap-1 text-left"
+                >
+                  <ChevronDown
+                    className={`h-3 w-3 shrink-0 opacity-50 transition-transform ${closed[group.label] ? "-rotate-90" : ""}`}
+                  />
+                  {group.label}
+                </button>
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent className={!collapsed && closed[group.label] ? "hidden" : ""}>
               <SidebarMenu>
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.url}>
