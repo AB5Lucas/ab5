@@ -36,7 +36,8 @@ function Page() {
   const qc = useQueryClient();
   const items = useQuery({ queryKey: ["andam-items"], queryFn: async () => (await supabase.from("andam_items").select("*").order("name")).data ?? [] });
   const stock = useQuery({ queryKey: ["andam-stock"], queryFn: async () => (await supabase.from("andam_stock").select("*")).data ?? [] });
-  const clients = useQuery({ queryKey: ["andam-clients"], queryFn: async () => (await supabase.from("clients").select("id, name").eq("active", true).order("name")).data ?? [] });
+  // O cliente "PATIO" é o próprio Estoque central: nunca usar como obra
+  const clients = useQuery({ queryKey: ["andam-clients-nopatio"], queryFn: async () => ((await supabase.from("clients").select("id, name").eq("active", true).order("name")).data ?? []).filter((c: any) => c.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() !== "PATIO") });
   const works = useQuery({ queryKey: ["andam-works"], queryFn: async () => (await supabase.from("works").select("id, name, client_id").order("name")).data ?? [] });
 
   const [f, setF] = useState({ client: ALL, work: ALL, item: ALL, category: ALL, location: ALL });
