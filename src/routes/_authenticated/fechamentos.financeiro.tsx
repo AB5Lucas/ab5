@@ -67,7 +67,11 @@ function FinanceiroPage() {
     queryFn: async () => {
       const out = new Set<string>();
       const [ent, rdo, sch] = await Promise.all([
-        fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id").gte("entry_date", start).lte("entry_date", end).order("id").range(a, b)),
+        fetchAll<any>((a, b) =>
+          supabase.from("work_entries").select("work_id")
+            .or(`and(entry_date.gte.${start},entry_date.lte.${end}),and(competence_month.gte.${start.slice(0, 7)},competence_month.lte.${end.slice(0, 7)})`)
+            .order("id").range(a, b),
+        ),
         fetchAll<any>((a, b) => supabase.from("rdos").select("work_id").gte("report_date", start).lte("report_date", end).order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("daily_schedules").select("id").gte("schedule_date", start).lte("schedule_date", end).order("id").range(a, b)),
       ]);
