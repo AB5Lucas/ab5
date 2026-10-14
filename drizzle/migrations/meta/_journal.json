@@ -155,6 +155,13 @@
       "when": 1792002577939,
       "tag": "0021_andam_structure_project_art",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792005942725,
+      "tag": "0022_andam_patio_access",
+      "breakpoints": true
     }
   ]
 }
