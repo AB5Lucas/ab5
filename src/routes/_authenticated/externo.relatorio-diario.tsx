@@ -32,13 +32,13 @@ export const Route = createFileRoute("/_authenticated/externo/relatorio-diario")
 });
 
 function RdoPage() {
-  const { user, canWrite } = useCurrentUser();
+  const { user, canWrite, role } = useCurrentUser();
   const [tab, setTab] = useState("fill");
   const [workId, setWorkId] = useState<string>("");
   const [date, setDate] = useState(todayISO());
 
   const works = useQuery({
-    queryKey: ["rdo-works", user?.id, canWrite],
+    queryKey: ["rdo-works", user?.id, role],
     enabled: !!user?.id,
     queryFn: async () => {
       const sel = "id, name, client_id, entry_time, exit_time, exit_time_weekend, active, clients(name)";
