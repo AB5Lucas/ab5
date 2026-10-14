@@ -73,6 +73,7 @@ type Row = {
   integration_date: string;
   expires_at: string | null;
   notes: string | null;
+  documentation?: boolean | null;
 };
 
 type Status = "valid" | "expiring" | "expired" | "documentation";
@@ -149,7 +150,7 @@ function IntegrationsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_integrations")
-        .select("id, collaborator_id, client_id, integration_date, expires_at, notes")
+        .select("id, collaborator_id, client_id, integration_date, expires_at, notes, documentation")
         .order("integration_date", { ascending: false });
       if (error) throw error;
       return data as Row[];
@@ -217,7 +218,7 @@ function IntegrationsPage() {
       if (!p) return false;
       const clientName = clientById.get(r.client_id) ?? "";
       if (clientFilter !== "all" && r.client_id !== clientFilter) return false;
-      if (statusFilter !== "all" && statusOf(r.expires_at, today) !== statusFilter) return false;
+      if (statusFilter !== "all" && statusOf(r.expires_at, today, r.documentation) !== statusFilter) return false;
       if (q) {
         const hit =
           (p?.full_name ?? "").toLowerCase().includes(q) ||
@@ -230,11 +231,12 @@ function IntegrationsPage() {
   }, [integrations.data, search, clientFilter, statusFilter, personById, clientById, today]);
 
   const summary = useMemo(() => {
-    const s = { total: filtered.length, valid: 0, expiring: 0, expired: 0 };
+    const s = { total: filtered.length, valid: 0, expiring: 0, expired: 0, documentation: 0 };
     filtered.forEach((r) => {
-      const st = statusOf(r.expires_at, today);
+      const st = statusOf(r.expires_at, today, r.documentation);
       if (st === "valid") s.valid++;
       else if (st === "expiring") s.expiring++;
+      else if (st === "documentation") s.documentation++;
       else s.expired++;
     });
     return s;
@@ -425,6 +427,7 @@ function IntegrationsPage() {
         <Badge variant="outline">Válidas: {summary.valid}</Badge>
         <Badge variant="secondary">Próximas do vencimento: {summary.expiring}</Badge>
         <Badge variant="destructive">Vencidas: {summary.expired}</Badge>
+        <Badge variant="destructive">Documentação: {summary.documentation}</Badge>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -459,6 +462,7 @@ function IntegrationsPage() {
             <SelectItem value="valid">Válida</SelectItem>
             <SelectItem value="expiring">Próxima do vencimento</SelectItem>
             <SelectItem value="expired">Vencida</SelectItem>
+            <SelectItem value="documentation">Documentação</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -494,7 +498,7 @@ function IntegrationsPage() {
             )}
             {filtered.map((r) => {
               const p = personById.get(r.collaborator_id);
-              const st = statusOf(r.expires_at, today);
+              const st = statusOf(r.expires_at, today, r.documentation);
               
               return (
                 <TableRow key={r.id}>
@@ -506,11 +510,21 @@ function IntegrationsPage() {
                   <TableCell className="hidden md:table-cell">{formatDateBR(r.integration_date)}</TableCell>
                   <TableCell className="hidden md:table-cell">{formatDateBR(r.expires_at)}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant={st === "valid" ? "outline" : st === "expiring" ? "secondary" : "destructive"}
-                    >
-                      {STATUS_LABEL[st]}
-                    </Badge>
+                    {canWrite && (st === "expired" || st === "documentation") ? (
+                      <button
+                        type="button"
+                        title={st === "expired" ? "Marcar como Documentação" : "Voltar para Vencida"}
+                        onClick={() => toggleDoc.mutate({ id: r.id, value: st === "expired" })}
+                      >
+                        <Badge variant="destructive" className="cursor-pointer">{STATUS_LABEL[st]}</Badge>
+                      </button>
+                    ) : (
+                      <Badge
+                        variant={st === "valid" ? "outline" : st === "expiring" ? "secondary" : "destructive"}
+                      >
+                        {STATUS_LABEL[st]}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
@@ -645,7 +659,7 @@ function IntegrationsPage() {
               </p>
               <p>
                 <span className="text-muted-foreground">Status: </span>
-                {STATUS_LABEL[statusOf(viewing.expires_at, today)]}
+                {STATUS_LABEL[statusOf(viewing.expires_at, today, viewing.documentation)]}
               </p>
               <p>
                 <span className="text-muted-foreground">Observações: </span>
