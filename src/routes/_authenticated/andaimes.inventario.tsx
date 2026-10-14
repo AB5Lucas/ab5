@@ -91,8 +91,8 @@ function Page() {
             {(list.data ?? []).map((i: any) => (
               <TableRow key={i.id} className="[&>td]:py-1">
                 <TableCell>{i.number}</TableCell>
-                <TableCell>{i.location === "central" ? "Pátio" : i.clients?.name}</TableCell>
-                <TableCell>{i.works?.name ?? "Canteiro"}</TableCell>
+                <TableCell>{i.location === "central" ? "PATIO" : i.clients?.name}</TableCell>
+                <TableCell>{i.location === "central" ? "PATIO" : i.works?.name ?? "Canteiro"}</TableCell>
                 <TableCell>{fmtDate(i.inventory_date)}</TableCell>
                 <TableCell>{userName(i.user_id)}</TableCell>
                 <TableCell className="text-right">{i.andam_inventory_items?.[0]?.count ?? 0}</TableCell>
@@ -113,9 +113,9 @@ function Page() {
           <DialogHeader><DialogTitle>Novo inventário</DialogTitle></DialogHeader>
           {form && (
             <div className="space-y-3">
-              <Pick label="Cliente" value={form.client} onChange={(v) => setForm({ ...form, client: v, work: CANTEIRO })} options={[...(scoped ? [] : [[PATIO, "Pátio (estoque central)"]]), ...(clients.data ?? []).map((c: any) => [c.id, c.name])]} />
+              <Pick label="Cliente" value={form.client} onChange={(v) => setForm({ ...form, client: v, work: CANTEIRO })} options={[...(scoped ? [] : [[PATIO, "PATIO"]]), ...(clients.data ?? []).map((c: any) => [c.id, c.name])]} />
               {form.client === PATIO
-                ? <div className="space-y-1"><Label>Serviço</Label><Input value="Canteiro" disabled /></div>
+                ? <div className="space-y-1"><Label>Serviço</Label><Input value="PATIO" disabled /></div>
                 : <Pick label="Serviço" value={form.work} onChange={(v) => setForm({ ...form, work: v })} options={[[CANTEIRO, "Canteiro"], ...(works.data ?? []).filter((w: any) => w.client_id === form.client).map((w: any) => [w.id, w.name])]} />}
               <div className="space-y-1"><Label>Data</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
               <div className="space-y-1"><Label>Observação</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
@@ -159,7 +159,7 @@ function InventoryDialog({ inv, canWrite, userName, onClose }: { inv: any; canWr
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl">
-        <DialogHeader><DialogTitle>Inventário nº {h.number} — {h.location === "central" ? "Pátio" : h.clients?.name} · {h.works?.name ?? "Canteiro"}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Inventário nº {h.number} — {h.location === "central" ? "PATIO" : `${h.clients?.name} · ${h.works?.name ?? "Canteiro"}`}</DialogTitle></DialogHeader>
         <div className="text-sm text-muted-foreground">
           {fmtDate(h.inventory_date)} · {INV_STATUS[h.status]} · Responsável: {userName(h.user_id)}
           {h.finalized_at && <> · Finalizado em {new Date(h.finalized_at).toLocaleString("pt-BR")} por {userName(h.finalized_by)}</>}
