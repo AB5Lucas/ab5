@@ -103,18 +103,20 @@ function FinanceiroPage() {
       if (!raw) return;
       const full = buildBase(w, raw, "", "", { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [] });
       if (!full) return;
-      let mo = 0, transport = 0, materials = 0, billed = 0;
+      let mo = 0, transport = 0, materials = 0, compBilled = 0, billed = 0;
       for (const r of full.rows) if (sel.has(r.ym)) { mo += r.labor; transport += r.transport; }
       for (const e of raw.entries as any[]) {
-        if (!sel.has(e.entry_date.slice(0, 7))) continue;
         const v = Number(e.amount);
-        if (e.category === "faturamento") billed += v;
+        // Valor faturado exibido pelo mês do lançamento; margem pela competência
+        if (e.category === "faturamento" && sel.has(String(e.doc_date ?? e.entry_date).slice(0, 7))) billed += v;
+        if (!sel.has(e.entry_date.slice(0, 7))) continue;
+        if (e.category === "faturamento") compBilled += v;
         else if (e.category === "mao_obra") mo += v;
         else if (e.category === "terceiros") transport += v;
         else if (["materiais", "ferramentas", "andaimes"].includes(e.category)) materials += v;
       }
       const tax = billed * FIN_TAX;
-      const margin = billed - tax - mo - transport - materials;
+      const margin = compBilled * (1 - FIN_TAX) - mo - transport - materials;
       if (!billed && !mo && !transport && !materials) return;
       const lastYm = yms[yms.length - 1] ?? `${year}-12`;
       const progress = w.contract_enabled
