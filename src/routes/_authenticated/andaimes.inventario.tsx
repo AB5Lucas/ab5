@@ -113,7 +113,7 @@ function Page() {
           <DialogHeader><DialogTitle>Novo inventário</DialogTitle></DialogHeader>
           {form && (
             <div className="space-y-3">
-              <Pick label="Cliente" value={form.client} onChange={(v) => setForm({ ...form, client: v, work: CANTEIRO })} options={[...(scoped ? [] : [[PATIO, "PATIO"]]), ...(clients.data ?? []).map((c: any) => [c.id, c.name])]} />
+              <Pick label="Cliente" value={form.client} onChange={(v) => setForm({ ...form, client: v, work: CANTEIRO })} options={[...(scoped ? [] : [[PATIO, "PATIO (Estoque Central)"]]), ...(clients.data ?? []).filter((c: any) => c.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() !== "PATIO").map((c: any) => [c.id, c.name])]} />
               {form.client === PATIO
                 ? <div className="space-y-1"><Label>Serviço</Label><Input value="PATIO" disabled /></div>
                 : <Pick label="Serviço" value={form.work} onChange={(v) => setForm({ ...form, work: v })} options={[[CANTEIRO, "Canteiro"], ...(works.data ?? []).filter((w: any) => w.client_id === form.client).map((w: any) => [w.id, w.name])]} />}
