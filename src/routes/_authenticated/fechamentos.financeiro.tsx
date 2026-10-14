@@ -117,7 +117,7 @@ function FinanceiroPage() {
       }
       const tax = billed * FIN_TAX;
       const margin = compBilled * (1 - FIN_TAX) - mo - transport - materials;
-      if (!billed && !mo && !transport && !materials) return;
+      if (!billed && !compBilled && !mo && !transport && !materials) return;
       const lastYm = yms[yms.length - 1] ?? `${year}-12`;
       const progress = w.contract_enabled
         ? contractFraction((raw.entries as any[]).filter((e) => e.category === "faturamento" && e.entry_date.slice(0, 7) <= lastYm).length, Number(w.contract_months ?? 12)) * 100
@@ -134,7 +134,7 @@ function FinanceiroPage() {
         const m = rev * (1 - FIN_TAX) - (mo + transport + materials);
         total = { margin: m, pct: rev ? (m / rev) * 100 : 0 };
       }
-      g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: billed ? (margin / billed) * 100 : 0, total, full, raw });
+      g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: compBilled ? (margin / compBilled) * 100 : 0, total, full, raw });
       by.set(key, g);
     });
     return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
