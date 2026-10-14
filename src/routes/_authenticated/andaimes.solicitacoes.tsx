@@ -123,7 +123,7 @@ function Page() {
           </TableBody>
         </Table>
       </div>
-      {form && <NewDialog form={form} setForm={setForm} clients={clients} works={works} userId={user?.id} onDone={(id) => { setForm(null); qc.invalidateQueries({ queryKey: ["andam-req"] }); setOpen(id); }} />}
+      {form && <NewDialog form={form} setForm={setForm} clients={clients} works={works} userId={user?.id} onDone={(id: string) => { setForm(null); qc.invalidateQueries({ queryKey: ["andam-req"] }); setOpen(id); }} />}
       {open && <RequestDialog id={open} canEdit={canEdit} onClose={() => { setOpen(null); qc.invalidateQueries({ queryKey: ["andam-req"] }); }} />}
     </div>
   );

@@ -4,6 +4,6 @@
 - [x] Prêmio motorista automático ao adicionar carro no fim de semana (Montar Transporte)
 - [x] Remover aba Requisitos e suas dependências
 - [x] Andaimes etapa 1: Inventário e Estoque
-- [ ] Andaimes etapa 2: Solicitações e Romaneios (aguardando validação da etapa 1)
+- [x] Andaimes etapa 2: Solicitações e Romaneios
 - [ ] Andaimes etapa 3: Acompanhamento (montagem, renovação, desmontagem)
 - [ ] Andaimes etapa 4: Patrimônio (valores, custo de locação, rateio, integração com Resultados)
