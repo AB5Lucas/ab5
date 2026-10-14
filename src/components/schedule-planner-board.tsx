@@ -1661,7 +1661,7 @@ export function SchedulePlannerBoard({
                             <span className="truncate">{p?.full_name ?? "—"}</span>
                           </p>
                           <p className="truncate text-[10px] leading-tight text-muted-foreground">
-                            {(r.position_id ? positionById.get(r.position_id) : p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
+                            {(p?.position_id ? positionById.get(p.position_id) : r.position_id ? positionById.get(r.position_id) : null) ?? "Sem função"}
                           </p>
                         </div>
                         {(() => {
