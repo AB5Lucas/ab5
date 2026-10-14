@@ -127,6 +127,13 @@
       "when": 1791987581097,
       "tag": "0017_vehicle_external_place",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791989112207,
+      "tag": "0018_andaimes_acompanhamento_patrimonio",
+      "breakpoints": true
     }
   ]
 }

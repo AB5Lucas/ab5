@@ -36,3 +36,21 @@ export function separationStatus(lines: { requested: number; separated: number; 
 }
 /** Unidades que saíram e não retornaram (nunca corrigido automaticamente) */
 export const notReturned = (sent: number, ret: number[]) => Math.max(0, Number(sent) - ret.reduce((a, b) => a + Number(b), 0));
+
+export const STRUCT_STATUS: Record<string, string> = {
+  montagem: "Em montagem", liberado: "Liberado", aguardando_desmontagem: "Aguardando desmontagem", desmontagem: "Em desmontagem", desmontado: "Desmontado",
+};
+/** Vistoria: vencida após a data; a vencer em até 7 dias */
+export function inspectionState(validUntil: string | null | undefined, today: string): "none" | "ok" | "expiring" | "expired" {
+  if (!validUntil) return "none";
+  if (validUntil < today) return "expired";
+  const diff = (new Date(validUntil).getTime() - new Date(today).getTime()) / 86400000;
+  return diff <= 7 ? "expiring" : "ok";
+}
+/** Depreciação linear por unidade, limitada ao valor de aquisição */
+export function depreciation(acq: number, lifeMonths: number, acquiredAt: string | null | undefined, today: string) {
+  if (!acquiredAt || !lifeMonths || acq <= 0) return 0;
+  const [y1, m1] = acquiredAt.split("-").map(Number), [y2, m2] = today.split("-").map(Number);
+  const months = Math.max(0, ((y2 ?? 0) - (y1 ?? 0)) * 12 + ((m2 ?? 0) - (m1 ?? 0)));
+  return Math.min(acq, (acq / lifeMonths) * months);
+}

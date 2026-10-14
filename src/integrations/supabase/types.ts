@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      andam_asset_values: {
+        Row: {
+          acquired_at: string | null
+          acquisition_value: number
+          item_id: string
+          rental_value_month: number
+          replacement_value: number
+          updated_at: string
+          useful_life_months: number
+        }
+        Insert: {
+          acquired_at?: string | null
+          acquisition_value?: number
+          item_id: string
+          rental_value_month?: number
+          replacement_value?: number
+          updated_at?: string
+          useful_life_months?: number
+        }
+        Update: {
+          acquired_at?: string | null
+          acquisition_value?: number
+          item_id?: string
+          rental_value_month?: number
+          replacement_value?: number
+          updated_at?: string
+          useful_life_months?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_asset_values_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "andam_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       andam_inventory: {
         Row: {
           client_id: string | null
@@ -497,6 +535,111 @@ export type Database = {
           },
           {
             foreignKeyName: "andam_stock_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      andam_structure_items: {
+        Row: {
+          id: string
+          item_id: string
+          quantity: number
+          structure_id: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          quantity?: number
+          structure_id: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          quantity?: number
+          structure_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_structure_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "andam_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_structure_items_structure_id_fkey"
+            columns: ["structure_id"]
+            isOneToOne: false
+            referencedRelation: "andam_structures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      andam_structures: {
+        Row: {
+          assembled_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          dismantled_at: string | null
+          id: string
+          inspection_valid_until: string | null
+          location_desc: string | null
+          notes: string | null
+          order_code: string | null
+          released_at: string | null
+          responsible: string | null
+          status: string
+          updated_at: string
+          work_id: string | null
+        }
+        Insert: {
+          assembled_at?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          dismantled_at?: string | null
+          id?: string
+          inspection_valid_until?: string | null
+          location_desc?: string | null
+          notes?: string | null
+          order_code?: string | null
+          released_at?: string | null
+          responsible?: string | null
+          status?: string
+          updated_at?: string
+          work_id?: string | null
+        }
+        Update: {
+          assembled_at?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          dismantled_at?: string | null
+          id?: string
+          inspection_valid_until?: string | null
+          location_desc?: string | null
+          notes?: string | null
+          order_code?: string | null
+          released_at?: string | null
+          responsible?: string | null
+          status?: string
+          updated_at?: string
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_structures_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_structures_work_id_fkey"
             columns: ["work_id"]
             isOneToOne: false
             referencedRelation: "works"
