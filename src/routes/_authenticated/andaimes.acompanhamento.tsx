@@ -2,7 +2,47 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Eye, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Eye, Plus, Trash2, AlertTriangle, Paperclip, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+
+function DocField({ kind, label, ro, number, path, onNumber, onPath }: {
+  kind: "project" | "art"; label: string; ro: boolean; number: string; path: string | null;
+  onNumber: (v: string) => void; onPath: (p: string | null) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const upload = async (file: File) => {
+    setBusy(true);
+    const p = `${kind}/${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+    const { error } = await supabase.storage.from("andam-docs").upload(p, file, { contentType: file.type });
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    onPath(p); toast.success("Arquivo anexado");
+  };
+  const openFile = async () => {
+    if (!path) return;
+    const { data, error } = await supabase.storage.from("andam-docs").createSignedUrl(path, 600);
+    if (error || !data) { toast.error(error?.message ?? "Erro"); return; }
+    window.open(data.signedUrl, "_blank");
+  };
+  return (
+    <div className="space-y-1">
+      <span>{label}</span>
+      <div className="flex items-center gap-1">
+        <Input disabled={ro} value={number} onChange={(e) => onNumber(e.target.value)} />
+        <label className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${ro ? "opacity-50" : "cursor-pointer hover:bg-accent"} ${path ? "text-primary" : "text-muted-foreground"}`} title={path ? "Substituir arquivo" : "Anexar arquivo"}>
+          <Paperclip className="h-4 w-4" />
+          <input type="file" className="hidden" disabled={ro || busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+        </label>
+      </div>
+      {path && (
+        <div className="flex items-center gap-1 text-xs">
+          <button type="button" className="truncate text-primary underline" onClick={openFile}>{path.split("/").pop()?.replace(/^[0-9a-f-]{36}-/, "")}</button>
+          {!ro && <button type="button" onClick={() => onPath(null)} title="Remover"><X className="h-3 w-3" /></button>}
+        </div>
+      )}
+    </div>
+  );
+}
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useAndamScope } from "@/hooks/use-andam-scope";
@@ -151,6 +191,9 @@ function StructDialog({ id, clients, works, canEdit, onClose }: { id: string | n
       status: form.status, assembled_at: form.assembled_at || null, released_at: form.released_at || null,
       inspection_valid_until: form.inspection_valid_until || null, dismantled_at: form.dismantled_at || null,
       responsible: form.responsible || null, notes: form.notes || null,
+      has_project_art: !!form.has_project_art,
+      project_number: form.project_number || null, project_file_path: form.project_file_path || null,
+      art_number: form.art_number || null, art_file_path: form.art_file_path || null,
     };
     let sid = id;
     if (id) {
@@ -194,6 +237,16 @@ function StructDialog({ id, clients, works, canEdit, onClose }: { id: string | n
               setF(p);
             }}>{Object.entries(STRUCT_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
           <label className="space-y-1">Responsável<Input disabled={ro} value={form.responsible ?? ""} onChange={(e) => set("responsible", e.target.value)} /></label>
+          <div className="col-span-2 flex items-center gap-2 pt-1">
+            <Switch disabled={ro} checked={!!form.has_project_art} onCheckedChange={(v) => set("has_project_art", v)} />
+            <span>Projeto/ART</span>
+          </div>
+          {form.has_project_art && (["project", "art"] as const).map((k) => (
+            <DocField key={k} kind={k} label={k === "project" ? "Nº do Projeto" : "Nº da ART"} ro={ro}
+              number={form[`${k}_number`] ?? ""} path={form[`${k}_file_path`] ?? null}
+              onNumber={(v) => set(`${k}_number`, v)}
+              onPath={(p) => setF((cur: any) => ({ ...(cur ?? form), [`${k}_file_path`]: p }))} />
+          ))}
           <label className="space-y-1">Montagem<Input disabled={ro} type="date" value={form.assembled_at ?? ""} onChange={(e) => set("assembled_at", e.target.value)} /></label>
           <label className="space-y-1">Liberação<Input disabled={ro} type="date" value={form.released_at ?? ""} onChange={(e) => set("released_at", e.target.value)} /></label>
           <label className="space-y-1">Vistoria válida até<Input disabled={ro} type="date" value={form.inspection_valid_until ?? ""} onChange={(e) => set("inspection_valid_until", e.target.value)} /></label>
