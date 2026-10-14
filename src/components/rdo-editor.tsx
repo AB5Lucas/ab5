@@ -591,6 +591,7 @@ function ServicesStep({ rdoId, editable, onlyScaffolds = false }: { rdoId: strin
   const qc = useQueryClient();
   const [svcDialog, setSvcDialog] = useState<string | null>(null);
   const [scafOpen, setScafOpen] = useState(false);
+  const [scafEdit, setScafEdit] = useState<any>(null);
 
   const services = useQuery({
     queryKey: ["rdo-services", rdoId],
@@ -672,6 +673,11 @@ function ServicesStep({ rdoId, editable, onlyScaffolds = false }: { rdoId: strin
                   </p>
                 </div>
                 {editable && (
+                  <Button variant="ghost" size="icon" onClick={() => { setScafEdit(s); setScafOpen(true); }} aria-label="Editar">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                {editable && (
                   <Button variant="ghost" size="icon" onClick={() => del.mutate({ table: "rdo_scaffolds", id: s.id })} aria-label="Excluir">
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -687,7 +693,7 @@ function ServicesStep({ rdoId, editable, onlyScaffolds = false }: { rdoId: strin
         <div key={c.key}>{block(c.label, () => setSvcDialog(c.key), "Adicionar", svcList(c.key))}</div>
       ))}
       <ServiceDialog rdoId={rdoId} category={svcDialog} onClose={() => setSvcDialog(null)} />
-      <ScaffoldDialog rdoId={rdoId} open={scafOpen} onClose={() => setScafOpen(false)} />
+      <ScaffoldDialog rdoId={rdoId} open={scafOpen} edit={scafEdit} onClose={() => { setScafOpen(false); setScafEdit(null); }} />
     </div>
   );
 }
@@ -745,15 +751,18 @@ function ServiceDialog({ rdoId, category, onClose }: { rdoId: string; category: 
   );
 }
 
-function ScaffoldDialog({ rdoId, open, onClose }: { rdoId: string; open: boolean; onClose: () => void }) {
+function ScaffoldDialog({ rdoId, open, edit, onClose }: { rdoId: string; open: boolean; edit?: any; onClose: () => void }) {
   const qc = useQueryClient();
   const empty = { scaffold_type: "", location: "", length_m: "", width_m: "", height_m: "", quantity: "1", operation: "montagem", notes: "" };
   const [f, setF] = useState(empty);
-  useEffect(() => { if (open) setF(empty); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const str = (v: any) => (v == null ? "" : String(v));
+  useEffect(() => {
+    if (!open) return;
+    setF(edit ? { scaffold_type: str(edit.scaffold_type), location: str(edit.location), length_m: str(edit.length_m), width_m: str(edit.width_m), height_m: str(edit.height_m), quantity: str(edit.quantity ?? 1), operation: edit.operation ?? "montagem", notes: str(edit.notes) } : empty);
+  }, [open, edit]); // eslint-disable-line react-hooks/exhaustive-deps
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("rdo_scaffolds").insert({
-        rdo_id: rdoId,
+      const row = {
         scaffold_type: f.scaffold_type || null,
         location: f.location || null,
         length_m: num(f.length_m),
@@ -762,7 +771,10 @@ function ScaffoldDialog({ rdoId, open, onClose }: { rdoId: string; open: boolean
         quantity: num(f.quantity) ?? 1,
         operation: f.operation,
         notes: f.notes || null,
-      });
+      };
+      const { error } = edit
+        ? await supabase.from("rdo_scaffolds").update(row).eq("id", edit.id)
+        : await supabase.from("rdo_scaffolds").insert({ rdo_id: rdoId, ...row });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -776,7 +788,7 @@ function ScaffoldDialog({ rdoId, open, onClose }: { rdoId: string; open: boolean
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Adicionar andaime</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{edit ? "Editar andaime" : "Adicionar andaime"}</DialogTitle></DialogHeader>
         <div className="grid grid-cols-3 gap-2">
           <div className="col-span-3">
             <Label>Operação</Label>
