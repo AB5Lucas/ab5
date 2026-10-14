@@ -32,6 +32,7 @@ export const Route = createFileRoute("/_authenticated/andaimes/inventario")({
 
 const CANTEIRO = "__canteiro";
 const PATIO = "__patio";
+const isPatioName = (n: string) => n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() === "PATIO";
 const fmtDate = (d: string) => d.split("-").reverse().join("/");
 
 function Page() {
@@ -115,7 +116,7 @@ function Page() {
           <DialogHeader><DialogTitle>Novo inventário</DialogTitle></DialogHeader>
           {form && (
             <div className="space-y-3">
-              <Pick label="Cliente" value={form.client} onChange={(v) => setForm({ ...form, client: v, work: CANTEIRO })} options={[...(scoped ? [] : [[PATIO, "PATIO (Estoque Central)"]]), ...(clients.data ?? []).filter((c: any) => c.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() !== "PATIO").map((c: any) => [c.id, c.name])]} />
+              <Pick label="Cliente" value={form.client} onChange={(v) => setForm({ ...form, client: v, work: CANTEIRO })} options={[...(!scoped || (clients.data ?? []).some((c: any) => isPatioName(c.name)) ? [[PATIO, "PATIO (Estoque Central)"]] : []), ...(clients.data ?? []).filter((c: any) => !isPatioName(c.name)).map((c: any) => [c.id, c.name])]} />
               {form.client === PATIO
                 ? <div className="space-y-1"><Label>Serviço</Label><Input value="PATIO" disabled /></div>
                 : <Pick label="Serviço" value={form.work} onChange={(v) => setForm({ ...form, work: v })} options={[[CANTEIRO, "Canteiro"], ...(works.data ?? []).filter((w: any) => w.client_id === form.client).map((w: any) => [w.id, w.name])]} />}
