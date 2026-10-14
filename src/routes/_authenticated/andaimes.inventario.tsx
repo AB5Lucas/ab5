@@ -89,7 +89,7 @@ function Page() {
           <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço</TableHead><TableHead>Data</TableHead><TableHead>Responsável</TableHead><TableHead className="text-right">Itens</TableHead><TableHead>Status</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
           <TableBody>
             {(list.data ?? []).map((i: any) => (
-              <TableRow key={i.id} className="[&>td]:py-1">
+              <TableRow key={i.id}>
                 <TableCell>{i.number}</TableCell>
                 <TableCell>{i.location === "central" ? "PATIO" : i.clients?.name}</TableCell>
                 <TableCell>{i.location === "central" ? "PATIO" : i.works?.name ?? "Canteiro"}</TableCell>
@@ -97,9 +97,9 @@ function Page() {
                 <TableCell>{userName(i.user_id)}</TableCell>
                 <TableCell className="text-right">{i.andam_inventory_items?.[0]?.count ?? 0}</TableCell>
                 <TableCell><Badge variant={i.status === "finalizado" ? "default" : i.status === "cancelado" ? "secondary" : "outline"}>{INV_STATUS[i.status]}</Badge></TableCell>
-                <TableCell className="py-1"><div className="flex items-center justify-end gap-1">
-                  {canWrite && (i.status !== "finalizado" || isAdmin) && <Button size="icon" variant="ghost" className="h-7 w-7" title="Excluir" onClick={() => remove(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
-                  <Button size="icon" variant="ghost" className="h-7 w-7" title={i.status === "em_andamento" ? "Continuar" : "Ver detalhes"} onClick={() => setOpen(i)}><Eye className="h-4 w-4" /></Button>
+                <TableCell><div className="flex items-center gap-1">
+                  {canWrite && (i.status !== "finalizado" || isAdmin) && <Button size="icon" variant="ghost" title="Excluir" onClick={() => remove(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+                  <Button size="icon" variant="ghost" title={i.status === "em_andamento" ? "Continuar" : "Ver detalhes"} onClick={() => setOpen(i)}><Eye className="h-4 w-4" /></Button>
                 </div></TableCell>
               </TableRow>
             ))}
