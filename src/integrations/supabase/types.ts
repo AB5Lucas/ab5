@@ -217,6 +217,238 @@ export type Database = {
           },
         ]
       }
+      andam_request_items: {
+        Row: {
+          id: string
+          item_id: string
+          purchase_status: string | null
+          request_id: string
+          requested_qty: number
+          separated_qty: number
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          purchase_status?: string | null
+          request_id: string
+          requested_qty: number
+          separated_qty?: number
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          purchase_status?: string | null
+          request_id?: string
+          requested_qty?: number
+          separated_qty?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_request_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "andam_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_request_items_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "andam_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      andam_requests: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          needed_date: string | null
+          notes: string | null
+          number: number
+          priority: string
+          request_date: string
+          status: string
+          updated_at: string
+          user_id: string | null
+          work_id: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          needed_date?: string | null
+          notes?: string | null
+          number?: number
+          priority?: string
+          request_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          needed_date?: string | null
+          notes?: string | null
+          number?: number
+          priority?: string
+          request_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_requests_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      andam_romaneio_items: {
+        Row: {
+          id: string
+          item_id: string
+          requested_qty: number
+          ret_bom: number
+          ret_danificado: number
+          ret_inutilizado: number
+          ret_manutencao: number
+          ret_quebrado: number
+          romaneio_id: string
+          sent_qty: number
+          separated_qty: number
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          requested_qty?: number
+          ret_bom?: number
+          ret_danificado?: number
+          ret_inutilizado?: number
+          ret_manutencao?: number
+          ret_quebrado?: number
+          romaneio_id: string
+          sent_qty?: number
+          separated_qty?: number
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          requested_qty?: number
+          ret_bom?: number
+          ret_danificado?: number
+          ret_inutilizado?: number
+          ret_manutencao?: number
+          ret_quebrado?: number
+          romaneio_id?: string
+          sent_qty?: number
+          separated_qty?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_romaneio_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "andam_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_romaneio_items_romaneio_id_fkey"
+            columns: ["romaneio_id"]
+            isOneToOne: false
+            referencedRelation: "andam_romaneios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      andam_romaneios: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          number: number
+          received_at: string | null
+          request_id: string | null
+          returned_at: string | null
+          romaneio_date: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+          work_id: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          number?: number
+          received_at?: string | null
+          request_id?: string | null
+          returned_at?: string | null
+          romaneio_date?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          number?: number
+          received_at?: string | null
+          request_id?: string | null
+          returned_at?: string | null
+          romaneio_date?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_romaneios_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_romaneios_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "andam_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_romaneios_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       andam_stock: {
         Row: {
           client_id: string | null
@@ -2991,6 +3223,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _andam_move: {
+        Args: {
+          _fc: string
+          _fl: string
+          _fw: string
+          _item: string
+          _kind: string
+          _note: string
+          _qty: number
+          _tc: string
+          _tl: string
+          _tw: string
+        }
+        Returns: undefined
+      }
       andam_adjust: {
         Args: {
           _client: string
@@ -3005,6 +3252,9 @@ export type Database = {
       andam_can: { Args: { _page: string }; Returns: boolean }
       andam_client_ok: { Args: { _client: string }; Returns: boolean }
       andam_finalize_inventory: { Args: { _inv: string }; Returns: undefined }
+      andam_romaneio_receive: { Args: { _rom: string }; Returns: undefined }
+      andam_romaneio_return: { Args: { _rom: string }; Returns: undefined }
+      andam_romaneio_send: { Args: { _rom: string }; Returns: undefined }
       andam_transfer: {
         Args: {
           _from_client: string
