@@ -273,13 +273,13 @@ function DashboardPage() {
             <div className="grid gap-6 border-b py-5 xl:grid-cols-2">
               <div>
                 <SectionTitle>Colaboradores alocados por cliente</SectionTitle>
-                <div className="mt-3" style={{ height: Math.max(240, calc.clientBars.length * 30) }}>
+                <div className="mt-3 h-72">
                   {calc.clientBars.length ? (
                     <ResponsiveContainer>
-                      <BarChart data={calc.clientBars} layout="vertical" margin={{ left: 10, right: 30 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                        <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} />
+                      <BarChart data={calc.clientBars} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                        <XAxis dataKey="name" interval={0} angle={-35} textAnchor="end" height={70} tick={{ fontSize: 10 }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                         <Tooltip
                           contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }}
                           formatter={(v: any, _n: any, it: any) => [`${v} colaboradores (${it.payload.pct.toFixed(1)}%)`, it.payload.name]}
