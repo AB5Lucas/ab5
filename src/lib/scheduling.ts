@@ -68,6 +68,7 @@ export type Integration = {
   client_id: string;
   integration_date: string;
   expires_at: string | null;
+  documentation?: boolean | null;
 };
 
 export type Aso = {
@@ -150,7 +151,7 @@ export async function fetchScheduleContext(date: string) {
       .lte("date", date)
       .or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`),
     supabase.from("holidays").select("name").eq("date", date),
-    supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at"),
+    supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at, documentation"),
     supabase.from("asos").select("collaborator_id, exam_date, expires_at"),
   ]);
 
@@ -255,7 +256,7 @@ export function checkIntegration(
   if (!clientId) return { status: "no_client", expiresAt: null };
   if (work?.clients?.requires_integration === false) return { status: "not_required", expiresAt: null };
   const rec = ctx.integrations.find((i) => i.collaborator_id === collaboratorId && i.client_id === clientId);
-  if (!rec) return { status: "missing", expiresAt: null };
+  if (!rec || rec.documentation) return { status: "missing", expiresAt: null };
   if (!rec.expires_at) return { status: "valid", expiresAt: null };
   if (rec.expires_at < date) return { status: "expired", expiresAt: rec.expires_at };
   if (rec.expires_at <= addDays(date, INTEGRATION_WARN_DAYS))

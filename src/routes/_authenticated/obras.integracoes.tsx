@@ -75,17 +75,19 @@ type Row = {
   notes: string | null;
 };
 
-type Status = "valid" | "expiring" | "expired";
+type Status = "valid" | "expiring" | "expired" | "documentation";
 
 const STATUS_LABEL: Record<Status, string> = {
   valid: "Válida",
   expiring: "Próxima do vencimento",
   expired: "Vencida",
+  documentation: "Documentação",
 };
 
 const onlyDigits = (v: string) => (v ?? "").replace(/\D/g, "");
 
-function statusOf(expires: string | null, today: string): Status {
+function statusOf(expires: string | null, today: string, documentation?: boolean | null): Status {
+  if (documentation) return "documentation";
   if (!expires) return "valid";
   if (expires < today) return "expired";
   if (expires <= addDays(today, INTEGRATION_WARN_DAYS)) return "expiring";
