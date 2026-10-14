@@ -136,6 +136,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     const travelOn = a.travel_bonus_override ?? ((travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? prizeFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)) > 0));
     const prize = travelOn ? prizeFor(dist) : 0;
     if (prize > 0) r.prizeRows.push({ date, vehicle: a.vehicles?.plate ?? "—", work, distance: dist, value: prize });
+    if (a.overnight) r.prizeRows.push({ date, vehicle: "—", work: `Pernoite - ${work}`, distance: 0, value: OVERNIGHT_PRIZE });
   }
   // Dias em quadros (sem obra): aparecem no detalhamento; ASO/Treinamento/Integração podem gerar VT
   for (const e of entries) {
