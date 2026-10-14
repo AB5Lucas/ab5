@@ -272,7 +272,7 @@ function CollaboratorsPage() {
     },
     onSuccess: () => {
       toast.success(editing ? "Colaborador atualizado." : "Colaborador cadastrado.");
-      queryClient.invalidateQueries({ queryKey: ["collaborators"] });
+      queryClient.invalidateQueries();
       setOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -285,7 +285,7 @@ function CollaboratorsPage() {
     },
     onSuccess: () => {
       toast.success("Colaborador excluído.");
-      queryClient.invalidateQueries({ queryKey: ["collaborators"] });
+      queryClient.invalidateQueries();
       setDeleting(null);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -359,7 +359,7 @@ function CollaboratorsPage() {
       },
       errors,
     );
-    await queryClient.invalidateQueries({ queryKey: ["collaborators"] });
+    await queryClient.invalidateQueries();
     return result;
   }
 
