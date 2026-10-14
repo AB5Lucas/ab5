@@ -1239,16 +1239,39 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
             </Select>
             <Input className="min-w-40 flex-1" placeholder="Descrição" value={entry.description} onChange={(e) => setEntry({ ...entry, description: e.target.value })} />
             <Input className="w-32" placeholder="Valor" value={entry.amount} onChange={(e) => setEntry({ ...entry, amount: e.target.value })} onKeyDown={(e) => e.key === "Enter" && saveEntry.mutate()} />
+            {isBilling && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 ${entry.competence && entry.competence !== entry.date.slice(0, 7) ? "text-primary" : "text-muted-foreground/60"}`}
+                title="Mês de competência"
+                aria-label="Mês de competência"
+                onClick={() => setCompOpen((o) => !o)}
+              >
+                <CalendarDays className="h-4 w-4" />
+              </Button>
+            )}
             <Button onClick={() => saveEntry.mutate()} disabled={saveEntry.isPending}>
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+          {isBilling && compOpen && (
+            <div className="flex items-center gap-2 text-sm">
+              <Label className="text-muted-foreground">Mês de competência</Label>
+              <Input type="month" className="w-44" value={entry.competence || entry.date.slice(0, 7)} onChange={(e) => setEntry({ ...entry, competence: e.target.value })} />
+              <span className="text-xs text-muted-foreground">Padrão: mês do lançamento</span>
+            </div>
+          )}
           <div className="max-h-96 overflow-auto">
             <Table>
               <TableBody>
                 {(data.data?.entries ?? []).filter((e: any) => (e.category === "faturamento") === isBilling).map((e: any) => (
                   <TableRow key={e.id} className={editingId === e.id ? "bg-muted" : undefined}>
-                    <TableCell>{fmtDate(e.entry_date)}</TableCell>
+                    <TableCell>
+                      {fmtDate(e.doc_date ?? e.entry_date)}
+                      {e.doc_date && <span className="ml-2 text-xs text-muted-foreground">Comp. {monthLabel(e.competence_month)}</span>}
+                    </TableCell>
                     {isAll && <TableCell className="text-xs">{works.data?.find((x) => x.id === e.work_id)?.name ?? "—"}</TableCell>}
                     <TableCell>{catLabel(e.category)}</TableCell>
                     <TableCell>{e.description ?? "—"}</TableCell>
@@ -1256,7 +1279,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                     <TableCell className="w-20 whitespace-nowrap">
                       <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => {
                         setEditingId(e.id);
-                        setEntry({ date: e.entry_date, category: e.category, description: e.description ?? "", amount: Number(e.amount).toFixed(2).replace(".", ",") });
+                        setCompOpen(!!e.doc_date);
+                        setEntry({ date: e.doc_date ?? e.entry_date, category: e.category, description: e.description ?? "", amount: Number(e.amount).toFixed(2).replace(".", ","), competence: e.competence_month ?? "" });
                       }}>
                         <Pencil className="h-4 w-4" />
                       </Button>
