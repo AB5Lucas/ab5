@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArrowLeftRight, History, Plus, SlidersHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
+import { useAccess } from "@/hooks/use-access";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,9 @@ const ALL = "__all";
 const CANTEIRO = "__canteiro";
 
 function Page() {
-  const { canWrite } = useCurrentUser();
+  const { isAdmin } = useCurrentUser();
+  const { canAccess } = useAccess();
+  const canWrite = isAdmin || canAccess("/andaimes/estoque");
   const qc = useQueryClient();
   const items = useQuery({ queryKey: ["andam-items"], queryFn: async () => (await supabase.from("andam_items").select("*").order("name")).data ?? [] });
   const stock = useQuery({ queryKey: ["andam-stock"], queryFn: async () => (await supabase.from("andam_stock").select("*")).data ?? [] });

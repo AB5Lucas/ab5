@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Eye, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
+import { useAccess } from "@/hooks/use-access";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +36,8 @@ const fmtDate = (d: string) => d.split("-").reverse().join("/");
 
 function Page() {
   const { canWrite: cw, isForeman, isAdmin, role, user } = useCurrentUser();
-  const canWrite = cw || isForeman;
+  const { canAccess } = useAccess();
+  const canWrite = isAdmin || canAccess("/andaimes/inventario");
   const scoped = role === "coordenador" || role === "encarregado";
   const qc = useQueryClient();
   const list = useQuery({
