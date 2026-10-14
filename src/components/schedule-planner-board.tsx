@@ -854,7 +854,10 @@ export function SchedulePlannerBoard({
       .filter((p): p is NonNullable<typeof p> => !!p)
       .map((p) => `${p.full_name}\nCPF: ${formatCpf(p.cpf)}`)
       .join("\n\n");
-    if (!text) return toast.error("Nenhuma pessoa para copiar.");
+    if (!text) {
+      toast.error("Nenhuma pessoa para copiar.");
+      return;
+    }
     navigator.clipboard.writeText(text).then(
       () => toast.success(`${uniq.length} pessoa(s) copiada(s).`),
       () => toast.error("Não foi possível copiar."),
