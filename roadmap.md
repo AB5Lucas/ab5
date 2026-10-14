@@ -7,3 +7,4 @@
 - [x] Andaimes etapa 2: Solicitações e Romaneios
 - [ ] Andaimes etapa 3: Acompanhamento (montagem, renovação, desmontagem)
 - [ ] Andaimes etapa 4: Patrimônio (valores, custo de locação, rateio, integração com Resultados)
+- [ ] Excluir a aba Auditoria
