@@ -54,7 +54,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", workIds).range(a, b),
         ),
         fetchAll<any>((a, b) =>
-          supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours").in("work_id", workIds).range(a, b),
+          supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, position_id, collaborators(position_id)").in("work_id", workIds).range(a, b),
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
         supabase.from("work_entries").select("*").in("work_id", workIds).order("entry_date", { ascending: false }),
@@ -157,10 +157,12 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
   const { isAll, workIds } = opts;
     // Fechamento: do início da obra até o último dia do mês selecionado
     let cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
-    // HH: realizado (MO e transporte) só até o último RDO
+    // HH: realizado só até o último RDO e até o fim do último mês com produtividade (% conclusão) apontada
     if (!isAll && (work as any).hh_enabled) {
       const lastRdo = raw.rdoWf.reduce((m: string, r: any) => (r.report_date > m ? r.report_date : m), "");
       if (lastRdo && lastRdo < cut) cut = lastRdo;
+      const lastProgYm = (raw.progress ?? []).map((p: any) => String(p.month).slice(0, 7)).filter((ym: string) => !untilMonth || ym <= untilMonth).sort().pop();
+      if (lastProgYm && monthEnd(lastProgYm) < cut) cut = monthEnd(lastProgYm);
     }
     // Com mês inicial: só o que estiver dentro do período; sem mês inicial: desde o começo da obra
     const from = fromMonth ? `${fromMonth}-01` : "";
@@ -433,7 +435,11 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       }
     }
     const months = [...new Set([...monthly.keys(), ...progMap.keys()])].filter((ym) => !fromMonth || ym >= fromMonth).sort();
-    const order = Number(work.order_value ?? 0);
+    // HH: pedido = horas dos RDOs até o corte × valor cobrado por hora da função
+    const hhRates = (work as any).hh_rates as Record<string, number> | undefined;
+    const order = !isAll && (work as any).hh_enabled && hhRates
+      ? d.rdoWf.filter((r: any) => r.present).reduce((a: number, r: any) => a + Number(r.worked_hours ?? DEFAULT_HOURS) * Number(hhRates[r.position_id ?? r.collaborators?.position_id ?? ""] ?? 0), 0)
+      : Number(work.order_value ?? 0);
     const budget = Number(work.budget_cost ?? 0);
     const budgetMarginPct = order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0;
     // Com mês inicial: receita só do avanço dentro do período (desconta o andamento anterior)

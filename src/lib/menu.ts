@@ -118,7 +118,6 @@ const RAW_GROUPS: MenuGroup[] = [
     icon: Shield,
     items: [
       { title: "Usuários", url: "/admin/usuarios" },
-      { title: "Auditoria", url: "/admin/auditoria" },
       { title: "Configurações", url: "/admin/configuracoes" },
       { title: "Acessos", url: "/admin/acessos" },
     ],
