@@ -293,6 +293,18 @@ function IntegrationsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const toggleDoc = useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
+      const { error } = await supabase.from("client_integrations").update({ documentation: value }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["client-integrations"] });
+      qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const remove = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("client_integrations").delete().eq("id", id);
