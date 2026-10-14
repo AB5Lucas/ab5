@@ -103,19 +103,21 @@ function FinanceiroPage() {
       if (!raw) return;
       const full = buildBase(w, raw, "", "", { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [] });
       if (!full) return;
-      let mo = 0, transport = 0, materials = 0, billed = 0;
+      let mo = 0, transport = 0, materials = 0, compBilled = 0, billed = 0;
       for (const r of full.rows) if (sel.has(r.ym)) { mo += r.labor; transport += r.transport; }
       for (const e of raw.entries as any[]) {
-        if (!sel.has(e.entry_date.slice(0, 7))) continue;
         const v = Number(e.amount);
-        if (e.category === "faturamento") billed += v;
+        // Valor faturado exibido pelo mês do lançamento; margem pela competência
+        if (e.category === "faturamento" && sel.has(String(e.doc_date ?? e.entry_date).slice(0, 7))) billed += v;
+        if (!sel.has(e.entry_date.slice(0, 7))) continue;
+        if (e.category === "faturamento") compBilled += v;
         else if (e.category === "mao_obra") mo += v;
         else if (e.category === "terceiros") transport += v;
         else if (["materiais", "ferramentas", "andaimes"].includes(e.category)) materials += v;
       }
       const tax = billed * FIN_TAX;
-      const margin = billed - tax - mo - transport - materials;
-      if (!billed && !mo && !transport && !materials) return;
+      const margin = compBilled * (1 - FIN_TAX) - mo - transport - materials;
+      if (!billed && !compBilled && !mo && !transport && !materials) return;
       const lastYm = yms[yms.length - 1] ?? `${year}-12`;
       const progress = w.contract_enabled
         ? contractFraction((raw.entries as any[]).filter((e) => e.category === "faturamento" && e.entry_date.slice(0, 7) <= lastYm).length, Number(w.contract_months ?? 12)) * 100
@@ -132,7 +134,7 @@ function FinanceiroPage() {
         const m = rev * (1 - FIN_TAX) - (mo + transport + materials);
         total = { margin: m, pct: rev ? (m / rev) * 100 : 0 };
       }
-      g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: billed ? (margin / billed) * 100 : 0, total, full, raw });
+      g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: compBilled ? (margin / compBilled) * 100 : 0, total, full, raw });
       by.set(key, g);
     });
     return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
