@@ -53,6 +53,7 @@ export type VehicleScheduleRow = {
   trips?: number;
   is_suzano_local?: boolean;
   work_id?: string | null;
+  external_place?: string | null;
 };
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -108,6 +109,7 @@ type CellForm = {
   extras: string[];
   extraDrivers: string[];
   trips: string;
+  external_place: string;
 };
 
 const NONE = "__none__";
@@ -120,7 +122,7 @@ export function VehicleTimeline() {
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [driverSearch, setDriverSearch] = useState("");
   const [cell, setCell] = useState<{ vehicleId: string; date: string } | null>(null);
-  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], trips: "1" });
+  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], trips: "1", external_place: "" });
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
@@ -277,7 +279,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_km, trips, is_suzano_local, work_id")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_km, trips, is_suzano_local, work_id, external_place")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -432,6 +434,7 @@ export function VehicleTimeline() {
       trips?: number | undefined;
       is_suzano_local?: boolean | undefined;
       work_id?: string | null | undefined;
+      external_place?: string | null | undefined;
     },
   ) {
     const workId = f.work_id ?? null;
@@ -456,6 +459,7 @@ export function VehicleTimeline() {
       extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
       extra_km: extras.reduce((s, id) => s + extraKm(id), 0),
       work_id: special ? null : workId,
+      external_place: f.is_external ? (f.external_place ?? "").trim() || null : null,
     };
   }
 
@@ -480,6 +484,7 @@ export function VehicleTimeline() {
       extras: [...(current?.extra_client_ids ?? [])],
       extraDrivers: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_driver_ids?.[i] || NONE),
       trips: String(current?.trips ?? 1),
+      external_place: current?.external_place ?? "",
     });
     setDriverSearch("");
     setCell({ vehicleId, date });
@@ -506,6 +511,7 @@ export function VehicleTimeline() {
       driver_bonus: form.driver_bonus,
       extra_client_ids: form.extras,
       extra_driver_ids: form.extraDrivers,
+      external_place: form.external_place,
     };
     const targets: string[] = [cell.date];
     if (form.repeat_until && form.repeat_until > cell.date) {
@@ -535,6 +541,7 @@ export function VehicleTimeline() {
           trips: src.trips,
           is_suzano_local: src.is_suzano_local,
           work_id: src.work_id,
+          external_place: src.external_place,
         }),
       ]);
     } catch {
@@ -569,6 +576,7 @@ export function VehicleTimeline() {
             trips: s.trips,
             is_suzano_local: s.is_suzano_local,
             work_id: s.work_id,
+            external_place: s.external_place,
           }),
         );
       }
@@ -860,7 +868,7 @@ export function VehicleTimeline() {
                               {row.is_maintenance
                                 ? "MANUTENÇÃO"
                                 : row.is_external
-                                  ? "EXTERNO"
+                                  ? (row.external_place || "EXTERNO").toUpperCase()
                                   : row.is_suzano_local
                                     ? "SUZANO LOCAL"
                                   : clientName.get(row.client_id ?? "") ?? "—"}
@@ -958,6 +966,9 @@ export function VehicleTimeline() {
                       ? `${clientKm.get(form.client_id.startsWith(WORK_PREFIX) ? workById.get(form.client_id.slice(WORK_PREFIX.length))?.client_id ?? "" : form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
                       : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
+              {form.client_id === EXTERNAL_KEY && (
+                <Input placeholder="Local (opcional)" value={form.external_place} onChange={(e) => setForm((f) => ({ ...f, external_place: e.target.value }))} />
+              )}
             </div>
             <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
               <div>
