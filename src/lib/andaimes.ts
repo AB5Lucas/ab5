@@ -54,3 +54,9 @@ export function depreciation(acq: number, lifeMonths: number, acquiredAt: string
   const months = Math.max(0, ((y2 ?? 0) - (y1 ?? 0)) * 12 + ((m2 ?? 0) - (m1 ?? 0)));
   return Math.min(acq, (acq / lifeMonths) * months);
 }
+
+/** Número da ordem após "ORDEM": só dígitos; tolera espaços/letras/pontuação isolados entre os números. Sem número → "". */
+export function parseOrder(text: string | null | undefined): string {
+  const m = /ORDEM[^0-9]{0,8}?([0-9](?:[\s.\-\/_a-zA-Z]?[0-9])*)/i.exec(text ?? "");
+  return m?.[1] ? m[1].replace(/\D/g, "") : "";
+}

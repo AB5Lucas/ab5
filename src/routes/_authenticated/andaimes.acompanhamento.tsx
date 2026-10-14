@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { STRUCT_STATUS, inspectionState } from "@/lib/andaimes";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Apontamentos, Produtividade, RdoFilters, useRdoFilters } from "@/components/scaffold-rdo-reports";
 
 export const Route = createFileRoute("/_authenticated/andaimes/acompanhamento")({
   head: () => ({
@@ -57,10 +59,20 @@ function Page() {
     if (error) { toast.error(error.message); return; }
     toast.success("Excluído"); qc.invalidateQueries({ queryKey: ["andam-struct"] });
   };
+  const rf = useRdoFilters();
   return (
     <div className="space-y-4">
-      <PageHeader title="Acompanhamento" description="Andaimes montados nas obras: montagem, liberação, vistorias e desmontagem."
-        actions={canEdit ? <Button onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" />Novo andaime</Button> : undefined} />
+      <PageHeader title="Acompanhamento" description="Andaimes montados nas obras, apontamentos e produtividade a partir dos RDOs." />
+      <Tabs defaultValue="andaimes" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="andaimes">Andaimes</TabsTrigger>
+          <TabsTrigger value="apontamentos">Apontamentos</TabsTrigger>
+          <TabsTrigger value="produtividade">Produtividade</TabsTrigger>
+        </TabsList>
+        <TabsContent value="apontamentos" className="space-y-4"><RdoFilters f={rf} /><Apontamentos workId={rf.wid} start={rf.start} end={rf.end} ym={rf.ym} /></TabsContent>
+        <TabsContent value="produtividade" className="space-y-4"><RdoFilters f={rf} /><Produtividade workId={rf.wid} start={rf.start} end={rf.end} /></TabsContent>
+        <TabsContent value="andaimes" className="space-y-4">
+      {canEdit && <div className="flex justify-end"><Button onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" />Novo andaime</Button></div>}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {cards.map(([l, n]) => (
           <div key={l} className="rounded-md border p-3"><div className="text-xs text-muted-foreground">{l}</div><div className="text-2xl font-semibold">{n}</div></div>
@@ -102,6 +114,8 @@ function Page() {
           </TableBody>
         </Table>
       </div>
+        </TabsContent>
+      </Tabs>
       {(open || creating) && (
         <StructDialog id={open} clients={clients} works={works} canEdit={canEdit}
           onClose={() => { setOpen(null); setCreating(false); qc.invalidateQueries({ queryKey: ["andam-struct"] }); }} />

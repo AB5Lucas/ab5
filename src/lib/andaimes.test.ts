@@ -21,3 +21,12 @@ t2("depreciação linear limitada", () => {
   e2(depreciation(1200, 60, "2026-01-10", "2026-07-01")).toBe(120);
   e2(depreciation(1200, 12, "2020-01-01", "2026-07-01")).toBe(1200);
 });
+
+import { parseOrder } from "./andaimes";
+t2("ordem sempre numérica", () => {
+  e2(parseOrder("ORDEM 12345678")).toBe("12345678");
+  e2(parseOrder("ordem: 1234 5678 montagem")).toBe("12345678");
+  e2(parseOrder("ORDEM nº 12a34")).toBe("1234");
+  e2(parseOrder("ORDEM pendente")).toBe("");
+  e2(parseOrder(null)).toBe("");
+});

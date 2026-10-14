@@ -109,7 +109,7 @@ const RAW_GROUPS: MenuGroup[] = [
     items: [
       { title: "Financeiro", url: "/fechamentos/financeiro" },
       { title: "Premiações", url: "/fechamento" },
-      { title: "Acompanhamento", url: "/fechamentos/suzano" },
+      { title: "Pedidos", url: "/fechamentos/suzano" },
     ],
   },
   { label: "Relatórios", icon: FileBarChart, items: [{ title: "Alocações", url: "/relatorios" }, { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
