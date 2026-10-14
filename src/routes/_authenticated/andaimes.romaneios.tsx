@@ -49,7 +49,7 @@ function Page() {
       <PageHeader title="Romaneios" description="Controle físico de saída e retorno dos materiais. Gere romaneios a partir de uma solicitação separada." />
       <div className="rounded-md border">
         <Table>
-          <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço / Canteiro</TableHead><TableHead>Solicitação</TableHead><TableHead>Data</TableHead><TableHead>Status</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço</TableHead><TableHead>Solicitação</TableHead><TableHead>Data</TableHead><TableHead>Status</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
           <TableBody>
             {(list.data ?? []).map((r: any) => (
               <TableRow key={r.id}>

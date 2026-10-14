@@ -16,12 +16,13 @@ export type Database = {
     Tables: {
       andam_inventory: {
         Row: {
-          client_id: string
+          client_id: string | null
           created_at: string
           finalized_at: string | null
           finalized_by: string | null
           id: string
           inventory_date: string
+          location: string
           notes: string | null
           number: number
           status: string
@@ -30,12 +31,13 @@ export type Database = {
           work_id: string | null
         }
         Insert: {
-          client_id: string
+          client_id?: string | null
           created_at?: string
           finalized_at?: string | null
           finalized_by?: string | null
           id?: string
           inventory_date?: string
+          location?: string
           notes?: string | null
           number?: number
           status?: string
@@ -44,12 +46,13 @@ export type Database = {
           work_id?: string | null
         }
         Update: {
-          client_id?: string
+          client_id?: string | null
           created_at?: string
           finalized_at?: string | null
           finalized_by?: string | null
           id?: string
           inventory_date?: string
+          location?: string
           notes?: string | null
           number?: number
           status?: string
