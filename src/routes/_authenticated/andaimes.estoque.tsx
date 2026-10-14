@@ -115,7 +115,7 @@ function Page() {
               <TableRow key={r.item.id}>
                 <TableCell className="font-medium">{r.item.name}<span className="ml-2 text-xs text-muted-foreground">{r.item.code}</span></TableCell>
                 {cols.map((l) => <TableCell key={l.key} className="text-right">{(r.by[l.key] ?? 0).toLocaleString("pt-BR")}</TableCell>)}
-                <TableCell className={`text-right font-semibold ${r.item.min_stock > 0 && (r.by.central ?? 0) < r.item.min_stock ? "text-destructive" : ""}`}>{r.total.toLocaleString("pt-BR")}</TableCell>
+                <TableCell className={`text-right font-semibold ${r.item.min_stock > 0 && (r.by["central"] ?? 0) < r.item.min_stock ? "text-destructive" : ""}`}>{r.total.toLocaleString("pt-BR")}</TableCell>
                 <TableCell><Button size="icon" variant="ghost" title="Movimentações" onClick={() => setMoves(r.item)}><History className="h-4 w-4" /></Button></TableCell>
               </TableRow>
             ))}
@@ -137,9 +137,9 @@ function Page() {
             </div>
           )}
           <DialogFooter><Button onClick={async () => {
-            if (!newItem.name.trim()) return toast.error("Informe o nome");
+            if (!newItem.name.trim()) { toast.error("Informe o nome"); return; }
             const { error } = await supabase.from("andam_items").insert({ code: newItem.code || null, name: newItem.name.trim(), category: newItem.category || null, unit: newItem.unit || "un", min_stock: Number(newItem.min_stock) || 0 });
-            if (error) return toast.error(error.message);
+            if (error) { toast.error(error.message); return; }
             setNewItem(null); refresh(); toast.success("Material cadastrado");
           }}>Salvar</Button></DialogFooter>
         </DialogContent>
@@ -159,10 +159,10 @@ function Page() {
           )}
           <DialogFooter><Button onClick={async () => {
             const a = adjust; const d = Number(a.delta);
-            if (!a.item || !d) return toast.error("Informe material e quantidade");
-            if (a.location === "obra" && !a.client) return toast.error("Informe o cliente");
+            if (!a.item || !d) { toast.error("Informe material e quantidade"); return; }
+            if (a.location === "obra" && !a.client) { toast.error("Informe o cliente"); return; }
             const { error } = await supabase.rpc("andam_adjust", { _item: a.item, _location: a.location, _client: a.location === "obra" ? a.client : null, _work: a.location === "obra" && a.work !== CANTEIRO ? a.work : null, _delta: d, _note: a.note || null } as any);
-            if (error) return toast.error(error.message);
+            if (error) { toast.error(error.message); return; }
             setAdjust(null); refresh(); toast.success("Estoque ajustado");
           }}>Confirmar</Button></DialogFooter>
         </DialogContent>
@@ -186,12 +186,12 @@ function Page() {
           )}
           <DialogFooter><Button onClick={async () => {
             const t = transfer; const q = Number(t.qty);
-            if (!t.item || !(q > 0)) return toast.error("Informe material e quantidade");
-            if ((t.from === "obra" && !t.fromClient) || (t.to === "obra" && !t.toClient)) return toast.error("Informe o cliente");
+            if (!t.item || !(q > 0)) { toast.error("Informe material e quantidade"); return; }
+            if ((t.from === "obra" && !t.fromClient) || (t.to === "obra" && !t.toClient)) { toast.error("Informe o cliente"); return; }
             const side = (loc: string, c: string, w: string) => [loc === "obra" ? c : null, loc === "obra" && w !== CANTEIRO ? w : null];
             const [fc, fw] = side(t.from, t.fromClient, t.fromWork); const [tc, tw] = side(t.to, t.toClient, t.toWork);
             const { error } = await supabase.rpc("andam_transfer", { _item: t.item, _from_loc: t.from, _from_client: fc, _from_work: fw, _to_loc: t.to, _to_client: tc, _to_work: tw, _qty: q, _note: t.note || null } as any);
-            if (error) return toast.error(error.message);
+            if (error) { toast.error(error.message); return; }
             setTransfer(null); refresh(); toast.success("Transferência registrada");
           }}>Confirmar</Button></DialogFooter>
         </DialogContent>
@@ -263,7 +263,7 @@ function Pick({ label, value, onChange, options }: { label: string; value: strin
   return (
     <div className="space-y-1">
       <Label>{label}</Label>
-      <Select value={value || undefined} onValueChange={onChange}>
+      <Select {...(value ? { value } : {})} onValueChange={onChange}>
         <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
         <SelectContent>{options.map(([v, l]) => <SelectItem key={v} value={v!}>{l}</SelectItem>)}</SelectContent>
       </Select>

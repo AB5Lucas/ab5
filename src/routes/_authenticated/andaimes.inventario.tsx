@@ -47,10 +47,10 @@ function Page() {
   const userName = (id: string) => users.data?.find((u: any) => u.id === id)?.full_name ?? "—";
 
   const create = async () => {
-    if (!form.client) return toast.error("Informe o cliente");
+    if (!form.client) { toast.error("Informe o cliente"); return; }
     const workId = form.work && form.work !== CANTEIRO ? form.work : null;
-    const { data: inv, error } = await supabase.from("andam_inventory").insert({ client_id: form.client, work_id: workId, inventory_date: form.date, notes: form.notes || null, user_id: user?.id }).select().single();
-    if (error || !inv) return toast.error(error?.message ?? "Erro");
+    const { data: inv, error } = await supabase.from("andam_inventory").insert({ client_id: form.client, work_id: workId, inventory_date: form.date, notes: form.notes || null, user_id: user?.id ?? null }).select().single();
+    if (error || !inv) { toast.error(error?.message ?? "Erro"); return; }
     // Carrega os materiais registrados na obra (todos os ativos, com a quantidade atual)
     const [{ data: items }, { data: stock }] = await Promise.all([
       supabase.from("andam_items").select("id").eq("active", true),
@@ -123,13 +123,13 @@ function InventoryDialog({ inv, canWrite, userName, onClose }: { inv: any; canWr
   const finalize = async () => {
     if (!confirm("Finalizar o inventário? As quantidades da obra serão atualizadas e não poderão mais ser alteradas.")) return;
     const { error } = await supabase.rpc("andam_finalize_inventory", { _inv: inv.id } as any);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Inventário finalizado"); qc.invalidateQueries({ queryKey: ["andam-stock"] }); onClose();
   };
   const cancel = async () => {
     if (!confirm("Cancelar este inventário?")) return;
     const { error } = await supabase.from("andam_inventory").update({ status: "cancelado" }).eq("id", inv.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     onClose();
   };
 
@@ -179,7 +179,7 @@ function Pick({ label, value, onChange, options }: { label: string; value: strin
   return (
     <div className="space-y-1">
       <Label>{label}</Label>
-      <Select value={value || undefined} onValueChange={onChange}>
+      <Select {...(value ? { value } : {})} onValueChange={onChange}>
         <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
         <SelectContent>{options.map(([v, l]) => <SelectItem key={v} value={v!}>{l}</SelectItem>)}</SelectContent>
       </Select>
