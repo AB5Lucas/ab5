@@ -423,7 +423,15 @@ function ServicesPage() {
     >
       <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium leading-tight">{a.collaborators?.full_name ?? "—"}</p>
+        <p className="flex items-center gap-1 truncate font-medium leading-tight">
+          {(() => {
+            const st = wctx.data && a.work_id ? checkIntegration(wctx.data.ctx, a.work_id, a.collaborator_id, date).status : null;
+            return st === "missing" || st === "expired" ? (
+              <span title={st === "missing" ? "Sem integração com este cliente" : "Integração vencida"} className="shrink-0 font-bold text-destructive">!</span>
+            ) : null;
+          })()}
+          <span className="truncate">{a.collaborators?.full_name ?? "—"}</span>
+        </p>
         <p className="truncate text-[10px] leading-tight text-muted-foreground">{a.positions?.name ?? "Sem função"}</p>
       </div>
       {isWeekend && (
