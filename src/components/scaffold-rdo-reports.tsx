@@ -1,3 +1,4 @@
+import type React from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
@@ -24,7 +25,7 @@ export function useRdoFilters() {
   return { year, setYear, month, setMonth, workId, setWorkId, clientId, setClientId, ym, start: `${ym}-01`, end: monthEnd(ym), wid: workId === "all" ? "" : workId };
 }
 
-export function RdoFilters({ f }: { f: ReturnType<typeof useRdoFilters> }) {
+export function RdoFilters({ f, extra }: { f: ReturnType<typeof useRdoFilters>; extra?: React.ReactNode }) {
   const works = useQuery({
     queryKey: ["suzano-works"],
     queryFn: async () => (await supabase.from("works").select("id, name, client_id, clients(name)").order("name")).data ?? [],
@@ -49,6 +50,18 @@ export function RdoFilters({ f }: { f: ReturnType<typeof useRdoFilters> }) {
             {(works.data ?? []).filter((w: any) => !f.clientId || f.clientId === "all" || w.client_id === f.clientId).map((w: any) => (
               <SelectItem key={w.id} value={w.id}>{w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}</SelectItem>))}
           </SelectContent></Select></div>
+      {extra}
+    </div>
+  );
+}
+
+export function MonthProductivity({ workId, start, end }: { workId: string; start: string; end: string }) {
+  const p = useProdRows(workId, start, end);
+  if (!workId) return null;
+  return (
+    <div className="rounded-md border px-3 py-1.5 text-sm">
+      <div className="text-xs text-muted-foreground">Produtividade do mês</div>
+      <div className="font-semibold">{n2(p.prod)} m³/pessoa <span className="text-xs font-normal text-muted-foreground">({n2(p.totalVol)} m³ ÷ {p.people} pessoas)</span></div>
     </div>
   );
 }
@@ -220,7 +233,7 @@ function PriorityDialog({ open, onClose, list }: { open: boolean; onClose: () =>
   );
 }
 
-export function Produtividade({ workId, start, end }: { workId: string; start: string; end: string }) {
+export function useProdRows(workId: string, start: string, end: string) {
   const present = usePresent(workId, start, end);
   const scaf = useQuery({
     queryKey: ["suzano-scaffolds", workId, start, end],
@@ -247,6 +260,14 @@ export function Produtividade({ workId, start, end }: { workId: string; start: s
       return { id: s.id, date, ord, op: s.operation, l: Number(s.length_m ?? 0), w: Number(s.width_m ?? 0), h: Number(s.height_m ?? 0), vol, people, prod: people ? vol / people : 0 };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
+  const ppl = new Set<string>();
+  for (const r of rows) for (const id of perDay.get(r.date) ?? []) ppl.add(id);
+  const totalVol = rows.reduce((s, r) => s + r.vol, 0);
+  return { rows, loading: scaf.isLoading, totalVol, people: ppl.size, prod: ppl.size ? totalVol / ppl.size : 0 };
+}
+
+export function Produtividade({ workId, start, end }: { workId: string; start: string; end: string }) {
+  const { rows, loading } = useProdRows(workId, start, end);
   return (
     <div className="panel overflow-x-auto">
       <Table>
@@ -259,8 +280,8 @@ export function Produtividade({ workId, start, end }: { workId: string; start: s
           </TableRow>
         </TableHeader>
         <TableBody>
-          {scaf.isLoading && <TableRow><TableCell colSpan={9}>Carregando...</TableCell></TableRow>}
-          {!scaf.isLoading && !rows.length && <TableRow><TableCell colSpan={9} className="text-muted-foreground">Nenhum andaime registrado nos RDOs do período.</TableCell></TableRow>}
+          {loading && <TableRow><TableCell colSpan={9}>Carregando...</TableCell></TableRow>}
+          {!loading && !rows.length && <TableRow><TableCell colSpan={9} className="text-muted-foreground">Nenhum andaime registrado nos RDOs do período.</TableCell></TableRow>}
           {rows.map((r) => (
             <TableRow key={r.id}>
               <TableCell>{br(r.date)}</TableCell>

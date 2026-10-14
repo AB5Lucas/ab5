@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { STRUCT_STATUS, inspectionState } from "@/lib/andaimes";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Apontamentos, Produtividade, RdoFilters, useRdoFilters } from "@/components/scaffold-rdo-reports";
+import { Apontamentos, MonthProductivity, Produtividade, RdoFilters, useRdoFilters } from "@/components/scaffold-rdo-reports";
 
 export const Route = createFileRoute("/_authenticated/andaimes/acompanhamento")({
   head: () => ({
@@ -70,7 +70,7 @@ function Page() {
           <TabsTrigger value="produtividade">Produtividade</TabsTrigger>
         </TabsList>
         <TabsContent value="apontamentos" className="space-y-4"><RdoFilters f={rf} /><Apontamentos workId={rf.wid} start={rf.start} end={rf.end} ym={rf.ym} /></TabsContent>
-        <TabsContent value="produtividade" className="space-y-4"><RdoFilters f={rf} /><Produtividade workId={rf.wid} start={rf.start} end={rf.end} /></TabsContent>
+        <TabsContent value="produtividade" className="space-y-4"><RdoFilters f={rf} extra={<MonthProductivity workId={rf.wid} start={rf.start} end={rf.end} />} /><Produtividade workId={rf.wid} start={rf.start} end={rf.end} /></TabsContent>
         <TabsContent value="andaimes" className="space-y-4">
       {canEdit && <div className="flex justify-end"><Button onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" />Novo andaime</Button></div>}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
