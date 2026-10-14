@@ -31,7 +31,7 @@ const fmtDate = (d?: string | null) => (d ? d.split("-").reverse().join("/") : "
 const RET = [["ret_bom", "Bom"], ["ret_danificado", "Danificado"], ["ret_quebrado", "Quebrado"], ["ret_inutilizado", "Inutilizado"], ["ret_manutencao", "Manutenção"]] as const;
 
 function Page() {
-  const { canEdit } = useAndamScope();
+  const { canEdit, isAdmin } = useAndamScope();
   const qc = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
   const list = useQuery({
@@ -60,8 +60,8 @@ function Page() {
                 <TableCell>{fmtDate(r.romaneio_date)}</TableCell>
                 <TableCell><Badge variant={r.status === "retornado" ? "default" : r.status === "em_transito" ? "outline" : "secondary"}>{ROM_STATUS[r.status]}</Badge></TableCell>
                 <TableCell className="whitespace-nowrap">
+                  {canEdit && (["rascunho", "cancelado"].includes(r.status) || isAdmin) && <Button size="icon" variant="ghost" title="Excluir" onClick={() => remove(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
                   <Button size="icon" variant="ghost" title="Ver detalhes" onClick={() => setOpen(r.id)}><Eye className="h-4 w-4" /></Button>
-                  {canEdit && ["rascunho", "cancelado"].includes(r.status) && <Button size="icon" variant="ghost" title="Excluir" onClick={() => remove(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
                 </TableCell>
               </TableRow>
             ))}
