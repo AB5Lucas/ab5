@@ -30,6 +30,7 @@ export const Route = createFileRoute("/_authenticated/andaimes/inventario")({
 });
 
 const CANTEIRO = "__canteiro";
+const PATIO = "__patio";
 const fmtDate = (d: string) => d.split("-").reverse().join("/");
 
 function Page() {
@@ -62,14 +63,17 @@ function Page() {
 
   const create = async () => {
     if (!form.client) { toast.error("Informe o cliente"); return; }
-    const workId = form.work && form.work !== CANTEIRO ? form.work : null;
-    const { data: inv, error } = await supabase.from("andam_inventory").insert({ client_id: form.client, work_id: workId, inventory_date: form.date, notes: form.notes || null, user_id: user?.id ?? null }).select().single();
+    const patio = form.client === PATIO;
+    const clientId = patio ? null : form.client;
+    const workId = !patio && form.work && form.work !== CANTEIRO ? form.work : null;
+    const { data: inv, error } = await supabase.from("andam_inventory").insert({ location: patio ? "central" : "obra", client_id: clientId, work_id: workId, inventory_date: form.date, notes: form.notes || null, user_id: user?.id ?? null }).select().single();
     if (error || !inv) { toast.error(error?.message ?? "Erro"); return; }
     // Carrega os materiais registrados na obra (todos os ativos, com a quantidade atual)
     const [{ data: items }, { data: stock }] = await Promise.all([
       supabase.from("andam_items").select("id").eq("active", true),
-      (workId ? supabase.from("andam_stock").select("item_id, quantity").eq("location", "obra").eq("client_id", form.client).eq("work_id", workId)
-        : supabase.from("andam_stock").select("item_id, quantity").eq("location", "obra").eq("client_id", form.client).is("work_id", null)),
+      (patio ? supabase.from("andam_stock").select("item_id, quantity").eq("location", "central").is("client_id", null).is("work_id", null)
+        : workId ? supabase.from("andam_stock").select("item_id, quantity").eq("location", "obra").eq("client_id", clientId!).eq("work_id", workId)
+        : supabase.from("andam_stock").select("item_id, quantity").eq("location", "obra").eq("client_id", clientId!).is("work_id", null)),
     ]);
     const rows = (items ?? []).map((i: any) => ({ inventory_id: inv.id, item_id: i.id, system_qty: Number(stock?.find((s: any) => s.item_id === i.id)?.quantity ?? 0) }));
     if (rows.length) await supabase.from("andam_inventory_items").insert(rows);
@@ -82,12 +86,12 @@ function Page() {
         actions={canWrite ? <Button onClick={() => setForm({ client: "", work: CANTEIRO, date: new Date().toISOString().slice(0, 10), notes: "" })}><Plus className="mr-1 h-4 w-4" />Novo inventário</Button> : undefined} />
       <div className="rounded-md border">
         <Table>
-          <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Obra / Serviço</TableHead><TableHead>Data</TableHead><TableHead>Responsável</TableHead><TableHead className="text-right">Itens</TableHead><TableHead>Status</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço</TableHead><TableHead>Data</TableHead><TableHead>Responsável</TableHead><TableHead className="text-right">Itens</TableHead><TableHead>Status</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
           <TableBody>
             {(list.data ?? []).map((i: any) => (
               <TableRow key={i.id}>
                 <TableCell>{i.number}</TableCell>
-                <TableCell>{i.clients?.name}</TableCell>
+                <TableCell>{i.location === "central" ? "Pátio" : i.clients?.name}</TableCell>
                 <TableCell>{i.works?.name ?? "Canteiro"}</TableCell>
                 <TableCell>{fmtDate(i.inventory_date)}</TableCell>
                 <TableCell>{userName(i.user_id)}</TableCell>
@@ -107,8 +111,10 @@ function Page() {
           <DialogHeader><DialogTitle>Novo inventário</DialogTitle></DialogHeader>
           {form && (
             <div className="space-y-3">
-              <Pick label="Cliente" value={form.client} onChange={(v) => setForm({ ...form, client: v, work: CANTEIRO })} options={(clients.data ?? []).map((c: any) => [c.id, c.name])} />
-              <Pick label="Serviço" value={form.work} onChange={(v) => setForm({ ...form, work: v })} options={[[CANTEIRO, "Canteiro"], ...(works.data ?? []).filter((w: any) => w.client_id === form.client).map((w: any) => [w.id, w.name])]} />
+              <Pick label="Cliente" value={form.client} onChange={(v) => setForm({ ...form, client: v, work: CANTEIRO })} options={[...(scoped ? [] : [[PATIO, "Pátio (estoque central)"]]), ...(clients.data ?? []).map((c: any) => [c.id, c.name])]} />
+              {form.client === PATIO
+                ? <div className="space-y-1"><Label>Serviço</Label><Input value="Canteiro" disabled /></div>
+                : <Pick label="Serviço" value={form.work} onChange={(v) => setForm({ ...form, work: v })} options={[[CANTEIRO, "Canteiro"], ...(works.data ?? []).filter((w: any) => w.client_id === form.client).map((w: any) => [w.id, w.name])]} />}
               <div className="space-y-1"><Label>Data</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
               <div className="space-y-1"><Label>Observação</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
             </div>
@@ -151,7 +157,7 @@ function InventoryDialog({ inv, canWrite, userName, onClose }: { inv: any; canWr
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl">
-        <DialogHeader><DialogTitle>Inventário nº {h.number} — {h.clients?.name} · {h.works?.name ?? "Canteiro"}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Inventário nº {h.number} — {h.location === "central" ? "Pátio" : h.clients?.name} · {h.works?.name ?? "Canteiro"}</DialogTitle></DialogHeader>
         <div className="text-sm text-muted-foreground">
           {fmtDate(h.inventory_date)} · {INV_STATUS[h.status]} · Responsável: {userName(h.user_id)}
           {h.finalized_at && <> · Finalizado em {new Date(h.finalized_at).toLocaleString("pt-BR")} por {userName(h.finalized_by)}</>}

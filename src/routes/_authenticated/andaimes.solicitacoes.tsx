@@ -102,7 +102,7 @@ function Page() {
       </div>
       <div className="rounded-md border">
         <Table>
-          <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço / Canteiro</TableHead><TableHead>Solicitada em</TableHead><TableHead>Necessária em</TableHead><TableHead>Prioridade</TableHead><TableHead>Status</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço</TableHead><TableHead>Solicitada em</TableHead><TableHead>Necessária em</TableHead><TableHead>Prioridade</TableHead><TableHead>Status</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
           <TableBody>
             {filtered.map((r: any) => (
               <TableRow key={r.id}>
@@ -158,7 +158,7 @@ function NewDialog({ form, setForm, clients, works, userId, onDone }: any) {
         <DialogHeader><DialogTitle>Nova solicitação</DialogTitle></DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <Pick label="Cliente" value={form.client} onChange={(v) => setForm({ ...form, client: v, work: CANTEIRO })} options={clients.map((c: any) => [c.id, c.name])} />
-          <Pick label="Serviço ou Canteiro" value={form.work} onChange={(v) => setForm({ ...form, work: v })} options={[[CANTEIRO, "Canteiro"], ...works.filter((w: any) => w.client_id === form.client).map((w: any) => [w.id, w.name])]} />
+          <Pick label="Serviço" value={form.work} onChange={(v) => setForm({ ...form, work: v })} options={[[CANTEIRO, "Canteiro"], ...works.filter((w: any) => w.client_id === form.client).map((w: any) => [w.id, w.name])]} />
           <div className="space-y-1"><Label>Data da solicitação</Label><Input type="date" value={form.request_date} onChange={(e) => setForm({ ...form, request_date: e.target.value })} /></div>
           <div className="space-y-1"><Label>Data necessária</Label><Input type="date" value={form.needed_date} onChange={(e) => setForm({ ...form, needed_date: e.target.value })} /></div>
           <Pick label="Prioridade" value={form.priority} onChange={(v) => setForm({ ...form, priority: v })} options={Object.entries(PRIORITY)} />
