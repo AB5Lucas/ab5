@@ -134,6 +134,13 @@
       "when": 1791989112207,
       "tag": "0018_andaimes_acompanhamento_patrimonio",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791993858357,
+      "tag": "0019_allocation_overnight",
+      "breakpoints": true
     }
   ]
 }

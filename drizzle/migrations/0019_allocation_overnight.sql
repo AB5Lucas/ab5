@@ -1,0 +1,1 @@
+ALTER TABLE public.daily_allocations ADD COLUMN IF NOT EXISTS overnight boolean NOT NULL DEFAULT false;

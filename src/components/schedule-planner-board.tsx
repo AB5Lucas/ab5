@@ -560,6 +560,14 @@ export function SchedulePlannerBoard({
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
     onError: (e: Error) => toast.error(e.message),
   });
+  const toggleOvernight = useMutation({
+    mutationFn: async ({ id, current }: { id: string; current: boolean }) => {
+      const { error } = await supabase.from("daily_allocations").update({ overnight: !current }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const toggleAllocVt = useMutation({
     mutationFn: async ({ id, workId, collaboratorId, current }: { id: string; workId: string; collaboratorId: string; current: boolean }) => {
@@ -1702,6 +1710,7 @@ export function SchedulePlannerBoard({
                             />
                           );
                         })()}
+                        <span className="flex items-center gap-0.5">
                         {(() => {
                           const tb = r.travel_bonus_override ?? defaultAllocTravel(r.work_id, r.collaborator_id);
                           const exc = r.travel_bonus_override !== null && r.travel_bonus_override !== undefined;
@@ -1716,6 +1725,15 @@ export function SchedulePlannerBoard({
                             />
                           );
                         })()}
+                        <button
+                          type="button"
+                          disabled={!editable}
+                          title={(r as any).overnight ? "Pernoite (+R$ 25,00 prêmio viagem)" : "Sem pernoite"}
+                          aria-label="Alternar pernoite do colaborador"
+                          onClick={(e) => { e.stopPropagation(); toggleOvernight.mutate({ id: r.id, current: !!(r as any).overnight }); }}
+                          className={`h-2 w-2 shrink-0 rounded-full ${(r as any).overnight ? "bg-warning" : "bg-muted-foreground/40"}`}
+                        />
+                        </span>
                         </span>
                       </li>
                     );
