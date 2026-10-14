@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { copyNameList } from "@/lib/copy-names";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -359,7 +360,12 @@ function TrainingsPage() {
         title="Treinamentos"
         description="Catálogo de treinamentos e controle de validade por colaborador."
         actions={
-          canWrite && (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void copyNameList(`Treinamentos${trainingIds.length ? " " + (trainings.data ?? []).filter((t) => trainingIds.includes(t.id)).map((t) => t.name.toUpperCase()).join(", ") : ""}`, filtered.map((r) => nameById.get(r.collaborator_id)))}>
+              <Copy className="h-4 w-4" />
+              Copiar nomes
+            </Button>
+            {canWrite && (
             <div className="flex flex-wrap gap-2">
               <AppointmentDialog type="treinamento" />
               <ImportDialog
@@ -372,7 +378,8 @@ function TrainingsPage() {
                 <Plus className="h-4 w-4" /> Registrar treinamento
               </Button>
             </div>
-          )
+            )}
+          </div>
         }
       />
 

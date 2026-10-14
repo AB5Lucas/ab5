@@ -40,6 +40,7 @@ export const formatBR = (iso: string) =>
 export type Collaborator = {
   id: string;
   full_name: string;
+  cpf?: string | null;
   registration_number: string;
   position_id: string | null;
   status: string;
@@ -133,7 +134,7 @@ export async function fetchScheduleContext(date: string) {
     supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, active, clients(name, city, distance_km, requires_integration)").order("name"),
     supabase
       .from("collaborators")
-      .select("id, full_name, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type")
+      .select("id, full_name, cpf, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type")
       .order("full_name"),
     supabase.from("positions").select("id, name").order("name"),
     supabase.from("vehicles").select("id, plate, model, passenger_capacity, status").order("plate"),

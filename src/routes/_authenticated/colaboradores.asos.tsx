@@ -3,8 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Copy, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { copyNameList } from "@/lib/copy-names";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -327,6 +328,10 @@ function AsosPage() {
         description="Atestados de Saúde Ocupacional dos colaboradores. O vencimento é calculado automaticamente: 1 ano após a realização."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void copyNameList("ASOs", filtered.map((r) => personById.get(r.collaborator_id)?.full_name))}>
+              <Copy className="h-4 w-4" />
+              Copiar nomes
+            </Button>
             <AppointmentDialog type="aso" />
             {canWrite && (
               <ImportDialog

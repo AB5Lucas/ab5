@@ -49,6 +49,7 @@ import {
 } from "@/lib/scheduling";
 import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
+import { formatCpf } from "@/lib/copy-names";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
 import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
@@ -846,6 +847,23 @@ export function SchedulePlannerBoard({
     return m;
   }, [people]);
 
+  const copyPeopleCpf = (ids: string[]) => {
+    const uniq = Array.from(new Set(ids));
+    const text = uniq
+      .map((id) => personById.get(id))
+      .filter((p): p is NonNullable<typeof p> => !!p)
+      .map((p) => `${p.full_name}\nCPF: ${formatCpf(p.cpf)}`)
+      .join("\n\n");
+    if (!text) {
+      toast.error("Nenhuma pessoa para copiar.");
+      return;
+    }
+    navigator.clipboard.writeText(text).then(
+      () => toast.success(`${uniq.length} pessoa(s) copiada(s).`),
+      () => toast.error("Não foi possível copiar."),
+    );
+  };
+
   const roleQuery = roleSearch.trim().toLowerCase();
   /** O colaborador atende ao filtro de função digitado? */
   const matchesRole = (collaboratorId: string, positionOverride?: string | null) => {
@@ -1572,10 +1590,20 @@ export function SchedulePlannerBoard({
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
-                    <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
-                      <Users className="mr-0.5 h-2.5 w-2.5" />
-                      {workRows.length}
-                    </Badge>
+                    <button
+                      type="button"
+                      title="Copiar nomes e CPF"
+                      aria-label="Copiar nomes e CPF"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyPeopleCpf(workRows.map((r) => r.collaborator_id));
+                      }}
+                    >
+                      <Badge variant="outline" className="shrink-0 cursor-pointer px-1 py-0 text-[10px] hover:bg-accent">
+                        <Users className="mr-0.5 h-2.5 w-2.5" />
+                        {workRows.length}
+                      </Badge>
+                    </button>
                     <span className="flex shrink-0 flex-col items-center gap-0.5">
                     <button
                       type="button"
@@ -1830,10 +1858,20 @@ export function SchedulePlannerBoard({
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
-                    <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
-                      <Users className="mr-0.5 h-2.5 w-2.5" />
-                      {boxRows.length + autoRows.length}
-                    </Badge>
+                    <button
+                      type="button"
+                      title="Copiar nomes e CPF"
+                      aria-label="Copiar nomes e CPF"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyPeopleCpf([...autoRows.map((a) => a.id), ...boxRows.map((r) => r.collaborator_id)]);
+                      }}
+                    >
+                      <Badge variant="outline" className="shrink-0 cursor-pointer px-1 py-0 text-[10px] hover:bg-accent">
+                        <Users className="mr-0.5 h-2.5 w-2.5" />
+                        {boxRows.length + autoRows.length}
+                      </Badge>
+                    </button>
                     {vtBoxDefault(b.key) !== null && (
                       <button
                         type="button"
