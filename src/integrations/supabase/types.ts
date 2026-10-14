@@ -842,6 +842,7 @@ export type Database = {
           client_id: string
           collaborator_id: string
           created_at: string
+          documentation: boolean
           expires_at: string | null
           id: string
           integration_date: string
@@ -852,6 +853,7 @@ export type Database = {
           client_id: string
           collaborator_id: string
           created_at?: string
+          documentation?: boolean
           expires_at?: string | null
           id?: string
           integration_date?: string
@@ -862,6 +864,7 @@ export type Database = {
           client_id?: string
           collaborator_id?: string
           created_at?: string
+          documentation?: boolean
           expires_at?: string | null
           id?: string
           integration_date?: string
