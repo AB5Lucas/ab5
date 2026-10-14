@@ -26,6 +26,8 @@ import { Route as AuthenticatedAdminConfiguracoesRouteImport } from './routes/_a
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
 import { Route as AuthenticatedAndaimesEstoqueRouteImport } from './routes/_authenticated/andaimes.estoque'
 import { Route as AuthenticatedAndaimesInventarioRouteImport } from './routes/_authenticated/andaimes.inventario'
+import { Route as AuthenticatedAndaimesRomaneiosRouteImport } from './routes/_authenticated/andaimes.romaneios'
+import { Route as AuthenticatedAndaimesSolicitacoesRouteImport } from './routes/_authenticated/andaimes.solicitacoes'
 import { Route as AuthenticatedAusenciasAtestadosRouteImport } from './routes/_authenticated/ausencias.atestados'
 import { Route as AuthenticatedAusenciasFeriasRouteImport } from './routes/_authenticated/ausencias.ferias'
 import { Route as AuthenticatedAusenciasFolgasRouteImport } from './routes/_authenticated/ausencias.folgas'
@@ -145,6 +147,18 @@ const AuthenticatedAndaimesInventarioRoute =
   AuthenticatedAndaimesInventarioRouteImport.update({
     id: '/andaimes/inventario',
     path: '/andaimes/inventario',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAndaimesRomaneiosRoute =
+  AuthenticatedAndaimesRomaneiosRouteImport.update({
+    id: '/andaimes/romaneios',
+    path: '/andaimes/romaneios',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAndaimesSolicitacoesRoute =
+  AuthenticatedAndaimesSolicitacoesRouteImport.update({
+    id: '/andaimes/solicitacoes',
+    path: '/andaimes/solicitacoes',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAusenciasAtestadosRoute =
@@ -326,6 +340,8 @@ export interface FileRoutesByFullPath {
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/andaimes/estoque': typeof AuthenticatedAndaimesEstoqueRoute
   '/andaimes/inventario': typeof AuthenticatedAndaimesInventarioRoute
+  '/andaimes/romaneios': typeof AuthenticatedAndaimesRomaneiosRoute
+  '/andaimes/solicitacoes': typeof AuthenticatedAndaimesSolicitacoesRoute
   '/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
   '/ausencias/ferias': typeof AuthenticatedAusenciasFeriasRoute
   '/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
@@ -371,6 +387,8 @@ export interface FileRoutesByTo {
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/andaimes/estoque': typeof AuthenticatedAndaimesEstoqueRoute
   '/andaimes/inventario': typeof AuthenticatedAndaimesInventarioRoute
+  '/andaimes/romaneios': typeof AuthenticatedAndaimesRomaneiosRoute
+  '/andaimes/solicitacoes': typeof AuthenticatedAndaimesSolicitacoesRoute
   '/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
   '/ausencias/ferias': typeof AuthenticatedAusenciasFeriasRoute
   '/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
@@ -418,6 +436,8 @@ export interface FileRoutesById {
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/_authenticated/andaimes/estoque': typeof AuthenticatedAndaimesEstoqueRoute
   '/_authenticated/andaimes/inventario': typeof AuthenticatedAndaimesInventarioRoute
+  '/_authenticated/andaimes/romaneios': typeof AuthenticatedAndaimesRomaneiosRoute
+  '/_authenticated/andaimes/solicitacoes': typeof AuthenticatedAndaimesSolicitacoesRoute
   '/_authenticated/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
   '/_authenticated/ausencias/ferias': typeof AuthenticatedAusenciasFeriasRoute
   '/_authenticated/ausencias/folgas': typeof AuthenticatedAusenciasFolgasRoute
@@ -465,6 +485,8 @@ export interface FileRouteTypes {
     | '/admin/usuarios'
     | '/andaimes/estoque'
     | '/andaimes/inventario'
+    | '/andaimes/romaneios'
+    | '/andaimes/solicitacoes'
     | '/ausencias/atestados'
     | '/ausencias/ferias'
     | '/ausencias/folgas'
@@ -510,6 +532,8 @@ export interface FileRouteTypes {
     | '/admin/usuarios'
     | '/andaimes/estoque'
     | '/andaimes/inventario'
+    | '/andaimes/romaneios'
+    | '/andaimes/solicitacoes'
     | '/ausencias/atestados'
     | '/ausencias/ferias'
     | '/ausencias/folgas'
@@ -556,6 +580,8 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/usuarios'
     | '/_authenticated/andaimes/estoque'
     | '/_authenticated/andaimes/inventario'
+    | '/_authenticated/andaimes/romaneios'
+    | '/_authenticated/andaimes/solicitacoes'
     | '/_authenticated/ausencias/atestados'
     | '/_authenticated/ausencias/ferias'
     | '/_authenticated/ausencias/folgas'
@@ -711,6 +737,20 @@ declare module '@tanstack/react-router' {
       path: '/andaimes/inventario'
       fullPath: '/andaimes/inventario'
       preLoaderRoute: typeof AuthenticatedAndaimesInventarioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/andaimes/romaneios': {
+      id: '/_authenticated/andaimes/romaneios'
+      path: '/andaimes/romaneios'
+      fullPath: '/andaimes/romaneios'
+      preLoaderRoute: typeof AuthenticatedAndaimesRomaneiosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/andaimes/solicitacoes': {
+      id: '/_authenticated/andaimes/solicitacoes'
+      path: '/andaimes/solicitacoes'
+      fullPath: '/andaimes/solicitacoes'
+      preLoaderRoute: typeof AuthenticatedAndaimesSolicitacoesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ausencias/atestados': {
@@ -919,6 +959,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminUsuariosRoute: typeof AuthenticatedAdminUsuariosRoute
   AuthenticatedAndaimesEstoqueRoute: typeof AuthenticatedAndaimesEstoqueRoute
   AuthenticatedAndaimesInventarioRoute: typeof AuthenticatedAndaimesInventarioRoute
+  AuthenticatedAndaimesRomaneiosRoute: typeof AuthenticatedAndaimesRomaneiosRoute
+  AuthenticatedAndaimesSolicitacoesRoute: typeof AuthenticatedAndaimesSolicitacoesRoute
   AuthenticatedAusenciasAtestadosRoute: typeof AuthenticatedAusenciasAtestadosRoute
   AuthenticatedAusenciasFeriasRoute: typeof AuthenticatedAusenciasFeriasRoute
   AuthenticatedAusenciasFolgasRoute: typeof AuthenticatedAusenciasFolgasRoute
@@ -962,6 +1004,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminUsuariosRoute: AuthenticatedAdminUsuariosRoute,
   AuthenticatedAndaimesEstoqueRoute: AuthenticatedAndaimesEstoqueRoute,
   AuthenticatedAndaimesInventarioRoute: AuthenticatedAndaimesInventarioRoute,
+  AuthenticatedAndaimesRomaneiosRoute: AuthenticatedAndaimesRomaneiosRoute,
+  AuthenticatedAndaimesSolicitacoesRoute:
+    AuthenticatedAndaimesSolicitacoesRoute,
   AuthenticatedAusenciasAtestadosRoute: AuthenticatedAusenciasAtestadosRoute,
   AuthenticatedAusenciasFeriasRoute: AuthenticatedAusenciasFeriasRoute,
   AuthenticatedAusenciasFolgasRoute: AuthenticatedAusenciasFolgasRoute,
