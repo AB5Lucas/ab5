@@ -14,6 +14,261 @@ export type Database = {
   }
   public: {
     Tables: {
+      andam_inventory: {
+        Row: {
+          client_id: string
+          created_at: string
+          finalized_at: string | null
+          finalized_by: string | null
+          id: string
+          inventory_date: string
+          notes: string | null
+          number: number
+          status: string
+          updated_at: string
+          user_id: string | null
+          work_id: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          inventory_date?: string
+          notes?: string | null
+          number?: number
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          inventory_date?: string
+          notes?: string | null
+          number?: number
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_inventory_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_inventory_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      andam_inventory_items: {
+        Row: {
+          counted_qty: number | null
+          id: string
+          inventory_id: string
+          item_id: string
+          notes: string | null
+          system_qty: number
+        }
+        Insert: {
+          counted_qty?: number | null
+          id?: string
+          inventory_id: string
+          item_id: string
+          notes?: string | null
+          system_qty?: number
+        }
+        Update: {
+          counted_qty?: number | null
+          id?: string
+          inventory_id?: string
+          item_id?: string
+          notes?: string | null
+          system_qty?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_inventory_items_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "andam_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_inventory_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "andam_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      andam_items: {
+        Row: {
+          active: boolean
+          category: string | null
+          code: string | null
+          created_at: string
+          description: string | null
+          id: string
+          min_stock: number
+          name: string
+          notes: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string | null
+          code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          min_stock?: number
+          name: string
+          notes?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string | null
+          code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          min_stock?: number
+          name?: string
+          notes?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      andam_movements: {
+        Row: {
+          created_at: string
+          from_client_id: string | null
+          from_location: string | null
+          from_work_id: string | null
+          id: string
+          inventory_id: string | null
+          item_id: string
+          kind: string
+          notes: string | null
+          quantity: number
+          to_client_id: string | null
+          to_location: string | null
+          to_work_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          from_client_id?: string | null
+          from_location?: string | null
+          from_work_id?: string | null
+          id?: string
+          inventory_id?: string | null
+          item_id: string
+          kind: string
+          notes?: string | null
+          quantity: number
+          to_client_id?: string | null
+          to_location?: string | null
+          to_work_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          from_client_id?: string | null
+          from_location?: string | null
+          from_work_id?: string | null
+          id?: string
+          inventory_id?: string | null
+          item_id?: string
+          kind?: string
+          notes?: string | null
+          quantity?: number
+          to_client_id?: string | null
+          to_location?: string | null
+          to_work_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "andam_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      andam_stock: {
+        Row: {
+          client_id: string | null
+          id: string
+          item_id: string
+          location: string
+          quantity: number
+          updated_at: string
+          work_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          id?: string
+          item_id: string
+          location: string
+          quantity?: number
+          updated_at?: string
+          work_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          id?: string
+          item_id?: string
+          location?: string
+          quantity?: number
+          updated_at?: string
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_stock_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_stock_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "andam_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "andam_stock_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           client_id: string | null
@@ -2736,6 +2991,33 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      andam_adjust: {
+        Args: {
+          _client: string
+          _delta: number
+          _item: string
+          _location: string
+          _note: string
+          _work: string
+        }
+        Returns: undefined
+      }
+      andam_can: { Args: { _page: string }; Returns: boolean }
+      andam_finalize_inventory: { Args: { _inv: string }; Returns: undefined }
+      andam_transfer: {
+        Args: {
+          _from_client: string
+          _from_loc: string
+          _from_work: string
+          _item: string
+          _note: string
+          _qty: number
+          _to_client: string
+          _to_loc: string
+          _to_work: string
+        }
+        Returns: undefined
+      }
       can_access_client: { Args: { _client_id: string }; Returns: boolean }
       can_access_page: { Args: { _path: string }; Returns: boolean }
       can_access_rdo: { Args: { _rdo_id: string }; Returns: boolean }
