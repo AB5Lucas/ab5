@@ -134,10 +134,19 @@ function ServicesPage() {
             .in("work_id", ids)).data ?? []
         : [];
       // Quem está de folga, férias ou atestado no dia fica fora (efetivo e transporte)
-      const [{ data: off }, { data: vac }, { data: med }] = await Promise.all([
+      const [{ data: off }, { data: vac }, { data: med }, { data: trApp }, { data: trBox }] = await Promise.all([
         supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date),
         supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date),
         supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
+        supabase.from("appointments").select("collaborator_id").eq("type", "treinamento").eq("scheduled_date", date).neq("status", "cancelado"),
+        sched
+          ? supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).eq("box_key", "treinamento")
+          : Promise.resolve({ data: [] as { collaborator_id: string }[] }),
+      ]);
+      // Escalado para treinamento no dia: sai da aba Serviços
+      const training = new Set<string>([
+        ...(trApp ?? []).map((t) => t.collaborator_id),
+        ...(trBox ?? []).map((t) => t.collaborator_id),
       ]);
       const away = new Set<string>([
         ...(off ?? []).filter((o) => (o.end_date ?? o.date) >= date).map((o) => o.collaborator_id),
