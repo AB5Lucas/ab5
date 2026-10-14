@@ -42,7 +42,7 @@ function RdoPage() {
     enabled: !!user?.id,
     queryFn: async () => {
       const sel = "id, name, client_id, entry_time, exit_time, exit_time_weekend, active, clients(name)";
-      if (canWrite) {
+      if (role === "admin" || role === "programmer") {
         const { data } = await supabase.from("works").select(sel).eq("active", true);
         return data ?? [];
       }
