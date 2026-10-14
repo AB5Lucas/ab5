@@ -909,7 +909,8 @@ export function SchedulePlannerBoard({
     const intBad = integ.status === "expired" || integ.status === "missing";
     const asoBad = requiresInt && (aso.status === "expired" || aso.status === "missing");
 
-    if (intBad || asoBad) {
+    // Sem integração (ou vencida) não bloqueia: vira aviso. ASO continua bloqueando.
+    if (asoBad) {
       const blockers: string[] = [];
       if (integ.status === "expired")
         blockers.push(`Integração com ${clientName} vencida em ${formatDateBR(integ.expiresAt)}`);
@@ -945,6 +946,9 @@ export function SchedulePlannerBoard({
     if (requiresInt && aso.status === "expiring")
       warnings.unshift(`ASO vence em ${formatDateBR(aso.expiresAt)}`);
     if (integ.status === "no_client") warnings.unshift("Serviço sem cliente vinculado");
+    if (integ.status === "expired") warnings.unshift(`Integração com ${clientName} vencida em ${formatDateBR(integ.expiresAt)}`);
+    if (integ.status === "missing") warnings.unshift(`Não possui integração válida com ${clientName}`);
+    void intBad;
 
     if (current && current.work_id !== workId)
       return base({
@@ -1637,7 +1641,15 @@ export function SchedulePlannerBoard({
                       >
                         {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium leading-tight">{p?.full_name ?? "—"}</p>
+                          <p className="flex items-center gap-1 truncate text-xs font-medium leading-tight">
+                            {(() => {
+                              const st = ctx.data ? checkIntegration(ctx.data as ScheduleContext, r.work_id, r.collaborator_id, date).status : null;
+                              return st === "missing" || st === "expired" ? (
+                                <span title={st === "missing" ? "Sem integração com este cliente" : "Integração vencida"} className="shrink-0 font-bold text-destructive">!</span>
+                              ) : null;
+                            })()}
+                            <span className="truncate">{p?.full_name ?? "—"}</span>
+                          </p>
                           <p className="truncate text-[10px] leading-tight text-muted-foreground">
                             {(r.position_id ? positionById.get(r.position_id) : p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
                           </p>

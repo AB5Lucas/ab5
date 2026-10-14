@@ -350,9 +350,6 @@ function ServicesPage() {
     }
     const ab = w.ctx.absences.get(cid);
     if (ab) return `De ${ab.toLowerCase()} neste dia`;
-    const integ = checkIntegration(w.ctx, workId, cid, date).status;
-    if (integ === "missing") return "Sem integração para este cliente";
-    if (integ === "expired") return "Integração vencida";
     if (workRequiresIntegration(w.ctx, workId)) {
       const aso = checkAso(w.ctx, cid, date, workId).status;
       if (aso === "missing") return "Sem ASO";
