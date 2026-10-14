@@ -40,6 +40,8 @@ async function all<T>(build: (from: number, to: number) => PromiseLike<{ data: T
   return out;
 }
 
+export const OVERNIGHT_PRIZE = 25;
+
 export async function loadClosing(month: string): Promise<ClosingRow[]> {
   const { start, end } = periodOf(month);
   const { data: schedules } = await supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", start).lt("schedule_date", end);
