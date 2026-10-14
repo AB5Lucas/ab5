@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Eye, Plus } from "lucide-react";
+import { Eye, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -33,14 +33,28 @@ const CANTEIRO = "__canteiro";
 const fmtDate = (d: string) => d.split("-").reverse().join("/");
 
 function Page() {
-  const { canWrite, user } = useCurrentUser();
+  const { canWrite: cw, isForeman, isAdmin, role, user } = useCurrentUser();
+  const canWrite = cw || isForeman;
+  const scoped = role === "coordenador" || role === "encarregado";
   const qc = useQueryClient();
   const list = useQuery({
     queryKey: ["andam-inv"],
     queryFn: async () => (await supabase.from("andam_inventory").select("*, clients(name), works(name), andam_inventory_items(count)").order("number", { ascending: false })).data ?? [],
   });
   const users = useQuery({ queryKey: ["andam-users"], queryFn: async () => (await supabase.from("users_profiles").select("id, full_name")).data ?? [] });
-  const clients = useQuery({ queryKey: ["andam-clients"], queryFn: async () => (await supabase.from("clients").select("id, name").eq("active", true).order("name")).data ?? [] });
+  const clients = useQuery({ queryKey: ["andam-clients", user?.id, scoped], enabled: !!user?.id, queryFn: async () => {
+    const all = (await supabase.from("clients").select("id, name").eq("active", true).order("name")).data ?? [];
+    if (!scoped) return all;
+    const { data: links } = await supabase.from("foreman_works").select("works(client_id)").eq("user_id", user!.id);
+    const ids = new Set((links ?? []).map((l: any) => l.works?.client_id).filter(Boolean));
+    return all.filter((c) => ids.has(c.id));
+  } });
+  const remove = async (i: any) => {
+    if (!confirm(`Excluir o inventário nº ${i.number}?`)) return;
+    const { error } = await supabase.from("andam_inventory").delete().eq("id", i.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Inventário excluído"); qc.invalidateQueries({ queryKey: ["andam-inv"] });
+  };
   const works = useQuery({ queryKey: ["andam-works"], queryFn: async () => (await supabase.from("works").select("id, name, client_id").order("name")).data ?? [] });
   const [form, setForm] = useState<any>(null);
   const [open, setOpen] = useState<any>(null);
@@ -68,7 +82,7 @@ function Page() {
         actions={canWrite ? <Button onClick={() => setForm({ client: "", work: CANTEIRO, date: new Date().toISOString().slice(0, 10), notes: "" })}><Plus className="mr-1 h-4 w-4" />Novo inventário</Button> : undefined} />
       <div className="rounded-md border">
         <Table>
-          <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Obra / Serviço</TableHead><TableHead>Data</TableHead><TableHead>Responsável</TableHead><TableHead className="text-right">Itens</TableHead><TableHead>Status</TableHead><TableHead className="w-12" /></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Obra / Serviço</TableHead><TableHead>Data</TableHead><TableHead>Responsável</TableHead><TableHead className="text-right">Itens</TableHead><TableHead>Status</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
           <TableBody>
             {(list.data ?? []).map((i: any) => (
               <TableRow key={i.id}>
@@ -79,7 +93,8 @@ function Page() {
                 <TableCell>{userName(i.user_id)}</TableCell>
                 <TableCell className="text-right">{i.andam_inventory_items?.[0]?.count ?? 0}</TableCell>
                 <TableCell><Badge variant={i.status === "finalizado" ? "default" : i.status === "cancelado" ? "secondary" : "outline"}>{INV_STATUS[i.status]}</Badge></TableCell>
-                <TableCell><Button size="icon" variant="ghost" title={i.status === "em_andamento" ? "Continuar" : "Ver detalhes"} onClick={() => setOpen(i)}><Eye className="h-4 w-4" /></Button></TableCell>
+                <TableCell><Button size="icon" variant="ghost" title={i.status === "em_andamento" ? "Continuar" : "Ver detalhes"} onClick={() => setOpen(i)}><Eye className="h-4 w-4" /></Button>
+                  {canWrite && (i.status !== "finalizado" || isAdmin) && <Button size="icon" variant="ghost" title="Excluir" onClick={() => remove(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}</TableCell>
               </TableRow>
             ))}
             {!list.data?.length && <TableRow><TableCell colSpan={8} className="text-muted-foreground">Nenhum inventário.</TableCell></TableRow>}

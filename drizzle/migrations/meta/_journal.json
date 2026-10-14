@@ -99,6 +99,13 @@
       "when": 1791973435208,
       "tag": "0013_andaimes_fase1",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791985463034,
+      "tag": "0014_andam_inventory_client_scope",
+      "breakpoints": true
     }
   ]
 }

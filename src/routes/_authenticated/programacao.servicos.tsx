@@ -71,7 +71,7 @@ function ServicesPage() {
     enabled: !!user?.id,
     queryFn: async () => {
       let list: { id: string; name: string }[];
-      if (canWrite) {
+      if (role === "admin" || role === "programmer") {
         const { data } = await supabase.from("clients").select("id, name").eq("active", true).order("name");
         list = data ?? [];
       } else {

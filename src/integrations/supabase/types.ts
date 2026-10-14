@@ -3003,6 +3003,7 @@ export type Database = {
         Returns: undefined
       }
       andam_can: { Args: { _page: string }; Returns: boolean }
+      andam_client_ok: { Args: { _client: string }; Returns: boolean }
       andam_finalize_inventory: { Args: { _inv: string }; Returns: undefined }
       andam_transfer: {
         Args: {
