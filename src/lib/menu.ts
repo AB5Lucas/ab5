@@ -10,6 +10,7 @@ import {
   FileBarChart,
   Shield,
   ClipboardList,
+  Boxes,
 } from "lucide-react";
 
 export type MenuItem = { title: string; url: string };
@@ -61,6 +62,14 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Serviços", url: "/obras" },
       { title: "Resultados", url: "/obras/resultado" },
       { title: "Clientes", url: "/clientes" },
+    ],
+  },
+  {
+    label: "Andaimes",
+    icon: Boxes,
+    items: [
+      { title: "Inventário", url: "/andaimes/inventario" },
+      { title: "Estoque", url: "/andaimes/estoque" },
     ],
   },
   {
@@ -116,7 +125,8 @@ const byName = (a: string, b: string) => a.localeCompare(b, "pt-BR");
 /** Grupos na ordem original; páginas de cada grupo em ordem alfabética. */
 export const MENU_GROUPS: MenuGroup[] = RAW_GROUPS.map((g) => ({
   ...g,
-  items: [...g.items].sort((a, b) => byName(a.title, b.title)),
+  // Andaimes segue a ordem do processo, não alfabética
+  items: g.label === "Andaimes" ? g.items : [...g.items].sort((a, b) => byName(a.title, b.title)),
 }));
 
 export const ALL_MENU_URLS = MENU_GROUPS.flatMap((g) => g.items.map((i) => i.url));
