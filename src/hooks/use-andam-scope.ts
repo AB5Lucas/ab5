@@ -1,10 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { useAccess } from "@/hooks/use-access";
+import { useLocation } from "@tanstack/react-router";
 
 /** Clientes/serviços visíveis no módulo Andaimes: coordenador e encarregado só os clientes atribuídos. */
 export function useAndamScope() {
-  const { role, user, isAdmin, canWrite, isForeman } = useCurrentUser();
+  const { role, user, isAdmin } = useCurrentUser();
+  const { canAccess } = useAccess();
+  const path = useLocation({ select: (l) => l.pathname });
   const scoped = role === "coordenador" || role === "encarregado";
   const clients = useQuery({
     queryKey: ["andam-scope-clients", user?.id, scoped],
@@ -21,5 +25,5 @@ export function useAndamScope() {
     queryKey: ["andam-works"],
     queryFn: async () => (await supabase.from("works").select("id, name, client_id").order("name")).data ?? [],
   });
-  return { clients: clients.data ?? [], works: works.data ?? [], user, isAdmin, canEdit: canWrite || isForeman };
+  return { clients: clients.data ?? [], works: works.data ?? [], user, isAdmin, canEdit: isAdmin || canAccess(path) };
 }
