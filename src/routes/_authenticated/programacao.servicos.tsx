@@ -164,7 +164,7 @@ function ServicesPage() {
         absent.push({ kind: kind(a.collaborator_id), name: a.collaborators?.full_name ?? "—" });
       });
       absent.sort((x, y) => x.name.localeCompare(y.name, "pt-BR"));
-      return { works: works ?? [], allocs: allocs.filter((a: any) => !away.has(a.collaborator_id)), absent };
+      return { works: works ?? [], allocs: allocs.filter((a: any) => !away.has(a.collaborator_id) && !training.has(a.collaborator_id)), absent };
     },
   });
 
