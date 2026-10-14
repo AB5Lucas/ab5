@@ -1,6 +1,6 @@
 // Módulo Andaimes — localizações e helpers operacionais (sem valores financeiros)
 export const LOCATIONS = [
-  { key: "central", label: "Estoque central" },
+  { key: "central", label: "Estoque central (Pátio)" },
   { key: "obra", label: "Em obras" },
   { key: "transito", label: "Em trânsito" },
   { key: "manutencao", label: "Em manutenção" },
