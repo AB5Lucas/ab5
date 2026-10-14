@@ -580,16 +580,21 @@ export type Database = {
       }
       andam_structures: {
         Row: {
+          art_file_path: string | null
+          art_number: string | null
           assembled_at: string | null
           client_id: string
           created_at: string
           created_by: string | null
           dismantled_at: string | null
+          has_project_art: boolean
           id: string
           inspection_valid_until: string | null
           location_desc: string | null
           notes: string | null
           order_code: string | null
+          project_file_path: string | null
+          project_number: string | null
           released_at: string | null
           responsible: string | null
           status: string
@@ -597,16 +602,21 @@ export type Database = {
           work_id: string | null
         }
         Insert: {
+          art_file_path?: string | null
+          art_number?: string | null
           assembled_at?: string | null
           client_id: string
           created_at?: string
           created_by?: string | null
           dismantled_at?: string | null
+          has_project_art?: boolean
           id?: string
           inspection_valid_until?: string | null
           location_desc?: string | null
           notes?: string | null
           order_code?: string | null
+          project_file_path?: string | null
+          project_number?: string | null
           released_at?: string | null
           responsible?: string | null
           status?: string
@@ -614,16 +624,21 @@ export type Database = {
           work_id?: string | null
         }
         Update: {
+          art_file_path?: string | null
+          art_number?: string | null
           assembled_at?: string | null
           client_id?: string
           created_at?: string
           created_by?: string | null
           dismantled_at?: string | null
+          has_project_art?: boolean
           id?: string
           inspection_valid_until?: string | null
           location_desc?: string | null
           notes?: string | null
           order_code?: string | null
+          project_file_path?: string | null
+          project_number?: string | null
           released_at?: string | null
           responsible?: string | null
           status?: string
