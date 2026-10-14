@@ -51,6 +51,6 @@ export function inspectionState(validUntil: string | null | undefined, today: st
 export function depreciation(acq: number, lifeMonths: number, acquiredAt: string | null | undefined, today: string) {
   if (!acquiredAt || !lifeMonths || acq <= 0) return 0;
   const [y1, m1] = acquiredAt.split("-").map(Number), [y2, m2] = today.split("-").map(Number);
-  const months = Math.max(0, (y2 - y1) * 12 + (m2 - m1));
+  const months = Math.max(0, ((y2 ?? 0) - (y1 ?? 0)) * 12 + ((m2 ?? 0) - (m1 ?? 0)));
   return Math.min(acq, (acq / lifeMonths) * months);
 }

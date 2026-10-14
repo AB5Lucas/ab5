@@ -24,8 +24,10 @@ import { Route as AuthenticatedAdminAcessosRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminAuditoriaRouteImport } from './routes/_authenticated/admin.auditoria'
 import { Route as AuthenticatedAdminConfiguracoesRouteImport } from './routes/_authenticated/admin.configuracoes'
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
+import { Route as AuthenticatedAndaimesAcompanhamentoRouteImport } from './routes/_authenticated/andaimes.acompanhamento'
 import { Route as AuthenticatedAndaimesEstoqueRouteImport } from './routes/_authenticated/andaimes.estoque'
 import { Route as AuthenticatedAndaimesInventarioRouteImport } from './routes/_authenticated/andaimes.inventario'
+import { Route as AuthenticatedAndaimesPatrimonioRouteImport } from './routes/_authenticated/andaimes.patrimonio'
 import { Route as AuthenticatedAndaimesRomaneiosRouteImport } from './routes/_authenticated/andaimes.romaneios'
 import { Route as AuthenticatedAndaimesSolicitacoesRouteImport } from './routes/_authenticated/andaimes.solicitacoes'
 import { Route as AuthenticatedAusenciasAtestadosRouteImport } from './routes/_authenticated/ausencias.atestados'
@@ -137,6 +139,12 @@ const AuthenticatedAdminUsuariosRoute =
     path: '/admin/usuarios',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAndaimesAcompanhamentoRoute =
+  AuthenticatedAndaimesAcompanhamentoRouteImport.update({
+    id: '/andaimes/acompanhamento',
+    path: '/andaimes/acompanhamento',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAndaimesEstoqueRoute =
   AuthenticatedAndaimesEstoqueRouteImport.update({
     id: '/andaimes/estoque',
@@ -147,6 +155,12 @@ const AuthenticatedAndaimesInventarioRoute =
   AuthenticatedAndaimesInventarioRouteImport.update({
     id: '/andaimes/inventario',
     path: '/andaimes/inventario',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAndaimesPatrimonioRoute =
+  AuthenticatedAndaimesPatrimonioRouteImport.update({
+    id: '/andaimes/patrimonio',
+    path: '/andaimes/patrimonio',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAndaimesRomaneiosRoute =
@@ -338,8 +352,10 @@ export interface FileRoutesByFullPath {
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
+  '/andaimes/acompanhamento': typeof AuthenticatedAndaimesAcompanhamentoRoute
   '/andaimes/estoque': typeof AuthenticatedAndaimesEstoqueRoute
   '/andaimes/inventario': typeof AuthenticatedAndaimesInventarioRoute
+  '/andaimes/patrimonio': typeof AuthenticatedAndaimesPatrimonioRoute
   '/andaimes/romaneios': typeof AuthenticatedAndaimesRomaneiosRoute
   '/andaimes/solicitacoes': typeof AuthenticatedAndaimesSolicitacoesRoute
   '/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
@@ -385,8 +401,10 @@ export interface FileRoutesByTo {
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
+  '/andaimes/acompanhamento': typeof AuthenticatedAndaimesAcompanhamentoRoute
   '/andaimes/estoque': typeof AuthenticatedAndaimesEstoqueRoute
   '/andaimes/inventario': typeof AuthenticatedAndaimesInventarioRoute
+  '/andaimes/patrimonio': typeof AuthenticatedAndaimesPatrimonioRoute
   '/andaimes/romaneios': typeof AuthenticatedAndaimesRomaneiosRoute
   '/andaimes/solicitacoes': typeof AuthenticatedAndaimesSolicitacoesRoute
   '/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
@@ -434,8 +452,10 @@ export interface FileRoutesById {
   '/_authenticated/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/_authenticated/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
+  '/_authenticated/andaimes/acompanhamento': typeof AuthenticatedAndaimesAcompanhamentoRoute
   '/_authenticated/andaimes/estoque': typeof AuthenticatedAndaimesEstoqueRoute
   '/_authenticated/andaimes/inventario': typeof AuthenticatedAndaimesInventarioRoute
+  '/_authenticated/andaimes/patrimonio': typeof AuthenticatedAndaimesPatrimonioRoute
   '/_authenticated/andaimes/romaneios': typeof AuthenticatedAndaimesRomaneiosRoute
   '/_authenticated/andaimes/solicitacoes': typeof AuthenticatedAndaimesSolicitacoesRoute
   '/_authenticated/ausencias/atestados': typeof AuthenticatedAusenciasAtestadosRoute
@@ -483,8 +503,10 @@ export interface FileRouteTypes {
     | '/admin/auditoria'
     | '/admin/configuracoes'
     | '/admin/usuarios'
+    | '/andaimes/acompanhamento'
     | '/andaimes/estoque'
     | '/andaimes/inventario'
+    | '/andaimes/patrimonio'
     | '/andaimes/romaneios'
     | '/andaimes/solicitacoes'
     | '/ausencias/atestados'
@@ -530,8 +552,10 @@ export interface FileRouteTypes {
     | '/admin/auditoria'
     | '/admin/configuracoes'
     | '/admin/usuarios'
+    | '/andaimes/acompanhamento'
     | '/andaimes/estoque'
     | '/andaimes/inventario'
+    | '/andaimes/patrimonio'
     | '/andaimes/romaneios'
     | '/andaimes/solicitacoes'
     | '/ausencias/atestados'
@@ -578,8 +602,10 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/auditoria'
     | '/_authenticated/admin/configuracoes'
     | '/_authenticated/admin/usuarios'
+    | '/_authenticated/andaimes/acompanhamento'
     | '/_authenticated/andaimes/estoque'
     | '/_authenticated/andaimes/inventario'
+    | '/_authenticated/andaimes/patrimonio'
     | '/_authenticated/andaimes/romaneios'
     | '/_authenticated/andaimes/solicitacoes'
     | '/_authenticated/ausencias/atestados'
@@ -725,6 +751,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminUsuariosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/andaimes/acompanhamento': {
+      id: '/_authenticated/andaimes/acompanhamento'
+      path: '/andaimes/acompanhamento'
+      fullPath: '/andaimes/acompanhamento'
+      preLoaderRoute: typeof AuthenticatedAndaimesAcompanhamentoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/andaimes/estoque': {
       id: '/_authenticated/andaimes/estoque'
       path: '/andaimes/estoque'
@@ -737,6 +770,13 @@ declare module '@tanstack/react-router' {
       path: '/andaimes/inventario'
       fullPath: '/andaimes/inventario'
       preLoaderRoute: typeof AuthenticatedAndaimesInventarioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/andaimes/patrimonio': {
+      id: '/_authenticated/andaimes/patrimonio'
+      path: '/andaimes/patrimonio'
+      fullPath: '/andaimes/patrimonio'
+      preLoaderRoute: typeof AuthenticatedAndaimesPatrimonioRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/andaimes/romaneios': {
@@ -957,8 +997,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminAuditoriaRoute: typeof AuthenticatedAdminAuditoriaRoute
   AuthenticatedAdminConfiguracoesRoute: typeof AuthenticatedAdminConfiguracoesRoute
   AuthenticatedAdminUsuariosRoute: typeof AuthenticatedAdminUsuariosRoute
+  AuthenticatedAndaimesAcompanhamentoRoute: typeof AuthenticatedAndaimesAcompanhamentoRoute
   AuthenticatedAndaimesEstoqueRoute: typeof AuthenticatedAndaimesEstoqueRoute
   AuthenticatedAndaimesInventarioRoute: typeof AuthenticatedAndaimesInventarioRoute
+  AuthenticatedAndaimesPatrimonioRoute: typeof AuthenticatedAndaimesPatrimonioRoute
   AuthenticatedAndaimesRomaneiosRoute: typeof AuthenticatedAndaimesRomaneiosRoute
   AuthenticatedAndaimesSolicitacoesRoute: typeof AuthenticatedAndaimesSolicitacoesRoute
   AuthenticatedAusenciasAtestadosRoute: typeof AuthenticatedAusenciasAtestadosRoute
@@ -1002,8 +1044,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminAuditoriaRoute: AuthenticatedAdminAuditoriaRoute,
   AuthenticatedAdminConfiguracoesRoute: AuthenticatedAdminConfiguracoesRoute,
   AuthenticatedAdminUsuariosRoute: AuthenticatedAdminUsuariosRoute,
+  AuthenticatedAndaimesAcompanhamentoRoute:
+    AuthenticatedAndaimesAcompanhamentoRoute,
   AuthenticatedAndaimesEstoqueRoute: AuthenticatedAndaimesEstoqueRoute,
   AuthenticatedAndaimesInventarioRoute: AuthenticatedAndaimesInventarioRoute,
+  AuthenticatedAndaimesPatrimonioRoute: AuthenticatedAndaimesPatrimonioRoute,
   AuthenticatedAndaimesRomaneiosRoute: AuthenticatedAndaimesRomaneiosRoute,
   AuthenticatedAndaimesSolicitacoesRoute:
     AuthenticatedAndaimesSolicitacoesRoute,
