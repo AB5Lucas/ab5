@@ -561,8 +561,10 @@ export function SchedulePlannerBoard({
     onError: (e: Error) => toast.error(e.message),
   });
   const toggleOvernight = useMutation({
-    mutationFn: async ({ id, current }: { id: string; current: boolean }) => {
-      const { error } = await supabase.from("daily_allocations").update({ overnight: !current }).eq("id", id);
+    mutationFn: async ({ id, current, travelOff }: { id: string; current: boolean; travelOff?: boolean | null }) => {
+      const patch: { overnight: boolean; travel_bonus_override?: boolean | null } = { overnight: !current };
+      if (current && travelOff !== undefined) patch.travel_bonus_override = travelOff;
+      const { error } = await supabase.from("daily_allocations").update(patch).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
@@ -1710,30 +1712,26 @@ export function SchedulePlannerBoard({
                             />
                           );
                         })()}
-                        <span className="flex items-center gap-0.5">
                         {(() => {
+                          // Ciclo: azul (prêmio viagem) → amarela (pernoite R$ 25) → apagada → azul
                           const tb = r.travel_bonus_override ?? defaultAllocTravel(r.work_id, r.collaborator_id);
-                          const exc = r.travel_bonus_override !== null && r.travel_bonus_override !== undefined;
+                          const on = !!(r as any).overnight;
                           return (
                             <button
                               type="button"
                               disabled={!editable}
-                              title={`${tb ? "Recebe prêmio viagem" : "Sem prêmio viagem"}${exc ? " (exceção)" : ""}`}
-                              aria-label="Alternar prêmio viagem do colaborador"
-                              onClick={(e) => { e.stopPropagation(); toggleAllocTravel.mutate({ id: r.id, workId: r.work_id, collaboratorId: r.collaborator_id, current: tb }); }}
-                              className={`h-2 w-2 shrink-0 rounded-full ${tb ? "bg-info" : "bg-muted-foreground/40"}`}
+                              title={on ? "Pernoite: R$ 25,00 de prêmio viagem" : tb ? "Recebe prêmio viagem (clique para pernoite)" : "Sem prêmio viagem"}
+                              aria-label="Alternar prêmio viagem / pernoite do colaborador"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (on) toggleOvernight.mutate({ id: r.id, current: true, travelOff: defaultAllocTravel(r.work_id, r.collaborator_id) ? false : null });
+                                else if (tb) toggleOvernight.mutate({ id: r.id, current: false });
+                                else toggleAllocTravel.mutate({ id: r.id, workId: r.work_id, collaboratorId: r.collaborator_id, current: tb });
+                              }}
+                              className={`h-2 w-2 shrink-0 rounded-full ${on ? "bg-warning" : tb ? "bg-info" : "bg-muted-foreground/40"}`}
                             />
                           );
                         })()}
-                        <button
-                          type="button"
-                          disabled={!editable}
-                          title={(r as any).overnight ? "Pernoite (+R$ 25,00 prêmio viagem)" : "Sem pernoite"}
-                          aria-label="Alternar pernoite do colaborador"
-                          onClick={(e) => { e.stopPropagation(); toggleOvernight.mutate({ id: r.id, current: !!(r as any).overnight }); }}
-                          className={`h-2 w-2 shrink-0 rounded-full ${(r as any).overnight ? "bg-warning" : "bg-muted-foreground/40"}`}
-                        />
-                        </span>
                         </span>
                       </li>
                     );
