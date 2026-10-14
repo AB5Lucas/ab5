@@ -40,6 +40,7 @@ export const formatBR = (iso: string) =>
 export type Collaborator = {
   id: string;
   full_name: string;
+  cpf?: string | null;
   registration_number: string;
   position_id: string | null;
   status: string;
