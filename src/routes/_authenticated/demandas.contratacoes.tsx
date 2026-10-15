@@ -72,8 +72,17 @@ function useBase() {
     queryFn: async () => (await supabase.from("works").select("id,name,client_id").eq("active", true).order("name")).data ?? [],
   });
   const positions = useQuery({
-    queryKey: ["hr-positions"],
-    queryFn: async () => (await supabase.from("positions").select("id,name").eq("active", true).order("name")).data ?? [],
+    queryKey: ["hr-positions-base"],
+    queryFn: async () => {
+      const rows = (await supabase.from("positions").select("id,name").eq("active", true).order("name")).data ?? [];
+      // só a função principal, sem nível (Ajudante N1..N4 → Ajudante)
+      const seen = new Map<string, { id: string; name: string }>();
+      for (const r of rows) {
+        const base = r.name.replace(/\s+N\d+\s*$/i, "").trim();
+        if (!seen.has(base.toLowerCase())) seen.set(base.toLowerCase(), { id: r.id, name: base });
+      }
+      return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    },
   });
   return { clients: clients.data ?? [], works: works.data ?? [], positions: positions.data ?? [] };
 }
