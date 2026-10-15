@@ -125,7 +125,7 @@ function Requests({ isRh }: { isRh: boolean }) {
       (f.status === ALL || x.status === f.status) &&
       (!f.from || x.created_at.slice(0, 10) >= f.from) &&
       (!f.to || x.created_at.slice(0, 10) <= f.to));
-    if (f.sort === "prio") r.sort((a, b) => PRIO_ORDER[a.priority] - PRIO_ORDER[b.priority]);
+    if (f.sort === "prio") r.sort((a, b) => (PRIO_ORDER[a.priority] ?? 9) - (PRIO_ORDER[b.priority] ?? 9));
     if (f.sort === "status") r.sort((a, b) => Object.keys(STATUS).indexOf(a.status) - Object.keys(STATUS).indexOf(b.status));
     return r;
   }, [all, f]);
@@ -313,8 +313,7 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
       if (status === "parcial" && (n <= 0 || n >= req.quantity)) throw new Error("Atendimento parcial: informe vagas atendidas entre 1 e " + (req.quantity - 1) + ".");
       if (status === req.status && n === req.filled && !note.trim() && !assume) throw new Error("Nada para atualizar.");
       const name = profile?.full_name || user?.email || null;
-      const patch: Record<string, unknown> = { status, filled: n, updated_at: new Date().toISOString() };
-      if (assume) { patch.rh_owner_id = user!.id; patch.rh_owner_name = name; }
+      const patch = { status, filled: n, updated_at: new Date().toISOString(), ...(assume ? { rh_owner_id: user!.id, rh_owner_name: name } : {}) };
       const { error } = await supabase.from("hiring_requests").update(patch).eq("id", req.id).eq("updated_at", req.updated_at).select("id").single();
       if (error) throw new Error("A solicitação foi alterada por outra pessoa. Reabra e tente de novo.");
       const ev = await supabase.from("hiring_request_events").insert({
