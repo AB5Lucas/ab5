@@ -181,8 +181,41 @@ function CertificatesPage() {
 function GenerateTab() {
   const qc = useQueryClient();
   const [date, setDate] = useState(today());
-  const { certData, tsts } = useBase();
+  const { certData, tsts, trainings } = useBase();
   const day = useDay(date);
+  type Person = { collabId: string; name: string; cpf: string | null; reg: string | null; kind: CertKind };
+  const [extras, setExtras] = useState<{ trainingId: string; name: string; p: Person }[]>([]);
+  const [addT, setAddT] = useState("");
+  const [addC, setAddC] = useState("");
+  const [addQ, setAddQ] = useState("");
+  const collabs = useQuery({
+    queryKey: ["cert-collabs"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("collaborators").select("id, full_name, cpf, registration_number").order("full_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const groups = useMemo(() => {
+    const out = (day.data ?? []).map((g) => ({ ...g, people: [...g.people] }));
+    for (const e of extras) {
+      let g = out.find((x) => x.trainingId === e.trainingId);
+      if (!g) { g = { trainingId: e.trainingId, name: e.name, people: [] }; out.push(g); }
+      if (!g.people.some((p) => p.collabId === e.p.collabId)) g.people.push(e.p);
+    }
+    return out;
+  }, [day.data, extras]);
+  const addManual = async () => {
+    const c = (collabs.data ?? []).find((x) => x.id === addC);
+    const t = (trainings.data ?? []).find((x) => x.id === addT);
+    if (!c || !t) return;
+    const { data: hist } = await supabase.from("collaborator_trainings").select("completed_at").eq("collaborator_id", c.id).eq("training_id", t.id);
+    const dates = (hist ?? []).map((h) => h.completed_at).filter(Boolean) as string[];
+    setExtras((s) => [...s, { trainingId: t.id, name: t.name, p: { collabId: c.id, name: (c.full_name ?? "").toUpperCase(), cpf: c.cpf, reg: c.registration_number, kind: dates.some((d) => d < date) ? "renovacao" : "inicial" } }]);
+    setSel((s) => ({ ...s, [`${t.id}|${c.id}`]: true }));
+    setAddC(""); setAddQ("");
+  };
+  const collabOpts = (collabs.data ?? []).filter((c) => !addQ || (c.full_name ?? "").toLowerCase().includes(addQ.toLowerCase())).slice(0, 100);
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [tstBy, setTstBy] = useState<Record<string, string>>({});
   const [kindBy, setKindBy] = useState<Record<string, "inicial" | "renovacao">>({});
@@ -205,10 +238,10 @@ function GenerateTab() {
   const key = (t: string, c: string) => `${t}|${c}`;
 
   const selected = useMemo(() => {
-    const out: { g: NonNullable<typeof day.data>[number]; p: NonNullable<typeof day.data>[number]["people"][number] }[] = [];
-    (day.data ?? []).forEach((g) => g.people.forEach((p) => sel[key(g.trainingId, p.collabId)] && out.push({ g, p })));
+    const out: { g: (typeof groups)[number]; p: Person }[] = [];
+    groups.forEach((g) => g.people.forEach((p) => sel[key(g.trainingId, p.collabId)] && out.push({ g, p })));
     return out;
-  }, [day.data, sel]);
+  }, [groups, sel]);
 
   const pending: string[] = [];
   const snaps: { s: CertSnapshot; trainingId: string; collabId: string; tstId: string; kind: "inicial" | "renovacao"; manual: boolean }[] = [];
@@ -313,28 +346,51 @@ function GenerateTab() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const allKeys = (day.data ?? []).flatMap((g) => g.people.map((p) => key(g.trainingId, p.collabId)));
+  const allKeys = groups.flatMap((g) => g.people.map((p) => key(g.trainingId, p.collabId)));
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <Label>Data do treinamento</Label>
-          <TrainingDatePicker value={date} onChange={(v) => { setDate(v); setSel({}); }} />
+          <TrainingDatePicker value={date} onChange={(v) => { setDate(v); setSel({}); setExtras([]); }} />
         </div>
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={split} onCheckedChange={setSplit} /> Um PDF por colaborador
         </label>
       </div>
 
+      <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3">
+        <div className="w-full text-sm font-medium">Adicionar colaborador fora da escalação</div>
+        <div className="w-64">
+          <Label>Treinamento</Label>
+          <Select value={addT} onValueChange={setAddT}>
+            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+            <SelectContent>{(trainings.data ?? []).filter((t) => t.active !== false).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="w-48">
+          <Label>Buscar</Label>
+          <Input value={addQ} onChange={(e) => setAddQ(e.target.value)} placeholder="Nome..." />
+        </div>
+        <div className="w-72">
+          <Label>Colaborador</Label>
+          <Select value={addC} onValueChange={setAddC}>
+            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+            <SelectContent>{collabOpts.map((c) => <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <Button variant="outline" disabled={!addT || !addC} onClick={addManual}><Plus className="h-4 w-4" /> Adicionar</Button>
+      </div>
+
       {day.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
-      {day.data && day.data.length === 0 && (
+      {day.data && groups.length === 0 && (
         <p className="rounded-md border border-border bg-secondary p-3 text-sm text-muted-foreground">
           Nenhum treinamento registrado em {brDate(date)}.
         </p>
       )}
 
-      {(day.data ?? []).map((g) => {
+      {groups.map((g) => {
         const all = g.people.every((p) => sel[key(g.trainingId, p.collabId)]);
         return (
           <div key={g.trainingId} className="rounded-lg border border-border bg-card p-3">
