@@ -78,7 +78,7 @@ function useBase() {
   const trainings = useQuery({
     queryKey: ["cert-trainings"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("trainings").select("id, name, active").order("name");
+      const { data, error } = await supabase.from("trainings").select("id, name, active, description").order("name");
       if (error) throw error;
       return data ?? [];
     },
