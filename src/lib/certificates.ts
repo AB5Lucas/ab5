@@ -1,5 +1,14 @@
 import { jsPDF } from "jspdf";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
+import nr06 from "@/assets/nr/nr06.png";
+import nr12 from "@/assets/nr/nr12.png";
+import nr18 from "@/assets/nr/nr18.png";
+import nr20 from "@/assets/nr/nr20.png";
+import nr26 from "@/assets/nr/nr26.png";
+import nr33 from "@/assets/nr/nr33.png";
+import nr34 from "@/assets/nr/nr34.png";
+import nr35 from "@/assets/nr/nr35.png";
+
 
 export type CertKind = "inicial" | "renovacao" | "conferir";
 export const KIND_LABEL: Record<CertKind, string> = {
@@ -129,9 +138,9 @@ function certHeader(doc: jsPDF, lg: Awaited<ReturnType<typeof logo>>, W: number,
   COMPANY.forEach((l, i) => doc.text(l, W / 2, y + 4 + i * 3, { align: "center" }));
 }
 
-function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof logo>>) {
+function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof logo>>, badge: string | null) {
   const W = doc.internal.pageSize.getWidth();
-  certHeader(doc, lg, W);
+  certHeader(doc, lg, W, badge);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(34);
   doc.text("Certificado", W / 2, 80, { align: "center" });
@@ -161,7 +170,7 @@ function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof log
 
   // Verso: conteúdo programático
   doc.addPage();
-  certHeader(doc, lg, W);
+  certHeader(doc, lg, W, badge);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text(`Conteúdo Programático Teórico do Treinamento: ${s.hours} horas.`, 30, 70);
@@ -183,9 +192,11 @@ function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof log
 export async function certificatesPdf(list: CertSnapshot[], fileName: string) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
   const lg = await logo();
+  const badges = new Map<string, string | null>();
+  for (const s of list) if (!badges.has(s.trainingName)) badges.set(s.trainingName, await badgeFor(s.trainingName));
   list.forEach((s, i) => {
     if (i > 0) doc.addPage();
-    drawCert(doc, s, lg);
+    drawCert(doc, s, lg, badges.get(s.trainingName) ?? null);
   });
   return { doc, fileName };
 }
