@@ -256,7 +256,27 @@ export async function attendancePdf(lists: ListSnapshot[]) {
   return doc;
 }
 
+/** Abre o PDF numa janela dentro do próprio sistema (navegadores como o Edge bloqueiam abrir em nova aba). */
 export function openPdf(doc: jsPDF) {
-  const url = doc.output("bloburl");
-  window.open(String(url), "_blank");
+  const url = String(doc.output("bloburl"));
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;flex-direction:column;padding:16px;gap:8px";
+  const bar = document.createElement("div");
+  bar.style.cssText = "display:flex;justify-content:flex-end;gap:8px";
+  const mkBtn = (label: string) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.style.cssText = "background:#fff;color:#111;border-radius:6px;padding:6px 14px;font-size:14px;font-weight:500";
+    return b;
+  };
+  const dl = mkBtn("Baixar");
+  dl.onclick = () => doc.save("documento.pdf");
+  const close = mkBtn("Fechar");
+  close.onclick = () => { overlay.remove(); URL.revokeObjectURL(url); };
+  bar.append(dl, close);
+  const frame = document.createElement("iframe");
+  frame.src = url;
+  frame.style.cssText = "flex:1;width:100%;border:0;border-radius:8px;background:#fff";
+  overlay.append(bar, frame);
+  document.body.appendChild(overlay);
 }
