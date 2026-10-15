@@ -140,7 +140,7 @@ function useDay(date: string) {
         const dates = (hist ?? [])
           .filter((h) => h.collaborator_id === r.collaborator_id && h.training_id === r.training_id && h.completed_at)
           .map((h) => h.completed_at as string);
-        const g = groups.get(r.training_id) ?? { trainingId: r.training_id, name: r.trainings?.name ?? "—", people: [] };
+        const g = groups.get(r.training_id) ?? { trainingId: r.training_id as string, name: (r.trainings?.name ?? "—") as string, people: [] as { collabId: string; name: string; cpf: string | null; reg: string | null; kind: CertKind }[] };
         g.people.push({
           collabId: r.collaborator_id,
           name: (r.collaborators?.full_name ?? "").toUpperCase(),
