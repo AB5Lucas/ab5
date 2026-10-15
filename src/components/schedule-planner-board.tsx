@@ -1005,7 +1005,12 @@ export function SchedulePlannerBoard({
       const ev = evaluate(p.id, selectedWork);
       // Com uma obra selecionada, mostra somente quem está apto para ela
       // (alocado ou não), a menos que o usuário peça para ver todos.
-      if (selectedWork && !showAll && (ev.level === "block" || ev.hardBlock)) return false;
+      if (
+        selectedWork &&
+        !showAll &&
+        (ev.level === "block" || ev.hardBlock || ev.integration === "missing" || ev.integration === "expired")
+      )
+        return false;
       for (const f of filters) {
         if (f === "allocated" && !alloc) return false;
         if (f === "unallocated" && (alloc || ev.hardBlock)) return false;
