@@ -162,6 +162,13 @@
       "when": 1792005942725,
       "tag": "0022_andam_patio_access",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792063185118,
+      "tag": "0023_user_page_access",
+      "breakpoints": true
     }
   ]
 }
