@@ -86,17 +86,40 @@ const COMPANY = [
   "Telefone para contato: (019)3841-3500.",
 ];
 
-function certHeader(doc: jsPDF, lg: Awaited<ReturnType<typeof logo>>, W: number) {
+const NR_BADGES: Record<string, string> = {
+  "06": nr06, "12": nr12, "18": nr18, "20": nr20, "26": nr26, "33": nr33, "34": nr34, "35": nr35,
+};
+
+async function toDataUrl(url: string) {
+  const blob = await (await fetch(url)).blob();
+  return new Promise<string>((res) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as string);
+    r.readAsDataURL(blob);
+  });
+}
+
+/** Etiqueta da NR (canto superior esquerdo), a partir do nome do treinamento. */
+async function badgeFor(trainingName: string): Promise<string | null> {
+  const m = trainingName.match(/NR\s*-?\s*(\d{1,2})/i);
+  if (!m) return null;
+  const url = NR_BADGES[m[1]!.padStart(2, "0")];
+  if (!url) return null;
+  try { return await toDataUrl(url); } catch { return null; }
+}
+
+function certHeader(doc: jsPDF, lg: Awaited<ReturnType<typeof logo>>, W: number, badge?: string | null) {
   doc.setDrawColor(20, 30, 210);
   doc.setLineWidth(1.2);
   doc.roundedRect(18, 18, W - 36, 180, 14, 14);
-  let y = 30;
+  if (badge) doc.addImage(badge, "PNG", 30, 28, 24, 24);
+  let y = 26;
   if (lg) {
-    const h = 9;
+    const h = 18;
     const w = (lg.w / lg.h) * h;
     doc.addImage(lg.data, "PNG", W / 2 - w / 2, y, w, h);
   }
-  y += 14;
+  y += 23;
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
