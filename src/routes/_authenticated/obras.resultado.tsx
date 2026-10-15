@@ -1161,7 +1161,10 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
             ))}
             </div>
             <p className="text-sm text-muted-foreground">
-              {hhOn ? "Valor do pedido (horas dos RDOs × valor por função)" : "Valor do pedido (soma)"}: <span className="font-semibold text-foreground">{brl(ordersSum)}</span>
+              {hhOn ? `Valor do pedido (horas dos RDOs × valor por função${hhFrom || hhTo ? ", só no período escolhido" : ""})` : "Valor do pedido (soma)"}:{" "}
+              <span className="font-semibold text-foreground">
+                {brl(hhOn && (hhFrom || hhTo) ? (aggHH(hhFrom || "0000-01-01", hhTo || "9999-12-31") ?? []).reduce((a, r) => a + r.hours * num(hhRates[r.id] ?? ""), 0) : ordersSum)}
+              </span>
             </p>
             <p className="text-xs text-muted-foreground">O valor faturado vem do botão Faturamentos.</p>
           </div>
