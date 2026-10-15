@@ -571,6 +571,18 @@ export function SchedulePlannerBoard({
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
     onError: (e: Error) => toast.error(e.message),
   });
+  const setGroupOvernight = useMutation({
+    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
+      if (!ids.length) return;
+      const patch: { overnight: boolean; travel_bonus_override?: null } = { overnight: value };
+      if (!value) patch.travel_bonus_override = null;
+      const { error } = await supabase.from("daily_allocations").update(patch).in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   const toggleAllocVt = useMutation({
     mutationFn: async ({ id, workId, collaboratorId, current }: { id: string; workId: string; collaboratorId: string; current: boolean }) => {
@@ -1618,14 +1630,30 @@ export function SchedulePlannerBoard({
                       onClick={(e) => { e.stopPropagation(); setGroupVt.mutate({ ids: g.works.map((x) => x.id), value: !workPaysVt(w.id) }); }}
                       className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${workPaysVt(w.id) ? "bg-success" : "bg-muted-foreground/40"}`}
                     />
-                    <button
-                      type="button"
-                      disabled={!editable}
-                      title={workPaysTravel(w.id) ? "Prêmio viagem: ligado (clique para desligar)" : "Prêmio viagem: desligado (clique para ligar)"}
-                      aria-label="Alternar prêmio viagem da obra"
-                      onClick={(e) => { e.stopPropagation(); setGroupTravel.mutate({ ids: g.works.map((x) => x.id), value: !workPaysTravel(w.id) }); }}
-                      className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${workPaysTravel(w.id) ? "bg-info" : "bg-muted-foreground/40"}`}
-                    />
+                    {(() => {
+                      // Ciclo: azul (prêmio viagem) → amarela (todos pernoite) → apagada → azul
+                      const allOn = workRows.length > 0 && workRows.every((r: any) => !!r.overnight);
+                      const tv = workPaysTravel(w.id);
+                      return (
+                        <button
+                          type="button"
+                          disabled={!editable}
+                          title={allOn ? "Pernoite: todos recebem R$ 25,00 (clique para desligar)" : tv ? "Prêmio viagem: ligado (clique para pernoite)" : "Prêmio viagem: desligado (clique para ligar)"}
+                          aria-label="Alternar prêmio viagem / pernoite da obra"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const ids = workRows.map((r) => r.id);
+                            const workIds = g.works.map((x) => x.id);
+                            if (allOn) {
+                              setGroupOvernight.mutate({ ids, value: false });
+                              setGroupTravel.mutate({ ids: workIds, value: false });
+                            } else if (tv) setGroupOvernight.mutate({ ids, value: true });
+                            else setGroupTravel.mutate({ ids: workIds, value: true });
+                          }}
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${allOn ? "bg-warning" : tv ? "bg-info" : "bg-muted-foreground/40"}`}
+                        />
+                      );
+                    })()}
                     </span>
                   </div>
                   <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
