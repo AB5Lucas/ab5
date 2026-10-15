@@ -176,6 +176,13 @@
       "when": 1792063811899,
       "tag": "0024_demandas_certificados",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792065332570,
+      "tag": "0025_cert_data_periodic_hours_title",
+      "breakpoints": true
     }
   ]
 }

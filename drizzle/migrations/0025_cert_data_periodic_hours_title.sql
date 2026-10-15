@@ -1,0 +1,1 @@
+ALTER TABLE public.training_cert_data ADD COLUMN IF NOT EXISTS workload_hours_periodic numeric, ADD COLUMN IF NOT EXISTS training_title text;
