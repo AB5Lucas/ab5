@@ -256,27 +256,52 @@ export async function attendancePdf(lists: ListSnapshot[]) {
   return doc;
 }
 
-/** Abre o PDF numa janela dentro do próprio sistema (navegadores como o Edge bloqueiam abrir em nova aba). */
-export function openPdf(doc: jsPDF) {
-  const url = String(doc.output("bloburl"));
+/**
+ * Mostra o PDF numa janela dentro do sistema, desenhando as páginas como imagens
+ * (o Edge bloqueia o leitor de PDF em nova aba e dentro de quadros).
+ */
+export async function openPdf(doc: jsPDF) {
   const overlay = document.createElement("div");
-  overlay.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;flex-direction:column;padding:16px;gap:8px";
+  overlay.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;flex-direction:column;padding:16px;gap:8px";
   const bar = document.createElement("div");
   bar.style.cssText = "display:flex;justify-content:flex-end;gap:8px";
   const mkBtn = (label: string) => {
     const b = document.createElement("button");
     b.textContent = label;
-    b.style.cssText = "background:#fff;color:#111;border-radius:6px;padding:6px 14px;font-size:14px;font-weight:500";
+    b.style.cssText = "background:#fff;color:#111;border-radius:6px;padding:6px 14px;font-size:14px;font-weight:500;cursor:pointer";
     return b;
   };
   const dl = mkBtn("Baixar");
   dl.onclick = () => doc.save("documento.pdf");
   const close = mkBtn("Fechar");
-  close.onclick = () => { overlay.remove(); URL.revokeObjectURL(url); };
+  close.onclick = () => overlay.remove();
   bar.append(dl, close);
-  const frame = document.createElement("iframe");
-  frame.src = url;
-  frame.style.cssText = "flex:1;width:100%;border:0;border-radius:8px;background:#fff";
-  overlay.append(bar, frame);
+  const pages = document.createElement("div");
+  pages.style.cssText = "flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:12px;color:#fff";
+  pages.textContent = "Carregando…";
+  overlay.append(bar, pages);
   document.body.appendChild(overlay);
+  try {
+    const pdfjs = await import("pdfjs-dist");
+    const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(doc.output("arraybuffer")) }).promise;
+    pages.textContent = "";
+    const width = Math.min(pages.clientWidth - 16, 1100);
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const base = page.getViewport({ scale: 1 });
+      const scale = (width / base.width) * (window.devicePixelRatio || 1);
+      const vp = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = vp.width;
+      canvas.height = vp.height;
+      canvas.style.cssText = `width:${width}px;background:#fff;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,.4)`;
+      pages.appendChild(canvas);
+      await page.render({ canvasContext: canvas.getContext("2d")!, viewport: vp }).promise;
+    }
+  } catch (e) {
+    pages.textContent = "Não foi possível mostrar a pré-visualização. Use o botão Baixar.";
+    console.error(e);
+  }
 }

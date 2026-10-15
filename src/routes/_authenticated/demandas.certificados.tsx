@@ -321,11 +321,6 @@ function GenerateTab() {
           <Label>Data do treinamento</Label>
           <TrainingDatePicker value={date} onChange={(v) => { setDate(v); setSel({}); }} />
         </div>
-        {allKeys.length > 0 && (
-          <Button variant="outline" onClick={() => setSel(Object.fromEntries(allKeys.map((k) => [k, true])))}>
-            Selecionar todos do dia
-          </Button>
-        )}
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={split} onCheckedChange={setSplit} /> Um PDF por colaborador
         </label>
