@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { TrainingDatePicker } from "@/components/training-date-picker";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -306,7 +307,7 @@ function GenerateTab() {
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <Label>Data do treinamento</Label>
-          <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setSel({}); }} className="w-44" />
+          <TrainingDatePicker value={date} onChange={(v) => { setDate(v); setSel({}); }} />
         </div>
         {allKeys.length > 0 && (
           <Button variant="outline" onClick={() => setSel(Object.fromEntries(allKeys.map((k) => [k, true])))}>
@@ -511,7 +512,7 @@ function AttendanceTab() {
     <div className="space-y-4">
       <div>
         <Label>Data do treinamento</Label>
-        <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setSel({}); }} className="w-44" />
+        <TrainingDatePicker value={date} onChange={(v) => { setDate(v); setSel({}); }} />
       </div>
       {day.data && day.data.length === 0 && (
         <p className="rounded-md border border-border bg-secondary p-3 text-sm text-muted-foreground">Nenhum treinamento registrado em {brDate(date)}.</p>
