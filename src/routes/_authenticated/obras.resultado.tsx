@@ -195,12 +195,13 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     enabled: !!workId && workId !== "__all__" && hhOn,
     queryFn: async () => {
       const [{ data: wf, error }, { data: pos }] = await Promise.all([
-        supabase.from("rdo_workforce").select("report_date, position_id, entry_time, exit_time, break_minutes, worked_hours, present, collaborators(position_id)").eq("work_id", workId).eq("present", true),
+        supabase.from("rdo_workforce").select("report_date, collaborator_id, position_id, entry_time, exit_time, break_minutes, worked_hours, present, collaborators(position_id)").eq("work_id", workId).eq("present", true),
         supabase.from("positions").select("id, name").order("name"),
       ]);
       if (error) throw error;
       const rows = (wf ?? []).map((w) => ({
         date: w.report_date as string,
+        cid: (w as any).collaborator_id as string,
         pid: (w.position_id ?? (w as any).collaborators?.position_id ?? "none") as string,
         h: w.worked_hours != null ? Number(w.worked_hours) : workedHours(w.entry_time, w.exit_time, w.break_minutes ?? 60),
       }));
@@ -279,12 +280,17 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     };
     const rows = hhRaw.data.rows.filter((r) => r.date >= periodStart && r.date <= periodEnd);
     const hol = new Set<string>((holidaysQ.data ?? []) as string[]);
+    // MO orçada = horas × maior salário do topo da função cobrada no HH × 2,6 (encargos)
+    const charged = (hhSavedWork.hh_rates ?? {}) as Record<string, number>;
     let mo = 0;
-    const perDay = new Map<string, number>();
+    const perDay = new Map<string, Set<string>>();
     for (const r of rows) {
-      mo += laborCost(r.h, rateOf(r.pid), false, r.date, hol);
-      perDay.set(r.date, (perDay.get(r.date) ?? 0) + 1);
+      if (!Number(charged[r.pid] ?? 0)) continue;
+      mo += r.h * rateOf(r.pid) * ENCARGOS;
+      if (!perDay.has(r.date)) perDay.set(r.date, new Set());
+      perDay.get(r.date)!.add(r.cid);
     }
+    void hol;
     const caps = (veh ?? []).filter((v) => v.status !== "inactive" && Number(v.passenger_capacity) > 0).map((v) => Number(v.passenger_capacity)).sort((a, b) => a - b);
     const cap = caps.length ? caps[Math.floor(caps.length / 2)]! : 7;
     const km = Number(cli?.distance_km ?? 0);
@@ -293,7 +299,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     const bonus = ((dbr ?? []) as any[]).filter((r) => r.calculation_type !== "fixed_monthly" && km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance))).reduce((s, r) => s + Number(r.amount), 0);
     const carDay = km * 2 * 1.35 + toll * 2 + bonus;
     let transporte = 0;
-    for (const n of perDay.values()) transporte += Math.ceil(n / cap) * carDay;
+    for (const n of perDay.values()) transporte += Math.ceil(n.size / cap) * carDay;
     return { mo, transporte };
   }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd, holidaysQ.data]);
   const calcHH = useMemo(() => {
