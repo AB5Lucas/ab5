@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -220,28 +220,40 @@ function NewRequest({ onClose }: { onClose: () => void }) {
   const base = useBase();
   const qc = useQueryClient();
   const { user, profile } = useCurrentUser();
-  const [v, setV] = useState({ client: "", work: "", position: "", quantity: "1", reason: "", desired: "", priority: "normal", notes: "" });
+  const [v, setV] = useState({ client: "", work: "", reason: "", priority: "normal", notes: "" });
+  const [lines, setLines] = useState([{ position: "", quantity: "1" }]);
+  const last = useQuery({
+    queryKey: ["hiring-last-number"],
+    queryFn: async () => (await supabase.from("hiring_requests").select("number").order("number", { ascending: false }).limit(1)).data?.[0]?.number ?? 0,
+  });
+  const nextNum = last.data != null ? last.data + 1 : null;
   const save = useMutation({
     mutationFn: async () => {
-      const pos = base.positions.find((p) => p.id === v.position);
-      const qty = parseInt(v.quantity, 10);
-      if (!v.client || !v.work || !pos || !(qty > 0) || !v.reason.trim()) throw new Error("Preencha cliente, serviço, função, quantidade e justificativa.");
+      const items = lines.map((l) => ({ pos: base.positions.find((p) => p.id === l.position), qty: parseInt(l.quantity, 10) }));
+      if (!v.client || !v.work || !v.reason.trim() || items.some((i) => !i.pos || !(i.qty > 0)))
+        throw new Error("Preencha cliente, serviço, justificativa e função/vagas de cada linha.");
+      if (new Set(items.map((i) => i.pos!.id)).size !== items.length) throw new Error("Função repetida: junte as vagas na mesma linha.");
       const name = profile?.full_name || user?.email || null;
-      const { data, error } = await supabase.from("hiring_requests").insert({
-        requester_id: user!.id, requester_name: name, client_id: v.client, work_id: v.work,
-        position_id: pos.id, position_name: pos.name, quantity: qty, reason: v.reason.trim(),
-        desired_date: v.desired || null, priority: v.priority, notes: v.notes.trim() || null,
-      }).select("id,number").single();
-      if (error) throw error;
-      const ev = await supabase.from("hiring_request_events").insert({
-        request_id: data.id, user_id: user!.id, user_name: name, event: "abertura", new_status: "aberta", note: v.notes.trim() || null,
-      });
-      if (ev.error) throw ev.error;
-      return data.number;
+      const nums: number[] = [];
+      for (const i of items) {
+        const { data, error } = await supabase.from("hiring_requests").insert({
+          requester_id: user!.id, requester_name: name, client_id: v.client, work_id: v.work,
+          position_id: i.pos!.id, position_name: i.pos!.name, quantity: i.qty, reason: v.reason.trim(),
+          priority: v.priority, notes: v.notes.trim() || null,
+        }).select("id,number").single();
+        if (error) throw error;
+        const ev = await supabase.from("hiring_request_events").insert({
+          request_id: data.id, user_id: user!.id, user_name: name, event: "abertura", new_status: "aberta", note: v.notes.trim() || null,
+        });
+        if (ev.error) throw ev.error;
+        nums.push(data.number);
+      }
+      return nums;
     },
     onSuccess: (n) => {
-      toast.success(`Solicitação ${num(n)} aberta.`);
+      toast.success(n.length > 1 ? `Solicitações ${n.map(num).join(", ")} abertas.` : `Solicitação ${num(n[0]!)} aberta.`);
       qc.invalidateQueries({ queryKey: ["hiring-requests"] });
+      qc.invalidateQueries({ queryKey: ["hiring-last-number"] });
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -251,6 +263,8 @@ function NewRequest({ onClose }: { onClose: () => void }) {
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Nova solicitação de contratação</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1"><Label>Nº da solicitação</Label><Input disabled value={nextNum ? (lines.length > 1 ? `${num(nextNum)} a ${num(nextNum + lines.length - 1)}` : num(nextNum)) : "Automático"} /></div>
+          <div className="space-y-1"><Label>Data da solicitação</Label><Input disabled value={new Date().toLocaleDateString("pt-BR")} /></div>
           <div className="col-span-2 space-y-1"><Label>Cliente *</Label>
             <Select value={v.client} onValueChange={(c) => setV({ ...v, client: c, work: "" })}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -261,14 +275,22 @@ function NewRequest({ onClose }: { onClose: () => void }) {
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>{base.works.filter((w) => w.client_id === v.client).map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
             </Select></div>
-          <div className="space-y-1"><Label>Função *</Label>
-            <Select value={v.position} onValueChange={(p) => setV({ ...v, position: p })}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>{base.positions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-            </Select></div>
-          <div className="space-y-1"><Label>Vagas *</Label><Input type="number" min={1} value={v.quantity} onChange={(e) => setV({ ...v, quantity: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Data desejada</Label><Input type="date" value={v.desired} onChange={(e) => setV({ ...v, desired: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Prioridade</Label>
+          <div className="col-span-2 space-y-2">
+            <div className="grid grid-cols-[1fr_90px_32px] gap-2 text-sm font-medium"><span>Função *</span><span>Vagas *</span><span /></div>
+            {lines.map((l, idx) => (
+              <div key={idx} className="grid grid-cols-[1fr_90px_32px] gap-2">
+                <Select value={l.position} onValueChange={(p) => setLines(lines.map((x, j) => (j === idx ? { ...x, position: p } : x)))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>{base.positions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input type="number" min={1} value={l.quantity} onChange={(e) => setLines(lines.map((x, j) => (j === idx ? { ...x, quantity: e.target.value } : x)))} />
+                <Button type="button" variant="ghost" size="icon" disabled={lines.length === 1} onClick={() => setLines(lines.filter((_, j) => j !== idx))}><Trash2 className="h-4 w-4" /></Button>
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={() => setLines([...lines, { position: "", quantity: "1" }])}><Plus className="mr-1 h-4 w-4" />Adicionar função</Button>
+            {lines.length > 1 && <p className="text-xs text-muted-foreground">Cada função vira uma solicitação separada.</p>}
+          </div>
+          <div className="col-span-2 space-y-1"><Label>Prioridade</Label>
             <Select value={v.priority} onValueChange={(p) => setV({ ...v, priority: p })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{Object.entries(PRIORITY).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}</SelectContent>
@@ -338,7 +360,7 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
     ["Abertura", dt(req.created_at)], ["Solicitante", req.requester_name ?? "—"],
     ["Cliente", cName(req.client_id)], ["Serviço", wName(req.work_id)],
     ["Função", req.position_name], ["Vagas", `${req.filled} atendidas de ${req.quantity} (${req.quantity - req.filled} pendentes)`],
-    ["Data desejada", req.desired_date ? req.desired_date.split("-").reverse().join("/") : "—"], ["Prioridade", PRIORITY[req.priority]],
+    ["Prioridade", PRIORITY[req.priority]],
     ["Responsável RH", req.rh_owner_name ?? "—"], ["Status", <Badge key="s" variant={STATUS_VARIANT[req.status]}>{STATUS[req.status]}</Badge>],
   ];
   return (
