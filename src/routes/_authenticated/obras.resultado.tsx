@@ -278,7 +278,15 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       rateFor.set(pid, r);
       return r;
     };
-    const rows = hhRaw.data.rows.filter((r) => r.date >= periodStart && r.date <= periodEnd);
+    // Mesmo corte do realizado: até o fim do período e até o fim do último mês com produtividade apontada
+    let cut = periodEnd;
+    const lastProgYm = ((data.data?.progress ?? []) as any[])
+      .map((p) => String(p.month).slice(0, 7))
+      .filter((ym) => !untilMonth || ym <= untilMonth)
+      .sort()
+      .pop();
+    if (lastProgYm && monthEnd(lastProgYm) < cut) cut = monthEnd(lastProgYm);
+    const rows = hhRaw.data.rows.filter((r) => r.date >= periodStart && r.date <= cut);
     const hol = new Set<string>((holidaysQ.data ?? []) as string[]);
     // MO orçada = horas × maior salário do topo da função cobrada no HH × 2,6 (encargos)
     const charged = (hhSavedWork.hh_rates ?? {}) as Record<string, number>;
@@ -301,7 +309,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     let transporte = 0;
     for (const n of perDay.values()) transporte += Math.ceil(n.size / cap) * carDay;
     return { mo, transporte };
-  }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd, holidaysQ.data]);
+  }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd, holidaysQ.data, data.data, untilMonth]);
   const calcHH = useMemo(() => {
     if (!calcBase || !hhBudget || isAll) return calcBase;
     const items = calcBase.items.map((i) => {
