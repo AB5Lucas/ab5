@@ -1,5 +1,14 @@
 import { jsPDF } from "jspdf";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
+import nr06 from "@/assets/nr/nr06.png";
+import nr12 from "@/assets/nr/nr12.png";
+import nr18 from "@/assets/nr/nr18.png";
+import nr20 from "@/assets/nr/nr20.png";
+import nr26 from "@/assets/nr/nr26.png";
+import nr33 from "@/assets/nr/nr33.png";
+import nr34 from "@/assets/nr/nr34.png";
+import nr35 from "@/assets/nr/nr35.png";
+
 
 export type CertKind = "inicial" | "renovacao" | "conferir";
 export const KIND_LABEL: Record<CertKind, string> = {
@@ -86,17 +95,40 @@ const COMPANY = [
   "Telefone para contato: (019)3841-3500.",
 ];
 
-function certHeader(doc: jsPDF, lg: Awaited<ReturnType<typeof logo>>, W: number) {
+const NR_BADGES: Record<string, string> = {
+  "06": nr06, "12": nr12, "18": nr18, "20": nr20, "26": nr26, "33": nr33, "34": nr34, "35": nr35,
+};
+
+async function toDataUrl(url: string) {
+  const blob = await (await fetch(url)).blob();
+  return new Promise<string>((res) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as string);
+    r.readAsDataURL(blob);
+  });
+}
+
+/** Etiqueta da NR (canto superior esquerdo), a partir do nome do treinamento. */
+async function badgeFor(trainingName: string): Promise<string | null> {
+  const m = trainingName.match(/NR\s*-?\s*(\d{1,2})/i);
+  if (!m) return null;
+  const url = NR_BADGES[m[1]!.padStart(2, "0")];
+  if (!url) return null;
+  try { return await toDataUrl(url); } catch { return null; }
+}
+
+function certHeader(doc: jsPDF, lg: Awaited<ReturnType<typeof logo>>, W: number, badge?: string | null) {
   doc.setDrawColor(20, 30, 210);
   doc.setLineWidth(1.2);
   doc.roundedRect(18, 18, W - 36, 180, 14, 14);
-  let y = 30;
+  if (badge) doc.addImage(badge, "PNG", 30, 28, 24, 24);
+  let y = 26;
   if (lg) {
-    const h = 9;
+    const h = 18;
     const w = (lg.w / lg.h) * h;
     doc.addImage(lg.data, "PNG", W / 2 - w / 2, y, w, h);
   }
-  y += 14;
+  y += 23;
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
@@ -106,9 +138,9 @@ function certHeader(doc: jsPDF, lg: Awaited<ReturnType<typeof logo>>, W: number)
   COMPANY.forEach((l, i) => doc.text(l, W / 2, y + 4 + i * 3, { align: "center" }));
 }
 
-function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof logo>>) {
+function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof logo>>, badge: string | null) {
   const W = doc.internal.pageSize.getWidth();
-  certHeader(doc, lg, W);
+  certHeader(doc, lg, W, badge);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(34);
   doc.text("Certificado", W / 2, 80, { align: "center" });
@@ -138,7 +170,7 @@ function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof log
 
   // Verso: conteúdo programático
   doc.addPage();
-  certHeader(doc, lg, W);
+  certHeader(doc, lg, W, badge);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text(`Conteúdo Programático Teórico do Treinamento: ${s.hours} horas.`, 30, 70);
@@ -160,9 +192,11 @@ function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof log
 export async function certificatesPdf(list: CertSnapshot[], fileName: string) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
   const lg = await logo();
+  const badges = new Map<string, string | null>();
+  for (const s of list) if (!badges.has(s.trainingName)) badges.set(s.trainingName, await badgeFor(s.trainingName));
   list.forEach((s, i) => {
     if (i > 0) doc.addPage();
-    drawCert(doc, s, lg);
+    drawCert(doc, s, lg, badges.get(s.trainingName) ?? null);
   });
   return { doc, fileName };
 }
