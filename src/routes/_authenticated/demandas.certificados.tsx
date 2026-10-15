@@ -114,7 +114,19 @@ function useDay(date: string) {
         .select("id, collaborator_id, training_id, completed_at, collaborators(full_name, cpf, registration_number), trainings(name)")
         .eq("completed_at", date);
       if (error) throw error;
-      const rows = data ?? [];
+      // Também reconhece quem está agendado (Agendamentos) para o treinamento no dia.
+      const { data: appts, error: aErr } = await supabase
+        .from("appointments")
+        .select("id, collaborator_id, training_id, status, collaborators(full_name, cpf, registration_number), trainings(name)")
+        .eq("scheduled_date", date)
+        .not("training_id", "is", null);
+      if (aErr) throw aErr;
+      const rows: any[] = [
+        ...(data ?? []),
+        ...((appts ?? []) as any[])
+          .filter((a) => !/cancel/i.test(String(a.status ?? "")))
+          .map((a) => ({ ...a, completed_at: date })),
+      ];
       const ids = [...new Set(rows.map((r) => r.collaborator_id))];
       const { data: hist } = ids.length
         ? await supabase.from("collaborator_trainings").select("collaborator_id, training_id, completed_at").in("collaborator_id", ids)
@@ -128,8 +140,8 @@ function useDay(date: string) {
         const dates = (hist ?? [])
           .filter((h) => h.collaborator_id === r.collaborator_id && h.training_id === r.training_id && h.completed_at)
           .map((h) => h.completed_at as string);
-        const g = groups.get(r.training_id) ?? { trainingId: r.training_id, name: r.trainings?.name ?? "—", people: [] };
-        g.people.push({
+        const g = groups.get(r.training_id) ?? { trainingId: r.training_id as string, name: (r.trainings?.name ?? "—") as string, people: [] as { collabId: string; name: string; cpf: string | null; reg: string | null; kind: CertKind }[] };
+        (g.people as any[]).push({
           collabId: r.collaborator_id,
           name: (r.collaborators?.full_name ?? "").toUpperCase(),
           cpf: r.collaborators?.cpf ?? null,
