@@ -89,14 +89,19 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
       const ids = (raw ?? []).map((a) => a.collaborator_id);
       const blocked = new Set<string>();
       if (ids.length) {
-        const [off, vac, med] = await Promise.all([
+        const [off, vac, med, appt, boxes] = await Promise.all([
           supabase.from("days_off").select("collaborator_id, date, end_date").in("collaborator_id", ids).lte("date", date),
           supabase.from("vacations").select("collaborator_id").in("collaborator_id", ids).lte("start_date", date).gte("end_date", date).neq("status", "cancelled"),
           supabase.from("medical_leaves").select("collaborator_id").in("collaborator_id", ids).lte("start_date", date).gte("end_date", date),
+          // Escalado para integração/treinamento no dia: sai do RDO da obra
+          supabase.from("appointments").select("collaborator_id").in("collaborator_id", ids).in("type", ["integracao", "treinamento"]).eq("scheduled_date", date).neq("status", "cancelado"),
+          supabase.from("daily_status_entries").select("collaborator_id, box_key").eq("schedule_id", s.id).in("collaborator_id", ids),
         ]);
         for (const o of off.data ?? []) if ((o.end_date ?? o.date) >= date) blocked.add(o.collaborator_id);
         for (const v of vac.data ?? []) blocked.add(v.collaborator_id);
         for (const m of med.data ?? []) blocked.add(m.collaborator_id);
+        for (const a of appt.data ?? []) if (a.collaborator_id) blocked.add(a.collaborator_id);
+        for (const b of boxes.data ?? []) if (b.box_key === "treinamento" || b.box_key.startsWith("integracao")) blocked.add(b.collaborator_id);
       }
       const data = (raw ?? []).filter((a) => !blocked.has(a.collaborator_id));
       // Última função usada no RDO deste serviço (mantida para os próximos RDOs)
