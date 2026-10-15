@@ -9,4 +9,5 @@
 - [ ] Andaimes etapa 4: Patrimônio (valores, custo de locação, rateio, integração com Resultados)
 - [x] Excluir a aba Auditoria
 
-- [ ] Demandas > Contratações (solicitações, status, histórico, e-mails por cliente via domínio ab5.com.br)
+- [x] Demandas > Contratações (solicitações, status, histórico, destinatários por cliente)
+- [ ] Contratações: envio real dos e-mails (aguarda configurar domínio de e-mail ab5.com.br)

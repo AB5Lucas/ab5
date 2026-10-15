@@ -1716,6 +1716,263 @@ export type Database = {
           },
         ]
       }
+      hiring_email_config_history: {
+        Row: {
+          active: boolean | null
+          cc_emails: string[] | null
+          changed_at: string
+          changed_by: string | null
+          client_id: string
+          id: string
+          notes: string | null
+          to_emails: string[] | null
+        }
+        Insert: {
+          active?: boolean | null
+          cc_emails?: string[] | null
+          changed_at?: string
+          changed_by?: string | null
+          client_id: string
+          id?: string
+          notes?: string | null
+          to_emails?: string[] | null
+        }
+        Update: {
+          active?: boolean | null
+          cc_emails?: string[] | null
+          changed_at?: string
+          changed_by?: string | null
+          client_id?: string
+          id?: string
+          notes?: string | null
+          to_emails?: string[] | null
+        }
+        Relationships: []
+      }
+      hiring_email_configs: {
+        Row: {
+          active: boolean
+          cc_emails: string[]
+          client_id: string
+          notes: string | null
+          to_emails: string[]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          active?: boolean
+          cc_emails?: string[]
+          client_id: string
+          notes?: string | null
+          to_emails?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          active?: boolean
+          cc_emails?: string[]
+          client_id?: string
+          notes?: string | null
+          to_emails?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hiring_email_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hiring_email_log: {
+        Row: {
+          cc_emails: string[]
+          created_at: string
+          error: string | null
+          event: string
+          event_id: string | null
+          id: string
+          request_id: string
+          result: string
+          to_emails: string[]
+        }
+        Insert: {
+          cc_emails?: string[]
+          created_at?: string
+          error?: string | null
+          event: string
+          event_id?: string | null
+          id?: string
+          request_id: string
+          result: string
+          to_emails?: string[]
+        }
+        Update: {
+          cc_emails?: string[]
+          created_at?: string
+          error?: string | null
+          event?: string
+          event_id?: string | null
+          id?: string
+          request_id?: string
+          result?: string
+          to_emails?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hiring_email_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "hiring_request_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hiring_email_log_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "hiring_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hiring_request_events: {
+        Row: {
+          created_at: string
+          event: string
+          filled: number | null
+          id: string
+          new_status: string | null
+          note: string | null
+          old_status: string | null
+          request_id: string
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          filled?: number | null
+          id?: string
+          new_status?: string | null
+          note?: string | null
+          old_status?: string | null
+          request_id: string
+          user_id?: string
+          user_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          filled?: number | null
+          id?: string
+          new_status?: string | null
+          note?: string | null
+          old_status?: string | null
+          request_id?: string
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hiring_request_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "hiring_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hiring_requests: {
+        Row: {
+          client_id: string
+          created_at: string
+          desired_date: string | null
+          filled: number
+          id: string
+          notes: string | null
+          number: number
+          position_id: string | null
+          position_name: string
+          priority: string
+          quantity: number
+          reason: string
+          requester_id: string
+          requester_name: string | null
+          rh_owner_id: string | null
+          rh_owner_name: string | null
+          status: string
+          updated_at: string
+          work_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          desired_date?: string | null
+          filled?: number
+          id?: string
+          notes?: string | null
+          number?: never
+          position_id?: string | null
+          position_name: string
+          priority?: string
+          quantity: number
+          reason: string
+          requester_id?: string
+          requester_name?: string | null
+          rh_owner_id?: string | null
+          rh_owner_name?: string | null
+          status?: string
+          updated_at?: string
+          work_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          desired_date?: string | null
+          filled?: number
+          id?: string
+          notes?: string | null
+          number?: never
+          position_id?: string | null
+          position_name?: string
+          priority?: string
+          quantity?: number
+          reason?: string
+          requester_id?: string
+          requester_name?: string | null
+          rh_owner_id?: string | null
+          rh_owner_name?: string | null
+          status?: string
+          updated_at?: string
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hiring_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hiring_requests_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hiring_requests_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holidays: {
         Row: {
           created_at: string
@@ -3703,6 +3960,7 @@ export type Database = {
       }
       is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
+      is_hiring_rh: { Args: never; Returns: boolean }
       move_allocation_service: {
         Args: { _alloc_id: string; _work_id: string }
         Returns: undefined

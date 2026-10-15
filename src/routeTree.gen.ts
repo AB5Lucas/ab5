@@ -40,6 +40,7 @@ import { Route as AuthenticatedColaboradoresAsosRouteImport } from './routes/_au
 import { Route as AuthenticatedColaboradoresEstruturaRouteImport } from './routes/_authenticated/colaboradores.estrutura'
 import { Route as AuthenticatedColaboradoresTurnosRouteImport } from './routes/_authenticated/colaboradores.turnos'
 import { Route as AuthenticatedDemandasCertificadosRouteImport } from './routes/_authenticated/demandas.certificados'
+import { Route as AuthenticatedDemandasContratacoesRouteImport } from './routes/_authenticated/demandas.contratacoes'
 import { Route as AuthenticatedExternoRelatorioDiarioRouteImport } from './routes/_authenticated/externo.relatorio-diario'
 import { Route as AuthenticatedFechamentosFinanceiroRouteImport } from './routes/_authenticated/fechamentos.financeiro'
 import { Route as AuthenticatedFechamentosSuzanoRouteImport } from './routes/_authenticated/fechamentos.suzano'
@@ -235,6 +236,12 @@ const AuthenticatedDemandasCertificadosRoute =
     path: '/demandas/certificados',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDemandasContratacoesRoute =
+  AuthenticatedDemandasContratacoesRouteImport.update({
+    id: '/demandas/contratacoes',
+    path: '/demandas/contratacoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedExternoRelatorioDiarioRoute =
   AuthenticatedExternoRelatorioDiarioRouteImport.update({
     id: '/externo/relatorio-diario',
@@ -367,6 +374,7 @@ export interface FileRoutesByFullPath {
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/demandas/certificados': typeof AuthenticatedDemandasCertificadosRoute
+  '/demandas/contratacoes': typeof AuthenticatedDemandasContratacoesRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
@@ -416,6 +424,7 @@ export interface FileRoutesByTo {
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/demandas/certificados': typeof AuthenticatedDemandasCertificadosRoute
+  '/demandas/contratacoes': typeof AuthenticatedDemandasContratacoesRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
@@ -467,6 +476,7 @@ export interface FileRoutesById {
   '/_authenticated/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/_authenticated/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
   '/_authenticated/demandas/certificados': typeof AuthenticatedDemandasCertificadosRoute
+  '/_authenticated/demandas/contratacoes': typeof AuthenticatedDemandasContratacoesRoute
   '/_authenticated/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/_authenticated/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/_authenticated/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
@@ -518,6 +528,7 @@ export interface FileRouteTypes {
     | '/colaboradores/estrutura'
     | '/colaboradores/turnos'
     | '/demandas/certificados'
+    | '/demandas/contratacoes'
     | '/externo/relatorio-diario'
     | '/fechamentos/financeiro'
     | '/fechamentos/suzano'
@@ -567,6 +578,7 @@ export interface FileRouteTypes {
     | '/colaboradores/estrutura'
     | '/colaboradores/turnos'
     | '/demandas/certificados'
+    | '/demandas/contratacoes'
     | '/externo/relatorio-diario'
     | '/fechamentos/financeiro'
     | '/fechamentos/suzano'
@@ -617,6 +629,7 @@ export interface FileRouteTypes {
     | '/_authenticated/colaboradores/estrutura'
     | '/_authenticated/colaboradores/turnos'
     | '/_authenticated/demandas/certificados'
+    | '/_authenticated/demandas/contratacoes'
     | '/_authenticated/externo/relatorio-diario'
     | '/_authenticated/fechamentos/financeiro'
     | '/_authenticated/fechamentos/suzano'
@@ -863,6 +876,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDemandasCertificadosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/demandas/contratacoes': {
+      id: '/_authenticated/demandas/contratacoes'
+      path: '/demandas/contratacoes'
+      fullPath: '/demandas/contratacoes'
+      preLoaderRoute: typeof AuthenticatedDemandasContratacoesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/externo/relatorio-diario': {
       id: '/_authenticated/externo/relatorio-diario'
       path: '/externo/relatorio-diario'
@@ -1012,6 +1032,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedColaboradoresEstruturaRoute: typeof AuthenticatedColaboradoresEstruturaRoute
   AuthenticatedColaboradoresTurnosRoute: typeof AuthenticatedColaboradoresTurnosRoute
   AuthenticatedDemandasCertificadosRoute: typeof AuthenticatedDemandasCertificadosRoute
+  AuthenticatedDemandasContratacoesRoute: typeof AuthenticatedDemandasContratacoesRoute
   AuthenticatedExternoRelatorioDiarioRoute: typeof AuthenticatedExternoRelatorioDiarioRoute
   AuthenticatedFechamentosFinanceiroRoute: typeof AuthenticatedFechamentosFinanceiroRoute
   AuthenticatedFechamentosSuzanoRoute: typeof AuthenticatedFechamentosSuzanoRoute
@@ -1066,6 +1087,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedColaboradoresTurnosRoute: AuthenticatedColaboradoresTurnosRoute,
   AuthenticatedDemandasCertificadosRoute:
     AuthenticatedDemandasCertificadosRoute,
+  AuthenticatedDemandasContratacoesRoute:
+    AuthenticatedDemandasContratacoesRoute,
   AuthenticatedExternoRelatorioDiarioRoute:
     AuthenticatedExternoRelatorioDiarioRoute,
   AuthenticatedFechamentosFinanceiroRoute:
