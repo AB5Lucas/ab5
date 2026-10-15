@@ -795,6 +795,54 @@ export type Database = {
           },
         ]
       }
+      attendance_lists: {
+        Row: {
+          id: string
+          issued_at: string
+          issued_by: string | null
+          snapshot: Json
+          training_date: string
+          training_id: string
+          tst_id: string | null
+          version: number
+        }
+        Insert: {
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          snapshot: Json
+          training_date: string
+          training_id: string
+          tst_id?: string | null
+          version?: number
+        }
+        Update: {
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          snapshot?: Json
+          training_date?: string
+          training_id?: string
+          tst_id?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_lists_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_lists_tst_id_fkey"
+            columns: ["tst_id"]
+            isOneToOne: false
+            referencedRelation: "tst_instructors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -2506,6 +2554,129 @@ export type Database = {
           },
         ]
       }
+      training_cert_data: {
+        Row: {
+          cert_phrase: string | null
+          code: string | null
+          default_location: string | null
+          is_periodic_label: boolean
+          legal_basis: string | null
+          norms: string | null
+          objectives: string | null
+          program: string | null
+          schedule_text: string | null
+          subject: string | null
+          training_id: string
+          updated_at: string
+          updated_by: string | null
+          workload_hours: number | null
+        }
+        Insert: {
+          cert_phrase?: string | null
+          code?: string | null
+          default_location?: string | null
+          is_periodic_label?: boolean
+          legal_basis?: string | null
+          norms?: string | null
+          objectives?: string | null
+          program?: string | null
+          schedule_text?: string | null
+          subject?: string | null
+          training_id: string
+          updated_at?: string
+          updated_by?: string | null
+          workload_hours?: number | null
+        }
+        Update: {
+          cert_phrase?: string | null
+          code?: string | null
+          default_location?: string | null
+          is_periodic_label?: boolean
+          legal_basis?: string | null
+          norms?: string | null
+          objectives?: string | null
+          program?: string | null
+          schedule_text?: string | null
+          subject?: string | null
+          training_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          workload_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_cert_data_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: true
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_certificates: {
+        Row: {
+          collaborator_id: string
+          id: string
+          issued_at: string
+          issued_by: string | null
+          kind: string
+          kind_manual: boolean
+          snapshot: Json
+          training_date: string
+          training_id: string
+          tst_id: string | null
+          version: number
+        }
+        Insert: {
+          collaborator_id: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          kind: string
+          kind_manual?: boolean
+          snapshot: Json
+          training_date: string
+          training_id: string
+          tst_id?: string | null
+          version?: number
+        }
+        Update: {
+          collaborator_id?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          kind?: string
+          kind_manual?: boolean
+          snapshot?: Json
+          training_date?: string
+          training_id?: string
+          tst_id?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_certificates_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_certificates_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_certificates_tst_id_fkey"
+            columns: ["tst_id"]
+            isOneToOne: false
+            referencedRelation: "tst_instructors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trainings: {
         Row: {
           active: boolean
@@ -2725,6 +2896,45 @@ export type Database = {
           id?: string
           maximum_distance?: number | null
           minimum_distance?: number
+        }
+        Relationships: []
+      }
+      tst_instructors: {
+        Row: {
+          active: boolean
+          company: string | null
+          council: string | null
+          cpf: string | null
+          created_at: string
+          full_name: string
+          id: string
+          notes: string | null
+          registration: string | null
+          role_title: string | null
+        }
+        Insert: {
+          active?: boolean
+          company?: string | null
+          council?: string | null
+          cpf?: string | null
+          created_at?: string
+          full_name: string
+          id?: string
+          notes?: string | null
+          registration?: string | null
+          role_title?: string | null
+        }
+        Update: {
+          active?: boolean
+          company?: string | null
+          council?: string | null
+          cpf?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          notes?: string | null
+          registration?: string | null
+          role_title?: string | null
         }
         Relationships: []
       }
