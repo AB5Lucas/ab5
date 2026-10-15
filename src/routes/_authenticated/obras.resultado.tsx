@@ -780,14 +780,14 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                 <Lbl>Valor Faturado</Lbl>
                 <span className="flex justify-between">
                   <span>{brl(billed)}</span>
-                  <span>{order ? `${Math.round((billed / order) * 100)}%` : ""}</span>
+                  <span>{shownOrder ? `${Math.round((billed / shownOrder) * 100)}%` : ""}</span>
                 </span>
                 <Lbl>Saldo a Faturar</Lbl>
-                <span>{brl(order - billed)}</span>
+                <span>{brl(shownOrder - billed)}</span>
               </div>
               <div className="mt-6 text-center">
                 <SectionTitle>Valor do Pedido</SectionTitle>
-                <p className="mt-2 text-xl font-bold">{brl(order)}</p>
+                <p className="mt-2 text-xl font-bold">{brl(shownOrder)}</p>
               </div>
             </div>
 
