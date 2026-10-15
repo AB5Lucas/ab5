@@ -1,5 +1,5 @@
 import { contractFraction } from "@/lib/contract";
-import { loadWorkData, buildBase as engineBuildBase, fetchAll, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, type ItemKey } from "@/lib/results-engine";
+import { loadWorkData, buildBase as engineBuildBase, fetchAll, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, bdiBudget, BDI_RATE, type ItemKey } from "@/lib/results-engine";
 import { resplitClient, splitDesc } from "@/lib/resplit";
 import { Switch } from "@/components/ui/switch";
 import { useEffect, useMemo, useState } from "react";
@@ -8,7 +8,7 @@ import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Trash2, Plus, Pencil, Check, X, CalendarDays } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X, CalendarDays, Download } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -328,33 +328,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     const fullBudget = calcHH.items.reduce((a, i) => a + i.budget, 0);
     return { ...calcHH, items, budget, last, budgetMarginPct: order ? ((order - order * TAX_RATE - fullBudget) / order) * 100 : 0 };
   }, [calcHH, hhSavedWork, isAll]);
-  /** Locação: orçado de andaime = faturado acumulado × média dos % mensais (gasto andaime ÷ faturado do mês). */
-  const rentalInfo = useMemo(() => {
-    const w = hhSavedWork;
-    if (!calcCt || isAll || !w?.rental_enabled || !data.data) return null;
-    const cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
-    const bill = new Map<string, number>();
-    const scaf = new Map<string, number>();
-    for (const e of data.data.entries as any[]) {
-      if (e.entry_date > cut) continue;
-      const ym = e.entry_date.slice(0, 7);
-      if (e.category === "faturamento") bill.set(ym, (bill.get(ym) ?? 0) + Number(e.amount));
-      else if (e.category === "andaimes") scaf.set(ym, (scaf.get(ym) ?? 0) + Number(e.amount));
-    }
-    const months = [...bill.entries()].filter(([, v]) => v > 0).sort(([a], [b]) => a.localeCompare(b));
-    if (!months.length) return null;
-    const rows = months.map(([ym, b]) => ({ ym, billed: b, spent: scaf.get(ym) ?? 0, pct: (scaf.get(ym) ?? 0) / b }));
-    const avg = rows.reduce((a, r) => a + r.pct, 0) / rows.length;
-    const billed = rows.reduce((a, r) => a + r.billed, 0);
-    return { rows, avg, budget: billed * avg };
-  }, [calcCt, hhSavedWork, isAll, data.data, untilMonth]);
-  const calcRt = useMemo(() => {
-    if (!calcCt || !rentalInfo) return calcCt;
-    const items = calcCt.items.map((i) =>
-      i.key === "andaimes" ? { ...i, budget: rentalInfo.budget, used: rentalInfo.budget ? (i.real / rentalInfo.budget) * 100 : i.real ? 100 : 0 } : i,
-    );
-    return { ...calcCt, items, budget: items.reduce((a, i) => a + i.budget, 0) };
-  }, [calcCt, rentalInfo]);
+  const calcRt = calcCt;
   /** Mensal: pedido = soma dos pedidos com data no período (sem período = todos); orçado = % fixo do pedido. */
   const monthlyInfo = useMemo(() => {
     const w = hhSavedWork;
@@ -389,30 +363,28 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     return { ...calcRt, items, budget, order, rows, last, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
   }, [calcRt, monthlyInfo, hhSavedWork, hasPeriod, periodStart]);
   const [ctOn, setCtOn] = useState(false);
-  const [rtOn, setRtOn] = useState(false);
   const [moOn, setMoOn] = useState(false);
+  const [hhFrom, setHhFrom] = useState("");
+  const [hhTo, setHhTo] = useState("");
   const [ctMonths, setCtMonths] = useState("12");
   const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
-  const itemsSum = ITEMS.reduce((a, it) => a + num(itemStrs[it.key] ?? ""), 0);
   const [bdiOn, setBdiOn] = useState(false);
-  /** Custos BDI: total orçado = pedido × 0,5885, dividido 4/2/1/3 (MO/transp./ferram./mat.).
-   * Com custos realizados, os pesos ficam metade padrão e metade proporcional ao realizado.
-   * Com andaime e sem ferramentas, o peso de ferramentas vai para andaimes. */
+  const itemsSum = ITEMS.reduce((a, it) => a + num(itemStrs[it.key] ?? ""), 0);
+  /** Custos BDI: preenche os campos agora; com o BDI ativo, o orçado é recalculado sozinho a cada pedido. */
   const applyBdi = () => {
-    const BDI = 0.5885;
     const order = ordersSum || Number((work as any)?.order_value ?? 0);
     if (!order) { toast.error("Informe o valor do pedido antes de usar Custos BDI"); return; }
-    const real = Object.fromEntries((calc?.items ?? []).map((i) => [i.key, Number.isFinite(i.real) ? Math.max(0, i.real) : 0])) as Record<string, number>;
-    const w: Record<string, number> = { mo: 4, transporte: 2, ferramentas: 1, materiais: 3, andaimes: 0 };
-    if ((real["andaimes"] ?? 0) > 0 && !(real["ferramentas"] ?? 0)) { w["andaimes"] = w["ferramentas"]!; w["ferramentas"] = 0; }
-    const realTotal = ITEMS.reduce((a, it) => a + (real[it.key] ?? 0), 0);
-    if (realTotal > 0) for (const it of ITEMS) w[it.key] = 0.5 * w[it.key]! + 0.5 * (10 * (real[it.key] ?? 0)) / realTotal;
-    const sumW = ITEMS.reduce((a, it) => a + w[it.key]!, 0) || 1;
-    const total = order * BDI;
-    setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, ((total * w[it.key]!) / sumW).toFixed(2).replace(".", ",")])));
+    const real = Object.fromEntries((calc?.items ?? []).map((i) => [i.key, i.real]));
+    const b = bdiBudget(order, real);
+    setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, Number(b[it.key] ?? 0).toFixed(2).replace(".", ",")])));
   };
+  // Com BDI ativo, os campos acompanham o valor dos pedidos enquanto edita
+  useEffect(() => {
+    if (bdiOn && ordersSum) applyBdi();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bdiOn, ordersSum]);
   const [progMonth, setProgMonth] = useState(new Date().toISOString().slice(0, 7));
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "", competence: "" });
@@ -435,14 +407,14 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
           order_value: ordersSum,
           hh_enabled: hhOn,
           contract_enabled: ctOn,
-          rental_enabled: rtOn,
+          rental_enabled: false,
           monthly_enabled: moOn,
           contract_months: Math.max(1, parseInt(ctMonths) || 12),
           hh_rates: Object.fromEntries(Object.entries(hhRates).map(([k, v]) => [k, num(v)]).filter(([, v]) => v)),
           order_number: list.map((o) => o.number.trim()).filter(Boolean).join(" / ") || null,
           quote_number: quoteNo.trim() || null,
-          budget_cost: itemsSum,
-          budget_items: Object.fromEntries(ITEMS.map((it) => [it.key, num(itemStrs[it.key] ?? "")])),
+          budget_cost: bdiOn ? Math.round(ordersSum * BDI_RATE * 100) / 100 : itemsSum,
+          budget_items: { ...Object.fromEntries(ITEMS.map((it) => [it.key, num(itemStrs[it.key] ?? "")])), bdi: bdiOn ? 1 : 0 },
         } as any)
         .eq("id", workId);
       if (error) throw error;
@@ -579,11 +551,13 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     setQuoteNo(w?.quote_number ?? "");
     setHhOn(!!w?.hh_enabled);
     setCtOn(!!w?.contract_enabled);
-    setRtOn(!!w?.rental_enabled);
     setMoOn(!!w?.monthly_enabled);
     setCtMonths(String(w?.contract_months ?? 12));
     setHhRates(Object.fromEntries(Object.entries((w?.hh_rates ?? {}) as Record<string, number>).map(([k, v]) => [k, f(v)])));
+    setHhFrom("");
+    setHhTo("");
     const bi = (w?.budget_items ?? {}) as Record<string, number>;
+    setBdiOn(Number(bi["bdi"] ?? 0) === 1);
     setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, f(bi[it.key])])));
   };
 
@@ -599,6 +573,51 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   const last = calc?.last;
   const billed = last?.billing ?? 0;
   const order = monthlyInfo ? monthlyInfo.order : hhPeriodValue ?? calc?.order ?? 0;
+  // HH com dias de início/fim: só o valor exibido em Dados do Cliente (margens não mudam)
+  const hhRangeValue = useMemo(() => {
+    if (!hhSavedWork?.hh_enabled || (!hhFrom && !hhTo) || !hhRaw.data) return null;
+    const rows = aggHH(hhFrom || "0000-01-01", hhTo || "9999-12-31") ?? [];
+    return rows.reduce((a, r) => a + r.hours * Number((hhSavedWork.hh_rates ?? {})[r.id] ?? 0), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hhSavedWork, hhFrom, hhTo, hhRaw.data]);
+  const shownOrder = hhRangeValue ?? order;
+
+  const exportHH = async () => {
+    if (!hhRaw.data) { toast.error("Horas dos RDOs ainda carregando"); return; }
+    const from = hhFrom || hhTo ? hhFrom || "0000-01-01" : periodStart;
+    const to = hhFrom || hhTo ? hhTo || "9999-12-31" : periodEnd;
+    const rates = (hhSavedWork?.hh_enabled ? hhSavedWork.hh_rates ?? {} : Object.fromEntries(Object.entries(hhRates).map(([k, v]) => [k, num(v)]))) as Record<string, number>;
+    const rows = hhRaw.data.rows.filter((r) => r.date >= from && r.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+    if (!rows.length) { toast.error("Nenhuma hora apontada nos dias selecionados"); return; }
+    const ids = [...new Set(rows.map((r) => r.cid))];
+    const { data: cols } = await supabase.from("collaborators").select("id, full_name, cpf").in("id", ids);
+    const cm = new Map((cols ?? []).map((c) => [c.id, c]));
+    const fmt = (d: string) => d.split("-").reverse().join("/");
+    const aoa: (string | number)[][] = [["Data", "Nome", "CPF", "Função", "Horas trabalhadas", "Valor hora da função", "Valor total do dia"]];
+    let total = 0;
+    const days = [...new Set(rows.map((r) => r.date))];
+    for (const d of days) {
+      let dayTot = 0;
+      for (const r of rows.filter((x) => x.date === d)) {
+        const rate = Number(rates[r.pid] ?? 0);
+        const v = Math.round(r.h * rate * 100) / 100;
+        dayTot += v;
+        const c = cm.get(r.cid);
+        aoa.push([fmt(d), c?.full_name ?? "—", c?.cpf ?? "", r.pid === "none" ? "Sem função" : hhRaw.data.names.get(r.pid) ?? "—", Math.round(r.h * 100) / 100, rate, v]);
+      }
+      aoa.push([`Total ${fmt(d)}`, "", "", "", "", "", Math.round(dayTot * 100) / 100]);
+      total += dayTot;
+    }
+    aoa.push([]);
+    aoa.push(["Total do fechamento no período", "", "", "", "", "", Math.round(total * 100) / 100]);
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 14 }, { wch: 36 }, { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 18 }, { wch: 18 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "HH");
+    const name = `HH - ${w?.client ?? ""} - ${w?.name ?? ""} - ${fmt(rows[0]!.date).replace(/\//g, "-")} a ${fmt(rows[rows.length - 1]!.date).replace(/\//g, "-")}.xlsx`.replace(/[\\/:*?"<>|]/g, "");
+    XLSX.writeFile(wb, name);
+  };
   const budgetMargin = order - order * TAX_RATE - (calc?.budget ?? 0);
   const realMargin = (last?.revenue ?? 0) * (1 - TAX_RATE) - (last?.cost ?? 0);
   // Margens fixas (independentes do filtro de período)
@@ -761,14 +780,14 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                 <Lbl>Valor Faturado</Lbl>
                 <span className="flex justify-between">
                   <span>{brl(billed)}</span>
-                  <span>{order ? `${Math.round((billed / order) * 100)}%` : ""}</span>
+                  <span>{shownOrder ? `${Math.round((billed / shownOrder) * 100)}%` : ""}</span>
                 </span>
                 <Lbl>Saldo a Faturar</Lbl>
-                <span>{brl(order - billed)}</span>
+                <span>{brl(shownOrder - billed)}</span>
               </div>
               <div className="mt-6 text-center">
                 <SectionTitle>Valor do Pedido</SectionTitle>
-                <p className="mt-2 text-xl font-bold">{brl(order)}</p>
+                <p className="mt-2 text-xl font-bold">{brl(shownOrder)}</p>
               </div>
             </div>
 
@@ -1084,17 +1103,14 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                   <Switch checked={hhOn} onCheckedChange={setHhOn} /> HH
                 </label>
                 <label className="flex items-center gap-2 text-sm font-medium">
-                  <Switch checked={ctOn} onCheckedChange={setCtOn} /> Contrato
+                  <Switch checked={ctOn} onCheckedChange={setCtOn} /> Faturamento Parcial
                 </label>
                 {ctOn && (
                   <div className="flex items-center gap-1 text-sm">
-                    <Input className="h-8 w-16" inputMode="numeric" value={ctMonths} onChange={(e) => setCtMonths(e.target.value.replace(/\D/g, ""))} aria-label="Meses do contrato" />
+                    <Input className="h-8 w-16" inputMode="numeric" value={ctMonths} onChange={(e) => setCtMonths(e.target.value.replace(/\D/g, ""))} aria-label="Meses do faturamento parcial" />
                     meses
                   </div>
                 )}
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <Switch checked={rtOn} onCheckedChange={setRtOn} /> Locação
-                </label>
                 <label className="flex items-center gap-2 text-sm font-medium">
                   <Switch checked={moOn} onCheckedChange={setMoOn} /> Mensal
                 </label>
@@ -1103,6 +1119,25 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                 <Button type="button" size="sm" variant="outline" onClick={() => setHhDlg(true)}>Valores</Button>
               )}
             </div>
+            {hhOn && (
+              <div className="flex flex-wrap items-end gap-2 rounded-md border p-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Início</Label>
+                  <Input type="date" className="h-8 w-40" value={hhFrom} onChange={(e) => setHhFrom(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Fim</Label>
+                  <Input type="date" className="h-8 w-40" value={hhTo} onChange={(e) => setHhTo(e.target.value)} />
+                </div>
+                {(hhFrom || hhTo) && (
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { setHhFrom(""); setHhTo(""); }}>Limpar</Button>
+                )}
+                <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={() => void exportHH()}>
+                  <Download className="h-4 w-4" /> Exportar Relatório
+                </Button>
+                <p className="w-full text-xs text-muted-foreground">Os dias só mudam o valor do pedido exibido em Dados do Cliente e o relatório exportado; as margens não mudam.</p>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <Label>Pedidos</Label>
               <Button type="button" size="sm" variant="outline" onClick={() => setOrderList((l) => [...l, { number: "", value: "" }])}>
@@ -1172,7 +1207,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
           </div>
           <label className="flex items-center gap-2 text-sm">
             <Switch checked={bdiOn} onCheckedChange={(v) => { setBdiOn(v); if (v) applyBdi(); }} />
-            Custos BDI (pedido × 0,5885) — os valores podem ser ajustados depois
+            Custos BDI (pedido × 0,5885) — recalculado automaticamente a cada novo pedido
           </label>
           <p className="text-sm text-muted-foreground">
             Total orçado: <span className="font-semibold text-foreground">{brl(itemsSum)}</span>

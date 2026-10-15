@@ -440,7 +440,9 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const order = !isAll && (work as any).hh_enabled && hhRates
       ? d.rdoWf.filter((r: any) => r.present).reduce((a: number, r: any) => a + Number(r.worked_hours ?? DEFAULT_HOURS) * Number(hhRates[r.position_id ?? r.collaborators?.position_id ?? ""] ?? 0), 0)
       : Number(work.order_value ?? 0);
-    const budget = Number(work.budget_cost ?? 0);
+    const biRaw = ((work as any).budget_items ?? {}) as Record<string, number>;
+    const bdiOn = !isAll && Number(biRaw["bdi"] ?? 0) === 1;
+    const budget = bdiOn ? order * BDI_RATE : Number(work.budget_cost ?? 0);
     const budgetMarginPct = order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0;
     // Com mês inicial: receita só do avanço dentro do período (desconta o andamento anterior)
     const pStart = fromMonth || "";
@@ -497,7 +499,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const pm = perMonth.get(r.ym)!;
       return { label: r.label, ...pm, materiais: pm.materiais + pm.ferramentas + pm.andaimes, faturamento: r.monthBilling };
     });
-    const bi = ((work as any).budget_items ?? {}) as Record<string, number>;
+    // Custos BDI ativos: orçado recalculado automaticamente sobre o pedido atual
+    const bi = bdiOn ? bdiBudget(order, real) : biRaw;
     const items = ITEMS.map((it) => {
       const b = Number(bi[it.key] ?? 0);
       const r = real[it.key];
@@ -519,27 +522,27 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
 }
 
-/** Custos orçados ajustados como em Resultados (Contrato, Locação, Mensal). HH usa o orçado salvo. */
+export const BDI_RATE = 0.5885;
+/** Custos BDI: total = pedido × 0,5885, pesos 4/2/1/3 (MO/transp./ferram./mat.); com custos realizados,
+ * metade padrão e metade proporcional ao realizado; com andaime e sem ferramentas, ferramentas vira andaimes. */
+export function bdiBudget(order: number, realIn: Partial<Record<string, number>>): Record<string, number> {
+  const real = Object.fromEntries(ITEMS.map((it) => [it.key, Math.max(0, Number(realIn[it.key] ?? 0) || 0)])) as Record<string, number>;
+  const w: Record<string, number> = { mo: 4, transporte: 2, ferramentas: 1, materiais: 3, andaimes: 0 };
+  if ((real["andaimes"] ?? 0) > 0 && !(real["ferramentas"] ?? 0)) { w["andaimes"] = w["ferramentas"]!; w["ferramentas"] = 0; }
+  const realTotal = ITEMS.reduce((a, it) => a + (real[it.key] ?? 0), 0);
+  if (realTotal > 0) for (const it of ITEMS) w[it.key] = 0.5 * w[it.key]! + 0.5 * (10 * (real[it.key] ?? 0)) / realTotal;
+  const sumW = ITEMS.reduce((a, it) => a + w[it.key]!, 0) || 1;
+  const total = order * BDI_RATE;
+  return Object.fromEntries(ITEMS.map((it) => [it.key, Math.round(((total * w[it.key]!) / sumW) * 100) / 100]));
+}
+
+/** Custos orçados ajustados como em Resultados (Faturamento Parcial, Mensal). */
 export function adjustedItems(work: any, base: NonNullable<ReturnType<typeof buildBase>>, raw: any) {
+  void raw;
   let items = base.items.map((i) => ({ ...i }));
   if (work.contract_enabled) {
     const f = contractFraction(base.billingCount, Number(work.contract_months ?? 12));
     items = items.map((i) => ({ ...i, budget: i.budget * f }));
-  }
-  if (work.rental_enabled) {
-    const bill = new Map<string, number>();
-    const scaf = new Map<string, number>();
-    for (const e of raw.entries as any[]) {
-      const ym = e.entry_date.slice(0, 7);
-      if (e.category === "faturamento") bill.set(ym, (bill.get(ym) ?? 0) + Number(e.amount));
-      else if (e.category === "andaimes") scaf.set(ym, (scaf.get(ym) ?? 0) + Number(e.amount));
-    }
-    const ms = [...bill.entries()].filter(([, v]) => v > 0);
-    if (ms.length) {
-      const avg = ms.reduce((a, [ym, b]) => a + (scaf.get(ym) ?? 0) / b, 0) / ms.length;
-      const billed = ms.reduce((a, [, b]) => a + b, 0);
-      items = items.map((i) => (i.key === "andaimes" ? { ...i, budget: billed * avg } : i));
-    }
   }
   if (work.monthly_enabled) {
     const total = ((Array.isArray(work.orders) ? work.orders : []) as any[]).reduce((a, o) => a + Number(o.value ?? 0), 0);
