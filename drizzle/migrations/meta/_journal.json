@@ -183,6 +183,13 @@
       "when": 1792065332570,
       "tag": "0025_cert_data_periodic_hours_title",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792079245198,
+      "tag": "0026_hiring_requests",
+      "breakpoints": true
     }
   ]
 }
