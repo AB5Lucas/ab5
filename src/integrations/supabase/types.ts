@@ -2728,6 +2728,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_page_access: {
+        Row: {
+          allowed: boolean
+          id: string
+          path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allowed: boolean
+          id?: string
+          path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allowed?: boolean
+          id?: string
+          path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
