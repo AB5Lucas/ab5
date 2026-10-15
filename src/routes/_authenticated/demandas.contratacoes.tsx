@@ -173,13 +173,9 @@ function Requests({ isRh }: { isRh: boolean }) {
       <div className="panel grid grid-cols-2 gap-2 p-3 md:grid-cols-6">
         <div className="space-y-1"><Label className="text-xs">Nº</Label><Input className="h-8" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} placeholder="000123" /></div>
         {sel("client", "Cliente", base.clients.map((c) => ({ v: c.id, l: c.name })))}
-        {sel("work", "Serviço", base.works.filter((w) => f.client === ALL || w.client_id === f.client).map((w) => ({ v: w.id, l: w.name })))}
         {sel("position", "Função", uniq(all.map((r) => r.position_name)).map((v) => ({ v, l: v })))}
         {sel("requester", "Solicitante", uniq(all.map((r) => r.requester_name)).map((v) => ({ v, l: v })))}
-        {sel("owner", "Responsável RH", uniq(all.map((r) => r.rh_owner_name)).map((v) => ({ v, l: v })))}
         {sel("status", "Status", Object.entries(STATUS).map(([v, l]) => ({ v, l })))}
-        <div className="space-y-1"><Label className="text-xs">De</Label><Input type="date" className="h-8" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></div>
-        <div className="space-y-1"><Label className="text-xs">Até</Label><Input type="date" className="h-8" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></div>
         <div className="space-y-1">
           <Label className="text-xs">Ordenar</Label>
           <Select value={f.sort} onValueChange={(v) => setF({ ...f, sort: v })}>
@@ -187,7 +183,7 @@ function Requests({ isRh }: { isRh: boolean }) {
             <SelectContent><SelectItem value="date">Data</SelectItem><SelectItem value="prio">Prioridade</SelectItem><SelectItem value="status">Status</SelectItem></SelectContent>
           </Select>
         </div>
-        <div className="col-span-2 flex items-end justify-end gap-2">
+        <div className="col-span-2 flex items-end justify-end gap-2 md:col-span-6">
           <Button variant="outline" size="sm" onClick={() => setF({ q: "", client: ALL, work: ALL, position: ALL, requester: ALL, owner: ALL, status: ALL, from: "", to: "", sort: "date" })}>Limpar</Button>
           <Button size="sm" onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" />Nova solicitação</Button>
         </div>
