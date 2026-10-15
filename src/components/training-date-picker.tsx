@@ -24,6 +24,12 @@ export function TrainingDatePicker({ value, onChange }: { value: string; onChang
         for (const r of data ?? []) if (r.completed_at) set.add(String(r.completed_at).slice(0, 10));
         if (!data || data.length < 1000) break;
       }
+      for (let f = 0; ; f += 1000) {
+        const { data, error } = await supabase.from("appointments").select("scheduled_date, status").not("training_id", "is", null).order("id").range(f, f + 999);
+        if (error) throw error;
+        for (const r of data ?? []) if (r.scheduled_date && !/cancel/i.test(String(r.status ?? ""))) set.add(String(r.scheduled_date).slice(0, 10));
+        if (!data || data.length < 1000) break;
+      }
       return [...set].map(toDate);
     },
   });
