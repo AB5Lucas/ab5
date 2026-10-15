@@ -222,6 +222,11 @@ function NewRequest({ onClose }: { onClose: () => void }) {
   const { user, profile } = useCurrentUser();
   const [v, setV] = useState({ client: "", work: "", reason: "", priority: "normal", notes: "" });
   const [lines, setLines] = useState([{ position: "", quantity: "1" }]);
+  const last = useQuery({
+    queryKey: ["hiring-last-number"],
+    queryFn: async () => (await supabase.from("hiring_requests").select("number").order("number", { ascending: false }).limit(1)).data?.[0]?.number ?? 0,
+  });
+  const nextNum = last.data != null ? last.data + 1 : null;
   const save = useMutation({
     mutationFn: async () => {
       const items = lines.map((l) => ({ pos: base.positions.find((p) => p.id === l.position), qty: parseInt(l.quantity, 10) }));
@@ -248,6 +253,7 @@ function NewRequest({ onClose }: { onClose: () => void }) {
     onSuccess: (n) => {
       toast.success(n.length > 1 ? `Solicitações ${n.map(num).join(", ")} abertas.` : `Solicitação ${num(n[0]!)} aberta.`);
       qc.invalidateQueries({ queryKey: ["hiring-requests"] });
+      qc.invalidateQueries({ queryKey: ["hiring-last-number"] });
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -257,6 +263,8 @@ function NewRequest({ onClose }: { onClose: () => void }) {
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Nova solicitação de contratação</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1"><Label>Nº da solicitação</Label><Input disabled value={nextNum ? (lines.length > 1 ? `${num(nextNum)} a ${num(nextNum + lines.length - 1)}` : num(nextNum)) : "Automático"} /></div>
+          <div className="space-y-1"><Label>Data da solicitação</Label><Input disabled value={new Date().toLocaleDateString("pt-BR")} /></div>
           <div className="col-span-2 space-y-1"><Label>Cliente *</Label>
             <Select value={v.client} onValueChange={(c) => setV({ ...v, client: c, work: "" })}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
