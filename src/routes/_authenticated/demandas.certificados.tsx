@@ -577,7 +577,6 @@ function AttendanceTab() {
 const DATA_FIELDS: { k: keyof CertData; label: string; area?: boolean; hint?: string }[] = [
   { k: "code", label: "Código / referência" },
   { k: "subject", label: "Assunto (lista de presença)", hint: "Ex.: NR 33 - ESPAÇO CONFINADO" },
-  { k: "training_title", label: "Nome do treinamento", hint: "Ex.: Espaço Confinado" },
   { k: "workload_hours", label: "Carga horária Inicial (horas)" },
   { k: "workload_hours_periodic", label: "Carga horária Periódico (horas)" },
   { k: "schedule_text", label: "Horário", hint: "Ex.: 08:00 às 17:00" },
@@ -645,7 +644,7 @@ function TrainingDataTab() {
             return (
               <TableRow key={t.id}>
                 <TableCell className="font-medium">{t.name}</TableCell>
-                <TableCell>{d?.training_title || "—"}</TableCell>
+                <TableCell>{(t as { description?: string | null }).description || "—"}</TableCell>
                 <TableCell>{d?.workload_hours || d?.workload_hours_periodic ? `Inicial ${d?.workload_hours ?? "—"} h / Periódico ${d?.workload_hours_periodic ?? "—"} h` : "—"}</TableCell>
                 <TableCell>{m.length ? <Badge variant="outline" className="text-destructive">Incompleto</Badge> : <Badge>Pronto</Badge>}</TableCell>
                 <TableCell>
