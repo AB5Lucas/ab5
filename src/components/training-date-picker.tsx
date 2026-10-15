@@ -38,8 +38,7 @@ export function TrainingDatePicker({ value, onChange }: { value: string; onChang
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
-          selected={value ? toDate(value) : undefined}
-          defaultMonth={value ? toDate(value) : undefined}
+          {...(value ? { selected: toDate(value), defaultMonth: toDate(value) } : {})}
           onSelect={(d: Date | undefined) => { if (d) { onChange(iso(d)); setOpen(false); } }}
           modifiers={{ trained: days.data ?? [] }}
           modifiersStyles={{ trained: { background: "color-mix(in oklch, var(--primary) 30%, var(--background))", borderRadius: 6, fontWeight: 600 } }}
