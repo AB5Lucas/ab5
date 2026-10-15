@@ -147,13 +147,24 @@ function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof log
   doc.setFont("helvetica", "normal");
   doc.setFontSize(13);
   doc.text(`${s.name} - ${s.cpf}`, W / 2, 93, { align: "center" });
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
-  doc.text(doc.splitTextToSize(s.phrase, W - 70), W / 2, 106, { align: "center" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
   const body = `Ministrado pelo Centro de Treinamentos desta empresa, conforme estabelece ${s.legalBasis} com carga horária de ${s.hours} horas realizado no dia ${brDate(s.date)}.`;
-  doc.text(doc.splitTextToSize(body, W - 110), W / 2, 113, { align: "center" });
+  // Ajusta a fonte para frase + texto caberem entre o nome (y≈100) e a data (y≈130)
+  let fs = 9.5;
+  let pl: string[] = [], bl: string[] = [];
+  const lh = (f: number) => f * 0.3528 * 1.15;
+  for (; fs >= 6; fs -= 0.25) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(fs);
+    pl = doc.splitTextToSize(s.phrase, W - 60);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(fs - 0.5);
+    bl = doc.splitTextToSize(body, W - 90);
+    if (pl.length * lh(fs) + bl.length * lh(fs - 0.5) + 2 <= 28) break;
+  }
+  let ty = 103;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(fs);
+  doc.text(pl, W / 2, ty, { align: "center", lineHeightFactor: 1.15 });
+  ty += pl.length * lh(fs) + 2;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(fs - 0.5);
+  doc.text(bl, W / 2, ty, { align: "center", lineHeightFactor: 1.15 });
   doc.setFontSize(11);
   doc.text(`${s.location}, ${longDate(s.date)}`, W / 2, 135, { align: "center" });
   doc.setLineWidth(0.3);
@@ -175,18 +186,33 @@ function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof log
   doc.setFontSize(10);
   doc.text(`Conteúdo Programático Teórico do Treinamento: ${s.hours} horas.`, 30, 70);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  let y = 79;
-  s.program.split("\n").filter(Boolean).forEach((line) => {
+  const lines = s.program.split("\n").filter(Boolean).map((line) => {
     const m = line.match(/^\s*([\d.]+)\s+(.*)$/);
-    if (m) {
-      doc.text(m[1]!, 34, y);
-      doc.text(doc.splitTextToSize(m[2]!, W - 90), 50, y);
-    } else doc.text(doc.splitTextToSize(line, W - 70), 34, y);
-    y += 5.5;
+    return m ? { n: m[1]!, t: m[2]!, x: 50, w: W - 90 } : { n: "", t: line, x: 34, w: W - 70 };
+  });
+  // Ajusta a fonte para o conteúdo caber entre y=76 e y=180 (data em 188)
+  let pf = 9;
+  const layout = (f: number) => { doc.setFontSize(f); return lines.map((l) => doc.splitTextToSize(l.t, l.w) as string[]); };
+  let wrapped = layout(pf);
+  const total = (f: number, w: string[][]) => w.reduce((a, x) => a + x.length * f * 0.3528 * 1.15 + f * 0.15, 0);
+  while (pf > 5 && total(pf, wrapped) > 104) { pf -= 0.25; wrapped = layout(pf); }
+  doc.setFontSize(pf);
+  let y = 79;
+  lines.forEach((l, i) => {
+    if (l.n) doc.text(l.n, 34, y);
+    doc.text(wrapped[i]!, l.x, y, { lineHeightFactor: 1.15 });
+    y += wrapped[i]!.length * pf * 0.3528 * 1.15 + pf * 0.15;
   });
   doc.setFontSize(11);
-  doc.text(`${s.location}, ${longDate(s.date)}`, W / 2, Math.max(y + 10, 175), { align: "center" });
+  doc.text(`${s.location}, ${longDate(s.date)}`, W / 2, 188, { align: "center" });
+}
+
+const NAMES = new WeakMap<jsPDF, string>();
+/** Padrão de arquivo: NR33 - Nome - DD-MM-AAAA */
+export function certFileName(s: CertSnapshot) {
+  const m = s.trainingName.match(/NR\s*-?\s*(\d{1,2})/i);
+  const nr = m ? `NR${m[1]!.padStart(2, "0")}` : s.trainingName;
+  return `${nr} - ${s.name} - ${brDate(s.date).replace(/\//g, "-")}`.replace(/[\\/:*?"<>|]/g, "");
 }
 
 export async function certificatesPdf(list: CertSnapshot[], fileName: string) {
@@ -198,7 +224,9 @@ export async function certificatesPdf(list: CertSnapshot[], fileName: string) {
     if (i > 0) doc.addPage();
     drawCert(doc, s, lg, badges.get(s.trainingName) ?? null);
   });
-  return { doc, fileName };
+  const name = fileName || (list.length === 1 ? certFileName(list[0]!) : list.length ? `${certFileName(list[0]!).split(" - ")[0]} - Certificados - ${brDate(list[0]!.date).replace(/\//g, "-")}` : "Certificados");
+  NAMES.set(doc, name);
+  return { doc, fileName: name };
 }
 
 export async function attendancePdf(lists: ListSnapshot[]) {
@@ -306,7 +334,7 @@ export async function openPdf(doc: jsPDF) {
     return b;
   };
   const dl = mkBtn("Baixar");
-  dl.onclick = () => doc.save("documento.pdf");
+  dl.onclick = () => doc.save(`${NAMES.get(doc) ?? "documento"}.pdf`);
   const close = mkBtn("Fechar");
   close.onclick = () => overlay.remove();
   bar.append(dl, close);

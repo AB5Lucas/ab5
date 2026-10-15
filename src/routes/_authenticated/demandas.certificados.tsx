@@ -23,6 +23,7 @@ import {
   brDate,
   buildPhrase,
   certificatesPdf,
+  certFileName,
   classifyKind,
   formatCpf,
   openPdf,
@@ -251,7 +252,7 @@ function GenerateTab() {
     if (split) {
       for (const s of list) {
         const { doc } = await certificatesPdf([s], "");
-        doc.save(`Certificado ${s.trainingName} - ${s.name}.pdf`);
+        doc.save(`${certFileName(s)}.pdf`);
       }
     } else {
       const { doc } = await certificatesPdf(list, "");
