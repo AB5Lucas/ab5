@@ -230,7 +230,7 @@ function NewRequest({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const { user, profile } = useCurrentUser();
   const [v, setV] = useState({ client: "", work: "", reason: "", priority: "normal", notes: "" });
-  const [lines, setLines] = useState([{ position: "", quantity: "1" }]);
+  const [lines, setLines] = useState([{ position: "", quantity: "1", custom: "" }]);
   const last = useQuery({
     queryKey: ["hiring-last-number"],
     queryFn: async () => (await supabase.from("hiring_requests").select("number").order("number", { ascending: false }).limit(1)).data?.[0]?.number ?? 0,
@@ -238,10 +238,10 @@ function NewRequest({ onClose }: { onClose: () => void }) {
   const nextNum = last.data != null ? last.data + 1 : null;
   const save = useMutation({
     mutationFn: async () => {
-      const items = lines.map((l) => ({ pos: base.positions.find((p) => p.id === l.position), qty: parseInt(l.quantity, 10) }));
+      const items = lines.map((l) => ({ pos: l.position === "__manual" ? (l.custom.trim() ? { id: null as string | null, name: l.custom.trim() } : undefined) : base.positions.find((p) => p.id === l.position), qty: parseInt(l.quantity, 10) }));
       if (!v.client || !v.work || !v.reason.trim() || items.some((i) => !i.pos || !(i.qty > 0)))
         throw new Error("Preencha cliente, serviço, justificativa e função/vagas de cada linha.");
-      if (new Set(items.map((i) => i.pos!.id)).size !== items.length) throw new Error("Função repetida: junte as vagas na mesma linha.");
+      if (new Set(items.map((i) => i.pos!.name.toLowerCase())).size !== items.length) throw new Error("Função repetida: junte as vagas na mesma linha.");
       const name = profile?.full_name || user?.email || null;
       const nums: number[] = [];
       for (const i of items) {
@@ -290,13 +290,19 @@ function NewRequest({ onClose }: { onClose: () => void }) {
               <div key={idx} className="grid grid-cols-[1fr_90px_32px] gap-2">
                 <Select value={l.position} onValueChange={(p) => setLines(lines.map((x, j) => (j === idx ? { ...x, position: p } : x)))}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>{base.positions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    <SelectItem value="__manual">Outra (digitar)</SelectItem>
+                    {base.positions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
                 </Select>
                 <Input type="number" min={1} value={l.quantity} onChange={(e) => setLines(lines.map((x, j) => (j === idx ? { ...x, quantity: e.target.value } : x)))} />
                 <Button type="button" variant="ghost" size="icon" disabled={lines.length === 1} onClick={() => setLines(lines.filter((_, j) => j !== idx))}><Trash2 className="h-4 w-4" /></Button>
+                {l.position === "__manual" && (
+                  <Input className="col-span-2" placeholder="Digite a função" value={l.custom} onChange={(e) => setLines(lines.map((x, j) => (j === idx ? { ...x, custom: e.target.value } : x)))} />
+                )}
               </div>
             ))}
-            <Button type="button" variant="outline" size="sm" onClick={() => setLines([...lines, { position: "", quantity: "1" }])}><Plus className="mr-1 h-4 w-4" />Adicionar função</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setLines([...lines, { position: "", quantity: "1", custom: "" }])}><Plus className="mr-1 h-4 w-4" />Adicionar função</Button>
             {lines.length > 1 && <p className="text-xs text-muted-foreground">Cada função vira uma solicitação separada.</p>}
           </div>
           <div className="col-span-2 space-y-1"><Label>Prioridade</Label>
