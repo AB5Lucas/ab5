@@ -49,6 +49,8 @@ type CertData = {
   code: string | null;
   subject: string | null;
   workload_hours: number | null;
+  workload_hours_periodic: number | null;
+  training_title: string | null;
   schedule_text: string | null;
   cert_phrase: string | null;
   legal_basis: string | null;
@@ -221,7 +223,7 @@ function GenerateTab() {
           kind: k,
           phrase: buildPhrase(cd.cert_phrase ?? "", k),
           legalBasis: cd.legal_basis ?? "",
-          hours: Number(cd.workload_hours ?? 0),
+          hours: Number((k === "renovacao" ? cd.workload_hours_periodic ?? cd.workload_hours : cd.workload_hours) ?? 0),
           date,
           location: cd.default_location ?? "Mogi Guaçu",
           program: cd.program ?? "",
@@ -575,7 +577,9 @@ function AttendanceTab() {
 const DATA_FIELDS: { k: keyof CertData; label: string; area?: boolean; hint?: string }[] = [
   { k: "code", label: "Código / referência" },
   { k: "subject", label: "Assunto (lista de presença)", hint: "Ex.: NR 33 - ESPAÇO CONFINADO" },
-  { k: "workload_hours", label: "Carga horária (horas)" },
+  { k: "training_title", label: "Nome do treinamento", hint: "Ex.: Espaço Confinado" },
+  { k: "workload_hours", label: "Carga horária Inicial (horas)" },
+  { k: "workload_hours_periodic", label: "Carga horária Periódico (horas)" },
   { k: "schedule_text", label: "Horário", hint: "Ex.: 08:00 às 17:00" },
   { k: "default_location", label: "Local" },
   { k: "cert_phrase", label: "Frase do certificado", area: true, hint: "Use {tipo} para Inicial/Periódico." },
@@ -601,6 +605,8 @@ function TrainingDataTab() {
         code: f.code || null,
         subject: f.subject || null,
         workload_hours: f.workload_hours ? Number(f.workload_hours) : null,
+        workload_hours_periodic: f.workload_hours_periodic ? Number(f.workload_hours_periodic) : null,
+        training_title: f.training_title || null,
         schedule_text: f.schedule_text || null,
         cert_phrase: f.cert_phrase || null,
         legal_basis: f.legal_basis || null,
@@ -625,6 +631,7 @@ function TrainingDataTab() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>NR</TableHead>
             <TableHead>Treinamento</TableHead>
             <TableHead>Carga horária</TableHead>
             <TableHead>Pendências para emissão</TableHead>
@@ -638,7 +645,8 @@ function TrainingDataTab() {
             return (
               <TableRow key={t.id}>
                 <TableCell className="font-medium">{t.name}</TableCell>
-                <TableCell>{d?.workload_hours ? `${d.workload_hours} h` : "—"}</TableCell>
+                <TableCell>{d?.training_title || "—"}</TableCell>
+                <TableCell>{d?.workload_hours || d?.workload_hours_periodic ? `Inicial ${d?.workload_hours ?? "—"} h / Periódico ${d?.workload_hours_periodic ?? "—"} h` : "—"}</TableCell>
                 <TableCell>{m.length ? <Badge variant="outline" className="text-destructive">Incompleto</Badge> : <Badge>Pronto</Badge>}</TableCell>
                 <TableCell>
                   <Button size="icon" variant="ghost" aria-label="Editar" onClick={() => setEdit({ id: t.id, name: t.name, form: { ...(d ?? {}) } })}>
@@ -660,7 +668,7 @@ function TrainingDataTab() {
                 {f.area ? (
                   <Textarea rows={f.k === "program" ? 8 : 3} value={String(edit?.form[f.k] ?? "")} placeholder={f.hint} onChange={(e) => setEdit((s) => s && { ...s, form: { ...s.form, [f.k]: e.target.value } })} />
                 ) : (
-                  <Input type={f.k === "workload_hours" ? "number" : "text"} value={String(edit?.form[f.k] ?? "")} placeholder={f.hint} onChange={(e) => setEdit((s) => s && { ...s, form: { ...s.form, [f.k]: e.target.value } })} />
+                  <Input type={f.k === "workload_hours" || f.k === "workload_hours_periodic" ? "number" : "text"} value={String(edit?.form[f.k] ?? "")} placeholder={f.hint} onChange={(e) => setEdit((s) => s && { ...s, form: { ...s.form, [f.k]: e.target.value } })} />
                 )}
               </div>
             ))}
