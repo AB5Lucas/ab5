@@ -148,6 +148,7 @@ function TrainingsPage() {
   const [tName, setTName] = useState("");
   const [tDesc, setTDesc] = useState("");
   const [tMonths, setTMonths] = useState("12");
+  const [tEditId, setTEditId] = useState<string | null>(null);
 
   const createTraining = useMutation({
     mutationFn: async () => {
@@ -155,18 +156,20 @@ function TrainingsPage() {
       if (name.length < 2) throw new Error("Informe o nome do treinamento");
       const months = Number(tMonths);
       if (!Number.isFinite(months) || months <= 0) throw new Error("Validade inválida");
-      const { error } = await supabase.from("trainings").insert({
-        name,
-        description: tDesc.trim() || null,
-        validity_months: months,
-      });
+      const values = { name, description: tDesc.trim() || null, validity_months: months };
+      // Edição mantém o mesmo id, preservando o vínculo com os colaboradores
+      const { error } = tEditId
+        ? await supabase.from("trainings").update(values).eq("id", tEditId)
+        : await supabase.from("trainings").insert(values);
       if (error) throw error;
     },
     onSuccess: () => {
       setTName("");
       setTDesc("");
       setTMonths("12");
-      toast.success("Treinamento criado.");
+      toast.success(tEditId ? "Treinamento atualizado." : "Treinamento criado.");
+      setTEditId(null);
+      qc.invalidateQueries({ queryKey: ["collaborator-trainings"] });
       qc.invalidateQueries({ queryKey: ["trainings"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -524,7 +527,7 @@ function TrainingsPage() {
           {canWrite && (
             <div className="panel flex flex-wrap items-end gap-3 p-4">
               <div className="min-w-[200px] flex-1 space-y-2">
-                <Label htmlFor="t-name">Novo treinamento</Label>
+                <Label htmlFor="t-name">{tEditId ? "Editando treinamento" : "Novo treinamento"}</Label>
                 <Input id="t-name" value={tName} onChange={(e) => setTName(e.target.value)} placeholder="Ex.: NR-10" />
               </div>
               <div className="min-w-[200px] flex-1 space-y-2">
@@ -536,8 +539,13 @@ function TrainingsPage() {
                 <Input id="t-months" type="number" min={1} value={tMonths} onChange={(e) => setTMonths(e.target.value)} />
               </div>
               <Button onClick={() => createTraining.mutate()} disabled={createTraining.isPending}>
-                <Plus className="h-4 w-4" /> Adicionar
+                {tEditId ? <><Pencil className="h-4 w-4" /> Salvar</> : <><Plus className="h-4 w-4" /> Adicionar</>}
               </Button>
+              {tEditId && (
+                <Button variant="ghost" onClick={() => { setTEditId(null); setTName(""); setTDesc(""); setTMonths("12"); }}>
+                  Cancelar
+                </Button>
+              )}
             </div>
           )}
 
@@ -575,11 +583,29 @@ function TrainingsPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {isAdmin && (
-                          <Button variant="ghost" size="icon" aria-label="Excluir treinamento" onClick={() => removeTraining.mutate(t.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
+                        <div className="flex justify-end gap-1">
+                          {canWrite && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Editar treinamento"
+                              onClick={() => {
+                                setTEditId(t.id);
+                                setTName(t.name);
+                                setTDesc(t.description ?? "");
+                                setTMonths(String(t.validity_months));
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {isAdmin && (
+                            <Button variant="ghost" size="icon" aria-label="Excluir treinamento" onClick={() => removeTraining.mutate(t.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
