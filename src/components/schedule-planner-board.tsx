@@ -880,7 +880,8 @@ export function SchedulePlannerBoard({
   /** O colaborador atende ao filtro de função digitado? */
   const matchesRole = (collaboratorId: string, positionOverride?: string | null) => {
     if (!roleQuery) return true;
-    const posId = positionOverride ?? personById.get(collaboratorId)?.position_id ?? null;
+    // Função atual do cadastro tem prioridade sobre a função gravada na alocação.
+    const posId = personById.get(collaboratorId)?.position_id ?? positionOverride ?? null;
     const name = posId ? positionById.get(posId) ?? "" : "";
     return name.toLowerCase().includes(roleQuery);
   };
