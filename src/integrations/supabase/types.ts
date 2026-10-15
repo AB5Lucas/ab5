@@ -2567,9 +2567,11 @@ export type Database = {
           schedule_text: string | null
           subject: string | null
           training_id: string
+          training_title: string | null
           updated_at: string
           updated_by: string | null
           workload_hours: number | null
+          workload_hours_periodic: number | null
         }
         Insert: {
           cert_phrase?: string | null
@@ -2583,9 +2585,11 @@ export type Database = {
           schedule_text?: string | null
           subject?: string | null
           training_id: string
+          training_title?: string | null
           updated_at?: string
           updated_by?: string | null
           workload_hours?: number | null
+          workload_hours_periodic?: number | null
         }
         Update: {
           cert_phrase?: string | null
@@ -2599,9 +2603,11 @@ export type Database = {
           schedule_text?: string | null
           subject?: string | null
           training_id?: string
+          training_title?: string | null
           updated_at?: string
           updated_by?: string | null
           workload_hours?: number | null
+          workload_hours_periodic?: number | null
         }
         Relationships: [
           {
