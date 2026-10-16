@@ -97,13 +97,13 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
       }
       // VT do dia: mesma regra da tela de Resultados
       const [wvt, novt, lv, rules, mineFull] = await Promise.all([
-        supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", sched.id).in("work_id", workIds),
+        supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", sched.id).in("work_id", sibIds),
         supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]),
         supabase.from("medical_leaves").select("collaborator_id").lte("start_date", picked!).gte("end_date", picked!),
         supabase.from("transport_voucher_rules").select("*").eq("active", true),
         supabase.from("daily_allocations").select("work_id, collaborator_id, vt_override, driver, collaborators(city, vt_enabled)").eq("schedule_id", sched.id).in("work_id", workIds),
       ]);
-      const payVt = new Map<string, boolean>(((wvt.data ?? []) as any[]).map((r) => [r.work_id, !!r.pays_vt]));
+      const clientVt = ((wvt.data ?? []) as any[]).some((r) => r.pays_vt);
       const skip = new Set<string>([...((novt.data ?? []) as any[]), ...((lv.data ?? []) as any[])].map((r) => r.collaborator_id));
       const vtDay = (driver: boolean) =>
         ((rules.data ?? []) as any[]).reduce((s, r) => {
@@ -115,7 +115,7 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
       for (const a of (mineFull.data ?? []) as any[]) {
         if (skip.has(a.collaborator_id)) continue;
         const pouso = String(a.collaborators?.city ?? "").toLowerCase().includes("pouso alegre");
-        const base = a.collaborators?.vt_enabled === false ? false : !!payVt.get(a.work_id) || pouso;
+        const base = a.collaborators?.vt_enabled === false ? false : clientVt || pouso;
         if (!(a.vt_override ?? base)) continue;
         vt += vtDay(!!a.driver);
       }
