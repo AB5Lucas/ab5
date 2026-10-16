@@ -278,14 +278,14 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       rateFor.set(pid, r);
       return r;
     };
-    // Mesmo corte do realizado: até o fim do período e até o fim do último mês com produtividade apontada
+    // Mesmo corte do realizado: até o fim do período e até o dia do último andamento apontado
     let cut = periodEnd;
-    const lastProgYm = ((data.data?.progress ?? []) as any[])
-      .map((p) => String(p.month).slice(0, 7))
-      .filter((ym) => !untilMonth || ym <= untilMonth)
+    const lastProgDay = ((data.data?.progress ?? []) as any[])
+      .map((p) => String(p.month).slice(0, 10))
+      .filter((d) => !untilMonth || d <= monthEnd(untilMonth))
       .sort()
       .pop();
-    if (lastProgYm && monthEnd(lastProgYm) < cut) cut = monthEnd(lastProgYm);
+    if (lastProgDay && lastProgDay < cut) cut = lastProgDay;
     const rows = hhRaw.data.rows.filter((r) => r.date >= periodStart && r.date <= cut);
     const hol = new Set<string>((holidaysQ.data ?? []) as string[]);
     // MO orçada = horas × maior salário do topo da função cobrada no HH × 2,6 (encargos)
@@ -393,7 +393,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     if (bdiOn && ordersSum) applyBdi();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bdiOn, ordersSum]);
-  const [progMonth, setProgMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [progDate, setProgDate] = useState(new Date().toISOString().slice(0, 10));
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "", competence: "" });
   const [compOpen, setCompOpen] = useState(false);
@@ -441,7 +441,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       if (p < 0 || p > 100) throw new Error("Informe um percentual entre 0 e 100");
       const { error } = await supabase
         .from("work_progress")
-        .upsert({ work_id: workId, month: `${progMonth}-01`, percent: p }, { onConflict: "work_id,month" });
+        .upsert({ work_id: workId, month: progDate, percent: p }, { onConflict: "work_id,month" });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1236,8 +1236,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
           </DialogHeader>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
-              <Label>Mês</Label>
-              <Input type="month" value={progMonth} onChange={(e) => setProgMonth(e.target.value)} />
+              <Label>Dia</Label>
+              <Input type="date" value={progDate} onChange={(e) => setProgDate(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>% acumulado</Label>
@@ -1254,9 +1254,9 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
           </div>
           <Table>
             <TableBody>
-              {(data.data?.progress ?? []).map((p: any) => (
+              {[...(data.data?.progress ?? [])].sort((a: any, b: any) => String(a.month).localeCompare(String(b.month))).map((p: any) => (
                 <TableRow key={p.id}>
-                  <TableCell>{monthLabel(String(p.month).slice(0, 7))}</TableCell>
+                  <TableCell>{new Date(`${String(p.month).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}</TableCell>
                   <TableCell className="text-right">{pct(Number(p.percent))}</TableCell>
                   <TableCell className="w-10">
                     <Button variant="ghost" size="icon" onClick={() => delProgress.mutate(p.id)} aria-label="Excluir">

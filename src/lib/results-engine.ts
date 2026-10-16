@@ -157,30 +157,30 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
   const { isAll, workIds } = opts;
     // Fechamento: do início da obra até o último dia do mês selecionado
     let cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
-    // HH: realizado só até o último RDO e até o fim do último mês com produtividade (% conclusão) apontada
+    // HH: realizado só até o último RDO e até o dia do último andamento (% conclusão) apontado
     if (!isAll && (work as any).hh_enabled) {
       const lastRdo = raw.rdoWf.reduce((m: string, r: any) => (r.report_date > m ? r.report_date : m), "");
       if (lastRdo && lastRdo < cut) cut = lastRdo;
-      const lastProgYm = (raw.progress ?? []).map((p: any) => String(p.month).slice(0, 7)).filter((ym: string) => !untilMonth || ym <= untilMonth).sort().pop();
-      if (lastProgYm && monthEnd(lastProgYm) < cut) cut = monthEnd(lastProgYm);
+      const lastProgDay = (raw.progress ?? []).map((p: any) => String(p.month).slice(0, 10)).filter((d: string) => !untilMonth || d <= monthEnd(untilMonth)).sort().pop();
+      if (lastProgDay && lastProgDay < cut) cut = lastProgDay;
     }
     // Com mês inicial: só o que estiver dentro do período; sem mês inicial: desde o começo da obra
     const from = fromMonth ? `${fromMonth}-01` : "";
     const okDate = (dt?: string | null) => !dt || (dt.slice(0, 10) <= cut && dt.slice(0, 10) >= from);
     // Contrato: custos só até o fim do mês do último faturamento do serviço
     const contractCut = contractCutoffs(work, raw.entries, isAll, opts.allWorks);
-    // Demais serviços: custos só até o fim do mês do último andamento (% conclusão) apontado
+    // Demais serviços: custos só até o dia do último andamento (% conclusão) apontado
     {
       const byId = new Map<string, any>((isAll ? opts.allWorks ?? [] : [work]).map((x: any) => [x.id, x]));
       const lastProg = new Map<string, string>();
       for (const p of raw.progress ?? []) {
-        const ym = String(p.month).slice(0, 7);
-        if (untilMonth && ym > untilMonth) continue;
+        const dt = String(p.month).slice(0, 10);
+        if (untilMonth && dt > monthEnd(untilMonth)) continue;
         const w = byId.get(p.work_id);
         if (!w || w.contract_enabled || w.hh_enabled || contractCut.has(p.work_id)) continue;
-        if (ym > (lastProg.get(p.work_id) ?? "")) lastProg.set(p.work_id, ym);
+        if (dt > (lastProg.get(p.work_id) ?? "")) lastProg.set(p.work_id, dt);
       }
-      for (const [k, ym] of lastProg) contractCut.set(k, monthEnd(ym));
+      for (const [k, dt] of lastProg) contractCut.set(k, dt);
     }
     const okW = (wid: string | null | undefined, dt?: string | null) => {
       if (!okDate(dt)) return false;
