@@ -37,6 +37,7 @@ export function useCurrentUser() {
 
   const profile = useQuery({
     queryKey: ["me", user?.id],
+    staleTime: 5 * 60_000,
     enabled: !!user?.id,
     queryFn: async () => {
       const [{ data: p }, { data: roles }] = await Promise.all([
