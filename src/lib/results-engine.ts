@@ -278,13 +278,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         charge(a.collaborator_id, date, hoursOf(key), myShare);
       }
     }
-    for (const r of mineMonthly ? [] : rdoKey.values()) {
-      const key = `${r.collaborator_id}|${r.report_date}`;
-      if (seen.has(key) || allocAny.has(key) || !r.present) continue;
-      if (myShare === null && !idSet.has(r.work_id)) continue;
-      seen.add(key);
-      charge(r.collaborator_id, r.report_date, Number(r.worked_hours ?? 0), myShare ?? 1);
-    }
+    // Pessoa presente no RDO sem escalação em nenhum serviço do cliente: não gera MO em serviço algum
+    void allocAny;
     const toll = d.client?.has_toll ? Number(d.client.toll_amount ?? 0) : 0;
     const transportRows: { date: string; km: number; trips: number; kmCost: number; toll: number; share: number; mine: number; total: number; direct: boolean }[] = [];
     const dayTotal = new Map<string, number>();
