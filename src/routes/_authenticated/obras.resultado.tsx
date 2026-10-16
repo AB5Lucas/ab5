@@ -676,8 +676,16 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   const fullOrder = monthlyInfo
     ? ((Array.isArray((work as any)?.orders) ? (work as any).orders : []) as any[]).reduce((a, o) => a + Number(o.value ?? 0), 0)
     : Number((work as any)?.order_value ?? 0) || order;
-  const fixedBudgetPct = calc?.budgetMarginPct ?? 0;
-  const fixedBudget = { margin: fullOrder * (fixedBudgetPct / 100), pct: fixedBudgetPct };
+  // Geral do cliente com serviços mensais: orçado só dos serviços com pedido, com BDI (pedidos × (1 − imposto − BDI))
+  const allMonthlyOrders = (() => {
+    if (!isAll) return null;
+    const inP = (ym: string) => (!fromMonth || ym >= fromMonth) && (!untilMonth || ym <= untilMonth);
+    const svcs = (works.data ?? []).filter((x: any) => workIds.includes(x.id) && x.monthly_enabled);
+    const tot = svcs.reduce((a: number, s: any) => a + ((Array.isArray(s.orders) ? s.orders : []) as any[]).filter((o) => o?.date && inP(String(o.date).slice(0, 7))).reduce((b, o) => b + Number(o.value ?? 0), 0), 0);
+    return tot > 0 ? tot : null;
+  })();
+  const fixedBudgetPct = allMonthlyOrders != null ? (1 - TAX_RATE - BDI_RATE) * 100 : calc?.budgetMarginPct ?? 0;
+  const fixedBudget = { margin: (allMonthlyOrders ?? fullOrder) * (fixedBudgetPct / 100), pct: fixedBudgetPct };
   const fixedReal = totalReal ?? { margin: realMargin, pct: last?.marginPct ?? 0 };
   const totBudget = (calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0) * (Number(calc?.order ?? 0) ? Math.min(1, Math.max(0, Number(last?.revenue ?? 0) / Number(calc?.order))) : 1);
   const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
