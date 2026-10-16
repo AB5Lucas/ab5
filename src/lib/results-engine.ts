@@ -536,9 +536,14 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     let budgetOut = budget;
     let budgetMarginOut = budgetMarginPct;
     if (!isAll && (work as any).hh_enabled) {
-      // HH: material não entra no custo orçado
-      const mi = items.find((i) => i.key === "materiais");
-      if (mi) { mi.budget = 0; mi.used = mi.real ? 100 : 0; }
+      // HH: materiais e ferramentas não entram no custo orçado
+      for (const it of items) if (it.key === "materiais" || it.key === "ferramentas") it.budget = 0;
+      if (bdiOn) {
+        // BDI: o total orçado continua pedido × BDI (margem orçada ~23%), repartido entre os itens restantes
+        const rest = items.reduce((a, i) => a + i.budget, 0);
+        if (rest > 0) for (const it of items) it.budget = Math.round(((it.budget * order * BDI_RATE) / rest) * 100) / 100;
+      }
+      for (const it of items) it.used = it.budget ? (it.real / it.budget) * 100 : it.real ? 100 : 0;
       budgetOut = items.reduce((a, i) => a + i.budget, 0);
       budgetMarginOut = order ? ((order - order * TAX_RATE - budgetOut) / order) * 100 : 0;
       for (const r of rows) { r.consumed = budgetOut ? (r.cost / budgetOut) * 100 : 0; r.budgetMarginPct = budgetMarginOut; }
