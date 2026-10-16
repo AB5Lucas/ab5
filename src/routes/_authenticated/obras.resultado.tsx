@@ -47,7 +47,12 @@ const CATEGORIES = [
   { key: "terceiros", label: "Transporte de terceiros" },
   { key: "faturamento", label: "Faturamento" },
 ] as const;
-const catLabel = (k: string) => CATEGORIES.find((c) => c.key === k)?.label ?? k;
+// Cliente Indústria usa outros nomes para Ferramentas/Andaimes (só rótulo; cálculos iguais)
+let INDUSTRIA_LABELS = false;
+const isIndustria = (name?: string | null) => (name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() === "INDUSTRIA";
+const relabel = (k: string, label: string) =>
+  INDUSTRIA_LABELS && k === "ferramentas" ? "Matéria Prima" : INDUSTRIA_LABELS && k === "andaimes" ? "Insumos" : label;
+const catLabel = (k: string) => relabel(k, CATEGORIES.find((c) => c.key === k)?.label ?? k);
 
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -144,6 +149,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     } as any;
   }, [visibleWorks, workId, clientKey, isAll]);
   const workIds: string[] = work ? ((work as any)._ids ?? [work.id]) : [];
+  INDUSTRIA_LABELS = isIndustria((work as any)?.clients?.name ?? (work as any)?.client);
   const canEdit = canWrite && !isAll;
 
   const data = useQuery({
@@ -902,7 +908,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                 <tbody>
                   {scaledItems.map((i) => (
                     <tr key={i.key}>
-                      <td className="py-1 pl-3">{i.label}</td>
+                      <td className="py-1 pl-3">{relabel(i.key, i.label)}</td>
                       <td className="text-right">{brl(i.budget)}</td>
                       <td className="text-right">
                         <button
@@ -960,7 +966,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Custo realizado — {ITEMS.find((i) => i.key === detail)?.label}</DialogTitle>
+            <DialogTitle>Custo realizado — {catLabel(detail ?? "")}</DialogTitle>
           </DialogHeader>
           <div className="max-h-[70vh] overflow-auto text-sm">
             {detail === "mo" && calc && (
@@ -1246,7 +1252,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
             {ITEMS.map((it) => (
               <Field
                 key={it.key}
-                label={`${it.label} (R$)`}
+                label={`${relabel(it.key, it.label)} (R$)`}
                 value={itemStrs[it.key] ?? ""}
                 onChange={(v) => setItemStrs((s) => ({ ...s, [it.key]: v }))}
               />
@@ -1335,7 +1341,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
               </SelectTrigger>
               <SelectContent>
                 {CATEGORIES.filter((c) => (c.key === "faturamento") === isBilling).map((c) => (
-                  <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                  <SelectItem key={c.key} value={c.key}>{relabel(c.key, c.label)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
