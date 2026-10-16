@@ -1236,8 +1236,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
           </DialogHeader>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
-              <Label>Mês</Label>
-              <Input type="month" value={progMonth} onChange={(e) => setProgMonth(e.target.value)} />
+              <Label>Dia</Label>
+              <Input type="date" value={progDate} onChange={(e) => setProgDate(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>% acumulado</Label>
@@ -1254,9 +1254,9 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
           </div>
           <Table>
             <TableBody>
-              {(data.data?.progress ?? []).map((p: any) => (
+              {[...(data.data?.progress ?? [])].sort((a: any, b: any) => String(a.month).localeCompare(String(b.month))).map((p: any) => (
                 <TableRow key={p.id}>
-                  <TableCell>{monthLabel(String(p.month).slice(0, 7))}</TableCell>
+                  <TableCell>{new Date(`${String(p.month).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}</TableCell>
                   <TableCell className="text-right">{pct(Number(p.percent))}</TableCell>
                   <TableCell className="w-10">
                     <Button variant="ghost" size="icon" onClick={() => delProgress.mutate(p.id)} aria-label="Excluir">
