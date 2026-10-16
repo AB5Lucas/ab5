@@ -869,7 +869,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
 
             <div className={`p-3 ${clickable}`} onClick={() => open("andamento")} title={canEdit ? "Clique para lançar o andamento" : undefined}>
               <SectionTitle>Conclusão da Obra</SectionTitle>
-              <Gauge value={last?.progress ?? 0} />
+              <Gauge value={monthlyInfo ? 100 : last?.progress ?? 0} />
             </div>
           </div>
 
