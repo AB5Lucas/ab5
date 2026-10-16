@@ -3965,6 +3965,7 @@ export type Database = {
         Args: { _alloc_id: string; _work_id: string }
         Returns: undefined
       }
+      prev_business_day: { Args: { _date: string }; Returns: string }
       rdo_add_worker: {
         Args: {
           _collaborator_id: string
