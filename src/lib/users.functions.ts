@@ -28,3 +28,35 @@ export const deleteUser = createServerFn({ method: "POST" })
     if (delErr) throw new Error(delErr.message);
     return { ok: true };
   });
+
+/** Admin define uma senha provisória; no próximo acesso o usuário é obrigado a criar uma nova. */
+export const resetUserPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) =>
+    z.object({ userId: z.string().uuid(), tempPassword: z.string().min(6).max(72) }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin, error } = await context.supabase.rpc("is_admin");
+    if (error || !isAdmin) throw new Error("Somente administradores podem resetar senhas.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u, error: gErr } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+    if (gErr || !u.user) throw new Error("Usuário não encontrado.");
+    const { error: upErr } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: data.tempPassword,
+      app_metadata: { ...(u.user.app_metadata ?? {}), must_change_password: true },
+    });
+    if (upErr) throw new Error(upErr.message);
+    return { ok: true };
+  });
+
+/** Remove a obrigação de troca de senha do próprio usuário (após definir a nova senha). */
+export const clearMustChangePassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.admin.getUserById(context.userId);
+    const meta = { ...(u.user?.app_metadata ?? {}) } as Record<string, unknown>;
+    delete meta.must_change_password;
+    await supabaseAdmin.auth.admin.updateUserById(context.userId, { app_metadata: meta });
+    return { ok: true };
+  });

@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Trash2 } from "lucide-react";
+import { Trash2, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { deleteUser } from "@/lib/users.functions";
+import { deleteUser, resetUserPassword } from "@/lib/users.functions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -110,6 +111,18 @@ function UsersPage() {
     onError: (e: Error) => toast.error("Não foi possível excluir: " + e.message),
   });
 
+  const [resetting, setResetting] = useState<{ id: string; full_name: string; email: string } | null>(null);
+  const [tempPwd, setTempPwd] = useState("");
+  const resetFn = useServerFn(resetUserPassword);
+  const resetPwd = useMutation({
+    mutationFn: (v: { userId: string; tempPassword: string }) => resetFn({ data: v }),
+    onSuccess: () => {
+      toast.success("Senha resetada. Informe a senha provisória ao usuário.");
+      setResetting(null);
+    },
+    onError: (e: Error) => toast.error("Não foi possível resetar: " + e.message),
+  });
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -188,9 +201,14 @@ function UsersPage() {
                 </TableCell>
                 <TableCell>
                   {isAdmin && u.id !== user?.id && (
-                    <Button variant="ghost" size="icon" aria-label="Excluir usuário" onClick={() => setDeleting(u)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex items-center">
+                      <Button variant="ghost" size="icon" aria-label="Resetar senha" title="Resetar senha" onClick={() => { setResetting(u); setTempPwd(""); }}>
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" aria-label="Excluir usuário" onClick={() => setDeleting(u)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   )}
                 </TableCell>
               </TableRow>
@@ -198,6 +216,30 @@ function UsersPage() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!resetting} onOpenChange={(o) => !o && setResetting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar senha?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Defina uma senha provisória para "{resetting?.full_name || resetting?.email}". Ao entrar com ela, a pessoa será obrigada a criar uma nova senha (sem confirmação por e-mail).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input type="text" placeholder="Senha provisória (mín. 6 caracteres)" value={tempPwd} onChange={(e) => setTempPwd(e.target.value)} />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={tempPwd.length < 6 || resetPwd.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (resetting) resetPwd.mutate({ userId: resetting.id, tempPassword: tempPwd });
+              }}
+            >
+              Resetar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>

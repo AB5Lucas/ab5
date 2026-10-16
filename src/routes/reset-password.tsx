@@ -3,6 +3,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { clearMustChangePassword } from "@/lib/users.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/reset-password")({
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
+  const clearMustChange = useServerFn(clearMustChangePassword);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -35,11 +38,18 @@ function ResetPasswordPage() {
     }
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       toast.error(error.message);
       return;
     }
+    try {
+      await clearMustChange();
+      await supabase.auth.refreshSession();
+    } catch {
+      /* ignora */
+    }
+    setLoading(false);
     toast.success("Senha atualizada com sucesso.");
     navigate({ to: "/dashboard" });
   }
