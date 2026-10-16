@@ -891,7 +891,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
 
             <div className={`p-3 ${clickable}`} onClick={() => open("andamento")} title={canEdit ? "Clique para lançar o andamento" : undefined}>
               <SectionTitle>Conclusão da Obra</SectionTitle>
-              <Gauge value={monthlyInfo || (isAll && (() => { const g = visibleWorks.filter((x) => groupKey(x) === clientKey); return g.length > 0 && g.every((x: any) => x.monthly_enabled); })()) ? 100 : last?.progress ?? 0} />
+              <Gauge value={monthlyInfo || (isAll && (() => { const g = (works.data ?? []).filter((x: any) => workIds.includes(x.id)); return g.length > 0 && g.every((x: any) => x.monthly_enabled); })()) ? 100 : last?.progress ?? 0} />
             </div>
           </div>
 
