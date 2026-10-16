@@ -180,7 +180,14 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       if (mensais.length) {
         const raw: any = data.data;
         const res = mensais.map((s: any) => {
-          const sub = { ...raw, entries: (raw.entries ?? []).filter((e: any) => e.work_id === s.id), progress: (raw.progress ?? []).filter((p: any) => p.work_id === s.id) };
+          const sub = {
+            ...raw,
+            allocs: (raw.allocs ?? []).filter((a: any) => a.work_id === s.id),
+            rdoWf: (raw.rdoWf ?? []).filter((r: any) => r.work_id === s.id),
+            workTravelRows: (raw.workTravelRows ?? []).filter((r: any) => r.work_id === s.id),
+            entries: (raw.entries ?? []).filter((e: any) => e.work_id === s.id),
+            progress: (raw.progress ?? []).filter((p: any) => p.work_id === s.id),
+          };
           const b = engineBuildBase(s, sub, "", "", { isAll: false, workIds: [s.id], holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [] });
           const list = (s.orders as any[]).filter((o) => o?.date && inP(String(o.date).slice(0, 7)));
           if (!list.length) return null;
