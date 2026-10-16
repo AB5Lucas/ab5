@@ -642,14 +642,18 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
   const barItems = (() => {
     const src = calc?.items ?? [];
+    // Orçado proporcional ao mesmo andamento usado na margem realizada
+    const orderBase = Number(calc?.order ?? 0);
+    const frac = orderBase ? Math.min(1, Math.max(0, Number(last?.revenue ?? 0) / orderBase)) : 1;
     const out: { key: string; label: string; budget: number; real: number; used: number }[] = [];
     const mat = { key: "materiais", label: "Materiais", budget: 0, real: 0, used: 0 };
     for (const i of src) {
+      const b = i.budget * frac;
       if (i.key === "materiais" || i.key === "ferramentas" || i.key === "andaimes") {
-        mat.budget += i.budget;
+        mat.budget += b;
         mat.real += i.real;
         if (!out.includes(mat)) out.push(mat);
-      } else out.push({ ...i });
+      } else out.push({ ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 });
     }
     mat.used = mat.budget ? (mat.real / mat.budget) * 100 : mat.real ? 100 : 0;
     return out.filter((i) => i.budget || i.real);
