@@ -295,7 +295,9 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     return { mo, transporte };
   }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd, holidaysQ.data, data.data, untilMonth]);
   const calcHH = useMemo(() => {
-    if (!calcBase || !hhBudget || isAll) return calcBase;
+    // HH segue o mesmo orçamento dos demais serviços (Custos BDI ou manual)
+    void hhBudget;
+    if (true) return calcBase;
     const items = calcBase.items.map((i) => {
       const b = i.key === "mo" ? hhBudget.mo : i.key === "transporte" ? hhBudget.transporte : i.budget;
       return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
@@ -603,7 +605,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
         const v = Math.round(r.h * rate * 100) / 100;
         total += v;
         const c = cm.get(r.cid);
-        aoa.push([fmt(r.date), c?.full_name ?? "—", c?.cpf ?? "", fnName(r.pid), Math.round(r.h * 100) / 100, rate, v]);
+        aoa.push([fmt(r.date), c?.full_name ?? "—", c?.cpf ?? "", positionLabel(fnName(r.pid)) ?? fnName(r.pid), Math.round(r.h * 100) / 100, rate, v]);
       }
       aoa.push([]);
       aoa.push(["Total do fechamento no período", "", "", "", "", "", Math.round(total * 100) / 100]);

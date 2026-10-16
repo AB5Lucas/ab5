@@ -519,6 +519,16 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const r = real[it.key];
       return { key: it.key, label: it.label, budget: b, real: r, used: b ? (r / b) * 100 : r ? 100 : 0 };
     });
+    let budgetOut = budget;
+    let budgetMarginOut = budgetMarginPct;
+    if (!isAll && (work as any).hh_enabled) {
+      // HH: material não entra no custo orçado
+      const mi = items.find((i) => i.key === "materiais");
+      if (mi) { mi.budget = 0; mi.used = mi.real ? 100 : 0; }
+      budgetOut = items.reduce((a, i) => a + i.budget, 0);
+      budgetMarginOut = order ? ((order - order * TAX_RATE - budgetOut) / order) * 100 : 0;
+      for (const r of rows) { r.consumed = budgetOut ? (r.cost / budgetOut) * 100 : 0; r.budgetMarginPct = budgetMarginOut; }
+    }
     const dates = [
       ...d.allocs.map((a: any) => a.daily_schedules?.schedule_date).filter(Boolean),
       ...d.rdoWf.map((r: any) => r.report_date),
@@ -532,7 +542,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
-    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
+    return { rows, last, order, budget: budgetOut, budgetMarginPct: budgetMarginOut, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
 }
 
 export const BDI_RATE = 0.5885;
