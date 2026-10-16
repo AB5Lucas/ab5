@@ -218,28 +218,10 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       .map(([id, h]) => ({ id, name: id === "none" ? "Sem função" : hhRaw.data!.names.get(id) ?? "—", hours: h }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   };
-  // Total (valor salvo do pedido) e só do período filtrado (exibição)
+  // Tabela de horas por função (serve ao diálogo de valores e ao relatório exportado)
   const hhData = { data: useMemo(() => aggHH("0000-01-01", "9999-12-31"), [hhRaw.data]), isLoading: hhRaw.isLoading };
-  const hhPeriodRows = useMemo(() => aggHH(periodStart, periodEnd), [hhRaw.data, periodStart, periodEnd]);
   const hhValue = (hhData.data ?? []).reduce((a, r) => a + r.hours * num(hhRates[r.id] ?? ""), 0);
   const hhSavedWork = works.data?.find((x) => x.id === workId) as any;
-  const hhPeriodValue =
-    hhSavedWork?.hh_enabled && hasPeriod && hhPeriodRows
-      ? hhPeriodRows.reduce((a, r) => a + r.hours * Number((hhSavedWork.hh_rates ?? {})[r.id] ?? 0), 0)
-      : null;
-  // Ao entrar num serviço HH: recalcula o pedido com as horas atuais dos RDOs e os valores salvos
-  useEffect(() => {
-    const w = works.data?.find((x) => x.id === workId) as any;
-    if (!w?.hh_enabled || !hhData.data) return;
-    const rates = (w.hh_rates ?? {}) as Record<string, number>;
-    const v = Math.round(hhData.data.reduce((a, r) => a + r.hours * Number(rates[r.id] ?? 0), 0) * 100) / 100;
-    if (Math.abs(v - Number(w.order_value ?? 0)) < 0.01) return;
-    void supabase.from("works").update({ order_value: v }).eq("id", w.id).then(({ error }) => {
-      if (error) return;
-      qc.invalidateQueries({ queryKey: ["works-result"] });
-      qc.invalidateQueries({ queryKey: ["work-result"] });
-    });
-  }, [hhData.data, workId, works.data]);
 
   // HH: custo orçado de MO e transporte proporcional às horas/dias dos RDOs
   const hhRefs = useQuery({
