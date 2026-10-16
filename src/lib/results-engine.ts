@@ -217,33 +217,68 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     };
     const seen = new Set<string>();
     const laborBy = new Map<string, { days: number; hours: number; cost: number }>();
-    const addLabor = (id: string, hours: number, cost: number) => {
+    const addLabor = (id: string, hours: number, cost: number, frac = 1) => {
       const l = laborBy.get(id) ?? { days: 0, hours: 0, cost: 0 };
-      l.days += 1;
-      l.hours += hours;
-      l.cost += cost;
+      l.days += frac;
+      l.hours += hours * frac;
+      l.cost += cost * frac;
       laborBy.set(id, l);
     };
     const hol = new Set<string>((opts.holidays ?? []) as string[]);
+    // Rateio: dia sem divisão na aba Serviços (todos num só serviço) ou pessoa do RDO sem escalação
+    // → custo dividido pela média de pessoas por serviço nos dias já divididos. Ao dividir, o rateio sai.
+    const dayWorks = new Map<string, Map<string, number>>();
+    for (const a of d.sibAllocs ?? []) {
+      const dt = a.daily_schedules?.schedule_date as string | undefined;
+      if (!dt) continue;
+      const m = dayWorks.get(dt) ?? new Map<string, number>();
+      m.set(a.work_id, (m.get(a.work_id) ?? 0) + 1);
+      dayWorks.set(dt, m);
+    }
+    const shareCount = new Map<string, number>();
+    let shareTotal = 0;
+    for (const m of dayWorks.values()) {
+      if (m.size < 2) continue;
+      for (const [w, n] of m) {
+        shareCount.set(w, (shareCount.get(w) ?? 0) + n);
+        shareTotal += n;
+      }
+    }
+    const myShare = shareTotal > 0 ? [...shareCount].reduce((s, [w, n]) => s + (idSet.has(w) ? n : 0), 0) / shareTotal : null;
+    const unsplit = (dt: string) => myShare !== null && (dayWorks.get(dt)?.size ?? 0) === 1;
+    const charge = (id: string, date: string, hours: number, frac: number) => {
+      if (frac <= 0) return;
+      const cost = laborCost(hours, rate.get(id) ?? 0, pj.has(id), date, hol);
+      addLabor(id, hours, cost, frac);
+      bump(date.slice(0, 7), "labor", cost * frac);
+    };
+    const hoursOf = (key: string) => {
+      const r = rdoKey.get(key);
+      return r ? (r.present ? Number(r.worked_hours ?? DEFAULT_HOURS) : 0) : DEFAULT_HOURS;
+    };
     for (const a of d.allocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date) continue;
+      if (!date || unsplit(date)) continue;
       const key = `${a.collaborator_id}|${date}`;
       seen.add(key);
-      const r = rdoKey.get(key);
-      const hours = r ? (r.present ? Number(r.worked_hours ?? DEFAULT_HOURS) : 0) : DEFAULT_HOURS;
-      const cost = laborCost(hours, rate.get(a.collaborator_id) ?? 0, pj.has(a.collaborator_id), date, hol);
-      addLabor(a.collaborator_id, hours, cost);
-      bump(date.slice(0, 7), "labor", cost);
+      charge(a.collaborator_id, date, hoursOf(key), 1);
     }
-    for (const r of d.rdoWf) {
+    if (myShare !== null) {
+      for (const a of d.sibAllocs ?? []) {
+        const date = a.daily_schedules?.schedule_date as string | undefined;
+        if (!date || !unsplit(date)) continue;
+        const key = `${a.collaborator_id}|${date}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        charge(a.collaborator_id, date, hoursOf(key), myShare);
+      }
+    }
+    for (const r of rdoKey.values()) {
       const key = `${r.collaborator_id}|${r.report_date}`;
       if (seen.has(key) || allocAny.has(key) || !r.present) continue;
+      if (myShare === null && !idSet.has(r.work_id)) continue;
       seen.add(key);
-      const hours = Number(r.worked_hours ?? 0);
-      const cost = laborCost(hours, rate.get(r.collaborator_id) ?? 0, pj.has(r.collaborator_id), r.report_date, hol);
-      addLabor(r.collaborator_id, hours, cost);
-      bump(r.report_date.slice(0, 7), "labor", cost);
+      charge(r.collaborator_id, r.report_date, Number(r.worked_hours ?? 0), myShare ?? 1);
     }
     const toll = d.client?.has_toll ? Number(d.client.toll_amount ?? 0) : 0;
     const transportRows: { date: string; km: number; trips: number; kmCost: number; toll: number; share: number; mine: number; total: number; direct: boolean }[] = [];
