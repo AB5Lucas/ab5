@@ -16,6 +16,7 @@ export function defaultAllowed(role: AppRole, url: string) {
 export function useRoleAccess() {
   return useQuery({
     queryKey: ["role-access"],
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase.from("role_page_access").select("role, path, allowed");
       if (error) throw error;
@@ -27,6 +28,7 @@ export function useRoleAccess() {
 export function useUserAccess(userId?: string | null) {
   return useQuery({
     queryKey: ["user-access", userId],
+    staleTime: 5 * 60_000,
     enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase

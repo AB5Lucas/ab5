@@ -12,18 +12,27 @@ import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
 import { menuUrlFor, MENU_GROUPS } from "@/lib/menu";
 
+let cachedUser: import("@supabase/supabase-js").User | null = null;
+if (typeof window !== "undefined") {
+  supabase.auth.onAuthStateChange((_e, session) => {
+    cachedUser = session?.user ?? null;
+  });
+}
+
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
+    if (cachedUser) return { user: cachedUser };
     // Lê a sessão salva primeiro (não depende de rede) para manter o login ao recarregar.
     let { data: s } = await supabase.auth.getSession();
     if (!s.session) {
       await new Promise((r) => setTimeout(r, 600));
       ({ data: s } = await supabase.auth.getSession());
     }
-    if (s.session?.user) return { user: s.session.user };
+    if (s.session?.user) { cachedUser = s.session.user; return { user: s.session.user }; }
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth" });
+    cachedUser = data.user;
     return { user: data.user };
   },
   component: AuthenticatedLayout,
