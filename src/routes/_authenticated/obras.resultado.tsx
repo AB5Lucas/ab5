@@ -301,9 +301,9 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
     });
     const budget = items.reduce((a, i) => a + i.budget, 0);
-    const order = hhPeriodValue ?? calcBase.order;
+    const order = calcBase.order;
     return { ...calcBase, items, budget, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
-  }, [calcBase, hhBudget, hhPeriodValue, isAll]);
+  }, [calcBase, hhBudget, isAll]);
   /** Contrato: custo orçado e conclusão = faturamentos lançados ÷ meses do contrato. */
   const calcCt = useMemo(() => {
     const w = hhSavedWork;
