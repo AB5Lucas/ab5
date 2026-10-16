@@ -294,16 +294,9 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     for (const n of perDay.values()) transporte += Math.ceil(n.size / cap) * carDay;
     return { mo, transporte };
   }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd, holidaysQ.data, data.data, untilMonth]);
-  const calcHH = useMemo(() => {
-    if (!calcBase || !hhBudget || isAll) return calcBase;
-    const items = calcBase.items.map((i) => {
-      const b = i.key === "mo" ? hhBudget.mo : i.key === "transporte" ? hhBudget.transporte : i.budget;
-      return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
-    });
-    const budget = items.reduce((a, i) => a + i.budget, 0);
-    const order = calcBase.order;
-    return { ...calcBase, items, budget, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
-  }, [calcBase, hhBudget, isAll]);
+  // HH segue o mesmo orçamento dos demais serviços (Custos BDI ou manual)
+  void hhBudget;
+  const calcHH = calcBase;
   /** Contrato: custo orçado e conclusão = faturamentos lançados ÷ meses do contrato. */
   const calcCt = useMemo(() => {
     const w = hhSavedWork;
@@ -603,7 +596,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
         const v = Math.round(r.h * rate * 100) / 100;
         total += v;
         const c = cm.get(r.cid);
-        aoa.push([fmt(r.date), c?.full_name ?? "—", c?.cpf ?? "", fnName(r.pid), Math.round(r.h * 100) / 100, rate, v]);
+        aoa.push([fmt(r.date), c?.full_name ?? "—", c?.cpf ?? "", positionLabel(fnName(r.pid)) ?? fnName(r.pid), Math.round(r.h * 100) / 100, rate, v]);
       }
       aoa.push([]);
       aoa.push(["Total do fechamento no período", "", "", "", "", "", Math.round(total * 100) / 100]);
@@ -627,7 +620,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     const main = rows.filter((r) => !expSep[r.pid]);
     if (main.length) XLSX.utils.book_append_sheet(wb, sheet(main), sheetName("HH"));
     for (const pid of [...new Set(rows.map((r) => r.pid))].filter((p) => expSep[p])) {
-      XLSX.utils.book_append_sheet(wb, sheet(rows.filter((r) => r.pid === pid)), sheetName(fnName(pid)));
+      XLSX.utils.book_append_sheet(wb, sheet(rows.filter((r) => r.pid === pid)), sheetName(positionLabel(fnName(pid)) ?? fnName(pid)));
     }
     const name = `HH - ${w?.client ?? ""} - ${w?.name ?? ""} - ${fmt(rows[0]!.date).replace(/\//g, "-")} a ${fmt(rows[rows.length - 1]!.date).replace(/\//g, "-")}.xlsx`.replace(/[\\/:*?"<>|]/g, "");
     XLSX.writeFile(wb, name);

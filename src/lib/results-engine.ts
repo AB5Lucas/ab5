@@ -157,12 +157,10 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
   const { isAll, workIds } = opts;
     // Fechamento: do início da obra até o último dia do mês selecionado
     let cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
-    // HH: realizado só até o último RDO e até o dia do último andamento (% conclusão) apontado
+    // HH: realizado só até o último RDO (andamento é automático pelos RDOs)
     if (!isAll && (work as any).hh_enabled) {
       const lastRdo = raw.rdoWf.reduce((m: string, r: any) => (r.report_date > m ? r.report_date : m), "");
       if (lastRdo && lastRdo < cut) cut = lastRdo;
-      const lastProgDay = (raw.progress ?? []).map((p: any) => String(p.month).slice(0, 10)).filter((d: string) => !untilMonth || d <= monthEnd(untilMonth)).sort().pop();
-      if (lastProgDay && lastProgDay < cut) cut = lastProgDay;
     }
     // Com mês inicial: só o que estiver dentro do período; sem mês inicial: desde o começo da obra
     const from = fromMonth ? `${fromMonth}-01` : "";
@@ -407,6 +405,24 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       progMap = new Map();
       bills.forEach((ym: string, i: number) => progMap.set(ym, contractFraction(i + 1, Number((work as any).contract_months ?? 12)) * 100));
     }
+    if (!isAll && (work as any).hh_enabled) {
+      // HH: andamento automático = valor HH acumulado dos RDOs (horas × valor hora cobrado) ÷ valor total do pedido
+      const rates = ((work as any).hh_rates ?? {}) as Record<string, number>;
+      const ord = Number(work.order_value ?? 0);
+      const byYm = new Map<string, number>();
+      for (const r of raw.rdoWf as any[]) {
+        if (!r.present || r.report_date > cut) continue;
+        const pid = r.position_id ?? r.collaborators?.position_id ?? "none";
+        const ym = r.report_date.slice(0, 7);
+        byYm.set(ym, (byYm.get(ym) ?? 0) + Number(r.worked_hours ?? 0) * Number(rates[pid] ?? 0));
+      }
+      progMap = new Map();
+      let acc = 0;
+      for (const ym of [...byYm.keys()].sort()) {
+        acc += byYm.get(ym)!;
+        progMap.set(ym, ord ? Math.min(100, (acc / ord) * 100) : 0);
+      }
+    }
     if (isAll) {
       // Andamento geral = média ponderada pelo valor do pedido de cada serviço
       const ow: Record<string, number> = (work as any)._orders ?? {};
@@ -503,6 +519,16 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const r = real[it.key];
       return { key: it.key, label: it.label, budget: b, real: r, used: b ? (r / b) * 100 : r ? 100 : 0 };
     });
+    let budgetOut = budget;
+    let budgetMarginOut = budgetMarginPct;
+    if (!isAll && (work as any).hh_enabled) {
+      // HH: material não entra no custo orçado
+      const mi = items.find((i) => i.key === "materiais");
+      if (mi) { mi.budget = 0; mi.used = mi.real ? 100 : 0; }
+      budgetOut = items.reduce((a, i) => a + i.budget, 0);
+      budgetMarginOut = order ? ((order - order * TAX_RATE - budgetOut) / order) * 100 : 0;
+      for (const r of rows) { r.consumed = budgetOut ? (r.cost / budgetOut) * 100 : 0; r.budgetMarginPct = budgetMarginOut; }
+    }
     const dates = [
       ...d.allocs.map((a: any) => a.daily_schedules?.schedule_date).filter(Boolean),
       ...d.rdoWf.map((r: any) => r.report_date),
@@ -516,7 +542,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
-    return { rows, last, order, budget, budgetMarginPct, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
+    return { rows, last, order, budget: budgetOut, budgetMarginPct: budgetMarginOut, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
 }
 
 export const BDI_RATE = 0.5885;
