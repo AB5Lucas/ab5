@@ -294,18 +294,9 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     for (const n of perDay.values()) transporte += Math.ceil(n.size / cap) * carDay;
     return { mo, transporte };
   }, [hhSavedWork, hhRaw.data, hhRefs.data, periodStart, periodEnd, holidaysQ.data, data.data, untilMonth]);
-  const calcHH = useMemo(() => {
-    // HH segue o mesmo orçamento dos demais serviços (Custos BDI ou manual)
-    void hhBudget;
-    if (true) return calcBase;
-    const items = calcBase.items.map((i) => {
-      const b = i.key === "mo" ? hhBudget.mo : i.key === "transporte" ? hhBudget.transporte : i.budget;
-      return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
-    });
-    const budget = items.reduce((a, i) => a + i.budget, 0);
-    const order = calcBase.order;
-    return { ...calcBase, items, budget, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
-  }, [calcBase, hhBudget, isAll]);
+  // HH segue o mesmo orçamento dos demais serviços (Custos BDI ou manual)
+  void hhBudget;
+  const calcHH = calcBase;
   /** Contrato: custo orçado e conclusão = faturamentos lançados ÷ meses do contrato. */
   const calcCt = useMemo(() => {
     const w = hhSavedWork;
