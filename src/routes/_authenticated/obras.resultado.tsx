@@ -629,7 +629,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     const main = rows.filter((r) => !expSep[r.pid]);
     if (main.length) XLSX.utils.book_append_sheet(wb, sheet(main), sheetName("HH"));
     for (const pid of [...new Set(rows.map((r) => r.pid))].filter((p) => expSep[p])) {
-      XLSX.utils.book_append_sheet(wb, sheet(rows.filter((r) => r.pid === pid)), sheetName(fnName(pid)));
+      XLSX.utils.book_append_sheet(wb, sheet(rows.filter((r) => r.pid === pid)), sheetName(positionLabel(fnName(pid)) ?? fnName(pid)));
     }
     const name = `HH - ${w?.client ?? ""} - ${w?.name ?? ""} - ${fmt(rows[0]!.date).replace(/\//g, "-")} a ${fmt(rows[rows.length - 1]!.date).replace(/\//g, "-")}.xlsx`.replace(/[\\/:*?"<>|]/g, "");
     XLSX.writeFile(wb, name);
