@@ -88,12 +88,12 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       const [sibAllocs, sibRdo, integAppts, integBoxes] = await Promise.all([
         sibIds.length
           ? fetchAll<any>((a, b) =>
-              supabase.from("daily_allocations").select("work_id, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
+              supabase.from("daily_allocations").select("work_id, collaborator_id, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
             )
           : Promise.resolve([] as any[]),
         sibIds.length
           ? fetchAll<any>((a, b) =>
-              supabase.from("rdo_workforce").select("work_id, report_date, present, worked_hours").in("work_id", sibIds).range(a, b),
+              supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours").in("work_id", sibIds).range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
@@ -201,7 +201,14 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const rate = new Map<string, number>(d.people.map((p: any) => [p.id, Number(p.salary ?? 0)]));
     const pj = new Set<string>(d.people.filter((p: any) => p.contract_type === "pj").map((p: any) => p.id));
     const enc = (id: string) => (pj.has(id) ? 1 : ENCARGOS);
-    const rdoKey = new Map<string, any>(d.rdoWf.map((r: any) => [`${r.collaborator_id}|${r.report_date}`, r]));
+    // Horas vêm do RDO de qualquer serviço do cliente (um RDO pode cobrir a equipe toda)
+    const rdoKey = new Map<string, any>(
+      [...(d.sibRdo ?? []), ...d.rdoWf].filter((r: any) => r.collaborator_id).map((r: any) => [`${r.collaborator_id}|${r.report_date}`, r]),
+    );
+    // Pessoa escalada em qualquer serviço do cliente no dia: a MO fica no serviço da escalação
+    const allocAny = new Set<string>(
+      (d.sibAllocs ?? []).map((a: any) => `${a.collaborator_id}|${a.daily_schedules?.schedule_date}`),
+    );
     const monthly = new Map<string, { labor: number; transport: number; entries: number; billing: number }>();
     const bump = (ym: string, k: "labor" | "transport" | "entries" | "billing", v: number) => {
       const m = monthly.get(ym) ?? { labor: 0, transport: 0, entries: 0, billing: 0 };
@@ -231,7 +238,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     }
     for (const r of d.rdoWf) {
       const key = `${r.collaborator_id}|${r.report_date}`;
-      if (seen.has(key) || !r.present) continue;
+      if (seen.has(key) || allocAny.has(key) || !r.present) continue;
+      seen.add(key);
       const hours = Number(r.worked_hours ?? 0);
       const cost = laborCost(hours, rate.get(r.collaborator_id) ?? 0, pj.has(r.collaborator_id), r.report_date, hol);
       addLabor(r.collaborator_id, hours, cost);
