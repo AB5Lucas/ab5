@@ -395,7 +395,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       const { error } = await supabase
         .from("works")
         .update({
-          orders: list.map((o) => ({ number: o.number.trim(), value: hhOn ? 0 : num(o.value), ...(moOn && o.date ? { date: o.date } : {}) })),
+          orders: list.map((o) => ({ number: o.number.trim(), value: num(o.value), ...(moOn && o.date ? { date: o.date } : {}) })),
           order_value: ordersSum,
           hh_enabled: hhOn,
           contract_enabled: ctOn,
