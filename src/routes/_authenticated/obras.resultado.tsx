@@ -210,7 +210,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     }
     const margin = b.last.revenue * (1 - TAX_RATE) - b.last.cost;
     return { margin, pct: b.last.revenue ? (margin / b.last.revenue) * 100 : 0 };
-  }, [work, data.data, hasPeriod, isAll, holidaysQ.data]);
+  }, [work, data.data, hasPeriod, isAll, holidaysQ.data, works.data]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string; date?: string }[]>([]);
