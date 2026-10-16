@@ -279,7 +279,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
-      const base = p?.vt_enabled === false ? false : !!workVt.get(`${a.schedule_id}|${a.work_id}`) || pouso;
+      const base = p?.vt_enabled === false ? false : !!workVt.get(a.schedule_id) || pouso;
       if (!(a.vt_override ?? base)) continue;
       const cost = vtDay(!!a.driver);
       if (!cost) continue;
