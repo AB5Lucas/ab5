@@ -1187,9 +1187,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                 {moOn && (
                   <Input className="w-40" type="date" aria-label="Data do pedido" value={o.date ?? ""} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)))} />
                 )}
-                {!hhOn && (
-                  <Input className="w-40" placeholder="Valor (R$)" value={o.value} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
-                )}
+                <Input className="w-40" placeholder="Valor (R$)" value={o.value} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
                 <Button type="button" variant="ghost" size="icon" aria-label="Remover" onClick={() => setOrderList((l) => l.filter((_, j) => j !== i))}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
@@ -1197,10 +1195,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
             ))}
             </div>
             <p className="text-sm text-muted-foreground">
-              {hhOn ? `Valor do pedido (horas dos RDOs × valor por função${hhFrom || hhTo ? ", só no período escolhido" : ""})` : "Valor do pedido (soma)"}:{" "}
-              <span className="font-semibold text-foreground">
-                {brl(hhOn && (hhFrom || hhTo) ? (aggHH(hhFrom || "0000-01-01", hhTo || "9999-12-31") ?? []).reduce((a, r) => a + r.hours * num(hhRates[r.id] ?? ""), 0) : ordersSum)}
-              </span>
+              Valor do pedido (soma):{" "}
+              <span className="font-semibold text-foreground">{brl(ordersSum)}</span>
             </p>
             <p className="text-xs text-muted-foreground">O valor faturado vem do botão Faturamentos.</p>
           </div>
