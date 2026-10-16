@@ -249,8 +249,20 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         shareTotal += n;
       }
     }
-    const myShare = !mineMonthly && shareTotal > 0 ? [...shareCount].reduce((s, [w, n]) => s + (idSet.has(w) ? n : 0), 0) / shareTotal : null;
-    const unsplit = (dt: string) => myShare !== null && (dayWorks.get(dt)?.size ?? 0) === 1;
+    // Dia sem divisão (equipe inteira num só serviço, acima do máximo que esse serviço tem em dias divididos):
+    // entra só no total do cliente (todos os serviços), nunca num serviço específico.
+    void mineMonthly; void shareTotal;
+    const sibWorkSet = new Set<string>((d.sibAllocs ?? []).map((a: any) => a.work_id));
+    const wholeClient = [...sibWorkSet].every((w) => idSet.has(w));
+    const maxSplit = new Map<string, number>();
+    for (const m of dayWorks.values()) if (m.size >= 2) for (const [w, n] of m) maxSplit.set(w, Math.max(maxSplit.get(w) ?? 0, n));
+    const unsplit = (dt: string) => {
+      if (wholeClient || !maxSplit.size) return false;
+      const m = dayWorks.get(dt);
+      if (!m || m.size !== 1) return false;
+      const [w, n] = [...m][0]!;
+      return n > (maxSplit.get(w) ?? Infinity);
+    };
     const charge = (id: string, date: string, hours: number, frac: number) => {
       if (frac <= 0) return;
       const cost = laborCost(hours, rate.get(id) ?? 0, pj.has(id), date, hol);
@@ -267,16 +279,6 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const key = `${a.collaborator_id}|${date}`;
       seen.add(key);
       charge(a.collaborator_id, date, hoursOf(key), 1);
-    }
-    if (myShare !== null) {
-      for (const a of d.sibAllocs ?? []) {
-        const date = a.daily_schedules?.schedule_date as string | undefined;
-        if (!date || !unsplit(date)) continue;
-        const key = `${a.collaborator_id}|${date}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        charge(a.collaborator_id, date, hoursOf(key), myShare);
-      }
     }
     // Pessoa presente no RDO sem escalação em nenhum serviço do cliente: não gera MO em serviço algum
     void allocAny;
