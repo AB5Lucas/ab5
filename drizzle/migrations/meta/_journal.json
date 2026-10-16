@@ -190,6 +190,13 @@
       "when": 1792079245198,
       "tag": "0026_hiring_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792158941579,
+      "tag": "0027_copy_prev_business_day",
+      "breakpoints": true
     }
   ]
 }
