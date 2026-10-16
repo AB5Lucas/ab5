@@ -294,6 +294,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     }
     for (const v of d.vs) {
       if (v.work_id && !idSet.has(v.work_id)) continue;
+      if (unsplit(v.schedule_date)) continue;
       const trips = Number(v.trips ?? 1);
       const kmCost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? KM_RATE);
       const t = v.is_suzano_local ? 0 : toll * 2 * trips;
@@ -320,7 +321,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const vtByDate = new Map<string, { people: number; cost: number }>();
     for (const a of d.allocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      if (!date || unsplit(date) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
