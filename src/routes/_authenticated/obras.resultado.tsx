@@ -393,7 +393,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     if (bdiOn && ordersSum) applyBdi();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bdiOn, ordersSum]);
-  const [progMonth, setProgMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [progDate, setProgDate] = useState(new Date().toISOString().slice(0, 10));
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "", competence: "" });
   const [compOpen, setCompOpen] = useState(false);
