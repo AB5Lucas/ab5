@@ -59,7 +59,7 @@ function AuthPage() {
       toast.error("Não foi possível entrar: " + error.message);
       return;
     }
-    if (signed.user?.app_metadata?.must_change_password) {
+    if (signed.user?.app_metadata?.["must_change_password"]) {
       toast.info("Sua senha foi resetada. Defina uma nova senha.");
       navigate({ to: "/reset-password" });
       return;

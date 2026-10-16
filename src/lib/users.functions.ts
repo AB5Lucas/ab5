@@ -56,7 +56,7 @@ export const clearMustChangePassword = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u } = await supabaseAdmin.auth.admin.getUserById(context.userId);
     const meta = { ...(u.user?.app_metadata ?? {}) } as Record<string, unknown>;
-    delete meta.must_change_password;
+    delete meta["must_change_password"];
     await supabaseAdmin.auth.admin.updateUserById(context.userId, { app_metadata: meta });
     return { ok: true };
   });
