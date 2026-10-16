@@ -176,19 +176,21 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     if (isAll && data.data) {
       const svcs = (works.data ?? []).filter((x: any) => workIds.includes(x.id));
       const mensais = svcs.filter((x: any) => x.monthly_enabled && (Array.isArray(x.orders) ? x.orders : []).some((o: any) => o?.date));
-      if (mensais.length && mensais.length === svcs.filter((x: any) => x.monthly_enabled).length && svcs.every((x: any) => x.monthly_enabled)) {
+      const inP = (ym: string) => (!fromMonth || ym >= fromMonth) && (!untilMonth || ym <= untilMonth);
+      if (mensais.length) {
         const raw: any = data.data;
         const res = mensais.map((s: any) => {
           const sub = { ...raw, entries: (raw.entries ?? []).filter((e: any) => e.work_id === s.id), progress: (raw.progress ?? []).filter((p: any) => p.work_id === s.id) };
           const b = engineBuildBase(s, sub, "", "", { isAll: false, workIds: [s.id], holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [] });
-          const list = (s.orders as any[]).filter((o) => o?.date);
+          const list = (s.orders as any[]).filter((o) => o?.date && inP(String(o.date).slice(0, 7)));
+          if (!list.length) return null;
           const months = new Set(list.map((o) => String(o.date).slice(0, 7)));
           const revenue = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
           const cost = (b?.rows ?? []).filter((r: any) => months.has(String(r.ym).slice(0, 7))).reduce((a: number, r: any) => a + Number(r.monthCost ?? 0), 0);
           const margin = revenue * (1 - TAX_RATE) - cost;
           return { margin, pct: revenue ? (margin / revenue) * 100 : 0 };
-        });
-        return {
+        }).filter(Boolean) as { margin: number; pct: number }[];
+        if (res.length) return {
           margin: res.reduce((a, r) => a + r.margin, 0),
           pct: res.reduce((a, r) => a + r.pct, 0) / res.length,
         };
@@ -210,7 +212,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     }
     const margin = b.last.revenue * (1 - TAX_RATE) - b.last.cost;
     return { margin, pct: b.last.revenue ? (margin / b.last.revenue) * 100 : 0 };
-  }, [work, data.data, hasPeriod, isAll, holidaysQ.data, works.data]);
+  }, [work, data.data, hasPeriod, isAll, holidaysQ.data, works.data, workIds, fromMonth, untilMonth]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string; date?: string }[]>([]);
