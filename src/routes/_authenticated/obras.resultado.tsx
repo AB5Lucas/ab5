@@ -1171,7 +1171,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-                <p className="w-full text-xs text-muted-foreground">Os dias só mudam o valor do pedido exibido em Dados do Cliente e o relatório exportado; as margens não mudam.</p>
+                <p className="w-full text-xs text-muted-foreground">Os dias filtram apenas o relatório HH exportado. O valor do pedido vem dos pedidos lançados acima.</p>
               </div>
             )}
             <div className="flex items-center justify-between">
