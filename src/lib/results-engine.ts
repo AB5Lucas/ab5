@@ -435,11 +435,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       }
     }
     const months = [...new Set([...monthly.keys(), ...progMap.keys()])].filter((ym) => !fromMonth || ym >= fromMonth).sort();
-    // HH: pedido = horas dos RDOs até o corte × valor cobrado por hora da função
-    const hhRates = (work as any).hh_rates as Record<string, number> | undefined;
-    const order = !isAll && (work as any).hh_enabled && hhRates
-      ? d.rdoWf.filter((r: any) => r.present).reduce((a: number, r: any) => a + Number(r.worked_hours ?? DEFAULT_HOURS) * Number(hhRates[r.position_id ?? r.collaborators?.position_id ?? ""] ?? 0), 0)
-      : Number(work.order_value ?? 0);
+    // Valor do pedido: sempre o informado em Dados do Cliente (HH ou não)
+    const order = Number(work.order_value ?? 0);
     const biRaw = ((work as any).budget_items ?? {}) as Record<string, number>;
     const bdiOn = !isAll && Number(biRaw["bdi"] ?? 0) === 1;
     const budget = bdiOn ? order * BDI_RATE : Number(work.budget_cost ?? 0);

@@ -218,28 +218,10 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       .map(([id, h]) => ({ id, name: id === "none" ? "Sem função" : hhRaw.data!.names.get(id) ?? "—", hours: h }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   };
-  // Total (valor salvo do pedido) e só do período filtrado (exibição)
+  // Tabela de horas por função (serve ao diálogo de valores e ao relatório exportado)
   const hhData = { data: useMemo(() => aggHH("0000-01-01", "9999-12-31"), [hhRaw.data]), isLoading: hhRaw.isLoading };
-  const hhPeriodRows = useMemo(() => aggHH(periodStart, periodEnd), [hhRaw.data, periodStart, periodEnd]);
   const hhValue = (hhData.data ?? []).reduce((a, r) => a + r.hours * num(hhRates[r.id] ?? ""), 0);
   const hhSavedWork = works.data?.find((x) => x.id === workId) as any;
-  const hhPeriodValue =
-    hhSavedWork?.hh_enabled && hasPeriod && hhPeriodRows
-      ? hhPeriodRows.reduce((a, r) => a + r.hours * Number((hhSavedWork.hh_rates ?? {})[r.id] ?? 0), 0)
-      : null;
-  // Ao entrar num serviço HH: recalcula o pedido com as horas atuais dos RDOs e os valores salvos
-  useEffect(() => {
-    const w = works.data?.find((x) => x.id === workId) as any;
-    if (!w?.hh_enabled || !hhData.data) return;
-    const rates = (w.hh_rates ?? {}) as Record<string, number>;
-    const v = Math.round(hhData.data.reduce((a, r) => a + r.hours * Number(rates[r.id] ?? 0), 0) * 100) / 100;
-    if (Math.abs(v - Number(w.order_value ?? 0)) < 0.01) return;
-    void supabase.from("works").update({ order_value: v }).eq("id", w.id).then(({ error }) => {
-      if (error) return;
-      qc.invalidateQueries({ queryKey: ["works-result"] });
-      qc.invalidateQueries({ queryKey: ["work-result"] });
-    });
-  }, [hhData.data, workId, works.data]);
 
   // HH: custo orçado de MO e transporte proporcional às horas/dias dos RDOs
   const hhRefs = useQuery({
@@ -319,9 +301,9 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
     });
     const budget = items.reduce((a, i) => a + i.budget, 0);
-    const order = hhPeriodValue ?? calcBase.order;
+    const order = calcBase.order;
     return { ...calcBase, items, budget, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
-  }, [calcBase, hhBudget, hhPeriodValue, isAll]);
+  }, [calcBase, hhBudget, isAll]);
   /** Contrato: custo orçado e conclusão = faturamentos lançados ÷ meses do contrato. */
   const calcCt = useMemo(() => {
     const w = hhSavedWork;
@@ -377,7 +359,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   const [hhFrom, setHhFrom] = useState("");
   const [hhTo, setHhTo] = useState("");
   const [ctMonths, setCtMonths] = useState("12");
-  const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
+  const ordersSum = orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
   const [bdiOn, setBdiOn] = useState(false);
@@ -413,7 +395,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       const { error } = await supabase
         .from("works")
         .update({
-          orders: list.map((o) => ({ number: o.number.trim(), value: hhOn ? 0 : num(o.value), ...(moOn && o.date ? { date: o.date } : {}) })),
+          orders: list.map((o) => ({ number: o.number.trim(), value: num(o.value), ...(moOn && o.date ? { date: o.date } : {}) })),
           order_value: ordersSum,
           hh_enabled: hhOn,
           contract_enabled: ctOn,
@@ -582,15 +564,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
 
   const last = calc?.last;
   const billed = last?.billing ?? 0;
-  const order = monthlyInfo ? monthlyInfo.order : hhPeriodValue ?? calc?.order ?? 0;
-  // HH com dias de início/fim: só o valor exibido em Dados do Cliente (margens não mudam)
-  const hhRangeValue = useMemo(() => {
-    if (!hhSavedWork?.hh_enabled || (!hhFrom && !hhTo) || !hhRaw.data) return null;
-    const rows = aggHH(hhFrom || "0000-01-01", hhTo || "9999-12-31") ?? [];
-    return rows.reduce((a, r) => a + r.hours * Number((hhSavedWork.hh_rates ?? {})[r.id] ?? 0), 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hhSavedWork, hhFrom, hhTo, hhRaw.data]);
-  const shownOrder = hhRangeValue ?? order;
+  const order = monthlyInfo ? monthlyInfo.order : calc?.order ?? 0;
+  const shownOrder = order;
 
   const expRange = () => {
     const from = hhFrom || hhTo ? hhFrom || "0000-01-01" : periodStart;
@@ -1196,7 +1171,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-                <p className="w-full text-xs text-muted-foreground">Os dias só mudam o valor do pedido exibido em Dados do Cliente e o relatório exportado; as margens não mudam.</p>
+                <p className="w-full text-xs text-muted-foreground">Os dias filtram apenas o relatório HH exportado. O valor do pedido vem dos pedidos lançados acima.</p>
               </div>
             )}
             <div className="flex items-center justify-between">
@@ -1212,9 +1187,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                 {moOn && (
                   <Input className="w-40" type="date" aria-label="Data do pedido" value={o.date ?? ""} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)))} />
                 )}
-                {!hhOn && (
-                  <Input className="w-40" placeholder="Valor (R$)" value={o.value} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
-                )}
+                <Input className="w-40" placeholder="Valor (R$)" value={o.value} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
                 <Button type="button" variant="ghost" size="icon" aria-label="Remover" onClick={() => setOrderList((l) => l.filter((_, j) => j !== i))}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
@@ -1222,10 +1195,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
             ))}
             </div>
             <p className="text-sm text-muted-foreground">
-              {hhOn ? `Valor do pedido (horas dos RDOs × valor por função${hhFrom || hhTo ? ", só no período escolhido" : ""})` : "Valor do pedido (soma)"}:{" "}
-              <span className="font-semibold text-foreground">
-                {brl(hhOn && (hhFrom || hhTo) ? (aggHH(hhFrom || "0000-01-01", hhTo || "9999-12-31") ?? []).reduce((a, r) => a + r.hours * num(hhRates[r.id] ?? ""), 0) : ordersSum)}
-              </span>
+              Valor do pedido (soma):{" "}
+              <span className="font-semibold text-foreground">{brl(ordersSum)}</span>
             </p>
             <p className="text-xs text-muted-foreground">O valor faturado vem do botão Faturamentos.</p>
           </div>
