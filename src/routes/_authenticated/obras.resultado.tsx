@@ -441,7 +441,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       if (p < 0 || p > 100) throw new Error("Informe um percentual entre 0 e 100");
       const { error } = await supabase
         .from("work_progress")
-        .upsert({ work_id: workId, month: `${progMonth}-01`, percent: p }, { onConflict: "work_id,month" });
+        .upsert({ work_id: workId, month: progDate, percent: p }, { onConflict: "work_id,month" });
       if (error) throw error;
     },
     onSuccess: () => {
