@@ -527,7 +527,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       return { label: r.label, ...pm, materiais: pm.materiais + pm.ferramentas + pm.andaimes, faturamento: r.monthBilling };
     });
     // Custos BDI ativos: orçado recalculado automaticamente sobre o pedido atual
-    const bi = bdiOn ? bdiBudget(order, real) : biRaw;
+    const bi = bdiOn ? bdiBudget(order, real, biRaw) : biRaw;
     const items = ITEMS.map((it) => {
       const b = Number(bi[it.key] ?? 0);
       const r = real[it.key];
@@ -562,7 +562,9 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
 export const BDI_RATE = 0.5885;
 /** Custos BDI: total = pedido × 0,5885, pesos 4/2/1/3 (MO/transp./ferram./mat.); com custos realizados,
  * metade padrão e metade proporcional ao realizado; com andaime e sem ferramentas, ferramentas vira andaimes. */
-export function bdiBudget(order: number, realIn: Partial<Record<string, number>>): Record<string, number> {
+export function bdiBudget(order: number, realIn: Partial<Record<string, number>>, saved?: Record<string, any>): Record<string, number> {
+  // Item zerado manualmente com BDI ativo fica fora do orçado (não é redistribuído)
+  const zeroed = new Set(["mo", "transporte", "ferramentas", "materiais"].filter((k) => saved && saved[k] != null && Number(saved[k]) === 0));
   const real = Object.fromEntries(ITEMS.map((it) => [it.key, Math.max(0, Number(realIn[it.key] ?? 0) || 0)])) as Record<string, number>;
   const w: Record<string, number> = { mo: 4, transporte: 2, ferramentas: 1, materiais: 3, andaimes: 0 };
   if ((real["andaimes"] ?? 0) > 0 && !(real["ferramentas"] ?? 0)) { w["andaimes"] = w["ferramentas"]!; w["ferramentas"] = 0; }
@@ -570,7 +572,7 @@ export function bdiBudget(order: number, realIn: Partial<Record<string, number>>
   if (realTotal > 0) for (const it of ITEMS) w[it.key] = 0.5 * w[it.key]! + 0.5 * (10 * (real[it.key] ?? 0)) / realTotal;
   const sumW = ITEMS.reduce((a, it) => a + w[it.key]!, 0) || 1;
   const total = order * BDI_RATE;
-  return Object.fromEntries(ITEMS.map((it) => [it.key, Math.round(((total * w[it.key]!) / sumW) * 100) / 100]));
+  return Object.fromEntries(ITEMS.map((it) => [it.key, zeroed.has(it.key) ? 0 : Math.round(((total * w[it.key]!) / sumW) * 100) / 100]));
 }
 
 /** Custos orçados ajustados como em Resultados (Faturamento Parcial, Mensal). */

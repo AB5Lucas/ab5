@@ -362,8 +362,11 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
     const order = ordersSum || Number((work as any)?.order_value ?? 0);
     if (!order) { toast.error("Informe o valor do pedido antes de usar Custos BDI"); return; }
     const real = Object.fromEntries((calc?.items ?? []).map((i) => [i.key, i.real]));
-    const b = bdiBudget(order, real);
-    setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, Number(b[it.key] ?? 0).toFixed(2).replace(".", ",")])));
+    setItemStrs((cur) => {
+      const saved = Object.fromEntries(Object.entries(cur).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, num(v)]));
+      const b = bdiBudget(order, real, saved);
+      return Object.fromEntries(ITEMS.map((it) => [it.key, Number(b[it.key] ?? 0).toFixed(2).replace(".", ",")]));
+    });
   };
   // Com BDI ativo, os campos acompanham o valor dos pedidos enquanto edita
   useEffect(() => {
