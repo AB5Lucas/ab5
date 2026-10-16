@@ -405,6 +405,24 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       progMap = new Map();
       bills.forEach((ym: string, i: number) => progMap.set(ym, contractFraction(i + 1, Number((work as any).contract_months ?? 12)) * 100));
     }
+    if (!isAll && (work as any).hh_enabled) {
+      // HH: andamento automático = valor HH acumulado dos RDOs (horas × valor hora cobrado) ÷ valor total do pedido
+      const rates = ((work as any).hh_rates ?? {}) as Record<string, number>;
+      const ord = Number(work.order_value ?? 0);
+      const byYm = new Map<string, number>();
+      for (const r of raw.rdoWf as any[]) {
+        if (!r.present || r.report_date > cut) continue;
+        const pid = r.position_id ?? r.collaborators?.position_id ?? "none";
+        const ym = r.report_date.slice(0, 7);
+        byYm.set(ym, (byYm.get(ym) ?? 0) + Number(r.worked_hours ?? 0) * Number(rates[pid] ?? 0));
+      }
+      progMap = new Map();
+      let acc = 0;
+      for (const ym of [...byYm.keys()].sort()) {
+        acc += byYm.get(ym)!;
+        progMap.set(ym, ord ? Math.min(100, (acc / ord) * 100) : 0);
+      }
+    }
     if (isAll) {
       // Andamento geral = média ponderada pelo valor do pedido de cada serviço
       const ow: Record<string, number> = (work as any)._orders ?? {};
