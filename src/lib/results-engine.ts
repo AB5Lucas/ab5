@@ -59,7 +59,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
         supabase.from("work_entries").select("*").in("work_id", workIds).order("entry_date", { ascending: false }),
         fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, city, vt_enabled, travel_bonus_enabled").range(a, b)),
-        w.client_id ? supabase.from("works").select("id").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
+        w.client_id ? supabase.from("works").select("id, monthly_enabled").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
               supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, vehicles(km_rate, plate), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).range(a, b),
@@ -122,6 +122,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
             : e,
         ),
         people,
+        monthlyIds: (((siblings as any).data ?? []) as any[]).filter((x) => x.monthly_enabled).map((x) => x.id as string),
         siblingCount: Math.max(1, (siblings as any).data?.length ?? 1),
         vs,
         client: (client as any).data,
@@ -235,16 +236,20 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       m.set(a.work_id, (m.get(a.work_id) ?? 0) + 1);
       dayWorks.set(dt, m);
     }
+    // Serviços mensais: sem rateio (não recebem nem entram na média); só MO escalada no próprio serviço
+    const monthlySet = new Set<string>(d.monthlyIds ?? []);
+    const mineMonthly = workIds.length > 0 && workIds.every((w) => monthlySet.has(w));
     const shareCount = new Map<string, number>();
     let shareTotal = 0;
     for (const m of dayWorks.values()) {
       if (m.size < 2) continue;
       for (const [w, n] of m) {
+        if (monthlySet.has(w)) continue;
         shareCount.set(w, (shareCount.get(w) ?? 0) + n);
         shareTotal += n;
       }
     }
-    const myShare = shareTotal > 0 ? [...shareCount].reduce((s, [w, n]) => s + (idSet.has(w) ? n : 0), 0) / shareTotal : null;
+    const myShare = !mineMonthly && shareTotal > 0 ? [...shareCount].reduce((s, [w, n]) => s + (idSet.has(w) ? n : 0), 0) / shareTotal : null;
     const unsplit = (dt: string) => myShare !== null && (dayWorks.get(dt)?.size ?? 0) === 1;
     const charge = (id: string, date: string, hours: number, frac: number) => {
       if (frac <= 0) return;
@@ -273,7 +278,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         charge(a.collaborator_id, date, hoursOf(key), myShare);
       }
     }
-    for (const r of rdoKey.values()) {
+    for (const r of mineMonthly ? [] : rdoKey.values()) {
       const key = `${r.collaborator_id}|${r.report_date}`;
       if (seen.has(key) || allocAny.has(key) || !r.present) continue;
       if (myShare === null && !idSet.has(r.work_id)) continue;
