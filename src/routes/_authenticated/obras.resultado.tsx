@@ -638,7 +638,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   const fixedBudgetPct = calc?.budgetMarginPct ?? 0;
   const fixedBudget = { margin: fullOrder * (fixedBudgetPct / 100), pct: fixedBudgetPct };
   const fixedReal = totalReal ?? { margin: realMargin, pct: last?.marginPct ?? 0 };
-  const totBudget = calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0;
+  const totBudget = (calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0) * (Number(calc?.order ?? 0) ? Math.min(1, Math.max(0, Number(last?.revenue ?? 0) / Number(calc?.order))) : 1);
   const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
   const progFrac = (() => {
     const ob = Number(calc?.order ?? 0);
