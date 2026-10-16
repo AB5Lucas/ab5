@@ -278,14 +278,14 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       rateFor.set(pid, r);
       return r;
     };
-    // Mesmo corte do realizado: até o fim do período e até o fim do último mês com produtividade apontada
+    // Mesmo corte do realizado: até o fim do período e até o dia do último andamento apontado
     let cut = periodEnd;
-    const lastProgYm = ((data.data?.progress ?? []) as any[])
-      .map((p) => String(p.month).slice(0, 7))
-      .filter((ym) => !untilMonth || ym <= untilMonth)
+    const lastProgDay = ((data.data?.progress ?? []) as any[])
+      .map((p) => String(p.month).slice(0, 10))
+      .filter((d) => !untilMonth || d <= monthEnd(untilMonth))
       .sort()
       .pop();
-    if (lastProgYm && monthEnd(lastProgYm) < cut) cut = monthEnd(lastProgYm);
+    if (lastProgDay && lastProgDay < cut) cut = lastProgDay;
     const rows = hhRaw.data.rows.filter((r) => r.date >= periodStart && r.date <= cut);
     const hol = new Set<string>((holidaysQ.data ?? []) as string[]);
     // MO orçada = horas × maior salário do topo da função cobrada no HH × 2,6 (encargos)
