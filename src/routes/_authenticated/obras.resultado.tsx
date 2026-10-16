@@ -564,15 +564,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
 
   const last = calc?.last;
   const billed = last?.billing ?? 0;
-  const order = monthlyInfo ? monthlyInfo.order : hhPeriodValue ?? calc?.order ?? 0;
-  // HH com dias de início/fim: só o valor exibido em Dados do Cliente (margens não mudam)
-  const hhRangeValue = useMemo(() => {
-    if (!hhSavedWork?.hh_enabled || (!hhFrom && !hhTo) || !hhRaw.data) return null;
-    const rows = aggHH(hhFrom || "0000-01-01", hhTo || "9999-12-31") ?? [];
-    return rows.reduce((a, r) => a + r.hours * Number((hhSavedWork.hh_rates ?? {})[r.id] ?? 0), 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hhSavedWork, hhFrom, hhTo, hhRaw.data]);
-  const shownOrder = hhRangeValue ?? order;
+  const order = monthlyInfo ? monthlyInfo.order : calc?.order ?? 0;
+  const shownOrder = order;
 
   const expRange = () => {
     const from = hhFrom || hhTo ? hhFrom || "0000-01-01" : periodStart;
