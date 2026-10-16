@@ -359,7 +359,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   const [hhFrom, setHhFrom] = useState("");
   const [hhTo, setHhTo] = useState("");
   const [ctMonths, setCtMonths] = useState("12");
-  const ordersSum = hhOn ? hhValue : orderList.reduce((a, o) => a + num(o.value), 0);
+  const ordersSum = orderList.reduce((a, o) => a + num(o.value), 0);
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
   const [bdiOn, setBdiOn] = useState(false);
