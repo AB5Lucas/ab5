@@ -377,6 +377,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "", competence: "" });
   const [compOpen, setCompOpen] = useState(false);
+  // Serviços fora do rateio no resultado geral (por padrão todos participam)
+  const [splitOff, setSplitOff] = useState<string[]>([]);
   const [dlg, setDlg] = useState<null | "cliente" | "orcamento" | "andamento" | "lancamentos" | "faturamentos">(null);
   const [detail, setDetail] = useState<ItemKey | null>(null);
 
@@ -461,7 +463,9 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
         // Rateio proporcional às horas trabalhadas em cada serviço
         const raw = data.data;
         if (!raw) throw new Error("Aguarde o carregamento dos dados");
-        const hours = new Map<string, number>(workIds.map((id) => [id, 0]));
+        const targets = workIds.filter((id) => !splitOff.includes(id));
+        if (!targets.length) throw new Error("Selecione ao menos um serviço para o rateio");
+        const hours = new Map<string, number>(targets.map((id) => [id, 0]));
         const rdo = new Map<string, any>(raw.rdoWf.map((r: any) => [`${r.collaborator_id}|${r.report_date}|${r.work_id}`, r]));
         const seen = new Set<string>();
         for (const a of raw.allocs) {
@@ -471,11 +475,11 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
           seen.add(k);
           const r = rdo.get(k);
           const h = r ? (r.present ? Number(r.worked_hours ?? DEFAULT_HOURS) : 0) : DEFAULT_HOURS;
-          hours.set(a.work_id, (hours.get(a.work_id) ?? 0) + h);
+          if (hours.has(a.work_id)) hours.set(a.work_id, hours.get(a.work_id)! + h);
         }
         for (const r of raw.rdoWf) {
           const k = `${r.collaborator_id}|${r.report_date}|${r.work_id}`;
-          if (seen.has(k) || !r.present) continue;
+          if (seen.has(k) || !r.present || !hours.has(r.work_id)) continue;
           hours.set(r.work_id, (hours.get(r.work_id) ?? 0) + Number(r.worked_hours ?? 0));
         }
         const total = [...hours.values()].reduce((a, b) => a + b, 0);
@@ -1308,7 +1312,20 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
             <DialogTitle>{isBilling ? "Faturamentos" : "Lançamentos"}</DialogTitle>
           </DialogHeader>
           {isAll && !isBilling && (
-            <p className="text-sm text-muted-foreground">O valor será rateado entre os serviços deste cliente, proporcional às horas trabalhadas em cada um.</p>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">O valor será rateado entre os serviços selecionados, proporcional às horas trabalhadas em cada um.</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 rounded-md border border-border p-2">
+                {workIds.map((id) => (
+                  <label key={id} className="flex items-center gap-2 text-sm">
+                    <Switch
+                      checked={!splitOff.includes(id)}
+                      onCheckedChange={(on) => setSplitOff((s) => (on ? s.filter((x) => x !== id) : [...s, id]))}
+                    />
+                    {works.data?.find((x) => x.id === id)?.name ?? "—"}
+                  </label>
+                ))}
+              </div>
+            </div>
           )}
           <div className="flex flex-wrap items-end gap-2">
             <Input type="date" className="w-40" value={entry.date} onChange={(e) => setEntry({ ...entry, date: e.target.value })} />
