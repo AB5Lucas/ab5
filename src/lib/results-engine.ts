@@ -260,7 +260,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       if (wholeClient || !maxSplit.size) return false;
       const m = dayWorks.get(dt);
       if (!m || m.size !== 1) return false;
-      const [[w, n]] = [...m];
+      const [w, n] = [...m][0]!;
       return n > (maxSplit.get(w) ?? Infinity);
     };
     const charge = (id: string, date: string, hours: number, frac: number) => {
