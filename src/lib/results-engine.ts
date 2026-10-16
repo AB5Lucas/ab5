@@ -157,12 +157,10 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
   const { isAll, workIds } = opts;
     // Fechamento: do início da obra até o último dia do mês selecionado
     let cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
-    // HH: realizado só até o último RDO e até o dia do último andamento (% conclusão) apontado
+    // HH: realizado só até o último RDO (andamento é automático pelos RDOs)
     if (!isAll && (work as any).hh_enabled) {
       const lastRdo = raw.rdoWf.reduce((m: string, r: any) => (r.report_date > m ? r.report_date : m), "");
       if (lastRdo && lastRdo < cut) cut = lastRdo;
-      const lastProgDay = (raw.progress ?? []).map((p: any) => String(p.month).slice(0, 10)).filter((d: string) => !untilMonth || d <= monthEnd(untilMonth)).sort().pop();
-      if (lastProgDay && lastProgDay < cut) cut = lastProgDay;
     }
     // Com mês inicial: só o que estiver dentro do período; sem mês inicial: desde o começo da obra
     const from = fromMonth ? `${fromMonth}-01` : "";
