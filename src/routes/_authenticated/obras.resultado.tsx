@@ -475,11 +475,11 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
           seen.add(k);
           const r = rdo.get(k);
           const h = r ? (r.present ? Number(r.worked_hours ?? DEFAULT_HOURS) : 0) : DEFAULT_HOURS;
-          hours.set(a.work_id, (hours.get(a.work_id) ?? 0) + h);
+          if (hours.has(a.work_id)) hours.set(a.work_id, hours.get(a.work_id)! + h);
         }
         for (const r of raw.rdoWf) {
           const k = `${r.collaborator_id}|${r.report_date}|${r.work_id}`;
-          if (seen.has(k) || !r.present) continue;
+          if (seen.has(k) || !r.present || !hours.has(r.work_id)) continue;
           hours.set(r.work_id, (hours.get(r.work_id) ?? 0) + Number(r.worked_hours ?? 0));
         }
         const total = [...hours.values()].reduce((a, b) => a + b, 0);
