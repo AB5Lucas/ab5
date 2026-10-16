@@ -70,7 +70,8 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           : Promise.resolve({ data: null as any }),
       ]);
       const [workVt, workTravelRows, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
-        fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", workIds).range(a, b)),
+        // VT é marcado por cliente na Programação: lê de todos os serviços do cliente
+        fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", [...new Set([...workIds, ...(((siblings as any).data ?? []) as any[]).map((x) => x.id)])]).range(a, b)),
         fetchAll<any>((a, b) => supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("work_id", workIds).range(a, b)),
         fetchAll<any>((a, b) =>
           supabase.from("daily_status_entries").select("schedule_id, collaborator_id")
@@ -260,7 +261,9 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     }
     // VT dos colaboradores escalados neste serviço entra no transporte da obra
     const person = new Map<string, any>(d.people.map((p: any) => [p.id, p]));
-    const workVt = new Map<string, boolean>((d.workVt ?? []).map((r: any) => [`${r.schedule_id}|${r.work_id}`, r.pays_vt]));
+    // Marcação de VT vale para o cliente no dia (qualquer serviço do cliente marcado)
+    const workVt = new Map<string, boolean>();
+    for (const r of (d.workVt ?? []) as any[]) if (r.pays_vt) workVt.set(r.schedule_id, true);
     const noVt = new Set<string>((d.noVtRows ?? []).map((r: any) => `${r.schedule_id}|${r.collaborator_id}`));
     const vtDay = (driver: boolean) =>
       (d.vtRules ?? []).reduce((sum: number, r: any) => {
