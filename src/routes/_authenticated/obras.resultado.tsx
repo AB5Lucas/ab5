@@ -190,6 +190,8 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   const [hhOn, setHhOn] = useState(false);
   const [hhRates, setHhRates] = useState<Record<string, string>>({});
   const [hhDlg, setHhDlg] = useState(false);
+  const [expDlg, setExpDlg] = useState(false);
+  const [expSep, setExpSep] = useState<Record<string, boolean>>({});
   const hhRaw = useQuery({
     queryKey: ["hh-hours-raw", workId],
     enabled: !!workId && workId !== "__all__" && hhOn,
@@ -590,41 +592,71 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   }, [hhSavedWork, hhFrom, hhTo, hhRaw.data]);
   const shownOrder = hhRangeValue ?? order;
 
-  const exportHH = async () => {
-    if (!hhRaw.data) { toast.error("Horas dos RDOs ainda carregando"); return; }
+  const expRange = () => {
     const from = hhFrom || hhTo ? hhFrom || "0000-01-01" : periodStart;
     const to = hhFrom || hhTo ? hhTo || "9999-12-31" : periodEnd;
+    return (hhRaw.data?.rows ?? []).filter((r) => r.date >= from && r.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+  };
+  const fnName = (pid: string) => (pid === "none" ? "Sem função" : hhRaw.data?.names.get(pid) ?? "—");
+  const expFns = useMemo(() => {
+    if (!expDlg) return [] as string[];
+    return [...new Set(expRange().map((r) => r.pid))].sort((a, b) => fnName(a).localeCompare(fnName(b)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expDlg, hhRaw.data, hhFrom, hhTo, periodStart, periodEnd]);
+  const openExport = () => {
+    if (!hhRaw.data) { toast.error("Horas dos RDOs ainda carregando"); return; }
+    if (!expRange().length) { toast.error("Nenhuma hora apontada nos dias selecionados"); return; }
+    setExpDlg(true);
+  };
+
+  const exportHH = async () => {
+    if (!hhRaw.data) return;
     const rates = (hhSavedWork?.hh_enabled ? hhSavedWork.hh_rates ?? {} : Object.fromEntries(Object.entries(hhRates).map(([k, v]) => [k, num(v)]))) as Record<string, number>;
-    const rows = hhRaw.data.rows.filter((r) => r.date >= from && r.date <= to).sort((a, b) => a.date.localeCompare(b.date));
-    if (!rows.length) { toast.error("Nenhuma hora apontada nos dias selecionados"); return; }
+    const rows = expRange();
+    if (!rows.length) return;
     const ids = [...new Set(rows.map((r) => r.cid))];
     const { data: cols } = await supabase.from("collaborators").select("id, full_name, cpf").in("id", ids);
     const cm = new Map((cols ?? []).map((c) => [c.id, c]));
     const fmt = (d: string) => d.split("-").reverse().join("/");
-    const aoa: (string | number)[][] = [["Data", "Nome", "CPF", "Função", "Horas trabalhadas", "Valor hora da função", "Valor total do dia"]];
-    let total = 0;
-    const days = [...new Set(rows.map((r) => r.date))];
-    for (const d of days) {
-      let dayTot = 0;
-      for (const r of rows.filter((x) => x.date === d)) {
+    const XLSX = await import("xlsx");
+    const CUR = '"R$" #,##0.00';
+    const sheet = (list: typeof rows) => {
+      const aoa: (string | number)[][] = [["Data", "Nome", "CPF", "Função", "Horas trabalhadas", "Valor hora da função", "Valor total do dia"]];
+      let total = 0;
+      for (const r of list) {
         const rate = Number(rates[r.pid] ?? 0);
         const v = Math.round(r.h * rate * 100) / 100;
-        dayTot += v;
+        total += v;
         const c = cm.get(r.cid);
-        aoa.push([fmt(d), c?.full_name ?? "—", c?.cpf ?? "", r.pid === "none" ? "Sem função" : hhRaw.data.names.get(r.pid) ?? "—", Math.round(r.h * 100) / 100, rate, v]);
+        aoa.push([fmt(r.date), c?.full_name ?? "—", c?.cpf ?? "", fnName(r.pid), Math.round(r.h * 100) / 100, rate, v]);
       }
-      aoa.push([`Total ${fmt(d)}`, "", "", "", "", "", Math.round(dayTot * 100) / 100]);
-      total += dayTot;
-    }
-    aoa.push([]);
-    aoa.push(["Total do fechamento no período", "", "", "", "", "", Math.round(total * 100) / 100]);
-    const XLSX = await import("xlsx");
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 14 }, { wch: 36 }, { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 18 }, { wch: 18 }];
+      aoa.push([]);
+      aoa.push(["Total do fechamento no período", "", "", "", "", "", Math.round(total * 100) / 100]);
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      for (let i = 1; i < aoa.length; i++) for (const col of ["F", "G"]) {
+        const cell = ws[`${col}${i + 1}`];
+        if (cell && typeof cell.v === "number") cell.z = CUR;
+      }
+      ws["!cols"] = [{ wch: 14 }, { wch: 36 }, { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 18 }, { wch: 18 }];
+      return ws;
+    };
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "HH");
+    const used = new Set<string>();
+    const sheetName = (n: string) => {
+      let base = n.replace(/[\\/?*[\]:]/g, "").slice(0, 28) || "Aba";
+      let k = base, i = 2;
+      while (used.has(k)) k = `${base.slice(0, 26)} ${i++}`;
+      used.add(k);
+      return k;
+    };
+    const main = rows.filter((r) => !expSep[r.pid]);
+    if (main.length) XLSX.utils.book_append_sheet(wb, sheet(main), sheetName("HH"));
+    for (const pid of [...new Set(rows.map((r) => r.pid))].filter((p) => expSep[p])) {
+      XLSX.utils.book_append_sheet(wb, sheet(rows.filter((r) => r.pid === pid)), sheetName(fnName(pid)));
+    }
     const name = `HH - ${w?.client ?? ""} - ${w?.name ?? ""} - ${fmt(rows[0]!.date).replace(/\//g, "-")} a ${fmt(rows[rows.length - 1]!.date).replace(/\//g, "-")}.xlsx`.replace(/[\\/:*?"<>|]/g, "");
     XLSX.writeFile(wb, name);
+    setExpDlg(false);
   };
   const budgetMargin = order - order * TAX_RATE - (calc?.budget ?? 0);
   const realMargin = (last?.revenue ?? 0) * (1 - TAX_RATE) - (last?.cost ?? 0);
@@ -1140,9 +1172,30 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                 {(hhFrom || hhTo) && (
                   <Button type="button" size="sm" variant="ghost" onClick={() => { setHhFrom(""); setHhTo(""); }}>Limpar</Button>
                 )}
-                <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={() => void exportHH()}>
+                <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={openExport}>
                   <Download className="h-4 w-4" /> Exportar Relatório
                 </Button>
+                <Dialog open={expDlg} onOpenChange={setExpDlg}>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Exportar relatório HH</DialogTitle></DialogHeader>
+                    <p className="text-sm text-muted-foreground">Marque as funções que devem ir para uma aba separada. As demais ficam juntas na aba HH.</p>
+                    <div className="max-h-80 space-y-2 overflow-auto">
+                      {expFns.map((pid) => (
+                        <label key={pid} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                          <span>{fnName(pid)}</span>
+                          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {expSep[pid] ? "Aba separada" : "Aba HH"}
+                            <Switch checked={!!expSep[pid]} onCheckedChange={(v) => setExpSep((p) => ({ ...p, [pid]: v }))} />
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setExpDlg(false)}>Cancelar</Button>
+                      <Button onClick={() => void exportHH()}><Download className="h-4 w-4" /> Baixar</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
                 <p className="w-full text-xs text-muted-foreground">Os dias só mudam o valor do pedido exibido em Dados do Cliente e o relatório exportado; as margens não mudam.</p>
               </div>
             )}
