@@ -431,12 +431,26 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const ctWorks = new Map<string, number>(
         (opts.allWorks ?? []).filter((x: any) => workIds.includes(x.id) && x.contract_enabled).map((x: any) => [x.id, Number(x.contract_months ?? 12)]),
       );
+      // Serviços HH: andamento automático = valor HH acumulado dos RDOs ÷ pedido
+      const hhWorks = new Map<string, any>((opts.allWorks ?? []).filter((x: any) => workIds.includes(x.id) && x.hh_enabled && !x.contract_enabled).map((x: any) => [x.id, x]));
       const progEv: { ym: string; id: string; pc: number }[] = d.progress
-        .filter((p: any) => !ctWorks.has(p.work_id))
+        .filter((p: any) => !ctWorks.has(p.work_id) && !hhWorks.has(p.work_id))
         .map((p: any) => ({ ym: String(p.month).slice(0, 7), id: p.work_id, pc: Number(p.percent) }));
       for (const [id, months] of ctWorks) {
         const bills = d.entries.filter((e: any) => e.work_id === id && e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)).sort();
         bills.forEach((ym: string, i: number) => progEv.push({ ym, id, pc: contractFraction(i + 1, months) * 100 }));
+      }
+      for (const [id, hw] of hhWorks) {
+        const rates = (hw.hh_rates ?? {}) as Record<string, number>;
+        const ord = Number(ow[id] ?? hw.order_value ?? 0);
+        const byYm = new Map<string, number>();
+        for (const r of raw.rdoWf as any[]) {
+          if (r.work_id !== id || !r.present || r.report_date > cut) continue;
+          const pid = r.position_id ?? r.collaborators?.position_id ?? "none";
+          byYm.set(r.report_date.slice(0, 7), (byYm.get(r.report_date.slice(0, 7)) ?? 0) + Number(r.worked_hours ?? 0) * Number(rates[pid] ?? 0));
+        }
+        let acc = 0;
+        for (const ym of [...byYm.keys()].sort()) { acc += byYm.get(ym)!; progEv.push({ ym, id, pc: ord ? Math.min(100, (acc / ord) * 100) : 0 }); }
       }
       progEv.sort((a, b) => a.ym.localeCompare(b.ym));
       const pm = [...new Set(progEv.map((p) => p.ym))];
