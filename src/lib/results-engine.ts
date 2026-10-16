@@ -639,8 +639,8 @@ export function adjustedItems(work: any, base: NonNullable<ReturnType<typeof bui
   }
   if (work.monthly_enabled) {
     const total = ((Array.isArray(work.orders) ? work.orders : []) as any[]).reduce((a, o) => a + Number(o.value ?? 0), 0);
-    const pctBy: Partial<Record<ItemKey, number>> = { mo: 0.5, transporte: 0.1, materiais: 0.03 };
-    items = items.map((i) => ({ ...i, budget: total * (pctBy[i.key as ItemKey] ?? 0) }));
+    const bb = bdiBudget(total, Object.fromEntries(items.map((i) => [i.key, i.real])));
+    items = items.map((i) => ({ ...i, budget: bb[i.key] ?? 0 }));
   }
   return items.map((i) => ({ ...i, used: i.budget ? (i.real / i.budget) * 100 : i.real ? 100 : 0 }));
 }

@@ -364,10 +364,10 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
   }, [calcRt, hhSavedWork, isAll, hasPeriod, periodStart, periodEnd]);
   const calc = useMemo(() => {
     if (!calcRt || !monthlyInfo) return calcRt;
-    // Mensal: MO 50%, Transporte 10%, Materiais 3% do pedido do período
-    const pctBy: Partial<Record<ItemKey, number>> = { mo: 0.5, transporte: 0.1, materiais: 0.03 };
+    // Mensal: custo orçado = pedidos do período × BDI (distribuído como em Custos BDI)
+    const bb = bdiBudget(monthlyInfo.order, Object.fromEntries(calcRt.items.map((i) => [i.key, i.real])));
     const items = calcRt.items.map((i) => {
-      const b = monthlyInfo.order * (pctBy[i.key as ItemKey] ?? 0);
+      const b = bb[i.key] ?? 0;
       return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
     });
     const budget = items.reduce((a, i) => a + i.budget, 0);
