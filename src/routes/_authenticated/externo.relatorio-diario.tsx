@@ -119,7 +119,7 @@ function RdoPage() {
 }
 
 function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void }) {
-  const { isAdmin } = useCurrentUser();
+  const { isAdmin, canWrite } = useCurrentUser();
   const [f, setF] = useState({ text: "", from: "", to: "", status: "all" });
   const list = useQuery({
     queryKey: ["rdo-history"],
