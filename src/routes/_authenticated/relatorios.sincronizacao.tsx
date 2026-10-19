@@ -6,6 +6,7 @@ import { Download, ChevronLeft, ChevronRight, Eye, RefreshCw, Save, CheckCircle2
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
+import { BillingEquivalences } from "@/components/billing-equivalences";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,7 +64,7 @@ function SynchronizationPage() {
     {last?.error_message&&<div role="alert" className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{last.error_message}</div>}
     {(notes.error||runs.error)&&<div role="alert" className="text-sm text-destructive">Não foi possível carregar o acompanhamento. <Button variant="link" onClick={()=>refresh()}>Tentar novamente</Button></div>}
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{counts.map(({label,value,Icon})=><div key={label} className="rounded-md border border-border bg-card p-4"><div className="flex items-center justify-between gap-2 text-sm text-muted-foreground"><span>{label}</span><Icon className="h-4 w-4"/></div><p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p></div>)}</div>
-    <Tabs defaultValue="notes"><TabsList><TabsTrigger value="notes">Notas fiscais</TabsTrigger><TabsTrigger value="runs">Execuções</TabsTrigger></TabsList><TabsContent value="notes" className="space-y-4">
+    <Tabs defaultValue="notes"><TabsList><TabsTrigger value="notes">Notas fiscais</TabsTrigger><TabsTrigger value="runs">Execuções</TabsTrigger><TabsTrigger value="equivalences">Equivalências</TabsTrigger></TabsList><TabsContent value="equivalences"><BillingEquivalences names={all.map(n=>n.client_name)} reprocess={async()=>{const result=await sync();await refresh();return result;}} /></TabsContent><TabsContent value="notes" className="space-y-4">
       <div className="flex flex-wrap items-end gap-3"><div><Label htmlFor="sync-start">De</Label><Input id="sync-start" type="date" min={BILLING_START} value={start} onChange={e=>update(setStart)(e.target.value||BILLING_START)} className="w-40"/></div><div><Label htmlFor="sync-end">Até</Label><Input id="sync-end" type="date" min={start} value={end} onChange={e=>update(setEnd)(e.target.value)} className="w-40"/></div><div className="min-w-48 flex-1"><Label htmlFor="sync-search">NFSe, pedido, orçamento ou texto</Label><Input id="sync-search" value={search} onChange={e=>update(setSearch)(e.target.value)} placeholder="Pesquisar"/></div>
         <Filter label="Cliente" value={client} onChange={update(setClient)} options={{all:"Todos os clientes",...Object.fromEntries([...new Set(all.map(n=>n.client_name))].sort().map(c=>[c,c]))}}/>
         <Filter label="Situação" value={state} onChange={update(setState)} options={{all:"Todas as situações",issues:"Erros e divergências",...BILLING_STATES}}/>
