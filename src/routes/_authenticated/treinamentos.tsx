@@ -507,7 +507,7 @@ function TrainingsPage() {
                               <Pencil className="h-4 w-4" />
                             </Button>
                           )}
-                          {isAdmin && (
+                          {canWrite && (
                             <Button variant="ghost" size="icon" aria-label="Remover registro" onClick={() => removeRecord.mutate(r.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -600,7 +600,7 @@ function TrainingsPage() {
                               <Pencil className="h-4 w-4" />
                             </Button>
                           )}
-                          {isAdmin && (
+                          {canWrite && (
                             <Button variant="ghost" size="icon" aria-label="Excluir treinamento" onClick={() => removeTraining.mutate(t.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>

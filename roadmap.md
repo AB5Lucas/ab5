@@ -12,3 +12,4 @@
 - [x] Demandas > Contratações (solicitações, status, histórico, destinatários por cliente)
 - [x] Contratações: data do dia e nº automático no formulário
 - [ ] Contratações: envio real dos e-mails (aguarda configurar domínio de e-mail ab5.com.br)
+- [ ] Resultados: coordenador vê só obras com acesso

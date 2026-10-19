@@ -205,7 +205,7 @@ function StructurePage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {isAdmin && (
+                    {canWrite && (
                       <Button variant="ghost" size="sm" onClick={() => removeRow.mutate({ id: r.id })}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

@@ -267,7 +267,7 @@ export function AbsenceManager({
                         <Pencil className="h-4 w-4" />
                       </Button>
                     )}
-                    {isAdmin && (
+                    {canWrite && (
                       <Button variant="ghost" size="icon" aria-label="Remover registro" onClick={() => remove.mutate(r.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

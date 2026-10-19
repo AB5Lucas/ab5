@@ -416,7 +416,7 @@ export function DailyScheduleBoard({
           )}
           {allowFinalize && canWrite && schedule.data && (
             finalized ? (
-              isAdmin && (
+              canWrite && (
                 <Button size="sm" variant="outline" onClick={() => setStatus.mutate("in_progress")}>
                   <LockOpen className="h-4 w-4" /> Reabrir
                 </Button>

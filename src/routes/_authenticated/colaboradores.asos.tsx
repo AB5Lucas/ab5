@@ -428,7 +428,7 @@ function AsosPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       )}
-                      {isAdmin && (
+                      {canWrite && (
                         <Button
                           size="icon"
                           variant="ghost"

@@ -184,7 +184,7 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
                 <Button size="sm" variant="outline" onClick={() => toast.promise(exportRdoPdf(r.id), { loading: "Gerando PDF...", success: "PDF gerado", error: (e) => e.message })}>
                   <FileDown className="h-4 w-4" /> PDF
                 </Button>
-                {isAdmin && (
+                {canWrite && (
                   <Button
                     size="sm"
                     variant="outline"
