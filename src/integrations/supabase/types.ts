@@ -876,6 +876,35 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_client_equivalences: {
+        Row: {
+          client_id: string
+          source_key: string
+          source_name: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          source_key: string
+          source_name: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          source_key?: string
+          source_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_client_equivalences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_sync_history: {
         Row: {
           action: string
@@ -4142,6 +4171,7 @@ export type Database = {
         Returns: undefined
       }
       billing_client_key: { Args: { v: string }; Returns: string }
+      billing_client_normalized: { Args: { v: string }; Returns: string }
       billing_doc_key: { Args: { v: string }; Returns: string }
       billing_sync_process: {
         Args: { p_notes: Json; p_run: string }
