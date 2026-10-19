@@ -18,6 +18,6 @@
 - [x] Mover Alocações para Demandas preservando URL e acessos
 - [x] Validar carga real e repetição sem duplicidades: 6 lançamentos; 17 testes aprovados, detalhes e exportação conferidos
 - [ ] Faturamentos: revisar 8 divergências de cliente, 13 notas sem correspondência e 7 linhas sem nota/valor na origem
-- [ ] Faturamentos: reconhecer SPAL JUNDIAI como COCA e reprocessar notas existentes
-- [ ] Sincronização: aba Equivalências com clientes da fonte sem repetição e vínculo ao cadastro
+- [x] Faturamentos: reconhecer SPAL JUNDIAI como COCA e reprocessar notas existentes (1591, 1680 e 1681 lançadas)
+- [x] Sincronização: aba Equivalências com clientes da fonte sem repetição e vínculo ao cadastro; gravação e reprocessamento conferidos na tela
 - [ ] Validar cancelamento, reativação e conciliação financeira com cenários isolados de integração (não exercitados com notas reais)
