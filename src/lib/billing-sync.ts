@@ -56,6 +56,7 @@ export function parseBillingRows(rows: unknown[][]): { notes: BillingNote[]; ign
     const invoice = doc(row[columns.invoice]); const client = doc(row[columns.client]);
     const amountCents = moneyCents(row[columns.amount]);
     const cancellation = norm(row[columns.cancelled]);
+    if (!amountCents) { ignored++; continue; } // sem montante: desconsiderar, não é erro
     const error = !client || amountCents === null || amountCents <= 0 ? "Cliente ou valor inválido" : !["", "sim", "nao", "s", "n"].includes(cancellation) ? "Situação de cancelamento inválida" : undefined;
     const issuer = columns.issuer >= 0 ? doc(row[columns.issuer]) : "AB5-servicos";
     const series = columns.series >= 0 ? doc(row[columns.series]) : "sem-serie";
