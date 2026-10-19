@@ -517,17 +517,18 @@ function MailPreview({ reqs, cName, wName, onClose }: { reqs: Req[]; cName: (id:
   });
   const [to, setTo] = useState<string | null>(null);
   const [cc, setCc] = useState<string | null>(null);
-  const nums = reqs.map((r) => num(r.number)).join(", ");
   const clientsTxt = clientIds.map(cName).join(", ");
   const totalVagas = reqs.reduce((s, r) => s + r.quantity - r.filled, 0);
   const [subject, setSubject] = useState(
     reqs.length === 1
-      ? `Contratação ${nums} - ${reqs[0]?.position_name ?? ""} - ${clientsTxt}`
-      : `Contratações ${clientsTxt} - ${totalVagas} vaga(s) em ${new Set(reqs.map((r) => r.position_name)).size} função(ões)`,
+      ? `Contratação - ${reqs[0]?.position_name ?? ""} - ${clientsTxt}`
+      : `Contratações ${clientsTxt} - ${totalVagas} ${totalVagas === 1 ? "vaga" : "vagas"} em ${new Set(reqs.map((r) => r.position_name)).size} funções`,
   );
   const [body, setBody] = useState(() => {
     const L: string[] = ["Prezados,", ""];
-    L.push(reqs.length === 1 ? "Segue solicitação de contratação:" : `Seguem ${reqs.length} solicitações de contratação, organizadas por cliente e serviço (total de ${totalVagas} vaga(s) pendente(s)):`);
+    const allHigh = reqs.length > 0 && reqs.every((r) => r.priority === "alta");
+    if (allHigh) L.push("Prioridade alta.", "");
+    L.push(reqs.length === 1 ? "Segue solicitação de contratação:" : `Seguem as solicitações de contratação. Total de ${totalVagas} ${totalVagas === 1 ? "vaga pendente" : "vagas pendentes"}:`);
     for (const cid of clientIds) {
       const cr = reqs.filter((r) => r.client_id === cid);
       L.push("", `CLIENTE: ${cName(cid).toUpperCase()}`);
@@ -536,7 +537,7 @@ function MailPreview({ reqs, cName, wName, onClose }: { reqs: Req[]; cName: (id:
         L.push(`  Serviço: ${wName(wid)}`);
         for (const r of wr) {
           const pend = r.quantity - r.filled;
-          L.push(`    • ${r.position_name}: ${pend} vaga(s)${r.filled ? ` (de ${r.quantity}, ${r.filled} já atendida(s))` : ""} · Prioridade ${PRIORITY[r.priority]} · ${num(r.number)}`);
+          L.push(`    • ${r.position_name}: ${pend} ${pend === 1 ? "vaga" : "vagas"}${r.filled ? ` (de ${r.quantity}, ${r.filled} já atendida(s))` : ""}${allHigh ? "" : ` · Prioridade ${PRIORITY[r.priority]}`}`);
         }
         const reasons = [...new Set(wr.map((r) => r.reason.trim()).filter(Boolean))];
         if (reasons.length === 1) L.push(`    Justificativa: ${reasons[0]}`);
