@@ -112,8 +112,8 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Pedidos", url: "/fechamentos/suzano" },
     ],
   },
-  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Alocações", url: "/relatorios" }, { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
-  { label: "Demandas", icon: ClipboardList, items: [{ title: "Certificados", url: "/demandas/certificados" }, { title: "Contratações", url: "/demandas/contratacoes" }] },
+  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Sincronização", url: "/relatorios/sincronizacao" }, { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
+  { label: "Demandas", icon: ClipboardList, items: [{ title: "Alocações", url: "/relatorios" }, { title: "Certificados", url: "/demandas/certificados" }, { title: "Contratações", url: "/demandas/contratacoes" }] },
   {
     label: "Administração",
     icon: Shield,

@@ -54,10 +54,12 @@ import { Route as AuthenticatedProgramacaoSemanalRouteImport } from './routes/_a
 import { Route as AuthenticatedProgramacaoServicosRouteImport } from './routes/_authenticated/programacao.servicos'
 import { Route as AuthenticatedRelatoriosIndexRouteImport } from './routes/_authenticated/relatorios.index'
 import { Route as AuthenticatedRelatoriosAjustePontoRouteImport } from './routes/_authenticated/relatorios.ajuste-ponto'
+import { Route as AuthenticatedRelatoriosSincronizacaoRouteImport } from './routes/_authenticated/relatorios.sincronizacao'
 import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authenticated/veiculos.index'
 import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_authenticated/veiculos.motoristas'
 import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
 import { Route as AuthenticatedVeiculosTransporteRouteImport } from './routes/_authenticated/veiculos.transporte'
+import { Route as ApiPublicJobsBillingSyncRouteImport } from './routes/api/public/jobs/billing-sync'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -319,6 +321,12 @@ const AuthenticatedRelatoriosAjustePontoRoute =
     path: '/relatorios/ajuste-ponto',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedRelatoriosSincronizacaoRoute =
+  AuthenticatedRelatoriosSincronizacaoRouteImport.update({
+    id: '/relatorios/sincronizacao',
+    path: '/relatorios/sincronizacao',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVeiculosIndexRoute =
   AuthenticatedVeiculosIndexRouteImport.update({
     id: '/veiculos/',
@@ -342,6 +350,12 @@ const AuthenticatedVeiculosTransporteRoute =
     id: '/veiculos/transporte',
     path: '/veiculos/transporte',
     getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiPublicJobsBillingSyncRoute =
+  ApiPublicJobsBillingSyncRouteImport.update({
+    id: '/api/public/jobs/billing-sync',
+    path: '/api/public/jobs/billing-sync',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -386,6 +400,7 @@ export interface FileRoutesByFullPath {
   '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
   '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
+  '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
@@ -393,6 +408,7 @@ export interface FileRoutesByFullPath {
   '/obras/': typeof AuthenticatedObrasIndexRoute
   '/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos/': typeof AuthenticatedVeiculosIndexRoute
+  '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -436,6 +452,7 @@ export interface FileRoutesByTo {
   '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
   '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
+  '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
@@ -443,6 +460,7 @@ export interface FileRoutesByTo {
   '/obras': typeof AuthenticatedObrasIndexRoute
   '/relatorios': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos': typeof AuthenticatedVeiculosIndexRoute
+  '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -488,6 +506,7 @@ export interface FileRoutesById {
   '/_authenticated/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/_authenticated/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
   '/_authenticated/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
+  '/_authenticated/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/_authenticated/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/_authenticated/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
@@ -495,6 +514,7 @@ export interface FileRoutesById {
   '/_authenticated/obras/': typeof AuthenticatedObrasIndexRoute
   '/_authenticated/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/_authenticated/veiculos/': typeof AuthenticatedVeiculosIndexRoute
+  '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -540,6 +560,7 @@ export interface FileRouteTypes {
     | '/programacao/semanal'
     | '/programacao/servicos'
     | '/relatorios/ajuste-ponto'
+    | '/relatorios/sincronizacao'
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
@@ -547,6 +568,7 @@ export interface FileRouteTypes {
     | '/obras/'
     | '/relatorios/'
     | '/veiculos/'
+    | '/api/public/jobs/billing-sync'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -590,6 +612,7 @@ export interface FileRouteTypes {
     | '/programacao/semanal'
     | '/programacao/servicos'
     | '/relatorios/ajuste-ponto'
+    | '/relatorios/sincronizacao'
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
@@ -597,6 +620,7 @@ export interface FileRouteTypes {
     | '/obras'
     | '/relatorios'
     | '/veiculos'
+    | '/api/public/jobs/billing-sync'
   id:
     | '__root__'
     | '/'
@@ -641,6 +665,7 @@ export interface FileRouteTypes {
     | '/_authenticated/programacao/semanal'
     | '/_authenticated/programacao/servicos'
     | '/_authenticated/relatorios/ajuste-ponto'
+    | '/_authenticated/relatorios/sincronizacao'
     | '/_authenticated/veiculos/motoristas'
     | '/_authenticated/veiculos/relatorios'
     | '/_authenticated/veiculos/transporte'
@@ -648,6 +673,7 @@ export interface FileRouteTypes {
     | '/_authenticated/obras/'
     | '/_authenticated/relatorios/'
     | '/_authenticated/veiculos/'
+    | '/api/public/jobs/billing-sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -655,6 +681,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPublicJobsBillingSyncRoute: typeof ApiPublicJobsBillingSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -974,6 +1001,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRelatoriosAjustePontoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/relatorios/sincronizacao': {
+      id: '/_authenticated/relatorios/sincronizacao'
+      path: '/relatorios/sincronizacao'
+      fullPath: '/relatorios/sincronizacao'
+      preLoaderRoute: typeof AuthenticatedRelatoriosSincronizacaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/veiculos/': {
       id: '/_authenticated/veiculos/'
       path: '/veiculos'
@@ -1001,6 +1035,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/veiculos/transporte'
       preLoaderRoute: typeof AuthenticatedVeiculosTransporteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/jobs/billing-sync': {
+      id: '/api/public/jobs/billing-sync'
+      path: '/api/public/jobs/billing-sync'
+      fullPath: '/api/public/jobs/billing-sync'
+      preLoaderRoute: typeof ApiPublicJobsBillingSyncRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -1044,6 +1085,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProgramacaoSemanalRoute: typeof AuthenticatedProgramacaoSemanalRoute
   AuthenticatedProgramacaoServicosRoute: typeof AuthenticatedProgramacaoServicosRoute
   AuthenticatedRelatoriosAjustePontoRoute: typeof AuthenticatedRelatoriosAjustePontoRoute
+  AuthenticatedRelatoriosSincronizacaoRoute: typeof AuthenticatedRelatoriosSincronizacaoRoute
   AuthenticatedVeiculosMotoristasRoute: typeof AuthenticatedVeiculosMotoristasRoute
   AuthenticatedVeiculosRelatoriosRoute: typeof AuthenticatedVeiculosRelatoriosRoute
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
@@ -1104,6 +1146,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProgramacaoServicosRoute: AuthenticatedProgramacaoServicosRoute,
   AuthenticatedRelatoriosAjustePontoRoute:
     AuthenticatedRelatoriosAjustePontoRoute,
+  AuthenticatedRelatoriosSincronizacaoRoute:
+    AuthenticatedRelatoriosSincronizacaoRoute,
   AuthenticatedVeiculosMotoristasRoute: AuthenticatedVeiculosMotoristasRoute,
   AuthenticatedVeiculosRelatoriosRoute: AuthenticatedVeiculosRelatoriosRoute,
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
@@ -1121,6 +1165,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiPublicJobsBillingSyncRoute: ApiPublicJobsBillingSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

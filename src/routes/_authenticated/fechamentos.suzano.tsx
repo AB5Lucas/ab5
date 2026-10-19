@@ -108,7 +108,7 @@ function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
     queryFn: async () => {
       const { data: ws } = await supabase.from("works").select("id, name, orders, client_id, clients(name)");
       const ids = (ws ?? []).map((w: any) => w.id);
-      const fat = ids.length ? (await supabase.from("work_entries").select("work_id, description, amount, entry_date").eq("category", "faturamento").in("work_id", ids)).data ?? [] : [];
+      const fat = ids.length ? (await supabase.from("work_entries").select("work_id, description, amount, entry_date").eq("sync_cancelled", false).eq("category", "faturamento").in("work_id", ids)).data ?? [] : [];
       // Pedidos com o mesmo número viram uma linha só: valores somados e meses listados
       const groups: Map<string, { key: string; num: string; client: string; clientId: string; number: string; works: Set<string>; workIds: Set<string>; dates: string[]; total: number; billed: number }> = new Map();
       for (const w of ((ws ?? []) as any[])) {

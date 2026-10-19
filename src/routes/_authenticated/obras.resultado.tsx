@@ -98,7 +98,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
       }
       const [rdoRows, entryRows] = await Promise.all([
         fetchAll<any>((a, b) => supabase.from("rdos").select("work_id").gte("report_date", periodStart).lte("report_date", periodEnd).order("id").range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id").gte("entry_date", periodStart).lte("entry_date", periodEnd).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id").eq("sync_cancelled", false).gte("entry_date", periodStart).lte("entry_date", periodEnd).order("id").range(a, b)),
       ]);
       rdoRows.forEach((r) => r.work_id && out.add(r.work_id));
       entryRows.forEach((r) => r.work_id && out.add(r.work_id));
