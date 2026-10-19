@@ -876,6 +876,201 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_sync_history: {
+        Row: {
+          action: string
+          happened_at: string
+          id: string
+          note_id: string | null
+          run_id: string | null
+          snapshot: Json
+        }
+        Insert: {
+          action: string
+          happened_at?: string
+          id?: string
+          note_id?: string | null
+          run_id?: string | null
+          snapshot: Json
+        }
+        Update: {
+          action?: string
+          happened_at?: string
+          id?: string
+          note_id?: string | null
+          run_id?: string | null
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_sync_history_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "billing_sync_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_sync_history_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "billing_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_sync_notes: {
+        Row: {
+          amount: number
+          cancelled: boolean
+          cancelled_at: string | null
+          client_name: string
+          decision: Json
+          difference_cents: number | null
+          entry_id: string | null
+          expected_cents: number | null
+          id: string
+          invoice_number: string
+          issued_at: string
+          last_attempt_at: string
+          method: string | null
+          order_number: string | null
+          original: Json
+          quote_number: string | null
+          reason: string | null
+          run_id: string | null
+          source_key: string
+          status: string
+          tolerance_cents: number
+          work_id: string | null
+        }
+        Insert: {
+          amount: number
+          cancelled?: boolean
+          cancelled_at?: string | null
+          client_name: string
+          decision?: Json
+          difference_cents?: number | null
+          entry_id?: string | null
+          expected_cents?: number | null
+          id?: string
+          invoice_number: string
+          issued_at: string
+          last_attempt_at?: string
+          method?: string | null
+          order_number?: string | null
+          original: Json
+          quote_number?: string | null
+          reason?: string | null
+          run_id?: string | null
+          source_key: string
+          status?: string
+          tolerance_cents?: number
+          work_id?: string | null
+        }
+        Update: {
+          amount?: number
+          cancelled?: boolean
+          cancelled_at?: string | null
+          client_name?: string
+          decision?: Json
+          difference_cents?: number | null
+          entry_id?: string | null
+          expected_cents?: number | null
+          id?: string
+          invoice_number?: string
+          issued_at?: string
+          last_attempt_at?: string
+          method?: string | null
+          order_number?: string | null
+          original?: Json
+          quote_number?: string | null
+          reason?: string | null
+          run_id?: string | null
+          source_key?: string
+          status?: string
+          tolerance_cents?: number
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_sync_notes_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "billing_sync_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_sync_notes_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_sync_runs: {
+        Row: {
+          analyzed: number
+          cancelled: number
+          error_message: string | null
+          errors: number
+          finished_at: string | null
+          id: string
+          inserted: number
+          pending: number
+          started_at: string
+          status: string
+          trigger_kind: string
+          updated: number
+        }
+        Insert: {
+          analyzed?: number
+          cancelled?: number
+          error_message?: string | null
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          inserted?: number
+          pending?: number
+          started_at?: string
+          status?: string
+          trigger_kind?: string
+          updated?: number
+        }
+        Update: {
+          analyzed?: number
+          cancelled?: number
+          error_message?: string | null
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          inserted?: number
+          pending?: number
+          started_at?: string
+          status?: string
+          trigger_kind?: string
+          updated?: number
+        }
+        Relationships: []
+      }
+      billing_sync_settings: {
+        Row: {
+          id: boolean
+          tolerance_cents: number
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          tolerance_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          tolerance_cents?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       city_distances: {
         Row: {
           city_a: string
@@ -3581,6 +3776,8 @@ export type Database = {
           split_group: string | null
           split_note: string | null
           split_total: number | null
+          sync_cancelled: boolean
+          sync_note_id: string | null
           updated_at: string
           work_id: string
         }
@@ -3595,6 +3792,8 @@ export type Database = {
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
+          sync_cancelled?: boolean
+          sync_note_id?: string | null
           updated_at?: string
           work_id: string
         }
@@ -3609,10 +3808,19 @@ export type Database = {
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
+          sync_cancelled?: boolean
+          sync_note_id?: string | null
           updated_at?: string
           work_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "work_entries_sync_note_id_fkey"
+            columns: ["sync_note_id"]
+            isOneToOne: false
+            referencedRelation: "billing_sync_notes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "work_entries_work_id_fkey"
             columns: ["work_id"]
@@ -3933,6 +4141,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      billing_client_key: { Args: { v: string }; Returns: string }
+      billing_doc_key: { Args: { v: string }; Returns: string }
+      billing_sync_process: {
+        Args: { p_notes: Json; p_run: string }
+        Returns: Json
+      }
+      billing_sync_start: { Args: { p_kind?: string }; Returns: string }
       can_access_client: { Args: { _client_id: string }; Returns: boolean }
       can_access_page: { Args: { _path: string }; Returns: boolean }
       can_access_rdo: { Args: { _rdo_id: string }; Returns: boolean }

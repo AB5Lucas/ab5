@@ -68,7 +68,7 @@ function FinanceiroPage() {
       const out = new Set<string>();
       const [ent, rdo, sch] = await Promise.all([
         fetchAll<any>((a, b) =>
-          supabase.from("work_entries").select("work_id")
+          supabase.from("work_entries").select("work_id").eq("sync_cancelled", false)
             .or(`and(entry_date.gte.${start},entry_date.lte.${end}),and(competence_month.gte.${start.slice(0, 7)},competence_month.lte.${end.slice(0, 7)})`)
             .order("id").range(a, b),
         ),

@@ -1,0 +1,56 @@
+export const BILLING_START = "2026-10-01";
+export const BILLING_METHODS: Record<string, string> = { order: "Pedido", quote: "Orçamento", reconciliation: "Conciliação inteligente", tolerance: "Tolerância de centavos" };
+export const BILLING_STATES: Record<string, string> = { posted: "Lançado", pending: "Pendente de identificação", ambiguity: "Ambiguidade", divergence: "Divergência", cancelled: "Cancelamento processado", error: "Erro de sincronização" };
+export function documentKey(value: unknown): string {
+  return String(value ?? "").trim().toUpperCase().replace(/\s+/g, "").split(/([/.-])/).map(p => /^\d+$/.test(p) ? p.replace(/^0+(?=\d)/, "") : p).join("");
+}
+export function moneyCents(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? Math.round(value * 100) : null;
+  const s = String(value ?? "").replace(/R\$|\s/g, "");
+  const canonical = s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s;
+  if (!/^-?\d+(\.\d{1,2})?$/.test(canonical)) return null;
+  const negative = canonical.startsWith("-");
+  const [whole = "0", fraction = ""] = canonical.replace(/^-/, "").split(".");
+  return (Number(whole) * 100 + Number(fraction.padEnd(2, "0"))) * (negative ? -1 : 1);
+}
+export function excelDate(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000).toISOString().slice(0, 10);
+  const s = String(value ?? "").trim();
+  const br = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
+  const iso = br ? `${br[3]}-${br[2]}-${br[1]}` : s;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const date = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
+}
+export type BillingNote = { key: string; invoice: string; issuedAt: string; client: string; order: string; quote: string; amountCents: number; cancelled: boolean; raw: unknown[]; row: number; error?: string };
+const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+const doc = (s: unknown) => ["n/a", "na", "-", ""].includes(norm(s)) ? "" : String(s).trim();
+export function parseBillingRows(rows: unknown[][]): { notes: BillingNote[]; ignored: number; invalid: number } {
+  const header = rows[0]?.map(norm) ?? [];
+  const col = (names: string[]) => header.findIndex(h => names.includes(h));
+  const columns = { date: col(["data"]), client: col(["cliente"]), invoice: col(["nfse"]), order: col(["nro. pedido"]), quote: col(["proposta"]), amount: col(["r$ bruto"]), cancelled: col(["cancelada?"]), issuer: col(["empresa emissora", "cnpj emissor"]), series: col(["serie"]) };
+  if ([columns.date, columns.client, columns.invoice, columns.order, columns.quote, columns.amount, columns.cancelled].some(i => i < 0)) throw new Error("A planilha não contém todas as colunas obrigatórias de faturamento.");
+  const notes: BillingNote[] = []; let ignored = 0; let invalid = 0;
+  for (const [index, row] of rows.slice(1).entries()) {
+    if (!row.some(v => v !== "" && v !== null)) continue;
+    const issuedAt = excelDate(row[columns.date]);
+    if (!issuedAt) { invalid++; continue; }
+    if (issuedAt < BILLING_START) { ignored++; continue; }
+    const invoice = doc(row[columns.invoice]); const client = doc(row[columns.client]);
+    const amountCents = moneyCents(row[columns.amount]);
+    const cancellation = norm(row[columns.cancelled]);
+    const error = !invoice || !client || amountCents === null || amountCents < 0 ? "Nota, cliente ou valor inválido" : !["", "sim", "nao", "s", "n"].includes(cancellation) ? "Situação de cancelamento inválida" : undefined;
+    const issuer = columns.issuer >= 0 ? doc(row[columns.issuer]) : "AB5-servicos";
+    const series = columns.series >= 0 ? doc(row[columns.series]) : "sem-serie";
+    notes.push({ key: [issuer, series, issuedAt.slice(0, 4), documentKey(invoice || `invalid-row-${index + 2}`)].join("|"), invoice: invoice || `Não emitida (linha ${index + 2})`, client: client || "Cliente não informado", issuedAt, order: doc(row[columns.order]), quote: doc(row[columns.quote]), amountCents: amountCents ?? 0, cancelled: ["sim", "s"].includes(cancellation), raw: row, row: index + 2, ...(error ? { error } : {}) });
+  }
+  const grouped = new Map<string, BillingNote[]>();
+  for (const n of notes) grouped.set(n.key, [...(grouped.get(n.key) ?? []), n]);
+  return { notes: [...grouped.values()].map(group => {
+    const first = group[0];
+    if (!first) throw new Error("Grupo de notas vazio");
+    const equal = group.every(n => JSON.stringify([n.issuedAt,n.client,n.order,n.quote,n.amountCents,n.cancelled]) === JSON.stringify([first.issuedAt,first.client,first.order,first.quote,first.amountCents,first.cancelled]));
+    return equal ? first : { ...first, error: "Mesmo identificador de nota em linhas com informações diferentes" };
+  }), ignored, invalid };
+}
+export function activeFinancialEntries<T extends { sync_cancelled?: boolean }>(entries: T[]): T[] { return entries.filter(e => !e.sync_cancelled); }

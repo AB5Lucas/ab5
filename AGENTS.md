@@ -26,3 +26,6 @@
 - Financeiro opens Resultados with the exact selected month list; changing the detail period clears that list and uses the new range. Why: drill-down must preserve the report period, including nonconsecutive months.
 - Resultados uses result-budget.ts to derive displayed budget items and totals for both the table and chart. Why: monthly budgets must not be scaled a second time by progress.
 - Night premium: laborCost takes night hours from nightHours(entry, exit, break) for RDO rows of night services (rdos.shift='night' or works.night_shift). Why: one labor-cost formula shared by results and financeiro.
+- Billing: server-only Excel reads feed atomic billing_sync_process; all financial readers exclude sync_cancelled. Why: preserve idempotent financial history.
+- Daily billing uses the managed authenticated route, request-scoped execution context and persisted run state. Why: no dependency on an open browser.
+- Alocações keeps /relatorios under Demandas. Why: preserve permissions and links.
