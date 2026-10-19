@@ -315,7 +315,7 @@ function WorksPage() {
               <TableHead className="hidden lg:table-cell">Cidade</TableHead>
               <TableHead className="hidden xl:table-cell">Seg–Qui</TableHead>
               <TableHead className="hidden xl:table-cell">Sex–Dom</TableHead>
-              <TableHead className="hidden xl:table-cell">Encarregado</TableHead>
+              <TableHead className="hidden xl:table-cell">Gestor</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-24" />
             </TableRow>
@@ -351,7 +351,7 @@ function WorksPage() {
                     {`${String(w.entry_time ?? DEFAULT_ENTRY).slice(0, 5)} - ${String(w.exit_time_weekend ?? DEFAULT_EXIT_WEEKEND).slice(0, 5)}`}
                   </TableCell>
                   <TableCell className="hidden xl:table-cell">
-                    {w.supervisor_id ? (nameById.get(w.supervisor_id) ?? "—") : "—"}
+                    {w.manager_id ? (nameById.get(w.manager_id) ?? "—") : "—"}
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(w.status)}>{WORK_STATUS_LABEL[w.status]}</Badge>
