@@ -85,7 +85,11 @@ function FinanceiroPage() {
       return out;
     },
   });
-  const list = useMemo(() => (works.data ?? []).filter((w: any) => active.data?.has(w.id)), [works.data, active.data]);
+  // Qualquer serviço (inclusive concluído/inativo) com movimento ou pedido datado no período
+  const list = useMemo(() => (works.data ?? []).filter((w: any) =>
+    active.data?.has(w.id) ||
+    (Array.isArray(w.orders) && w.orders.some((o: any) => o?.date && String(o.date).slice(0, 10) >= start && String(o.date).slice(0, 10) <= end)),
+  ), [works.data, active.data, start, end]);
   const raws = useQueries({
     queries: list.map((w: any) => ({
       queryKey: ["work-result", w.id, w.id, "vt"],
@@ -117,7 +121,8 @@ function FinanceiroPage() {
       }
       const tax = billed * FIN_TAX;
       const margin = compBilled * (1 - FIN_TAX) - mo - transport - materials;
-      if (!billed && !compBilled && !mo && !transport && !materials) return;
+      const hasOrder = (Array.isArray(w.orders) ? w.orders : []).some((o: any) => o?.date && sel.has(String(o.date).slice(0, 7)));
+      if (!billed && !compBilled && !mo && !transport && !materials && !hasOrder) return;
       const lastYm = yms[yms.length - 1] ?? `${year}-12`;
       const progress = w.contract_enabled
         ? contractFraction((raw.entries as any[]).filter((e) => e.category === "faturamento" && e.entry_date.slice(0, 7) <= lastYm).length, Number(w.contract_months ?? 12)) * 100
