@@ -528,7 +528,8 @@ function MailPreview({ reqs, cName, wName, onClose }: { reqs: Req[]; cName: (id:
       L.push("", `CLIENTE: ${cName(cid).toUpperCase()}`);
       for (const wid of [...new Set(cr.map((r) => r.work_id))]) {
         const wr = cr.filter((r) => r.work_id === wid).sort((a, b) => (PRIO_ORDER[a.priority] ?? 9) - (PRIO_ORDER[b.priority] ?? 9));
-        L.push("", `  Serviço: ${wName(wid)}`);
+        if (wid !== cr[0]?.work_id) L.push("");
+        L.push(`  Serviço: ${wName(wid)}`);
         for (const priority of [...new Set(wr.map((r) => r.priority))]) {
           L.push("", `    Prioridade ${PRIORITY[priority]}`, "");
           for (const r of wr.filter((r) => r.priority === priority)) {
