@@ -60,6 +60,7 @@ function downloadCsv(filename: string, rows: (string | number)[][]) {
 
 type AllocRow = {
   id: string;
+  collaborator_id: string | null;
   overnight: boolean;
   driver: boolean;
   confirmation_status: string;
@@ -71,6 +72,15 @@ type AllocRow = {
 function Page() {
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(iso(new Date()));
+  const [person, setPerson] = useState("");
+  const people = useQuery({
+    queryKey: ["report-people"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("collaborators").select("id, full_name").order("full_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   const allocations = useQuery({
     queryKey: ["report-allocations", from, to],
@@ -78,7 +88,7 @@ function Page() {
       const { data, error } = await supabase
         .from("daily_allocations")
         .select(
-          "id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(name), collaborators(full_name)",
+          "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(name), collaborators(full_name)",
         )
         .gte("daily_schedules.schedule_date", from)
         .lte("daily_schedules.schedule_date", to);
@@ -192,8 +202,54 @@ function Page() {
           <Label htmlFor="to">Até</Label>
           <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
         </div>
+        <div className="space-y-1">
+          <Label htmlFor="person">Colaborador</Label>
+          <select
+            id="person"
+            value={person}
+            onChange={(e) => setPerson(e.target.value)}
+            className="h-9 w-64 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            <option value="">Todos</option>
+            {(people.data ?? []).map((p) => (
+              <option key={p.id} value={p.id}>{p.full_name}</option>
+            ))}
+          </select>
+        </div>
         {loading && <span className="pb-2 text-sm text-muted-foreground">Carregando...</span>}
       </div>
+
+      {person && (
+        <div className="panel overflow-x-auto p-0">
+          <p className="p-3 text-sm font-medium">
+            Dia a dia de {(people.data ?? []).find((p) => p.id === person)?.full_name}
+          </p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Serviço</TableHead>
+                <TableHead>Pernoite</TableHead>
+                <TableHead>Motorista</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data
+                .filter((a) => a.collaborator_id === person)
+                .sort((a, b) => (a.daily_schedules?.schedule_date ?? "").localeCompare(b.daily_schedules?.schedule_date ?? ""))
+                .map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell>{a.daily_schedules ? fmtDate(a.daily_schedules.schedule_date) : "—"}</TableCell>
+                    <TableCell>{a.works?.name ?? "Sem serviço"}</TableCell>
+                    <TableCell>{a.overnight ? "Sim" : "—"}</TableCell>
+                    <TableCell>{a.driver ? "Sim" : "—"}</TableCell>
+                  </TableRow>
+                ))}
+              {!loading && !data.some((a) => a.collaborator_id === person) && <EmptyRow cols={4} />}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard label="Alocações" value={totals.allocations} />
