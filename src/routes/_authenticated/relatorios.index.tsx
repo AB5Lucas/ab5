@@ -85,15 +85,22 @@ function Page() {
   const allocations = useQuery({
     queryKey: ["report-allocations", from, to],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("daily_allocations")
-        .select(
+const out: AllocRow[] = [];
+      for (let off = 0; ; off += 1000) {
+        const { data, error } = await supabase
+          .from("daily_allocations")
+          .select(
           "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(name, order_number, client, clients(name)), collaborators(full_name)",
         )
-        .gte("daily_schedules.schedule_date", from)
-        .lte("daily_schedules.schedule_date", to);
-      if (error) throw error;
-      return (data ?? []) as unknown as AllocRow[];
+          .gte("daily_schedules.schedule_date", from)
+          .lte("daily_schedules.schedule_date", to)
+          .order("id")
+          .range(off, off + 999);
+        if (error) throw error;
+        out.push(...((data ?? []) as unknown as AllocRow[]));
+        if (!data || data.length < 1000) break;
+      }
+      return out;
     },
   });
 
