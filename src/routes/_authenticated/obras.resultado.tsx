@@ -113,8 +113,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
       if (role === "coordenador" || role === "encarregado") {
         const { data: mine } = await supabase.from("foreman_works").select("work_id").eq("user_id", user!.id);
         const ids = new Set((mine ?? []).map((m) => m.work_id));
-        const clients = new Set(data.filter((w) => ids.has(w.id) && w.client_id).map((w) => w.client_id));
-        return data.filter((w) => ids.has(w.id) || (w.client_id && clients.has(w.client_id)));
+        return data.filter((w) => ids.has(w.id));
       }
       return data;
     },
