@@ -22,3 +22,5 @@
 - Certificados (/demandas/certificados): source of trainings is collaborator_trainings.completed_at; issued certificates/lists store a frozen snapshot (training_certificates, attendance_lists) and reissue adds a version. Why: history never changes when cadastros change.
 - Contratações (/demandas/contratacoes): abrir = can_access_page; RH (atualizar status, e-mails) = is_hiring_rh() (admin/programador); cada evento grava hiring_request_events e o trigger registra a tentativa em hiring_email_log (único por evento, evita duplicidade). Por quê: histórico completo sem permissões paralelas.
 - Custos BDI: budget_items.bdi = 1 marks the service; results-engine (bdiBudget/BDI_RATE) recomputes the budget from the current order on every read, and the old Locação rule was removed. Why: new orders update budget and margin without re-saving.
+
+- Financeiro opens Resultados with the exact selected month list; changing the detail period clears that list and uses the new range. Why: drill-down must preserve the report period, including nonconsecutive months.

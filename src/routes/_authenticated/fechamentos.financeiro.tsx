@@ -267,17 +267,17 @@ function FinanceiroPage() {
           )}
         </table>
       </div>
-      <DetailDialog line={detail} onClose={() => setDetail(null)} />
+      <DetailDialog line={detail} months={yms} onClose={() => setDetail(null)} />
     </div>
   );
 }
 
-function DetailDialog({ line, onClose }: { line: Line | null; onClose: () => void }) {
+function DetailDialog({ line, months, onClose }: { line: Line | null; months: string[]; onClose: () => void }) {
   return (
     <Dialog open={!!line} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-[98vw] w-[98vw] h-[96vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{line?.work.clients?.name ?? line?.work.client} — {line?.work.name}</DialogTitle></DialogHeader>
-        {line && <ResultadoPage key={line.work.id} initialWorkId={line.work.id} />}
+        {line && <ResultadoPage key={`${line.work.id}:${months.join(",")}`} initialWorkId={line.work.id} initialMonths={months} />}
       </DialogContent>
     </Dialog>
   );
