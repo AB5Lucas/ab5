@@ -522,7 +522,7 @@ function MailPreview({ reqs, cName, wName, onClose }: { reqs: Req[]; cName: (id:
   const totalVagas = reqs.reduce((s, r) => s + r.quantity - r.filled, 0);
   const [subject, setSubject] = useState(
     reqs.length === 1
-      ? `Contratação ${nums} - ${reqs[0].position_name} - ${clientsTxt}`
+      ? `Contratação ${nums} - ${reqs[0]?.position_name ?? ""} - ${clientsTxt}`
       : `Contratações ${clientsTxt} - ${totalVagas} vaga(s) em ${new Set(reqs.map((r) => r.position_name)).size} função(ões)`,
   );
   const [body, setBody] = useState(() => {
