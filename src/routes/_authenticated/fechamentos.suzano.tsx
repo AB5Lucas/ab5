@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { monthEnd } from "@/lib/results-engine";
+import { billingMatchesOrder } from "@/lib/billing-sync";
 
 export const Route = createFileRoute("/_authenticated/fechamentos/suzano")({
   head: () => ({
