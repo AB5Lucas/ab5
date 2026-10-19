@@ -335,6 +335,7 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
   const [exception, setException] = useState(false);
   const [assume, setAssume] = useState(false);
   const closed = req.status === "cancelada" || req.status === "atendida";
+  const [mailOpen, setMailOpen] = useState(false);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -416,7 +417,11 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
         </div>
 
         <div className="space-y-2">
-          <p className="font-display text-sm uppercase tracking-wide">E-mails</p>
+          <div className="flex items-center justify-between">
+            <p className="font-display text-sm uppercase tracking-wide">E-mails</p>
+            <Button size="sm" variant="outline" onClick={() => setMailOpen(true)}>Enviar e-mail</Button>
+          </div>
+          {mailOpen && <MailPreview req={req} cName={cName} wName={wName} onClose={() => setMailOpen(false)} />}
           {(mails.data ?? []).map((m) => (
             <div key={m.id} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-xs text-muted-foreground">{dt(m.created_at)}</span>
