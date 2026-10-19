@@ -22,7 +22,24 @@ export function excelDate(value: unknown): string | null {
   const date = new Date(`${iso}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
 }
-export type BillingNote = { key: string; invoice: string; issuedAt: string; client: string; order: string; quote: string; amountCents: number; cancelled: boolean; raw: unknown[]; row: number; error?: string };
+export type BillingNote = { key: string; invoice: string; noInvoice?: boolean; issuedAt: string; client: string; order: string; quote: string; amountCents: number; cancelled: boolean; raw: unknown[]; row: number; error?: string };
+/** Orçamento "26/256" → "260256" (zero após os 2 primeiros números), igual ao lançado como pedido. */
+export function quoteKey(v: unknown): string {
+  const s = String(v ?? "").trim();
+  const m = /^(\d+)\s*\/\s*(\d+)$/.exec(s);
+  return m ? `${m[1]}${m[2]!.padStart(4, "0")}` : s.replace(/\D/g, "");
+}
+/** Um faturamento liquida o pedido quando a descrição contém o número (pedido ou orçamento), em qualquer formato. */
+export function billingMatchesOrder(description: string, orderNumber: string): boolean {
+  const num = orderNumber.replace(/\s+/g, "").toLowerCase();
+  if (!num) return false;
+  const d = description.replace(/\s+/g, "").toLowerCase();
+  if (d.includes(num)) return true;
+  const q = quoteKey(orderNumber);
+  if (q.length < 4) return false;
+  const tokens = description.match(/\d+\s*\/\s*\d+|\d+/g) ?? [];
+  return tokens.some((t) => quoteKey(t) === q);
+}
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 const doc = (s: unknown) => ["n/a", "na", "-", ""].includes(norm(s)) ? "" : String(s).trim();
 export function parseBillingRows(rows: unknown[][]): { notes: BillingNote[]; ignored: number; invalid: number } {
@@ -39,10 +56,13 @@ export function parseBillingRows(rows: unknown[][]): { notes: BillingNote[]; ign
     const invoice = doc(row[columns.invoice]); const client = doc(row[columns.client]);
     const amountCents = moneyCents(row[columns.amount]);
     const cancellation = norm(row[columns.cancelled]);
-    const error = !invoice || !client || amountCents === null || amountCents < 0 ? "Nota, cliente ou valor inválido" : !["", "sim", "nao", "s", "n"].includes(cancellation) ? "Situação de cancelamento inválida" : undefined;
+    const error = !client || amountCents === null || amountCents <= 0 ? "Cliente ou valor inválido" : !["", "sim", "nao", "s", "n"].includes(cancellation) ? "Situação de cancelamento inválida" : undefined;
     const issuer = columns.issuer >= 0 ? doc(row[columns.issuer]) : "AB5-servicos";
     const series = columns.series >= 0 ? doc(row[columns.series]) : "sem-serie";
-    notes.push({ key: [issuer, series, issuedAt.slice(0, 4), documentKey(invoice || `invalid-row-${index + 2}`)].join("|"), invoice: invoice || `Não emitida (linha ${index + 2})`, client: client || "Cliente não informado", issuedAt, order: doc(row[columns.order]), quote: doc(row[columns.quote]), amountCents: amountCents ?? 0, cancelled: ["sim", "s"].includes(cancellation), raw: row, row: index + 2, ...(error ? { error } : {}) });
+    const order = doc(row[columns.order]); const quote = doc(row[columns.quote]);
+    // Sem NF: chave estável pelo conteúdo; quando a NF for preenchida, a sincronização adota o mesmo lançamento
+    const ident = invoice ? documentKey(invoice) : `SEMNF-${issuedAt}-${client.toUpperCase().replace(/[^A-Z0-9]/g, "")}-${documentKey(order || quote)}-${amountCents ?? 0}`;
+    notes.push({ key: [issuer, series, issuedAt.slice(0, 4), ident].join("|"), invoice: invoice || "Sem NF", ...(invoice ? {} : { noInvoice: true }), client: client || "Cliente não informado", issuedAt, order, quote, amountCents: amountCents ?? 0, cancelled: ["sim", "s"].includes(cancellation), raw: row, row: index + 2, ...(error ? { error } : {}) });
   }
   const grouped = new Map<string, BillingNote[]>();
   for (const n of notes) grouped.set(n.key, [...(grouped.get(n.key) ?? []), n]);

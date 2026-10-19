@@ -123,7 +123,11 @@ function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
         }
       }
       const rows = [...groups.values()].map((g) => {
-        const hits = g.number !== "—" ? fat.filter((e: any) => g.workIds.has(e.work_id) && norm(e.description ?? "").includes(g.num)) : [];
+        // Pedido sem número: liquida com os faturamentos do serviço que não pertencem a outro pedido numerado dele
+        const others = [...groups.values()].filter((x) => x !== g && x.number !== "—" && [...x.workIds].some((id) => g.workIds.has(id)));
+        const hits = g.number !== "—"
+          ? fat.filter((e: any) => g.workIds.has(e.work_id) && billingMatchesOrder(e.description ?? "", g.number))
+          : fat.filter((e: any) => g.workIds.has(e.work_id) && !others.some((x) => billingMatchesOrder(e.description ?? "", x.number)));
         const dates = g.dates.length ? g.dates : hits.map((e: any) => e.entry_date as string).slice(0, 1);
         const months = [...new Set(dates.map((d) => d.slice(0, 7)))].sort();
         return { key: g.key, client: g.client, clientId: g.clientId, number: g.number, work: [...g.works].join(", "), workIds: [...g.workIds], date: months[0] ?? "", months, total: g.total, billed: hits.reduce((a: number, e: any) => a + Number(e.amount), 0) };
