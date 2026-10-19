@@ -264,7 +264,10 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const m = dayWorks.get(dt);
       if (!m || m.size !== 1) return false;
       const [w, n] = [...m][0]!;
-      return n > (maxSplit.get(w) ?? Infinity);
+      // Só equipe geral não dividida (ex.: Indústria): bem acima do máximo do serviço e com equipe grande.
+      // Variações normais de equipe (ex.: Três Corações) continuam contando no serviço.
+      const max = maxSplit.get(w) ?? Infinity;
+      return n >= 10 && n > max * 2;
     };
     const charge = (id: string, date: string, hours: number, frac: number) => {
       if (frac <= 0) return;
