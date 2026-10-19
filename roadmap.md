@@ -13,7 +13,9 @@
 - [x] Contratações: data do dia e nº automático no formulário
 - [ ] Contratações: envio real dos e-mails (aguarda configurar domínio de e-mail ab5.com.br)
 - [x] Resultados: coordenador vê só obras com acesso
-- [ ] Faturamentos: sincronização diária real do Excel, conciliação, cancelamentos e auditoria desde 01/10/2026
-- [ ] Relatórios > Sincronização: filtros, detalhes, indicadores, exportação e tolerância administrativa
-- [ ] Mover Alocações para Demandas preservando URL e acessos
-- [ ] Validar regras da sincronização e carga real ponta a ponta
+- [ ] Faturamentos: rotina criada e agendada; ativação no site publicado depende de publicar a atualização
+- [x] Relatórios > Sincronização: filtros, detalhes, indicadores, exportação e tolerância administrativa
+- [x] Mover Alocações para Demandas preservando URL e acessos
+- [x] Validar carga real e repetição sem duplicidades: 6 lançamentos; 17 testes aprovados, detalhes e exportação conferidos
+- [ ] Faturamentos: revisar 8 divergências de cliente, 13 notas sem correspondência e 7 linhas sem nota/valor na origem
+- [ ] Validar cancelamento, reativação e conciliação financeira com cenários isolados de integração (não exercitados com notas reais)
