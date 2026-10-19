@@ -336,7 +336,7 @@ function VehiclesPage() {
                         <Pencil className="h-4 w-4" />
                       </Button>
                     )}
-                    {isAdmin && (
+                    {canWrite && (
                       <Button variant="ghost" size="sm" onClick={() => setDeleting(v)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

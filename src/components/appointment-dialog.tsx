@@ -533,7 +533,7 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
                                 <X className="h-3.5 w-3.5" />
                               </Button>
                             )}
-                            {isAdmin && (
+                            {canWrite && (
                               <Button
                                 variant="ghost"
                                 size="icon"

@@ -119,7 +119,7 @@ function RdoPage() {
 }
 
 function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void }) {
-  const { isAdmin } = useCurrentUser();
+  const { isAdmin, canWrite } = useCurrentUser();
   const [f, setF] = useState({ text: "", from: "", to: "", status: "all" });
   const list = useQuery({
     queryKey: ["rdo-history"],
@@ -184,7 +184,7 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
                 <Button size="sm" variant="outline" onClick={() => toast.promise(exportRdoPdf(r.id), { loading: "Gerando PDF...", success: "PDF gerado", error: (e) => e.message })}>
                   <FileDown className="h-4 w-4" /> PDF
                 </Button>
-                {isAdmin && (
+                {canWrite && (
                   <Button
                     size="sm"
                     variant="outline"

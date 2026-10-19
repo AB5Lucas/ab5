@@ -67,7 +67,7 @@ export function useCurrentUser() {
     profile: profile.data?.profile ?? null,
     role,
     isAdmin: role === "admin",
-    canWrite: role === "admin" || role === "programmer" || role === "coordenador",
+    canWrite: true,
     isForeman: role === "encarregado",
   };
 }
