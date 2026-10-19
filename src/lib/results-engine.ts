@@ -2,7 +2,7 @@ import { isResultMonth } from "./result-period";
 import { supabase } from "@/integrations/supabase/client";
 import { contractFraction } from "@/lib/contract";
 import { resplitClient } from "@/lib/resplit";
-import { laborCost, ENCARGOS } from "@/lib/labor-cost";
+import { laborCost, nightHours, ENCARGOS } from "@/lib/labor-cost";
 import { buildDistanceLookup } from "@/lib/city-distance";
 
 /** Motor de cálculo de Resultados — usado pela página Resultados e pelo Financeiro (mesma lógica). */
@@ -55,12 +55,12 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", workIds).range(a, b),
         ),
         fetchAll<any>((a, b) =>
-          supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, position_id, collaborators(position_id)").in("work_id", workIds).range(a, b),
+          supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, position_id, collaborators(position_id), rdos(shift)").in("work_id", workIds).range(a, b),
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
         supabase.from("work_entries").select("*").in("work_id", workIds).order("entry_date", { ascending: false }),
         fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, city, vt_enabled, travel_bonus_enabled").range(a, b)),
-        w.client_id ? supabase.from("works").select("id, monthly_enabled").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
+        w.client_id ? supabase.from("works").select("id, monthly_enabled, night_shift").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
               supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, vehicles(km_rate, plate), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).range(a, b),
@@ -94,7 +94,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           : Promise.resolve([] as any[]),
         sibIds.length
           ? fetchAll<any>((a, b) =>
-              supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours").in("work_id", sibIds).range(a, b),
+              supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, rdos(shift)").in("work_id", sibIds).range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
@@ -124,6 +124,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         ),
         people,
         monthlyIds: (((siblings as any).data ?? []) as any[]).filter((x) => x.monthly_enabled).map((x) => x.id as string),
+        nightIds: (((siblings as any).data ?? []) as any[]).filter((x) => x.night_shift).map((x) => x.id as string),
         siblingCount: Math.max(1, (siblings as any).data?.length ?? 1),
         vs,
         client: (client as any).data,
@@ -226,6 +227,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       l.cost += cost * frac;
       laborBy.set(id, l);
     };
+    const nightWorks = new Set<string>([...((d.nightIds ?? []) as string[]), ...((opts.allWorks ?? []) as any[]).filter((x) => x.night_shift).map((x) => x.id), ...(work?.night_shift ? [work.id] : [])]);
     const hol = new Set<string>((opts.holidays ?? []) as string[]);
     // Rateio: dia sem divisão na aba Serviços (todos num só serviço) ou pessoa do RDO sem escalação
     // → custo dividido pela média de pessoas por serviço nos dias já divididos. Ao dividir, o rateio sai.
@@ -266,7 +268,10 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     };
     const charge = (id: string, date: string, hours: number, frac: number) => {
       if (frac <= 0) return;
-      const cost = laborCost(hours, rate.get(id) ?? 0, pj.has(id), date, hol);
+      const r = rdoKey.get(`${id}|${date}`);
+      const isNight = r?.present && (r.rdos?.shift === "night" || nightWorks.has(r.work_id));
+      const nh = isNight ? nightHours(r.entry_time?.slice(0, 5), r.exit_time?.slice(0, 5), r.break_minutes ?? 60) : 0;
+      const cost = laborCost(hours, rate.get(id) ?? 0, pj.has(id), date, hol, nh);
       addLabor(id, hours, cost, frac);
       bump(date.slice(0, 7), "labor", cost * frac);
     };
