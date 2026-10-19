@@ -519,27 +519,25 @@ function MailPreview({ reqs, cName, wName, onClose }: { reqs: Req[]; cName: (id:
   const [cc, setCc] = useState<string | null>(null);
   const clientsTxt = clientIds.map(cName).join(", ");
   const totalVagas = reqs.reduce((s, r) => s + r.quantity - r.filled, 0);
-  const [subject, setSubject] = useState(
-    reqs.length === 1
-      ? `Contratação - ${reqs[0]?.position_name ?? ""} - ${clientsTxt}`
-      : `Contratações ${clientsTxt} - ${totalVagas} ${totalVagas === 1 ? "vaga" : "vagas"} em ${new Set(reqs.map((r) => r.position_name)).size} funções`,
-  );
+  const [subject, setSubject] = useState(`Contratações - ${clientsTxt}`);
   const [body, setBody] = useState(() => {
-    const L: string[] = ["Prezados,", ""];
-    const allHigh = reqs.length > 0 && reqs.every((r) => r.priority === "alta");
-    if (allHigh) L.push("Prioridade alta.", "");
+    const L: string[] = [new Date().getHours() < 12 ? "Bom dia," : "Boa tarde,", ""];
     L.push(reqs.length === 1 ? "Segue solicitação de contratação:" : `Seguem as solicitações de contratação. Total de ${totalVagas} ${totalVagas === 1 ? "vaga pendente" : "vagas pendentes"}:`);
     for (const cid of clientIds) {
       const cr = reqs.filter((r) => r.client_id === cid);
       L.push("", `CLIENTE: ${cName(cid).toUpperCase()}`);
       for (const wid of [...new Set(cr.map((r) => r.work_id))]) {
         const wr = cr.filter((r) => r.work_id === wid).sort((a, b) => (PRIO_ORDER[a.priority] ?? 9) - (PRIO_ORDER[b.priority] ?? 9));
-        L.push(`  Serviço: ${wName(wid)}`);
-        for (const r of wr) {
-          const pend = r.quantity - r.filled;
-          L.push(`    • ${r.position_name}: ${pend} ${pend === 1 ? "vaga" : "vagas"}${r.filled ? ` (de ${r.quantity}, ${r.filled} já atendida(s))` : ""}${allHigh ? "" : ` · Prioridade ${PRIORITY[r.priority]}`}`);
+        L.push("", `  Serviço: ${wName(wid)}`);
+        for (const priority of [...new Set(wr.map((r) => r.priority))]) {
+          L.push("", `    Prioridade ${PRIORITY[priority]}`, "");
+          for (const r of wr.filter((r) => r.priority === priority)) {
+            const pend = r.quantity - r.filled;
+            L.push(`    • ${r.position_name}: ${pend} ${pend === 1 ? "vaga" : "vagas"}${r.filled ? ` (de ${r.quantity}, ${r.filled} já atendida(s))` : ""}`);
+          }
         }
         const reasons = [...new Set(wr.map((r) => r.reason.trim()).filter(Boolean))];
+        if (reasons.length) L.push("");
         if (reasons.length === 1) L.push(`    Justificativa: ${reasons[0]}`);
         else for (const r of wr) if (r.reason.trim()) L.push(`    Justificativa (${r.position_name}): ${r.reason.trim()}`);
         const notes = [...new Set(wr.map((r) => r.notes?.trim()).filter(Boolean) as string[])];
