@@ -218,6 +218,13 @@
       "when": 1792444683374,
       "tag": "0030_billing_spal_jundiai_coca",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792444885883,
+      "tag": "0031_billing_client_equivalences",
+      "breakpoints": true
     }
   ]
 }
