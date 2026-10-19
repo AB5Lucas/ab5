@@ -1,3 +1,4 @@
+import { isResultMonth } from "./result-period";
 import { supabase } from "@/integrations/supabase/client";
 import { contractFraction } from "@/lib/contract";
 import { resplitClient } from "@/lib/resplit";
@@ -137,7 +138,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       };
 }
 
-export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[] };
+export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[]; selectedMonths?: readonly string[] };
 
 /** Contrato: work_id → último dia do mês do último faturamento (custos depois disso não entram). */
 export function contractCutoffs(work: any, entries: any[], isAll: boolean, allWorks?: any[]) {
@@ -166,7 +167,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     }
     // Com mês inicial: só o que estiver dentro do período; sem mês inicial: desde o começo da obra
     const from = fromMonth ? `${fromMonth}-01` : "";
-    const okDate = (dt?: string | null) => !dt || (dt.slice(0, 10) <= cut && dt.slice(0, 10) >= from);
+    const okDate = (dt?: string | null) => !dt || (dt.slice(0, 10) <= cut && dt.slice(0, 10) >= from && isResultMonth(dt.slice(0, 7), "", "", opts.selectedMonths));
     // Contrato: custos só até o fim do mês do último faturamento do serviço
     const contractCut = contractCutoffs(work, raw.entries, isAll, opts.allWorks);
     // Demais serviços: custos só até o dia do último andamento (% conclusão) apontado
@@ -513,7 +514,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         progMap.set(ym, val);
       }
     }
-    const months = [...new Set([...monthly.keys(), ...progMap.keys()])].filter((ym) => !fromMonth || ym >= fromMonth).sort();
+    const months = [...new Set([...monthly.keys(), ...progMap.keys()])].filter((ym) => isResultMonth(ym, fromMonth, "", opts.selectedMonths)).sort();
     // Valor do pedido: sempre o informado em Dados do Cliente (HH ou não)
     const order = Number(work.order_value ?? 0);
     const biRaw = ((work as any).budget_items ?? {}) as Record<string, number>;
