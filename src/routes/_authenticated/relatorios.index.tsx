@@ -65,7 +65,7 @@ type AllocRow = {
   driver: boolean;
   confirmation_status: string;
   daily_schedules: { schedule_date: string } | null;
-  works: { name: string } | null;
+  works: { name: string; order_number: string | null; client: string | null; clients: { name: string } | null } | null;
   collaborators: { full_name: string } | null;
 };
 
@@ -88,7 +88,7 @@ function Page() {
       const { data, error } = await supabase
         .from("daily_allocations")
         .select(
-          "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(name), collaborators(full_name)",
+          "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(name, order_number, client, clients(name)), collaborators(full_name)",
         )
         .gte("daily_schedules.schedule_date", from)
         .lte("daily_schedules.schedule_date", to);
@@ -228,6 +228,8 @@ function Page() {
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
+                <TableHead>Pedido</TableHead>
+                <TableHead>Cliente</TableHead>
                 <TableHead>Serviço</TableHead>
                 <TableHead>Pernoite</TableHead>
                 <TableHead>Motorista</TableHead>
@@ -240,12 +242,14 @@ function Page() {
                 .map((a) => (
                   <TableRow key={a.id}>
                     <TableCell>{a.daily_schedules ? fmtDate(a.daily_schedules.schedule_date) : "—"}</TableCell>
+                    <TableCell>{a.works?.order_number || "—"}</TableCell>
+                    <TableCell>{a.works?.clients?.name ?? a.works?.client ?? "—"}</TableCell>
                     <TableCell>{a.works?.name ?? "Sem serviço"}</TableCell>
                     <TableCell>{a.overnight ? "Sim" : "—"}</TableCell>
                     <TableCell>{a.driver ? "Sim" : "—"}</TableCell>
                   </TableRow>
                 ))}
-              {!loading && !data.some((a) => a.collaborator_id === person) && <EmptyRow cols={4} />}
+              {!loading && !data.some((a) => a.collaborator_id === person) && <EmptyRow cols={6} />}
             </TableBody>
           </Table>
         </div>
