@@ -148,7 +148,7 @@ function DailyTransportSection() {
     },
   });
 
-  const locked = day.data?.schedule?.status === "finalized" && !isAdmin;
+  const locked = day.data?.schedule?.status === "finalized" && !canWrite;
   const canEdit = canWrite && !!day.data?.schedule && !locked;
 
   const nameOf = useMemo(() => {
@@ -325,7 +325,7 @@ function DailyTransportSection() {
       )}
 
       {day.data?.schedule?.status === "finalized" && (
-        <Badge variant="secondary">Programação finalizada{isAdmin ? " — edição liberada para administrador" : " — somente leitura"}</Badge>
+        <Badge variant="secondary">Programação finalizada{canWrite ? " — edição liberada" : " — somente leitura"}</Badge>
       )}
 
       <div className="panel overflow-x-auto">
