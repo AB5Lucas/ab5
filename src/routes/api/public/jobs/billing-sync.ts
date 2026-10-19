@@ -12,7 +12,13 @@ export const Route = createFileRoute("/api/public/jobs/billing-sync")({
     const { executeBillingSync } = await import("@/lib/billing-sync.server");
     const { deferBilling } = await import("@/lib/billing-background.server");
     const work = executeBillingSync({ lovableKey, excelKey }, "daily");
-    if (deferBilling(work.catch(error => console.error("Billing sync failed", error)))) return Response.json({ status: "accepted" }, { status: 202 });
+    const background = work.catch(error => console.error("Billing sync failed", error));
+    // Nitro's Cloudflare adapter attaches the execution context to the request.
+    if ("waitUntil" in request && typeof request.waitUntil === "function") {
+      request.waitUntil(background);
+      return Response.json({ status: "accepted" }, { status: 202 });
+    }
+    if (deferBilling(background)) return Response.json({ status: "accepted" }, { status: 202 });
     try { return Response.json(await work); } catch { return Response.json({ error: "Synchronization failed; see run history" }, { status: 503 }); }
   } } },
 });

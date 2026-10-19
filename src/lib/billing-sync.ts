@@ -42,7 +42,7 @@ export function parseBillingRows(rows: unknown[][]): { notes: BillingNote[]; ign
     const error = !invoice || !client || amountCents === null || amountCents < 0 ? "Nota, cliente ou valor inválido" : !["", "sim", "nao", "s", "n"].includes(cancellation) ? "Situação de cancelamento inválida" : undefined;
     const issuer = columns.issuer >= 0 ? doc(row[columns.issuer]) : "AB5-servicos";
     const series = columns.series >= 0 ? doc(row[columns.series]) : "sem-serie";
-    notes.push({ key: [issuer, series, issuedAt.slice(0, 4), documentKey(invoice || `invalid-row-${index + 2}`)].join("|"), invoice, client, issuedAt, order: doc(row[columns.order]), quote: doc(row[columns.quote]), amountCents: amountCents ?? 0, cancelled: ["sim", "s"].includes(cancellation), raw: row, row: index + 2, ...(error ? { error } : {}) });
+    notes.push({ key: [issuer, series, issuedAt.slice(0, 4), documentKey(invoice || `invalid-row-${index + 2}`)].join("|"), invoice: invoice || `Não emitida (linha ${index + 2})`, client: client || "Cliente não informado", issuedAt, order: doc(row[columns.order]), quote: doc(row[columns.quote]), amountCents: amountCents ?? 0, cancelled: ["sim", "s"].includes(cancellation), raw: row, row: index + 2, ...(error ? { error } : {}) });
   }
   const grouped = new Map<string, BillingNote[]>();
   for (const n of notes) grouped.set(n.key, [...(grouped.get(n.key) ?? []), n]);
