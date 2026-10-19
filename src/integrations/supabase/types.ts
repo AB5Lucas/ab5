@@ -4173,6 +4173,15 @@ export type Database = {
       billing_client_key: { Args: { v: string }; Returns: string }
       billing_client_normalized: { Args: { v: string }; Returns: string }
       billing_doc_key: { Args: { v: string }; Returns: string }
+      billing_entry_desc: {
+        Args: { p_note: Json; p_work: string }
+        Returns: string
+      }
+      billing_entry_ref: {
+        Args: { p_order: string; p_quote: string; p_work: string }
+        Returns: string
+      }
+      billing_quote_key: { Args: { v: string }; Returns: string }
       billing_sync_process: {
         Args: { p_notes: Json; p_run: string }
         Returns: Json
