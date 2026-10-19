@@ -118,6 +118,9 @@ function Requests({ isRh }: { isRh: boolean }) {
   const [f, setF] = useState({ q: "", client: ALL, work: ALL, position: ALL, requester: ALL, owner: ALL, status: ALL, from: "", to: "", sort: "date" });
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState<Req | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [mailing, setMailing] = useState(false);
+  const togglePick = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const cName = (id: string) => base.clients.find((c) => c.id === id)?.name ?? "—";
   const wName = (id: string) => base.works.find((w) => w.id === id)?.name ?? "—";
   const all = reqs.data ?? [];
@@ -185,12 +188,14 @@ function Requests({ isRh }: { isRh: boolean }) {
         </div>
         <div className="col-span-2 flex items-end justify-end gap-2 md:col-span-6">
           <Button variant="outline" size="sm" onClick={() => setF({ q: "", client: ALL, work: ALL, position: ALL, requester: ALL, owner: ALL, status: ALL, from: "", to: "", sort: "date" })}>Limpar</Button>
+          <Button variant="outline" size="sm" disabled={!picked.size} onClick={() => setMailing(true)}>Enviar e-mail{picked.size ? ` (${picked.size})` : ""}</Button>
           <Button size="sm" onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" />Nova solicitação</Button>
         </div>
       </div>
       <div className="panel overflow-x-auto">
         <Table>
           <TableHeader><TableRow>
+            <TableHead className="w-8"><Checkbox checked={rows.length > 0 && rows.every((r) => picked.has(r.id))} onCheckedChange={(c) => setPicked(c ? new Set(rows.map((r) => r.id)) : new Set())} /></TableHead>
             <TableHead>Nº</TableHead><TableHead>Abertura</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço</TableHead>
             <TableHead>Função</TableHead><TableHead>Vagas</TableHead><TableHead>Prioridade</TableHead><TableHead>Solicitante</TableHead>
             <TableHead>Responsável RH</TableHead><TableHead>Status</TableHead><TableHead>Atualizado</TableHead>
@@ -198,6 +203,7 @@ function Requests({ isRh }: { isRh: boolean }) {
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.id} className="cursor-pointer" onClick={() => setOpen(r)}>
+                <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={picked.has(r.id)} onCheckedChange={() => togglePick(r.id)} /></TableCell>
                 <TableCell className="font-mono">{num(r.number)}</TableCell>
                 <TableCell>{dt(r.created_at)}</TableCell>
                 <TableCell>{cName(r.client_id)}</TableCell>
@@ -211,10 +217,11 @@ function Requests({ isRh }: { isRh: boolean }) {
                 <TableCell>{dt(r.updated_at)}</TableCell>
               </TableRow>
             ))}
-            {!rows.length && <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>}
+            {!rows.length && <TableRow><TableCell colSpan={12} className="py-8 text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
+      {mailing && <MailPreview reqs={all.filter((r) => picked.has(r.id))} cName={cName} wName={wName} onClose={() => setMailing(false)} />}
       {creating && <NewRequest onClose={() => setCreating(false)} />}
       {open && <Detail req={all.find((r) => r.id === open.id) ?? open} isRh={isRh} onClose={() => setOpen(null)} cName={cName} wName={wName} />}
     </div>
@@ -421,7 +428,7 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
             <p className="font-display text-sm uppercase tracking-wide">E-mails</p>
             <Button size="sm" variant="outline" onClick={() => setMailOpen(true)}>Enviar e-mail</Button>
           </div>
-          {mailOpen && <MailPreview req={req} cName={cName} wName={wName} onClose={() => setMailOpen(false)} />}
+          {mailOpen && <MailPreview reqs={[req]} cName={cName} wName={wName} onClose={() => setMailOpen(false)} />}
           {(mails.data ?? []).map((m) => (
             <div key={m.id} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-xs text-muted-foreground">{dt(m.created_at)}</span>
@@ -502,35 +509,48 @@ function EmailConfig() {
   );
 }
 
-function MailPreview({ req, cName, wName, onClose }: { req: Req; cName: (id: string) => string; wName: (id: string) => string; onClose: () => void }) {
+function MailPreview({ reqs, cName, wName, onClose }: { reqs: Req[]; cName: (id: string) => string; wName: (id: string) => string; onClose: () => void }) {
+  const clientIds = [...new Set(reqs.map((r) => r.client_id))];
   const cfg = useQuery({
-    queryKey: ["hiring-mail-cfg", req.client_id],
-    queryFn: async () => (await supabase.from("hiring_email_configs").select("*").eq("client_id", req.client_id).maybeSingle()).data,
+    queryKey: ["hiring-mail-cfg", ...clientIds],
+    queryFn: async () => (await supabase.from("hiring_email_configs").select("*").in("client_id", clientIds)).data ?? [],
   });
   const [to, setTo] = useState<string | null>(null);
   const [cc, setCc] = useState<string | null>(null);
-  const [subject, setSubject] = useState(`Contratação ${num(req.number)} - ${req.position_name} - ${cName(req.client_id)}`);
-  const [body, setBody] = useState(
-    [
-      "Prezados,",
-      "",
-      `Segue solicitação de contratação ${num(req.number)}:`,
-      "",
-      `Cliente: ${cName(req.client_id)}`,
-      `Serviço: ${wName(req.work_id)}`,
-      `Função: ${req.position_name}`,
-      `Vagas: ${req.quantity} (${req.filled} atendidas)`,
-      `Prioridade: ${PRIORITY[req.priority]}`,
-      `Status: ${STATUS[req.status]}`,
-      `Justificativa: ${req.reason}`,
-      ...(req.notes ? [`Observações: ${req.notes}`] : []),
-      "",
-      "Atenciosamente,",
-      req.requester_name ?? "",
-    ].join("\n"),
+  const nums = reqs.map((r) => num(r.number)).join(", ");
+  const clientsTxt = clientIds.map(cName).join(", ");
+  const totalVagas = reqs.reduce((s, r) => s + r.quantity - r.filled, 0);
+  const [subject, setSubject] = useState(
+    reqs.length === 1
+      ? `Contratação ${nums} - ${reqs[0].position_name} - ${clientsTxt}`
+      : `Contratações ${clientsTxt} - ${totalVagas} vaga(s) em ${new Set(reqs.map((r) => r.position_name)).size} função(ões)`,
   );
-  const toV = to ?? cfg.data?.to_emails.join(", ") ?? "";
-  const ccV = cc ?? cfg.data?.cc_emails.join(", ") ?? "";
+  const [body, setBody] = useState(() => {
+    const L: string[] = ["Prezados,", ""];
+    L.push(reqs.length === 1 ? "Segue solicitação de contratação:" : `Seguem ${reqs.length} solicitações de contratação, organizadas por cliente e serviço (total de ${totalVagas} vaga(s) pendente(s)):`);
+    for (const cid of clientIds) {
+      const cr = reqs.filter((r) => r.client_id === cid);
+      L.push("", `CLIENTE: ${cName(cid).toUpperCase()}`);
+      for (const wid of [...new Set(cr.map((r) => r.work_id))]) {
+        const wr = cr.filter((r) => r.work_id === wid).sort((a, b) => (PRIO_ORDER[a.priority] ?? 9) - (PRIO_ORDER[b.priority] ?? 9));
+        L.push(`  Serviço: ${wName(wid)}`);
+        for (const r of wr) {
+          const pend = r.quantity - r.filled;
+          L.push(`    • ${r.position_name}: ${pend} vaga(s)${r.filled ? ` (de ${r.quantity}, ${r.filled} já atendida(s))` : ""} · Prioridade ${PRIORITY[r.priority]} · ${num(r.number)}`);
+        }
+        const reasons = [...new Set(wr.map((r) => r.reason.trim()).filter(Boolean))];
+        if (reasons.length === 1) L.push(`    Justificativa: ${reasons[0]}`);
+        else for (const r of wr) if (r.reason.trim()) L.push(`    Justificativa (${r.position_name}): ${r.reason.trim()}`);
+        const notes = [...new Set(wr.map((r) => r.notes?.trim()).filter(Boolean) as string[])];
+        if (notes.length) L.push(`    Observações: ${notes.join(" / ")}`);
+      }
+    }
+    const req = [...new Set(reqs.map((r) => r.requester_name).filter(Boolean))];
+    L.push("", "Atenciosamente,", req.join(", "));
+    return L.join("\n");
+  });
+  const toV = to ?? [...new Set((cfg.data ?? []).flatMap((c) => c.to_emails))].join(", ");
+  const ccV = cc ?? [...new Set((cfg.data ?? []).flatMap((c) => c.cc_emails))].join(", ");
   const open = () => {
     const q = [`subject=${encodeURIComponent(subject)}`, `body=${encodeURIComponent(body)}`];
     if (ccV.trim()) q.push(`cc=${encodeURIComponent(ccV.replace(/\s/g, ""))}`);
@@ -544,7 +564,7 @@ function MailPreview({ req, cName, wName, onClose }: { req: Req; cName: (id: str
           <div className="space-y-1"><Label>Para</Label><Input value={toV} onChange={(e) => setTo(e.target.value)} /></div>
           <div className="space-y-1"><Label>CC</Label><Input value={ccV} onChange={(e) => setCc(e.target.value)} /></div>
           <div className="space-y-1"><Label>Assunto</Label><Input value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
-          <div className="space-y-1"><Label>Mensagem</Label><Textarea rows={12} value={body} onChange={(e) => setBody(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Mensagem</Label><Textarea rows={14} className="font-mono text-xs" value={body} onChange={(e) => setBody(e.target.value)} /></div>
           <p className="text-xs text-muted-foreground">O e-mail abre no seu programa de e-mail, com a sua conta, para você revisar e enviar.</p>
         </div>
         <DialogFooter>
