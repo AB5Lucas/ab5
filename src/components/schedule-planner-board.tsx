@@ -830,8 +830,11 @@ export function SchedulePlannerBoard({
 
   const toggleClientVisible = useMutation({
     mutationFn: async (clientId: string) => {
-      const next = new Set(visibleClients);
-      if (next.has(clientId)) next.delete(clientId);
+      let next = new Set(visibleClients);
+      if (clientId === "__all__") {
+        const all = clientOptions.every((cl) => visibleClients.has(cl.id));
+        next = all ? new Set() : new Set(clientOptions.map((cl) => cl.id));
+      } else if (next.has(clientId)) next.delete(clientId);
       else next.add(clientId);
       const payload = clientOptions.map((cl) => ({
         schedule_date: date,
@@ -1486,7 +1489,19 @@ export function SchedulePlannerBoard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="max-h-80 w-72 overflow-y-auto">
-              <DropdownMenuLabel>Clientes do dia</DropdownMenuLabel>
+              <DropdownMenuLabel className="flex items-center justify-between">
+                Clientes do dia
+                {canWrite && clientOptions.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-xs font-normal text-muted-foreground hover:text-foreground hover:underline"
+                    onClick={() => toggleClientVisible.mutate("__all__")}
+                    disabled={toggleClientVisible.isPending}
+                  >
+                    {clientOptions.every((cl) => visibleClients.has(cl.id)) ? "Limpar" : "Todos"}
+                  </button>
+                )}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {clientOptions.map((cl) => (
                 <DropdownMenuCheckboxItem
