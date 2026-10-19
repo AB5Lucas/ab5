@@ -893,7 +893,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                           );
                         }}
                       />
-                      <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
+                      <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
                       <Bar dataKey="mo" name="R$ Total MO" fill="var(--chart-blue)" />
                       <Bar dataKey="materiais" name="R$ Total Materiais" fill="var(--muted-foreground)" />
                       <Bar dataKey="transporte" name="R$ Total Transporte" fill="var(--foreground)" />
@@ -920,7 +920,7 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                     <XAxis type="number" hide />
                     <YAxis type="category" dataKey="label" width={80} fontSize={11} axisLine={false} tickLine={false} />
                     <Tooltip formatter={(v: number) => brl(v)} />
-                    <Legend wrapperStyle={{ fontSize: 13 }} />
+                    <Legend wrapperStyle={{ fontSize: 13 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
                     <Bar dataKey="real" name="Custo Realizado" fill="var(--chart-blue)">
                       <LabelList dataKey="used" position="right" fontSize={11} className="fill-foreground" formatter={(v: number) => pct(Math.round(v))} />
                     </Bar>
