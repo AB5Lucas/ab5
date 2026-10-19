@@ -335,6 +335,7 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
   const [exception, setException] = useState(false);
   const [assume, setAssume] = useState(false);
   const closed = req.status === "cancelada" || req.status === "atendida";
+  const [mailOpen, setMailOpen] = useState(false);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -416,7 +417,11 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
         </div>
 
         <div className="space-y-2">
-          <p className="font-display text-sm uppercase tracking-wide">E-mails</p>
+          <div className="flex items-center justify-between">
+            <p className="font-display text-sm uppercase tracking-wide">E-mails</p>
+            <Button size="sm" variant="outline" onClick={() => setMailOpen(true)}>Enviar e-mail</Button>
+          </div>
+          {mailOpen && <MailPreview req={req} cName={cName} wName={wName} onClose={() => setMailOpen(false)} />}
           {(mails.data ?? []).map((m) => (
             <div key={m.id} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-xs text-muted-foreground">{dt(m.created_at)}</span>
@@ -494,5 +499,59 @@ function EmailConfig() {
         </Table>
       </div>
     </div>
+  );
+}
+
+function MailPreview({ req, cName, wName, onClose }: { req: Req; cName: (id: string) => string; wName: (id: string) => string; onClose: () => void }) {
+  const cfg = useQuery({
+    queryKey: ["hiring-mail-cfg", req.client_id],
+    queryFn: async () => (await supabase.from("hiring_email_configs").select("*").eq("client_id", req.client_id).maybeSingle()).data,
+  });
+  const [to, setTo] = useState<string | null>(null);
+  const [cc, setCc] = useState<string | null>(null);
+  const [subject, setSubject] = useState(`Contratação ${num(req.number)} - ${req.position_name} - ${cName(req.client_id)}`);
+  const [body, setBody] = useState(
+    [
+      "Prezados,",
+      "",
+      `Segue solicitação de contratação ${num(req.number)}:`,
+      "",
+      `Cliente: ${cName(req.client_id)}`,
+      `Serviço: ${wName(req.work_id)}`,
+      `Função: ${req.position_name}`,
+      `Vagas: ${req.quantity} (${req.filled} atendidas)`,
+      `Prioridade: ${PRIORITY[req.priority]}`,
+      `Status: ${STATUS[req.status]}`,
+      `Justificativa: ${req.reason}`,
+      ...(req.notes ? [`Observações: ${req.notes}`] : []),
+      "",
+      "Atenciosamente,",
+      req.requester_name ?? "",
+    ].join("\n"),
+  );
+  const toV = to ?? cfg.data?.to_emails.join(", ") ?? "";
+  const ccV = cc ?? cfg.data?.cc_emails.join(", ") ?? "";
+  const open = () => {
+    const q = [`subject=${encodeURIComponent(subject)}`, `body=${encodeURIComponent(body)}`];
+    if (ccV.trim()) q.push(`cc=${encodeURIComponent(ccV.replace(/\s/g, ""))}`);
+    window.location.href = `mailto:${toV.replace(/\s/g, "")}?${q.join("&")}`;
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Prévia do e-mail</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1"><Label>Para</Label><Input value={toV} onChange={(e) => setTo(e.target.value)} /></div>
+          <div className="space-y-1"><Label>CC</Label><Input value={ccV} onChange={(e) => setCc(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Assunto</Label><Input value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Mensagem</Label><Textarea rows={12} value={body} onChange={(e) => setBody(e.target.value)} /></div>
+          <p className="text-xs text-muted-foreground">O e-mail abre no seu programa de e-mail, com a sua conta, para você revisar e enviar.</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={open}>Abrir no meu e-mail</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
