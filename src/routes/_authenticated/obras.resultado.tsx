@@ -1,5 +1,6 @@
 import { contractFraction } from "@/lib/contract";
 import { isResultMonth } from "@/lib/result-period";
+import { displayedBudgetItems } from "@/lib/result-budget";
 import { loadWorkData, buildBase as engineBuildBase, fetchAll, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, bdiBudget, BDI_RATE, type ItemKey } from "@/lib/results-engine";
 import { resplitClient, splitDesc } from "@/lib/resplit";
 import { Switch } from "@/components/ui/switch";
@@ -688,25 +689,23 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   const fixedBudgetPct = allMonthlyOrders != null ? (1 - TAX_RATE - BDI_RATE) * 100 : calc?.budgetMarginPct ?? 0;
   const fixedBudget = { margin: (allMonthlyOrders ?? fullOrder) * (fixedBudgetPct / 100), pct: fixedBudgetPct };
   const fixedReal = totalReal ?? { margin: realMargin, pct: last?.marginPct ?? 0 };
-  const totBudget = (calc?.items.reduce((a, i) => a + i.budget, 0) ?? 0) * (Number(calc?.order ?? 0) ? Math.min(1, Math.max(0, Number(last?.revenue ?? 0) / Number(calc?.order))) : 1);
   const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
   const progFrac = (() => {
     const ob = Number(calc?.order ?? 0);
     return ob ? Math.min(1, Math.max(0, Number(last?.revenue ?? 0) / ob)) : 1;
   })();
-  const scaledItems = (calc?.items ?? []).map((i) => {
-    const b = i.budget * progFrac;
-    return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
-  });
+  const monthlyBudgetOrder = monthlyInfo?.order ?? allMonthlyOrders;
+  const monthlyBudget = monthlyBudgetOrder != null
+    ? bdiBudget(monthlyBudgetOrder, Object.fromEntries((calc?.items ?? []).map((i) => [i.key, i.real])))
+    : undefined;
+  const scaledItems = displayedBudgetItems(calc?.items ?? [], progFrac, monthlyBudget);
+  const totBudget = scaledItems.reduce((sum, item) => sum + item.budget, 0);
   const barItems = (() => {
-    const src = calc?.items ?? [];
-    // Orçado proporcional ao mesmo andamento usado na margem realizada
-    const orderBase = Number(calc?.order ?? 0);
-    const frac = orderBase ? Math.min(1, Math.max(0, Number(last?.revenue ?? 0) / orderBase)) : 1;
+    const src = scaledItems;
     const out: { key: string; label: string; budget: number; real: number; used: number }[] = [];
     const mat = { key: "materiais", label: "Materiais", budget: 0, real: 0, used: 0 };
     for (const i of src) {
-      const b = i.budget * frac;
+      const b = i.budget;
       if (i.key === "materiais" || i.key === "ferramentas" || i.key === "andaimes") {
         mat.budget += b;
         mat.real += i.real;

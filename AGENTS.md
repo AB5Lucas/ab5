@@ -24,3 +24,4 @@
 - Custos BDI: budget_items.bdi = 1 marks the service; results-engine (bdiBudget/BDI_RATE) recomputes the budget from the current order on every read, and the old Locação rule was removed. Why: new orders update budget and margin without re-saving.
 
 - Financeiro opens Resultados with the exact selected month list; changing the detail period clears that list and uses the new range. Why: drill-down must preserve the report period, including nonconsecutive months.
+- Resultados uses result-budget.ts to derive displayed budget items and totals for both the table and chart. Why: monthly budgets must not be scaled a second time by progress.
