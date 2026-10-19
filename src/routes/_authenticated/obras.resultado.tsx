@@ -894,9 +894,9 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                         }}
                       />
                       <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="mo" name="R$ Total MO" fill="var(--blue-1)" />
-                      <Bar dataKey="materiais" name="R$ Total Materiais" fill="var(--blue-3)" />
-                      <Bar dataKey="transporte" name="R$ Total Transporte" fill="var(--blue-5)" />
+                      <Bar dataKey="mo" name="R$ Total MO" fill="var(--chart-blue)" />
+                      <Bar dataKey="materiais" name="R$ Total Materiais" fill="var(--muted-foreground)" />
+                      <Bar dataKey="transporte" name="R$ Total Transporte" fill="var(--foreground)" />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -921,10 +921,10 @@ export function ResultadoPage({ initialWorkId }: { initialWorkId?: string } = {}
                     <YAxis type="category" dataKey="label" width={80} fontSize={11} axisLine={false} tickLine={false} />
                     <Tooltip formatter={(v: number) => brl(v)} />
                     <Legend wrapperStyle={{ fontSize: 13 }} />
-                    <Bar dataKey="real" name="Custo Realizado" fill="var(--blue-2)">
+                    <Bar dataKey="real" name="Custo Realizado" fill="var(--chart-blue)">
                       <LabelList dataKey="used" position="right" fontSize={11} className="fill-foreground" formatter={(v: number) => pct(Math.round(v))} />
                     </Bar>
-                    <Bar dataKey="budget" name="Custo Orçado" fill="var(--blue-4)" />
+                    <Bar dataKey="budget" name="Custo Orçado" fill="var(--chart-2)" />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -1480,7 +1480,7 @@ function Gauge({ value }: { value: number }) {
     <div className="mt-2 flex flex-col items-center">
       <svg viewBox="0 0 240 135" className="w-full max-w-xs">
         {bands.slice(0, -1).map((b, i) => (
-          <path key={b} d={seg(b, bands[i + 1]!)} fill={`var(--blue-${i + 1})`} />
+          <path key={b} d={seg(b, bands[i + 1]!)} fill="var(--chart-blue)" fillOpacity={0.15 + i * 0.2} />
         ))}
         <polygon points={`${nx},${ny} ${bx1},${by1} ${bx2},${by2}`} fill="var(--muted-foreground)" />
         <circle cx={cx} cy={cy} r={5} fill="var(--muted-foreground)" />
