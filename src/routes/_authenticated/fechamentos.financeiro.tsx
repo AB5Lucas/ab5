@@ -85,7 +85,11 @@ function FinanceiroPage() {
       return out;
     },
   });
-  const list = useMemo(() => (works.data ?? []).filter((w: any) => active.data?.has(w.id)), [works.data, active.data]);
+  // Qualquer serviço (inclusive concluído/inativo) com movimento ou pedido datado no período
+  const list = useMemo(() => (works.data ?? []).filter((w: any) =>
+    active.data?.has(w.id) ||
+    (Array.isArray(w.orders) && w.orders.some((o: any) => o?.date && String(o.date).slice(0, 10) >= start && String(o.date).slice(0, 10) <= end)),
+  ), [works.data, active.data, start, end]);
   const raws = useQueries({
     queries: list.map((w: any) => ({
       queryKey: ["work-result", w.id, w.id, "vt"],
