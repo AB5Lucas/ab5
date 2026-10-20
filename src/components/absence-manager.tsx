@@ -53,7 +53,7 @@ export function AbsenceManager({
 }) {
   const { canWrite: roleWrite, isAdmin } = useCurrentUser();
   const { canAccess } = useAccess();
-  const pagePath = table === "days_off" ? "/ausencias/folgas" : table === "vacations" ? "/ausencias/ferias" : "/ausencias/atestados";
+  const pagePath = "/ausencias";
   // Quem tem acesso à página (Acessos) pode incluir e editar
   const canWrite = roleWrite || canAccess(pagePath);
   const qc = useQueryClient();

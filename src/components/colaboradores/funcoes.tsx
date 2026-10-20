@@ -133,12 +133,6 @@ export function FuncoesPage() {
             {canWrite && (
               <ImportDialog entity="funções" columns={POSITION_COLUMNS} onImport={importPositions} />
             )}
-            <Button variant="outline" asChild>
-              <Link to="/colaboradores">
-                <ArrowLeft className="h-4 w-4" />
-                Colaboradores
-              </Link>
-            </Button>
           </div>
         }
       />
