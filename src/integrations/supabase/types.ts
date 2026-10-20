@@ -658,6 +658,7 @@ export type Database = {
           location_desc: string | null
           notes: string | null
           order_code: string | null
+          photos: Json
           project_file_path: string | null
           project_number: string | null
           released_at: string | null
@@ -680,6 +681,7 @@ export type Database = {
           location_desc?: string | null
           notes?: string | null
           order_code?: string | null
+          photos?: Json
           project_file_path?: string | null
           project_number?: string | null
           released_at?: string | null
@@ -702,6 +704,7 @@ export type Database = {
           location_desc?: string | null
           notes?: string | null
           order_code?: string | null
+          photos?: Json
           project_file_path?: string | null
           project_number?: string | null
           released_at?: string | null

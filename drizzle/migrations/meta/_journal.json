@@ -253,6 +253,13 @@
       "when": 1792517763420,
       "tag": "0035_clear_andaimes_operational_data",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792518526768,
+      "tag": "0036_andam_structure_photos",
+      "breakpoints": true
     }
   ]
 }

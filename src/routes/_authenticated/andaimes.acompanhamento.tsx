@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Eye, Plus, Trash2, AlertTriangle, Paperclip, X } from "lucide-react";
+import { Eye, Plus, Trash2, AlertTriangle, Paperclip, X, Camera, ImagePlus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 function DocField({ kind, label, ro, number, path, onNumber, onPath }: {
@@ -164,6 +164,60 @@ function Page() {
   );
 }
 
+type Photo = { path: string; status: string; at: string };
+function PhotoField({ ro, photos, status, onChange }: { ro: boolean; photos: Photo[]; status: string; onChange: (p: Photo[]) => void }) {
+  const [busy, setBusy] = useState(false);
+  const urls = useQuery({
+    queryKey: ["andam-photo-urls", photos.map((p) => p.path).join("|")],
+    enabled: photos.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase.storage.from("andam-docs").createSignedUrls(photos.map((p) => p.path), 3600);
+      return Object.fromEntries((data ?? []).map((d) => [d.path, d.signedUrl]));
+    },
+  });
+  const upload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy(true);
+    const added: Photo[] = [];
+    for (const file of Array.from(files)) {
+      const p = `photos/${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+      const { error } = await supabase.storage.from("andam-docs").upload(p, file, { contentType: file.type });
+      if (error) { toast.error(error.message); continue; }
+      added.push({ path: p, status, at: new Date().toISOString() });
+    }
+    setBusy(false);
+    if (added.length) { onChange([...photos, ...added]); toast.success(`${added.length} foto(s) anexada(s)`); }
+  };
+  const btn = `inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm ${ro || busy ? "opacity-50" : "cursor-pointer hover:bg-accent"}`;
+  return (
+    <div className="col-span-2 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">Fotos</span>
+        {!ro && <>
+          <label className={btn}><Camera className="h-4 w-4" /> Tirar foto
+            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={busy} onChange={(e) => { upload(e.target.files); e.target.value = ""; }} /></label>
+          <label className={btn}><ImagePlus className="h-4 w-4" /> Galeria
+            <input type="file" accept="image/*" multiple className="hidden" disabled={busy} onChange={(e) => { upload(e.target.files); e.target.value = ""; }} /></label>
+          {busy && <span className="text-xs text-muted-foreground">Enviando...</span>}
+        </>}
+      </div>
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          {photos.map((p) => (
+            <div key={p.path} className="relative">
+              <a href={urls.data?.[p.path]} target="_blank" rel="noreferrer">
+                {urls.data?.[p.path] ? <img src={urls.data[p.path]} alt="Foto do andaime" className="h-20 w-full rounded-md border object-cover" /> : <div className="h-20 rounded-md border bg-muted" />}
+              </a>
+              <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{STRUCT_STATUS[p.status] ?? p.status} · {new Date(p.at).toLocaleDateString("pt-BR")}</div>
+              {!ro && <button type="button" title="Remover" className="absolute right-1 top-1 rounded-full bg-background/80 p-0.5" onClick={() => onChange(photos.filter((x) => x.path !== p.path))}><X className="h-3 w-3" /></button>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StructDialog({ id, clients, works, canEdit, onClose }: { id: string | null; clients: any[]; works: any[]; canEdit: boolean; onClose: () => void }) {
   const loaded = useQuery({
     queryKey: ["andam-struct-one", id],
@@ -194,6 +248,7 @@ function StructDialog({ id, clients, works, canEdit, onClose }: { id: string | n
       has_project_art: !!form.has_project_art,
       project_number: form.project_number || null, project_file_path: form.project_file_path || null,
       art_number: form.art_number || null, art_file_path: form.art_file_path || null,
+      photos: form.photos ?? [],
     };
     let sid = id;
     if (id) {
@@ -251,6 +306,7 @@ function StructDialog({ id, clients, works, canEdit, onClose }: { id: string | n
           <label className="space-y-1">Liberação<Input disabled={ro} type="date" value={form.released_at ?? ""} onChange={(e) => set("released_at", e.target.value)} /></label>
           <label className="space-y-1">Vistoria válida até<Input disabled={ro} type="date" value={form.inspection_valid_until ?? ""} onChange={(e) => set("inspection_valid_until", e.target.value)} /></label>
           <label className="space-y-1">Desmontagem<Input disabled={ro} type="date" value={form.dismantled_at ?? ""} onChange={(e) => set("dismantled_at", e.target.value)} /></label>
+          <PhotoField ro={ro} photos={form.photos ?? []} status={form.status} onChange={(p) => setF((cur: any) => ({ ...(cur ?? form), photos: p }))} />
           <label className="col-span-2 space-y-1">Observações<Input disabled={ro} value={form.notes ?? ""} onChange={(e) => set("notes", e.target.value)} /></label>
         </div>
         <div className="mt-2 text-sm font-medium">Peças aplicadas</div>
