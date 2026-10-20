@@ -260,6 +260,13 @@
       "when": 1792518526768,
       "tag": "0036_andam_structure_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792522470112,
+      "tag": "0037_hiring_mail_recipients",
+      "breakpoints": true
     }
   ]
 }

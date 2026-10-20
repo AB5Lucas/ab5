@@ -4290,6 +4290,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      hiring_mail_recipients: {
+        Args: { _client_ids: string[] }
+        Returns: {
+          cc_emails: string[]
+          client_id: string
+          to_emails: string[]
+        }[]
+      }
       is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_hiring_rh: { Args: never; Returns: boolean }
