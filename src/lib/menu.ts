@@ -5,7 +5,6 @@ import {
   Users,
   Building2,
   Truck,
-  CalendarOff,
   Wallet,
   FileBarChart,
   Shield,

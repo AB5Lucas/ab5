@@ -29,6 +29,7 @@ import { Route as AuthenticatedAndaimesInventarioRouteImport } from './routes/_a
 import { Route as AuthenticatedAndaimesPatrimonioRouteImport } from './routes/_authenticated/andaimes.patrimonio'
 import { Route as AuthenticatedAndaimesRomaneiosRouteImport } from './routes/_authenticated/andaimes.romaneios'
 import { Route as AuthenticatedAndaimesSolicitacoesRouteImport } from './routes/_authenticated/andaimes.solicitacoes'
+import { Route as AuthenticatedAusenciasIndexRouteImport } from './routes/_authenticated/ausencias.index'
 import { Route as AuthenticatedAusenciasAtestadosRouteImport } from './routes/_authenticated/ausencias.atestados'
 import { Route as AuthenticatedAusenciasFeriasRouteImport } from './routes/_authenticated/ausencias.ferias'
 import { Route as AuthenticatedAusenciasFolgasRouteImport } from './routes/_authenticated/ausencias.folgas'
@@ -170,6 +171,12 @@ const AuthenticatedAndaimesSolicitacoesRoute =
   AuthenticatedAndaimesSolicitacoesRouteImport.update({
     id: '/andaimes/solicitacoes',
     path: '/andaimes/solicitacoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAusenciasIndexRoute =
+  AuthenticatedAusenciasIndexRouteImport.update({
+    id: '/ausencias/',
+    path: '/ausencias/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAusenciasAtestadosRoute =
@@ -404,6 +411,7 @@ export interface FileRoutesByFullPath {
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
+  '/ausencias/': typeof AuthenticatedAusenciasIndexRoute
   '/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
   '/obras/': typeof AuthenticatedObrasIndexRoute
   '/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
@@ -456,6 +464,7 @@ export interface FileRoutesByTo {
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
+  '/ausencias': typeof AuthenticatedAusenciasIndexRoute
   '/colaboradores': typeof AuthenticatedColaboradoresIndexRoute
   '/obras': typeof AuthenticatedObrasIndexRoute
   '/relatorios': typeof AuthenticatedRelatoriosIndexRoute
@@ -510,6 +519,7 @@ export interface FileRoutesById {
   '/_authenticated/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/_authenticated/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
+  '/_authenticated/ausencias/': typeof AuthenticatedAusenciasIndexRoute
   '/_authenticated/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
   '/_authenticated/obras/': typeof AuthenticatedObrasIndexRoute
   '/_authenticated/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
@@ -564,6 +574,7 @@ export interface FileRouteTypes {
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
+    | '/ausencias/'
     | '/colaboradores/'
     | '/obras/'
     | '/relatorios/'
@@ -616,6 +627,7 @@ export interface FileRouteTypes {
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
+    | '/ausencias'
     | '/colaboradores'
     | '/obras'
     | '/relatorios'
@@ -669,6 +681,7 @@ export interface FileRouteTypes {
     | '/_authenticated/veiculos/motoristas'
     | '/_authenticated/veiculos/relatorios'
     | '/_authenticated/veiculos/transporte'
+    | '/_authenticated/ausencias/'
     | '/_authenticated/colaboradores/'
     | '/_authenticated/obras/'
     | '/_authenticated/relatorios/'
@@ -824,6 +837,13 @@ declare module '@tanstack/react-router' {
       path: '/andaimes/solicitacoes'
       fullPath: '/andaimes/solicitacoes'
       preLoaderRoute: typeof AuthenticatedAndaimesSolicitacoesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ausencias/': {
+      id: '/_authenticated/ausencias/'
+      path: '/ausencias'
+      fullPath: '/ausencias/'
+      preLoaderRoute: typeof AuthenticatedAusenciasIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ausencias/atestados': {
@@ -1089,6 +1109,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVeiculosMotoristasRoute: typeof AuthenticatedVeiculosMotoristasRoute
   AuthenticatedVeiculosRelatoriosRoute: typeof AuthenticatedVeiculosRelatoriosRoute
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
+  AuthenticatedAusenciasIndexRoute: typeof AuthenticatedAusenciasIndexRoute
   AuthenticatedColaboradoresIndexRoute: typeof AuthenticatedColaboradoresIndexRoute
   AuthenticatedObrasIndexRoute: typeof AuthenticatedObrasIndexRoute
   AuthenticatedRelatoriosIndexRoute: typeof AuthenticatedRelatoriosIndexRoute
@@ -1151,6 +1172,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVeiculosMotoristasRoute: AuthenticatedVeiculosMotoristasRoute,
   AuthenticatedVeiculosRelatoriosRoute: AuthenticatedVeiculosRelatoriosRoute,
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
+  AuthenticatedAusenciasIndexRoute: AuthenticatedAusenciasIndexRoute,
   AuthenticatedColaboradoresIndexRoute: AuthenticatedColaboradoresIndexRoute,
   AuthenticatedObrasIndexRoute: AuthenticatedObrasIndexRoute,
   AuthenticatedRelatoriosIndexRoute: AuthenticatedRelatoriosIndexRoute,
