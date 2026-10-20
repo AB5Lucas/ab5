@@ -77,15 +77,6 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Veículos",
-    icon: Truck,
-    items: [
-      { title: "Frota", url: "/veiculos" },
-      { title: "Relatórios", url: "/veiculos/relatorios" },
-      { title: "Motoristas", url: "/veiculos/motoristas" },
-    ],
-  },
-  {
     label: "Ausências",
     icon: CalendarOff,
     items: [
