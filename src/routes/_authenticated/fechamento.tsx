@@ -55,7 +55,30 @@ function ClosingPage() {
   const [detail, setDetail] = useState<Detail>(null);
 
   const data = useQuery({ queryKey: ["closing", month], queryFn: () => loadClosing(month) });
-  const rows = data.data ?? [];
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [types, setTypes] = useState<string[]>([]);
+  const rows = useMemo(() => {
+    const raw = data.data ?? [];
+    const inR = (d: string) => (!from || d >= from) && (!to || d <= to);
+    const ranged = !!(from || to);
+    return raw.filter((r) => !types.length || types.includes(r.contract ?? "efetivo")).map((r) => {
+      if (!ranged) return r;
+      const days = r.days.filter((d) => inR(d.date));
+      const vtRows = r.vtRows.filter((v) => inR(v.date));
+      const prizeRows = r.prizeRows.filter((p) => inR(p.date));
+      const adjustments = r.adjustments.filter((a) => inR(a.entry_date));
+      const fixed = r.vtAuto - r.vtRows.reduce((s, v) => s + v.value, 0);
+      const vtAuto = vtRows.reduce((s, v) => s + v.value, 0) + (vtRows.some((v) => v.pays) ? fixed : 0);
+      return {
+        ...r, days, vtRows, prizeRows, adjustments, vtAuto,
+        meals: days.filter((d) => d.counted).length,
+        prizeAuto: prizeRows.reduce((s, p) => s + p.value, 0),
+        vtManual: adjustments.filter((a) => a.kind === "vt").reduce((s, a) => s + Number(a.amount), 0),
+        prizeManual: adjustments.filter((a) => a.kind === "premio").reduce((s, a) => s + Number(a.amount), 0),
+      };
+    }).filter((r) => !ranged || r.days.length || r.vtRows.length || r.adjustments.length);
+  }, [data.data, from, to, types]);
   const vt = (r: ClosingRow) => r.vtAuto + r.vtManual;
   const prize = (r: ClosingRow) => r.prizeAuto + r.prizeManual;
 
