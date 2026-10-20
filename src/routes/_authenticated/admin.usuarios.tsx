@@ -225,7 +225,7 @@ function UsersPage() {
               Defina uma senha provisória para "{resetting?.full_name || resetting?.email}". Ao entrar com ela, a pessoa será obrigada a criar uma nova senha (sem confirmação por e-mail).
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <Input type="text" placeholder="Senha provisória (mín. 6 caracteres)" value={tempPwd} onChange={(e) => setTempPwd(e.target.value)} />
+          <Input type="text" placeholder="Senha provisória (mín. 6 caracteres)" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={tempPwd} onChange={(e) => setTempPwd(e.target.value)} />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction

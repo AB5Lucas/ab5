@@ -72,7 +72,6 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Inventário", url: "/andaimes/inventario" },
       { title: "Estoque", url: "/andaimes/estoque" },
       { title: "Solicitações", url: "/andaimes/solicitacoes" },
-      { title: "Romaneios", url: "/andaimes/romaneios" },
       { title: "Acompanhamento", url: "/andaimes/acompanhamento" },
       { title: "Patrimônio", url: "/andaimes/patrimonio" },
     ],
