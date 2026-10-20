@@ -99,7 +99,7 @@ export function TrainingsPage() {
   });
 
   const people = useQuery({
-    queryKey: ["collaborators-min"],
+    queryKey: ["collaborators-min-active-trn"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("collaborators")
