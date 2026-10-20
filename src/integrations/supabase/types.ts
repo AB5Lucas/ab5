@@ -52,6 +52,24 @@ export type Database = {
           },
         ]
       }
+      andam_flow_roles: {
+        Row: {
+          key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       andam_inventory: {
         Row: {
           client_id: string | null
@@ -258,6 +276,47 @@ export type Database = {
           },
         ]
       }
+      andam_request_events: {
+        Row: {
+          action: string
+          created_at: string
+          from_stage: string | null
+          id: string
+          note: string | null
+          request_id: string
+          to_stage: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          note?: string | null
+          request_id: string
+          to_stage?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          note?: string | null
+          request_id?: string
+          to_stage?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "andam_request_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "andam_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       andam_request_items: {
         Row: {
           id: string
@@ -304,6 +363,7 @@ export type Database = {
         Row: {
           client_id: string
           created_at: string
+          flow_stage: string
           id: string
           needed_date: string | null
           notes: string | null
@@ -318,6 +378,7 @@ export type Database = {
         Insert: {
           client_id: string
           created_at?: string
+          flow_stage?: string
           id?: string
           needed_date?: string | null
           notes?: string | null
@@ -332,6 +393,7 @@ export type Database = {
         Update: {
           client_id?: string
           created_at?: string
+          flow_stage?: string
           id?: string
           needed_date?: string | null
           notes?: string | null
@@ -422,6 +484,7 @@ export type Database = {
           client_id: string
           created_at: string
           id: string
+          kind: string
           notes: string | null
           number: number
           received_at: string | null
@@ -438,6 +501,7 @@ export type Database = {
           client_id: string
           created_at?: string
           id?: string
+          kind?: string
           notes?: string | null
           number?: number
           received_at?: string | null
@@ -454,6 +518,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           id?: string
+          kind?: string
           notes?: string | null
           number?: number
           received_at?: string | null
@@ -4153,6 +4218,16 @@ export type Database = {
       andam_can: { Args: { _page: string }; Returns: boolean }
       andam_client_ok: { Args: { _client: string }; Returns: boolean }
       andam_finalize_inventory: { Args: { _inv: string }; Returns: undefined }
+      andam_flow_advance: {
+        Args: { _action: string; _note?: string; _req: string }
+        Returns: undefined
+      }
+      andam_flow_set_qty: {
+        Args: { _field: string; _line: string; _qty: number }
+        Returns: undefined
+      }
+      andam_flow_user: { Args: { _key: string }; Returns: boolean }
+      andam_req_visible: { Args: { _req: string }; Returns: boolean }
       andam_romaneio_receive: { Args: { _rom: string }; Returns: undefined }
       andam_romaneio_return: { Args: { _rom: string }; Returns: undefined }
       andam_romaneio_send: { Args: { _rom: string }; Returns: undefined }
