@@ -1,3 +1,4 @@
+import { LeaveNotice } from "@/components/leave-notice";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -457,6 +458,7 @@ export function AsosPage() {
                 </SelectContent>
               </Select>
             </div>
+            <LeaveNotice collaboratorId={form.collaborator_id} date={form.exam_date} />
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">

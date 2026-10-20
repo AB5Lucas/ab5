@@ -29,6 +29,6 @@
 - [x] Grupo Fechamentos → Financeiro; página Financeiro → Fechamento
 - [x] Sub aba Premiações renomeada; Frota/Motoristas/Relatórios viraram sub abas de Transporte; grupo Veículos removido
 - [x] Grupo Agendamentos → Documentação; página Agendamentos → Controles com sub abas ASOs/Integrações/Treinamentos
-- [ ] Apagar dados operacionais e estoque de andaimes (manter catálogo e responsáveis)
-- [ ] Treinamentos/ASO/Integrações: não alertar vencimentos de colaboradores inativos
-- [ ] Ao agendar treinamento/ASO/integração: avisar se colaborador estiver de férias ou afastado (período)
+- [x] Apagar dados operacionais e estoque de andaimes (manter catálogo e responsáveis)
+- [x] Treinamentos/ASO/Integrações: não alertar vencimentos de colaboradores inativos
+- [x] Ao agendar treinamento/ASO/integração: avisar se colaborador estiver de férias ou afastado (período)

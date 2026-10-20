@@ -1,3 +1,4 @@
+import { LeaveNotice } from "@/components/leave-notice";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -574,6 +575,7 @@ export function IntegrationsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <LeaveNotice collaboratorId={form.collaborator_id} date={form.integration_date} />
             <div className="space-y-1 sm:col-span-2">
               <Label>Cliente *</Label>
               <Select value={form.client_id} onValueChange={(v) => set("client_id", v)}>

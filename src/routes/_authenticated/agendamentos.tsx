@@ -1,3 +1,4 @@
+import { LeaveNotice } from "@/components/leave-notice";
 import { findDateConflicts } from "@/lib/date-conflicts";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -753,6 +754,7 @@ function AppointmentsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <LeaveNotice collaboratorId={form.collaborator_id} date={form.scheduled_date} />
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
