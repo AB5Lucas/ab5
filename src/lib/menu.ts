@@ -95,15 +95,6 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Benefícios",
-    icon: Wallet,
-    items: [
-      { title: "Vale-Transporte", url: "/beneficios/vale-transporte" },
-      { title: "Prêmio de Viagem", url: "/beneficios/premio-viagem" },
-      { title: "Prêmio de Motorista", url: "/beneficios/premio-motorista" },
-    ],
-  },
-  {
     label: "Fechamentos",
     icon: Wallet,
     items: [
