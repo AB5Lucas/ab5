@@ -444,9 +444,9 @@ function ServicesPage() {
         <p className="truncate text-[10px] leading-tight text-muted-foreground">{a.positions?.name ?? "Sem função"}</p>
       </div>
       {isWeekend && (
-        <button type="button" aria-label="Remover do dia" title="Remover do dia" className="text-muted-foreground hover:text-destructive" onClick={() => removeDay.mutate(a.id)}>
-          <X className="h-3 w-3" />
-        </button>
+        <Button type="button" variant="ghost" size="icon" aria-label="Remover do dia" title="Remover do dia" className="size-9 shrink-0 p-0 text-muted-foreground hover:text-destructive md:size-3 [&_svg]:size-5 md:[&_svg]:size-3" onClick={() => removeDay.mutate(a.id)}>
+          <X />
+        </Button>
       )}
     </li>
   );
@@ -521,11 +521,13 @@ function ServicesPage() {
                   className={cn("panel flex h-72 flex-col overflow-hidden transition", hover === w.id && "ring-2 ring-emerald-500")}
                 >
                   <header className="flex items-center gap-1.5 border-b border-border bg-secondary/60 px-2 py-1.5">
-                    <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
+                    <h2 className="font-display min-w-0 flex-1 break-words text-[11px] font-semibold uppercase leading-tight tracking-wide">
                       {clientName} - {w.name}
                     </h2>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       disabled={pool.length === 0 || move.isPending}
                       onClick={async () => {
                         const ids = pool.map((a) => a.id);
@@ -538,19 +540,21 @@ function ServicesPage() {
                       }}
                       title={pool.length ? `Importar todo o efetivo sem serviço (${pool.length}) para este serviço` : "Nenhum colaborador sem serviço para importar"}
                       aria-label="Importar efetivo"
-                      className="rounded p-0.5 text-muted-foreground/60 hover:text-foreground disabled:opacity-30"
+                      className="size-9 shrink-0 rounded p-0 text-muted-foreground/60 hover:text-foreground disabled:opacity-30 md:size-[18px] [&_svg]:size-5 md:[&_svg]:size-3.5"
                     >
-                      <ArrowUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
+                      <ArrowUp />
+                    </Button>
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => toggleNight(w.id)}
                       title={nightSet.has(w.id) ? "Turno noturno neste dia (entra hoje, sai amanhã). Clique para voltar a diurno" : "Marcar turno noturno neste dia"}
                       aria-label="Turno noturno"
-                      className={cn("rounded p-0.5", nightSet.has(w.id) ? "bg-info/15 text-info" : "text-muted-foreground/50 hover:text-foreground")}
+                      className={cn("size-9 shrink-0 rounded p-0 md:size-[18px] [&_svg]:size-5 md:[&_svg]:size-3.5", nightSet.has(w.id) ? "bg-info/15 text-info" : "text-muted-foreground/50 hover:text-foreground")}
                     >
-                      <Moon className="h-3.5 w-3.5" />
-                    </button>
+                      <Moon />
+                    </Button>
                     <Badge variant="outline" className="px-1 py-0 text-[10px]"><Users className="mr-0.5 h-2.5 w-2.5" />{list.length}</Badge>
                   </header>
                   <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
