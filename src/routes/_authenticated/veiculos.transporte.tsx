@@ -22,21 +22,51 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { VehicleTimeline } from "@/components/vehicle-timeline";
 import { VehicleHandover } from "@/components/vehicle-handover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VehiclesPage } from "@/components/veiculos/frota";
+import { FleetReportsPage } from "@/components/veiculos/relatorios";
+import { DriversPage } from "@/components/veiculos/motoristas";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/veiculos/transporte")({
   head: () => ({
     meta: [
-      { title: "Transporte | Programação Operacional" },
+      { title: "Transporte | AB5 Hub" },
       { name: "description", content: "Planejamento de transporte por obra: veículo, motorista, passageiros e horários de saída e retorno." },
-      { property: "og:title", content: "Transporte | Programação Operacional" },
+      { property: "og:title", content: "Transporte | AB5 Hub" },
       { property: "og:description", content: "Veículo, motorista, passageiros e horários por obra." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: TransportPage,
+  validateSearch: (s: Record<string, unknown>): { tab?: Tab } =>
+    TABS.some((t) => t.v === s["tab"]) ? { tab: s["tab"] as Tab } : {},
+  component: TransportTabs,
 });
+
+const TABS = [
+  { v: "transporte", l: "Transporte" },
+  { v: "frota", l: "Frota" },
+  { v: "motoristas", l: "Motoristas" },
+  { v: "relatorios", l: "Relatórios" },
+] as const;
+type Tab = (typeof TABS)[number]["v"];
+
+function TransportTabs() {
+  const { tab = "transporte" } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  return (
+    <Tabs value={tab} onValueChange={(v) => navigate({ search: v === "transporte" ? {} : { tab: v as Tab }, replace: true })}>
+      <TabsList>
+        {TABS.map((t) => <TabsTrigger key={t.v} value={t.v}>{t.l}</TabsTrigger>)}
+      </TabsList>
+      <TabsContent value="transporte" className="mt-4"><TransportPage /></TabsContent>
+      <TabsContent value="frota" className="mt-4"><VehiclesPage /></TabsContent>
+      <TabsContent value="motoristas" className="mt-4"><DriversPage /></TabsContent>
+      <TabsContent value="relatorios" className="mt-4"><FleetReportsPage /></TabsContent>
+    </Tabs>
+  );
+}
 
 const NONE = "__none__";
 

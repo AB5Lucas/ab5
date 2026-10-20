@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authenticated/fechamento")({
 });
 
 const TABS = [
-  { v: "fechamento", l: "Fechamento" },
+  { v: "fechamento", l: "Premiações" },
   { v: "premio-motorista", l: "Prêmio Motorista" },
   { v: "premio-viagem", l: "Prêmio Viagem" },
   { v: "vale-transporte", l: "Vale Transporte" },
