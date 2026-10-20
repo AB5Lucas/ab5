@@ -68,12 +68,12 @@ function TransportTabs() {
       tries++; setTimeout(restore, 100);
     };
     restore();
-    const onScroll = () => { if (ready) localStorage.setItem(key, String(Math.round(window.scrollY))); };
+    const onScroll = () => { if (ready && window.location.pathname.startsWith("/veiculos/transporte") && document.documentElement.scrollHeight > window.innerHeight + 50) localStorage.setItem(key, String(Math.round(window.scrollY))); };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   return (
-    <Tabs value={tab} onValueChange={(v) => navigate({ search: v === "transporte" ? {} : { tab: v as Tab }, replace: true })}>
+    <Tabs value={tab} onValueChange={(v) => navigate({ search: v === "transporte" ? {} : { tab: v as Tab }, replace: true, resetScroll: false })}>
       <TabsList>
         {TABS.map((t) => <TabsTrigger key={t.v} value={t.v}>{t.l}</TabsTrigger>)}
       </TabsList>
