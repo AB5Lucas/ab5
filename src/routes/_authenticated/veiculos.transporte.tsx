@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -55,6 +55,23 @@ type Tab = (typeof TABS)[number]["v"];
 function TransportTabs() {
   const { tab = "transporte" } = Route.useSearch();
   const navigate = Route.useNavigate();
+  // Volta para a mesma altura em que o usuário deixou a página.
+  useEffect(() => {
+    const key = "transporte-scroll";
+    const target = Number(localStorage.getItem(key) ?? 0);
+    let tries = 0, ready = target === 0;
+    const restore = () => {
+      if (ready) return;
+      if (document.documentElement.scrollHeight - window.innerHeight >= target || tries > 40) {
+        window.scrollTo(0, target); ready = true; return;
+      }
+      tries++; setTimeout(restore, 100);
+    };
+    restore();
+    const onScroll = () => { if (ready) localStorage.setItem(key, String(Math.round(window.scrollY))); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   return (
     <Tabs value={tab} onValueChange={(v) => navigate({ search: v === "transporte" ? {} : { tab: v as Tab }, replace: true })}>
       <TabsList>
