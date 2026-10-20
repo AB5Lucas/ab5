@@ -55,7 +55,30 @@ function ClosingPage() {
   const [detail, setDetail] = useState<Detail>(null);
 
   const data = useQuery({ queryKey: ["closing", month], queryFn: () => loadClosing(month) });
-  const rows = data.data ?? [];
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [types, setTypes] = useState<string[]>([]);
+  const rows = useMemo(() => {
+    const raw = data.data ?? [];
+    const inR = (d: string) => (!from || d >= from) && (!to || d <= to);
+    const ranged = !!(from || to);
+    return raw.filter((r) => !types.length || types.includes(r.contract ?? "efetivo")).map((r) => {
+      if (!ranged) return r;
+      const days = r.days.filter((d) => inR(d.date));
+      const vtRows = r.vtRows.filter((v) => inR(v.date));
+      const prizeRows = r.prizeRows.filter((p) => inR(p.date));
+      const adjustments = r.adjustments.filter((a) => inR(a.entry_date));
+      const fixed = r.vtAuto - r.vtRows.reduce((s, v) => s + v.value, 0);
+      const vtAuto = vtRows.reduce((s, v) => s + v.value, 0) + (vtRows.some((v) => v.pays) ? fixed : 0);
+      return {
+        ...r, days, vtRows, prizeRows, adjustments, vtAuto,
+        meals: days.filter((d) => d.counted).length,
+        prizeAuto: prizeRows.reduce((s, p) => s + p.value, 0),
+        vtManual: adjustments.filter((a) => a.kind === "vt").reduce((s, a) => s + Number(a.amount), 0),
+        prizeManual: adjustments.filter((a) => a.kind === "premio").reduce((s, a) => s + Number(a.amount), 0),
+      };
+    }).filter((r) => !ranged || r.days.length || r.vtRows.length || r.adjustments.length);
+  }, [data.data, from, to, types]);
   const vt = (r: ClosingRow) => r.vtAuto + r.vtManual;
   const prize = (r: ClosingRow) => r.prizeAuto + r.prizeManual;
 
@@ -87,9 +110,22 @@ function ClosingPage() {
       r.prizeRows.forEach((p) => det.push({ ...base, Data: brFull(p.date), Tipo: "Prêmio Viagem", "Obra/descrição": `${p.work} (${p.vehicle})`, "Valor automático": p.value, "Valor manual": "", Observação: `${p.distance} km` }));
       r.adjustments.forEach((a) => det.push({ ...base, Data: brFull(a.entry_date), Tipo: a.kind === "vt" ? "Vale Transporte (Manual)" : "Prêmio Viagem (Manual)", "Obra/descrição": a.description ?? "", "Valor automático": "", "Valor manual": Number(a.amount), Observação: a.notes ?? "" }));
     }
+    const fmt = (rowsData: Record<string, unknown>[], isMoney: (k: string, r: Record<string, unknown>) => boolean) => {
+      const ws = XLSX.utils.json_to_sheet(rowsData);
+      const keys = Object.keys(rowsData[0] ?? {});
+      ws["!cols"] = keys.map((k) => ({ wch: Math.min(80, Math.max(k.length, ...rowsData.map((r) => String(r[k] ?? "").length)) + 2) }));
+      keys.forEach((k, c) => {
+        for (let i = 1; i <= rowsData.length; i++) {
+          if (!isMoney(k, rowsData[i - 1]!)) continue;
+          const cell = ws[XLSX.utils.encode_cell({ r: i, c })];
+          if (cell && cell.t === "n") cell.z = '"R$" #,##0.00';
+        }
+      });
+      return ws;
+    };
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(main), "Fechamento");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(det), "Detalhamento");
+    XLSX.utils.book_append_sheet(wb, fmt(main, (k) => k === "Vale Transporte" || k === "Prêmio Viagem"), "Fechamento");
+    XLSX.utils.book_append_sheet(wb, fmt(det, (k, r) => k === "Valor manual" || (k === "Valor automático" && r["Tipo"] !== "Refeição")), "Detalhamento");
     XLSX.writeFile(wb, `Fechamento_${month.slice(5, 7)}-${month.slice(0, 4)}.xlsx`);
   }
 
@@ -112,6 +148,26 @@ function ClosingPage() {
             <Input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="w-44" />
           </div>
           <Button variant="outline" onClick={() => setMonth(shift(month, 1))}>Próximo <ChevronRight className="h-4 w-4" /></Button>
+        </div>
+        <div>
+          <Label className="text-xs">De</Label>
+          <Input type="date" min={start} max={endLabel} value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+        </div>
+        <div>
+          <Label className="text-xs">Até</Label>
+          <Input type="date" min={start} max={endLabel} value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
+        </div>
+        <div>
+          <Label className="text-xs">Tipo</Label>
+          <div className="flex gap-1">
+            {[["", "Toda MO"], ["efetivo", "Efetivos"], ["intermitente", "Intermitentes"], ["pj", "PJs"]].map(([k, l]) => {
+              const on = k ? types.includes(k) : !types.length;
+              return (
+                <Button key={l} size="sm" variant={on ? "default" : "outline"}
+                  onClick={() => setTypes(k ? (types.includes(k) ? types.filter((t) => t !== k) : [...types, k]) : [])}>{l}</Button>
+              );
+            })}
+          </div>
         </div>
         <div className="relative min-w-56 flex-1">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
