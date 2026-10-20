@@ -1,3 +1,4 @@
+import { LeaveNotice } from "@/components/leave-notice";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -99,7 +100,7 @@ export function TrainingsPage() {
   });
 
   const people = useQuery({
-    queryKey: ["collaborators-min"],
+    queryKey: ["collaborators-min-active-trn"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("collaborators")
@@ -619,6 +620,7 @@ export function TrainingsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <LeaveNotice collaboratorId={rPerson} date={rDate} />
             <div className="space-y-1">
               <Label>Treinamento *</Label>
               <Select value={rTraining} onValueChange={setRTraining}>

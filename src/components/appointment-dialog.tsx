@@ -1,3 +1,4 @@
+import { LeaveNotice } from "@/components/leave-notice";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -329,6 +330,7 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
                     </SelectContent>
                   </Select>
                 </div>
+                <LeaveNotice collaboratorId={form.collaborator_id} date={form.scheduled_date} />
 
                 <div className="space-y-1.5">
                   <Label htmlFor="appt-date">Data do agendamento *</Label>
