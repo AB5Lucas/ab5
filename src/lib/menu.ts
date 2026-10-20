@@ -108,11 +108,11 @@ const RAW_GROUPS: MenuGroup[] = [
     icon: Wallet,
     items: [
       { title: "Financeiro", url: "/fechamentos/financeiro" },
-      { title: "Premiações", url: "/fechamento" },
       { title: "Pedidos", url: "/fechamentos/suzano" },
+      { title: "Sincronização", url: "/relatorios/sincronizacao" },
     ],
   },
-  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Sincronização", url: "/relatorios/sincronizacao" }, { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
+  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Premiações", url: "/fechamento" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
   { label: "Demandas", icon: ClipboardList, items: [{ title: "Alocações", url: "/relatorios" }, { title: "Certificados", url: "/demandas/certificados" }, { title: "Contratações", url: "/demandas/contratacoes" }] },
   {
     label: "Administração",

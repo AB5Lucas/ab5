@@ -21,3 +21,5 @@
 - [x] Faturamentos: reconhecer SPAL JUNDIAI como COCA e reprocessar notas existentes (1591, 1680 e 1681 lançadas)
 - [x] Sincronização: aba Equivalências com clientes da fonte sem repetição e vínculo ao cadastro; gravação e reprocessamento conferidos na tela
 - [ ] Validar cancelamento, reativação e conciliação financeira com cenários isolados de integração (não exercitados com notas reais)
+- [x] Página inicial com nome AB5 Hub
+- [x] Menu: Premiações em Relatórios (2ª), Sincronização em Fechamentos
