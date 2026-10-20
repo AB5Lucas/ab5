@@ -30,3 +30,12 @@ t2("ordem sempre numérica", () => {
   e2(parseOrder("ORDEM pendente")).toBe("");
   e2(parseOrder(null)).toBe("");
 });
+
+import { flowPendingFor, FLOW } from "./andaimes";
+t2("fluxo: Sidnei aprova, André separa, Sidnei aprova saída, solicitante recebe/retorna, André recebe, Sidnei encerra", () => {
+  e2(FLOW.map((s) => s.actor)).toEqual(["coordenador", "patio", "coordenador", "solicitante", "solicitante", "patio", "coordenador", null]);
+  const ids = { coordenador: "sid", patio: "andre", solicitante: "enc" };
+  e2(flowPendingFor("aguardando_aprovacao", ids)).toBe("sid");
+  e2(flowPendingFor("aguardando_recebimento_patio", ids)).toBe("andre");
+  e2(flowPendingFor("encerrada", ids)).toBe(null);
+});
