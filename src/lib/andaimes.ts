@@ -60,3 +60,22 @@ export function parseOrder(text: string | null | undefined): string {
   const m = /ORDEM[^0-9]{0,8}?([0-9](?:[\s.\-\/_a-zA-Z]?[0-9])*)/i.exec(text ?? "");
   return m?.[1] ? m[1].replace(/\D/g, "") : "";
 }
+
+/** Fluxo único da solicitação: etapa → responsável e ação esperada */
+export type FlowActor = "coordenador" | "patio" | "solicitante";
+export const FLOW: { key: string; label: string; actor: FlowActor | null; action?: string; button?: string }[] = [
+  { key: "aguardando_aprovacao", label: "Aprovação da solicitação", actor: "coordenador", action: "aprovar_solicitacao", button: "Aprovar solicitação" },
+  { key: "em_separacao", label: "Separação no pátio", actor: "patio", action: "concluir_separacao", button: "Concluir separação" },
+  { key: "aguardando_aprovacao_saida", label: "Aprovação da saída", actor: "coordenador", action: "aprovar_saida", button: "Aprovar saída e gerar romaneio" },
+  { key: "aguardando_recebimento_obra", label: "Recebimento na obra", actor: "solicitante", action: "receber_obra", button: "Confirmar recebimento na obra" },
+  { key: "em_obra", label: "Material em obra", actor: "solicitante", action: "gerar_retorno", button: "Gerar romaneio de retorno" },
+  { key: "aguardando_recebimento_patio", label: "Recebimento no pátio", actor: "patio", action: "receber_patio", button: "Confirmar recebimento no pátio" },
+  { key: "aguardando_encerramento", label: "Encerramento", actor: "coordenador", action: "encerrar", button: "Aprovar e encerrar" },
+  { key: "encerrada", label: "Encerrada", actor: null },
+];
+export const flowStep = (stage: string) => FLOW.find((s) => s.key === stage);
+/** Quem precisa agir agora na solicitação */
+export function flowPendingFor(stage: string, ids: { coordenador?: string | undefined; patio?: string | undefined; solicitante?: string | null | undefined }) {
+  const a = flowStep(stage)?.actor;
+  return a ? ids[a] ?? null : null;
+}
