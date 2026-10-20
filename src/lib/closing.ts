@@ -27,6 +27,7 @@ export type ClosingRow = {
   vtAuto: number; vtRows: VtRow[]; vtManual: number;
   prizeAuto: number; prizeRows: PrizeRow[]; prizeManual: number;
   adjustments: Adjustment[];
+  contract?: string;
 };
 
 async function all<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
@@ -191,7 +192,14 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     const { data } = await supabase.from("collaborators").select("id, full_name, registration_number").in("id", missing);
     for (const c of data ?? []) { const r = rows.get(c.id)!; r.name = c.full_name; r.reg = c.registration_number; }
   }
+  const ctype = new Map<string, string>();
+  const ids = [...rows.keys()];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await supabase.from("collaborators").select("id, contract_type").in("id", ids.slice(i, i + 200));
+    for (const c of data ?? []) ctype.set(c.id, c.contract_type ?? "efetivo");
+  }
   return [...rows.values()].map(({ seen: _s, driver, ...r }) => {
+    r.contract = ctype.get(r.id) ?? "efetivo";
     r.days.sort((a, b) => a.date.localeCompare(b.date));
     r.vtRows.sort((a, b) => a.date.localeCompare(b.date));
     r.prizeRows.sort((a, b) => a.date.localeCompare(b.date));
