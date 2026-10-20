@@ -246,6 +246,13 @@
       "when": 1792513200374,
       "tag": "0034_andam_approval_flow",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792517763420,
+      "tag": "0035_clear_andaimes_operational_data",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,14 @@
+DELETE FROM public.andam_romaneio_items WHERE id IS NOT NULL;
+DELETE FROM public.andam_romaneios WHERE id IS NOT NULL;
+DELETE FROM public.andam_request_events WHERE id IS NOT NULL;
+DELETE FROM public.andam_request_items WHERE id IS NOT NULL;
+DELETE FROM public.andam_requests WHERE id IS NOT NULL;
+DELETE FROM public.andam_movements WHERE id IS NOT NULL;
+DELETE FROM public.andam_stock WHERE id IS NOT NULL;
+DELETE FROM public.andam_inventory_items WHERE id IS NOT NULL;
+DELETE FROM public.andam_inventory WHERE id IS NOT NULL;
+DELETE FROM public.andam_structure_items WHERE id IS NOT NULL;
+DELETE FROM public.andam_structures WHERE id IS NOT NULL;
+DELETE FROM public.andam_asset_values WHERE item_id IS NOT NULL;
+ALTER SEQUENCE public.andam_requests_number_seq RESTART WITH 1;
+ALTER SEQUENCE public.andam_romaneios_number_seq RESTART WITH 1;
