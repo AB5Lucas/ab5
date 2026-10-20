@@ -24,3 +24,4 @@
 - [x] Página inicial com nome AB5 Hub
 - [x] Menu: Premiações em Relatórios (2ª), Sincronização em Fechamentos
 - [x] Prêmio Motorista/Viagem e VT viraram sub abas de Premiações; grupo Benefícios removido
+- [x] Grupo Fechamentos → Financeiro; página Financeiro → Fechamento

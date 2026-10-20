@@ -95,10 +95,10 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Fechamentos",
+    label: "Financeiro",
     icon: Wallet,
     items: [
-      { title: "Financeiro", url: "/fechamentos/financeiro" },
+      { title: "Fechamento", url: "/fechamentos/financeiro" },
       { title: "Pedidos", url: "/fechamentos/suzano" },
       { title: "Sincronização", url: "/relatorios/sincronizacao" },
     ],
