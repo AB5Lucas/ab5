@@ -232,6 +232,13 @@
       "when": 1792445781823,
       "tag": "0032_billing_without_invoice_and_refs",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792501318287,
+      "tag": "0033_migrate_absence_page_access",
+      "breakpoints": true
     }
   ]
 }
