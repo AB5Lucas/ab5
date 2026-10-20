@@ -17,9 +17,9 @@ import { buildBase, fetchAll, loadWorkData, monthEnd, totalMargin } from "@/lib/
 export const Route = createFileRoute("/_authenticated/fechamentos/financeiro")({
   head: () => ({
     meta: [
-      { title: "Financeiro | AB5 Hub" },
+      { title: "Fechamento Financeiro | AB5 Hub" },
       { name: "description", content: "Relatório financeiro gerencial por cliente e serviço, a partir de Resultados." },
-      { property: "og:title", content: "Financeiro | AB5 Hub" },
+      { property: "og:title", content: "Fechamento Financeiro | AB5 Hub" },
       { property: "og:description", content: "Faturamento, impostos, custos e margens por período." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -155,7 +155,7 @@ function FinanceiroPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Financeiro" description="Entradas e saídas por cliente e serviço, com base em Resultados. Impostos de 18,5% sobre o faturamento." />
+      <PageHeader title="Fechamento" description="Entradas e saídas por cliente e serviço, com base em Resultados. Impostos de 18,5% sobre o faturamento." />
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <Label>Ano</Label>
