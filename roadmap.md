@@ -5,6 +5,7 @@
 - [x] Remover aba Requisitos e suas dependências
 - [x] Andaimes etapa 1: Inventário e Estoque
 - [x] Andaimes etapa 2: Solicitações e Romaneios
+- [ ] Andaimes: integrar romaneios em Solicitações e aprovações sequenciais de Sidnei, André e solicitante; validar fluxo e estoque
 - [ ] Andaimes etapa 3: Acompanhamento (montagem, renovação, desmontagem)
 - [ ] Andaimes etapa 4: Patrimônio (valores, custo de locação, rateio, integração com Resultados)
 - [x] Excluir a aba Auditoria
