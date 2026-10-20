@@ -198,7 +198,7 @@ function Requests({ isRh }: { isRh: boolean }) {
             <TableHead className="w-8"><Checkbox checked={rows.length > 0 && rows.every((r) => picked.has(r.id))} onCheckedChange={(c) => setPicked(c ? new Set(rows.map((r) => r.id)) : new Set())} /></TableHead>
             <TableHead>Nº</TableHead><TableHead>Abertura</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço</TableHead>
             <TableHead>Função</TableHead><TableHead>Vagas</TableHead><TableHead>Prioridade</TableHead><TableHead>Solicitante</TableHead>
-            <TableHead>Responsável RH</TableHead><TableHead>Status</TableHead><TableHead>Atualizado</TableHead>
+            <TableHead>Status</TableHead><TableHead>Atualizado</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {rows.map((r) => (
@@ -212,7 +212,6 @@ function Requests({ isRh }: { isRh: boolean }) {
                 <TableCell>{r.filled}/{r.quantity}</TableCell>
                 <TableCell>{PRIORITY[r.priority]}</TableCell>
                 <TableCell>{r.requester_name ?? "—"}</TableCell>
-                <TableCell>{r.rh_owner_name ?? "—"}</TableCell>
                 <TableCell><Badge variant={STATUS_VARIANT[r.status]}>{STATUS[r.status]}</Badge></TableCell>
                 <TableCell>{dt(r.updated_at)}</TableCell>
               </TableRow>
@@ -513,7 +512,11 @@ function MailPreview({ reqs, cName, wName, onClose }: { reqs: Req[]; cName: (id:
   const clientIds = [...new Set(reqs.map((r) => r.client_id))];
   const cfg = useQuery({
     queryKey: ["hiring-mail-cfg", ...clientIds],
-    queryFn: async () => (await supabase.from("hiring_email_configs").select("*").in("client_id", clientIds)).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("hiring_mail_recipients", { _client_ids: clientIds });
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const [to, setTo] = useState<string | null>(null);
   const [cc, setCc] = useState<string | null>(null);
