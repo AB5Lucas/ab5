@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Tabs as SubTabs, TabsContent as SubTabsContent, TabsList as SubTabsList, TabsTrigger as SubTabsTrigger } from "@/components/ui/tabs";
+import { FuncoesPage } from "@/components/colaboradores/funcoes";
+import { TurnosPage } from "@/components/colaboradores/turnos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -84,8 +87,29 @@ export const Route = createFileRoute("/_authenticated/colaboradores/")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: CollaboratorsPage,
+  validateSearch: (s: Record<string, unknown>): { tab?: ColabTab } =>
+    s["tab"] === "funcoes" || s["tab"] === "turnos" ? { tab: s["tab"] } : {},
+  component: ColabTabsPage,
 });
+
+type ColabTab = "colaboradores" | "funcoes" | "turnos";
+
+function ColabTabsPage() {
+  const { tab = "colaboradores" } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  return (
+    <SubTabs value={tab} onValueChange={(v) => navigate({ search: v === "colaboradores" ? {} : { tab: v as ColabTab }, replace: true })}>
+      <SubTabsList>
+        <SubTabsTrigger value="colaboradores">Colaboradores</SubTabsTrigger>
+        <SubTabsTrigger value="funcoes">Funções</SubTabsTrigger>
+        <SubTabsTrigger value="turnos">Turnos</SubTabsTrigger>
+      </SubTabsList>
+      <SubTabsContent value="colaboradores" className="mt-4"><CollaboratorsPage /></SubTabsContent>
+      <SubTabsContent value="funcoes" className="mt-4"><FuncoesPage /></SubTabsContent>
+      <SubTabsContent value="turnos" className="mt-4"><TurnosPage /></SubTabsContent>
+    </SubTabs>
+  );
+}
 
 type Collaborator = Tables<"collaborators">;
 
@@ -370,12 +394,6 @@ function CollaboratorsPage() {
         description="Cadastro de colaboradores, vínculo com função, departamento e supervisão."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/colaboradores/estrutura">
-                <Settings2 className="h-4 w-4" />
-                Funções e departamentos
-              </Link>
-            </Button>
             {canWrite && (
               <ImportDialog
                 entity="colaboradores"

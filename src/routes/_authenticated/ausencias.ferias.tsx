@@ -1,24 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AbsenceManager } from "@/components/absence-manager";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Página realocada como sub aba de Ausências; mantém links antigos funcionando.
 export const Route = createFileRoute("/_authenticated/ausencias/ferias")({
-  head: () => ({
-    meta: [
-      { title: "Férias | Programação Operacional" },
-      { name: "description", content: "Períodos de férias programados e em curso por colaborador." },
-      { property: "og:title", content: "Férias | Programação Operacional" },
-      { property: "og:description", content: "Períodos de férias programados e em curso por colaborador." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  }),
-  component: () => (
-    <AbsenceManager
-      table="vacations"
-      mode="period"
-      title="Férias"
-      description="Períodos de férias programados e em curso por colaborador."
-      addLabel="Lançar férias"
-    />
-  ),
+  beforeLoad: () => {
+    throw redirect({ to: "/ausencias", search: { tab: "ferias" } });
+  },
 });

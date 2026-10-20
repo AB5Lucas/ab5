@@ -5,7 +5,6 @@ import {
   Users,
   Building2,
   Truck,
-  CalendarOff,
   Wallet,
   FileBarChart,
   Shield,
@@ -29,21 +28,20 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Documentação",
+    label: "Controles",
     icon: CalendarClock,
     items: [
-      { title: "Controles", url: "/agendamentos" },
+      { title: "Documentação", url: "/agendamentos" },
       { title: "Conferência", url: "/conferencia" },
       { title: "Consulta", url: "/consulta" },
     ],
   },
   {
-    label: "Colaboradores",
+    label: "Funcionários",
     icon: Users,
     items: [
       { title: "Colaboradores", url: "/colaboradores" },
-      { title: "Funções", url: "/colaboradores/estrutura" },
-      { title: "Turnos", url: "/colaboradores/turnos" },
+      { title: "Ausências", url: "/ausencias" },
     ],
   },
   {
@@ -65,15 +63,6 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Romaneios", url: "/andaimes/romaneios" },
       { title: "Acompanhamento", url: "/andaimes/acompanhamento" },
       { title: "Patrimônio", url: "/andaimes/patrimonio" },
-    ],
-  },
-  {
-    label: "Ausências",
-    icon: CalendarOff,
-    items: [
-      { title: "Férias", url: "/ausencias/ferias" },
-      { title: "Atestados", url: "/ausencias/atestados" },
-      { title: "Folgas", url: "/ausencias/folgas" },
     ],
   },
   {
@@ -103,7 +92,15 @@ const byName = (a: string, b: string) => a.localeCompare(b, "pt-BR");
 export const MENU_GROUPS: MenuGroup[] = RAW_GROUPS.map((g) => ({
   ...g,
   // Andaimes segue a ordem do processo, não alfabética
-  items: g.label === "Andaimes" ? g.items : [...g.items].sort((a, b) => byName(a.title, b.title)),
+  // Andaimes segue a ordem do processo; em Controles, Documentação vem primeiro
+  items:
+    g.label === "Andaimes"
+      ? g.items
+      : [...g.items].sort((a, b) =>
+          g.label === "Controles" && (a.url === "/agendamentos" || b.url === "/agendamentos")
+            ? (a.url === "/agendamentos" ? -1 : 1)
+            : byName(a.title, b.title),
+        ),
 }));
 
 export const ALL_MENU_URLS = MENU_GROUPS.flatMap((g) => g.items.map((i) => i.url));
