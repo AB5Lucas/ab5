@@ -75,7 +75,7 @@ export const FLOW: { key: string; label: string; actor: FlowActor | null; action
 ];
 export const flowStep = (stage: string) => FLOW.find((s) => s.key === stage);
 /** Quem precisa agir agora na solicitação */
-export function flowPendingFor(stage: string, ids: { coordenador?: string; patio?: string; solicitante?: string | null }) {
+export function flowPendingFor(stage: string, ids: { coordenador?: string | undefined; patio?: string | undefined; solicitante?: string | null | undefined }) {
   const a = flowStep(stage)?.actor;
   return a ? ids[a] ?? null : null;
 }

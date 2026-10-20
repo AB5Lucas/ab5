@@ -232,7 +232,7 @@ function NewDialog({ form, setForm, clients, works, userId, onDone }: any) {
   );
 }
 
-function RequestDialog({ id, userId, isAdmin, people, onClose }: { id: string; userId?: string; isAdmin: boolean; people: any; onClose: () => void }) {
+function RequestDialog({ id, userId, isAdmin, people, onClose }: { id: string; userId?: string | undefined; isAdmin: boolean; people: any; onClose: () => void }) {
   const qc = useQueryClient();
   const central = useCentral();
   const [busy, setBusy] = useState(false);
