@@ -110,13 +110,13 @@ function ClosingPage() {
       r.prizeRows.forEach((p) => det.push({ ...base, Data: brFull(p.date), Tipo: "Prêmio Viagem", "Obra/descrição": `${p.work} (${p.vehicle})`, "Valor automático": p.value, "Valor manual": "", Observação: `${p.distance} km` }));
       r.adjustments.forEach((a) => det.push({ ...base, Data: brFull(a.entry_date), Tipo: a.kind === "vt" ? "Vale Transporte (Manual)" : "Prêmio Viagem (Manual)", "Obra/descrição": a.description ?? "", "Valor automático": "", "Valor manual": Number(a.amount), Observação: a.notes ?? "" }));
     }
-    const fmt = (rowsData: Record<string, unknown>[], moneyCols: string[]) => {
+    const fmt = (rowsData: Record<string, unknown>[], isMoney: (k: string, r: Record<string, unknown>) => boolean) => {
       const ws = XLSX.utils.json_to_sheet(rowsData);
       const keys = Object.keys(rowsData[0] ?? {});
       ws["!cols"] = keys.map((k) => ({ wch: Math.min(80, Math.max(k.length, ...rowsData.map((r) => String(r[k] ?? "").length)) + 2) }));
       keys.forEach((k, c) => {
-        if (!moneyCols.includes(k)) return;
         for (let i = 1; i <= rowsData.length; i++) {
+          if (!isMoney(k, rowsData[i - 1]!)) continue;
           const cell = ws[XLSX.utils.encode_cell({ r: i, c })];
           if (cell && cell.t === "n") cell.z = '"R$" #,##0.00';
         }
@@ -124,8 +124,8 @@ function ClosingPage() {
       return ws;
     };
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, fmt(main, ["Vale Transporte", "Prêmio Viagem"]), "Fechamento");
-    XLSX.utils.book_append_sheet(wb, fmt(det, ["Valor manual", ...(det.length ? [] : [])]), "Detalhamento");
+    XLSX.utils.book_append_sheet(wb, fmt(main, (k) => k === "Vale Transporte" || k === "Prêmio Viagem"), "Fechamento");
+    XLSX.utils.book_append_sheet(wb, fmt(det, (k, r) => k === "Valor manual" || (k === "Valor automático" && r["Tipo"] !== "Refeição")), "Detalhamento");
     XLSX.writeFile(wb, `Fechamento_${month.slice(5, 7)}-${month.slice(0, 4)}.xlsx`);
   }
 
