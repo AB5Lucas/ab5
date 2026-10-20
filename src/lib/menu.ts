@@ -95,19 +95,10 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Benefícios",
+    label: "Financeiro",
     icon: Wallet,
     items: [
-      { title: "Vale-Transporte", url: "/beneficios/vale-transporte" },
-      { title: "Prêmio de Viagem", url: "/beneficios/premio-viagem" },
-      { title: "Prêmio de Motorista", url: "/beneficios/premio-motorista" },
-    ],
-  },
-  {
-    label: "Fechamentos",
-    icon: Wallet,
-    items: [
-      { title: "Financeiro", url: "/fechamentos/financeiro" },
+      { title: "Fechamento", url: "/fechamentos/financeiro" },
       { title: "Pedidos", url: "/fechamentos/suzano" },
       { title: "Sincronização", url: "/relatorios/sincronizacao" },
     ],

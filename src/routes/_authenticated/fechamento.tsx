@@ -16,6 +16,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DriverBonusPage } from "@/components/premiacoes/premio-motorista";
+import { BonusPage } from "@/components/premiacoes/premio-viagem";
+import { VoucherPage } from "@/components/premiacoes/vale-transporte";
 import { loadClosing, periodOf, type Adjustment, type ClosingRow } from "@/lib/closing";
 
 export const Route = createFileRoute("/_authenticated/fechamento")({
@@ -29,8 +33,34 @@ export const Route = createFileRoute("/_authenticated/fechamento")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: ClosingPage,
+  validateSearch: (s: Record<string, unknown>): { tab?: Tab } =>
+    TABS.some((t) => t.v === s["tab"]) ? { tab: s["tab"] as Tab } : {},
+  component: PrizesPage,
 });
+
+const TABS = [
+  { v: "fechamento", l: "Fechamento" },
+  { v: "premio-motorista", l: "Prêmio Motorista" },
+  { v: "premio-viagem", l: "Prêmio Viagem" },
+  { v: "vale-transporte", l: "Vale Transporte" },
+] as const;
+type Tab = (typeof TABS)[number]["v"];
+
+function PrizesPage() {
+  const { tab = "fechamento" } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  return (
+    <Tabs value={tab} onValueChange={(v) => navigate({ search: v === "fechamento" ? {} : { tab: v as Tab }, replace: true })}>
+      <TabsList>
+        {TABS.map((t) => <TabsTrigger key={t.v} value={t.v}>{t.l}</TabsTrigger>)}
+      </TabsList>
+      <TabsContent value="fechamento" className="mt-4"><ClosingPage /></TabsContent>
+      <TabsContent value="premio-motorista" className="mt-4"><DriverBonusPage /></TabsContent>
+      <TabsContent value="premio-viagem" className="mt-4"><BonusPage /></TabsContent>
+      <TabsContent value="vale-transporte" className="mt-4"><VoucherPage /></TabsContent>
+    </Tabs>
+  );
+}
 
 const money = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const br = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
