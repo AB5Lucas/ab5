@@ -26,3 +26,4 @@
 - [x] Prêmio Motorista/Viagem e VT viraram sub abas de Premiações; grupo Benefícios removido
 - [x] Grupo Fechamentos → Financeiro; página Financeiro → Fechamento
 - [x] Sub aba Premiações renomeada; Frota/Motoristas/Relatórios viraram sub abas de Transporte; grupo Veículos removido
+- [x] Grupo Agendamentos → Documentação; página Agendamentos → Controles com sub abas ASOs/Integrações/Treinamentos

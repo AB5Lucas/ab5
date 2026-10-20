@@ -38,17 +38,21 @@ import { addDays, formatDateBR, todayISO } from "@/lib/scheduling";
 import { normText } from "@/lib/import-helpers";
 import type { AppointmentType } from "@/components/appointment-dialog";
 import { APPOINTMENT_TYPE_LABEL } from "@/components/appointment-dialog";
+import { Tabs as SubTabs, TabsContent as SubTabsContent, TabsList as SubTabsList, TabsTrigger as SubTabsTrigger } from "@/components/ui/tabs";
+import { IntegrationsPage } from "@/components/controles/integracoes";
+import { TrainingsPage } from "@/components/controles/treinamentos";
+import { AsosPage } from "@/components/controles/asos";
 
 export const Route = createFileRoute("/_authenticated/agendamentos")({
   head: () => ({
     meta: [
-      { title: "Agendamentos | Programação Operacional" },
+      { title: "Controles | AB5 Hub" },
       {
         name: "description",
         content:
           "Controle de pendências de ASO, treinamentos e integrações: confirme a realização ou reagende para uma nova data.",
       },
-      { property: "og:title", content: "Agendamentos | Programação Operacional" },
+      { property: "og:title", content: "Controles | AB5 Hub" },
       {
         property: "og:description",
         content: "Lista de pendências de ASO, treinamento e integração com confirmação e reagendamento.",
@@ -57,8 +61,34 @@ export const Route = createFileRoute("/_authenticated/agendamentos")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: AppointmentsPage,
+  validateSearch: (s: Record<string, unknown>): { tab?: CtrlTab } =>
+    CTRL_TABS.some((t) => t.v === s["tab"]) ? { tab: s["tab"] as CtrlTab } : {},
+  component: ControlsPage,
 });
+
+const CTRL_TABS = [
+  { v: "agendamentos", l: "Agendamentos" },
+  { v: "asos", l: "ASOs" },
+  { v: "integracoes", l: "Integrações" },
+  { v: "treinamentos", l: "Treinamentos" },
+] as const;
+type CtrlTab = (typeof CTRL_TABS)[number]["v"];
+
+function ControlsPage() {
+  const { tab = "agendamentos" } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  return (
+    <SubTabs value={tab} onValueChange={(v) => navigate({ search: v === "agendamentos" ? {} : { tab: v as CtrlTab }, replace: true })}>
+      <SubTabsList>
+        {CTRL_TABS.map((t) => <SubTabsTrigger key={t.v} value={t.v}>{t.l}</SubTabsTrigger>)}
+      </SubTabsList>
+      <SubTabsContent value="agendamentos" className="mt-4"><AppointmentsPage /></SubTabsContent>
+      <SubTabsContent value="asos" className="mt-4"><AsosPage /></SubTabsContent>
+      <SubTabsContent value="integracoes" className="mt-4"><IntegrationsPage /></SubTabsContent>
+      <SubTabsContent value="treinamentos" className="mt-4"><TrainingsPage /></SubTabsContent>
+    </SubTabs>
+  );
+}
 
 type Row = {
   id: string;
