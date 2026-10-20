@@ -216,7 +216,7 @@ function Requests({ isRh }: { isRh: boolean }) {
                 <TableCell>{dt(r.updated_at)}</TableCell>
               </TableRow>
             ))}
-            {!rows.length && <TableRow><TableCell colSpan={12} className="py-8 text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>}
+            {!rows.length && <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
