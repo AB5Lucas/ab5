@@ -1,23 +1,20 @@
 import { useEffect } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { CalendarDays, CalendarRange, Users, Truck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/use-auth";
+import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Programação Operacional Integrada | Obras e Equipes" },
+      { title: "AB5 Hub | Plataforma Integrada de Gestão" },
       {
         name: "description",
-        content:
-          "Sistema de programação operacional: equipes-base por obra, programação diária, ausências, frota e benefícios em um só lugar.",
+        content: "AB5 Hub: operações, obras, equipes e resultados da AB5 reunidos em uma única plataforma.",
       },
-      { property: "og:title", content: "Programação Operacional Integrada" },
-      {
-        property: "og:description",
-        content: "Programe colaboradores em obras todos os dias com validação automática de requisitos.",
-      },
+      { property: "og:title", content: "AB5 Hub | Plataforma Integrada de Gestão" },
+      { property: "og:description", content: "Operações, obras, equipes e resultados da AB5 em um só lugar." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -34,49 +31,36 @@ function Home() {
   }, [loading, session, navigate]);
 
   return (
-    <div className="min-h-screen bg-secondary">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <CalendarDays className="h-5 w-5" />
-          </span>
-          <span className="font-display text-sm uppercase tracking-widest">Programação Operacional</span>
+    <div className="flex min-h-screen flex-col bg-secondary">
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-6">
+        <div className="flex items-center gap-3">
+          <img src={ab5Logo.url} alt="AB5" className="h-10 w-10 object-contain" />
+          <span className="font-display text-sm font-semibold uppercase tracking-widest">AB5 Hub</span>
         </div>
-        <Button asChild size="sm">
+        <Button asChild size="sm" variant="outline">
           <Link to="/auth">Entrar</Link>
         </Button>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 pb-20">
-        <section className="panel p-8 md:p-12">
-          <h1 className="max-w-3xl font-display text-4xl font-semibold uppercase leading-tight tracking-wide md:text-5xl">
-            Programe suas equipes em obras todos os dias, sem retrabalho
+      <main className="mx-auto flex w-full max-w-5xl flex-1 items-center px-6 pb-20">
+        <section className="panel w-full p-10 md:p-16">
+          <img src={ab5Logo.url} alt="AB5" className="h-20 w-20 object-contain" />
+          <p className="mt-8 text-xs font-semibold uppercase tracking-[0.3em] text-primary">Plataforma Integrada de Gestão</p>
+          <h1 className="mt-3 font-display text-5xl font-semibold uppercase leading-tight tracking-wide md:text-7xl">
+            AB5 Hub
           </h1>
-          <p className="mt-4 max-w-2xl text-muted-foreground">
-            Equipe-base por obra, programação diária independente do histórico, validação automática de
-            férias, atestados, folgas e treinamentos, designação de veículos e cálculo de benefícios.
+          <p className="mt-5 max-w-xl text-lg text-muted-foreground">
+            Operações, obras, equipes e resultados reunidos em um só lugar.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <Link to="/auth">Acessar o sistema</Link>
-            </Button>
-          </div>
-        </section>
-
-        <section className="mt-6 grid gap-3 md:grid-cols-3">
-          {[
-            { icon: CalendarRange, title: "Programação diária", text: "Copie o dia útil anterior ou parta da equipe-base, sempre com validação." },
-            { icon: Users, title: "Equipes-base", text: "A equipe padrão da obra permanece intacta mesmo com trocas diárias." },
-            { icon: Truck, title: "Transporte e benefícios", text: "Veículos, motoristas, vale-transporte e prêmio de viagem integrados." },
-          ].map((f) => (
-            <div key={f.title} className="panel p-5">
-              <f.icon className="h-5 w-5 text-primary" />
-              <h2 className="mt-3 font-display text-base uppercase tracking-wide">{f.title}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{f.text}</p>
-            </div>
-          ))}
+          <Button asChild size="lg" className="mt-10">
+            <Link to="/auth">
+              Acessar o sistema <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
         </section>
       </main>
+
+      <footer className="pb-6 text-center text-xs text-muted-foreground">AB5 · Acesso restrito à equipe</footer>
     </div>
   );
 }

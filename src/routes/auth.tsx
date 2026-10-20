@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { toast } from "sonner";
-import { CalendarDays } from "lucide-react";
+import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,12 +118,10 @@ function AuthPage() {
     <div className="flex min-h-screen items-center justify-center bg-secondary px-4 py-10">
       <div className="panel w-full max-w-md p-6">
         <div className="mb-6 flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <CalendarDays className="h-5 w-5" />
-          </span>
+          <img src={ab5Logo.url} alt="AB5" className="h-10 w-10 object-contain" />
           <div>
             <h1 className="font-display text-xl font-semibold uppercase tracking-wide">
-              Programação Operacional
+              AB5 Hub
             </h1>
             <p className="text-xs text-muted-foreground">Acesso restrito à equipe</p>
           </div>
