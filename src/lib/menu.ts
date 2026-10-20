@@ -29,19 +29,10 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Controles",
-    icon: ClipboardList,
-    items: [
-      { title: "Integrações", url: "/obras/integracoes" },
-      { title: "Treinamentos", url: "/treinamentos" },
-      { title: "ASOs", url: "/colaboradores/asos" },
-    ],
-  },
-  {
-    label: "Agendamentos",
+    label: "Documentação",
     icon: CalendarClock,
     items: [
-      { title: "Agendamentos", url: "/agendamentos" },
+      { title: "Controles", url: "/agendamentos" },
       { title: "Conferência", url: "/conferencia" },
       { title: "Consulta", url: "/consulta" },
     ],
