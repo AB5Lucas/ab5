@@ -1,5 +1,4 @@
 import {
-  LayoutDashboard,
   CalendarDays,
   CalendarClock,
   Users,
@@ -17,7 +16,6 @@ export type MenuGroup = { label: string; icon: typeof Users; items: MenuItem[] }
 
 /** Menu real do sistema — fonte única para o menu lateral e a página Acessos. */
 const RAW_GROUPS: MenuGroup[] = [
-  { label: "Dashboard", icon: LayoutDashboard, items: [{ title: "Dashboard", url: "/dashboard" }] },
   {
     label: "Planejamento",
     icon: CalendarDays,
@@ -64,7 +62,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   { label: "Relatórios", icon: FileBarChart, items: [{ title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Premiações", url: "/fechamento" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
-  { label: "Demandas", icon: ClipboardList, items: [{ title: "Alocações", url: "/relatorios" }, { title: "Certificados", url: "/demandas/certificados" }] },
+  { label: "Demandas", icon: ClipboardList, items: [{ title: "Alocações", url: "/relatorios" }, { title: "Certificados", url: "/demandas/certificados" }, { title: "Dashboard", url: "/dashboard" }] },
   {
     label: "Andaimes",
     icon: Boxes,
