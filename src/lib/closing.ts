@@ -52,7 +52,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
 
   const [allocs, entries, workVt, boxVtR, personVtR, holidays, daysOff, vacations, leaves, rdoWf, vtRules, tbRules, adjs] = await Promise.all([
     ids.length ? all<any>((f, t) => supabase.from("daily_allocations")
-      .select("collaborator_id, schedule_id, work_id, driver, vt_override, travel_bonus_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled, travel_bonus_enabled), works(name, city, distance_km, clients(name, city, distance_km))")
+      .select("collaborator_id, schedule_id, work_id, driver, overnight, vt_override, travel_bonus_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled, travel_bonus_enabled), works(name, city, distance_km, clients(name, city, distance_km))")
       .in("schedule_id", ids).order("id").range(f, t)) : [],
     ids.length ? all<any>((f, t) => supabase.from("daily_status_entries")
       .select("schedule_id, collaborator_id, box_key, collaborators(full_name, registration_number)").in("schedule_id", ids).order("id").range(f, t)) : [],
