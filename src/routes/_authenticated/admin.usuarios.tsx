@@ -229,10 +229,10 @@ function UsersPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={tempPwd.length < 6 || resetPwd.isPending}
+              disabled={tempPwd.trim().length < 6 || resetPwd.isPending}
               onClick={(e) => {
                 e.preventDefault();
-                if (resetting) resetPwd.mutate({ userId: resetting.id, tempPassword: tempPwd });
+                if (resetting) resetPwd.mutate({ userId: resetting.id, tempPassword: tempPwd.trim() });
               }}
             >
               Resetar

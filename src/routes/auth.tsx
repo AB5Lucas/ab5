@@ -53,7 +53,7 @@ function AuthPage() {
       return;
     }
     setLoading(true);
-    const { data: signed, error } = await supabase.auth.signInWithPassword({ email: parsed.data.email, password });
+    const { data: signed, error } = await supabase.auth.signInWithPassword({ email: parsed.data.email.toLowerCase(), password: password.trim() });
     setLoading(false);
     if (error) {
       toast.error("Não foi possível entrar: " + error.message);
@@ -137,11 +137,11 @@ function AuthPage() {
             <form onSubmit={handleSignIn} className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="email">E-mail</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Entrando..." : "Entrar"}
@@ -160,7 +160,7 @@ function AuthPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email-up">E-mail</Label>
-                <Input id="email-up" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+                <Input id="email-up" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password-up">Senha</Label>

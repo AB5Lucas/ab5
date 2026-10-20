@@ -33,7 +33,7 @@ export const deleteUser = createServerFn({ method: "POST" })
 export const resetUserPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data) =>
-    z.object({ userId: z.string().uuid(), tempPassword: z.string().min(6).max(72) }).parse(data),
+    z.object({ userId: z.string().uuid(), tempPassword: z.string().trim().min(6).max(72) }).parse(data),
   )
   .handler(async ({ data, context }) => {
     const { data: isAdmin, error } = await context.supabase.rpc("is_admin");
