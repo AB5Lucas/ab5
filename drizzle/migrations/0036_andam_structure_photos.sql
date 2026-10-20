@@ -1,0 +1,2 @@
+ALTER TABLE public.andam_structures ADD COLUMN IF NOT EXISTS photos jsonb NOT NULL DEFAULT '[]'::jsonb;
+COMMENT ON COLUMN public.andam_structures.photos IS 'Fotos anexadas: [{path, status, at}] no bucket andam-docs';
