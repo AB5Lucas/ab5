@@ -55,6 +55,17 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
+    label: "Financeiro",
+    icon: Wallet,
+    items: [
+      { title: "Fechamento", url: "/fechamentos/financeiro" },
+      { title: "Pedidos", url: "/fechamentos/suzano" },
+      { title: "Sincronização", url: "/relatorios/sincronizacao" },
+    ],
+  },
+  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Alocações", url: "/relatorios" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
+  { label: "Demandas", icon: ClipboardList, items: [{ title: "Certificados", url: "/demandas/certificados" }, { title: "Contratações", url: "/demandas/contratacoes" }] },
+  {
     label: "Andaimes",
     icon: Boxes,
     items: [
@@ -66,17 +77,6 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Patrimônio", url: "/andaimes/patrimonio" },
     ],
   },
-  {
-    label: "Financeiro",
-    icon: Wallet,
-    items: [
-      { title: "Fechamento", url: "/fechamentos/financeiro" },
-      { title: "Pedidos", url: "/fechamentos/suzano" },
-      { title: "Sincronização", url: "/relatorios/sincronizacao" },
-    ],
-  },
-  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Alocações", url: "/relatorios" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
-  { label: "Demandas", icon: ClipboardList, items: [{ title: "Certificados", url: "/demandas/certificados" }, { title: "Contratações", url: "/demandas/contratacoes" }] },
   {
     label: "Administração",
     icon: Shield,
