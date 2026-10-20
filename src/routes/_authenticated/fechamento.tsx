@@ -3,7 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
-import { ArrowUpDown, ChevronLeft, ChevronRight, Download, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, Download, Filter, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -157,18 +159,29 @@ function ClosingPage() {
           <Label className="text-xs">Até</Label>
           <Input type="date" min={start} max={endLabel} value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
         </div>
-        <div>
-          <Label className="text-xs">Tipo</Label>
-          <div className="flex gap-1">
-            {[["", "Toda MO"], ["efetivo", "Efetivos"], ["intermitente", "Intermitentes"], ["pj", "PJs"]].map(([k, l]) => {
-              const on = k ? types.includes(k) : !types.length;
-              return (
-                <Button key={l} size="sm" variant={on ? "default" : "outline"}
-                  onClick={() => setTypes(k ? (types.includes(k) ? types.filter((t) => t !== k) : [...types, k]) : [])}>{l}</Button>
-              );
-            })}
-          </div>
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline">
+              <Filter className="h-4 w-4" /> Tipo
+              {types.length > 0 && <Badge variant="secondary">{types.length}</Badge>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={!types.length} onCheckedChange={() => setTypes([])} />
+                <span>Todos</span>
+              </label>
+              {[["efetivo", "Efetivos"], ["intermitente", "Intermitentes"], ["pj", "PJs"]].map(([k, l]) => (
+                <label key={k} className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={types.includes(k!)}
+                    onCheckedChange={(c) => setTypes(c ? [...types, k!] : types.filter((t) => t !== k))} />
+                  <span>{l}</span>
+                </label>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
         <div className="relative min-w-56 flex-1">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input className="pl-8" placeholder="Buscar por matrícula ou nome" value={q} onChange={(e) => setQ(e.target.value)} />
