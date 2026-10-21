@@ -53,3 +53,12 @@ describe("indústria", () => {
     expect(parseInvoices([row("1592", "TENNECO MOGI MIRIM"), row("1593", "PINHALENSE")]).map(i => i.invoice)).toEqual(["1593"]);
   });
 });
+
+import { parseOrders as po2 } from "./industry-sync";
+import { test as t2, expect as e2 } from "vitest";
+t2("usa FAT. R$ e PREV. MP quando REALIZ. R$ e MP REAL estão vazios", () => {
+  const head = ["FR","OP","ENTRADA","Cliente","Material","Qtd","DIV","PREV. MP","%","MP REAL","%2","FAT. R$","REALIZ. R$","DATA PREV","DATA FINAL","FATURAMENTO"];
+  const rows: unknown[][] = [head, ["", 27515, "", "PINHALENSE", "", "", "PPO N", 207.9, "", "", "", 5420, "", 46294, "", 27514]];
+  const o = po2(rows).orders[0]!;
+  e2(o.order).toBe("27514"); e2(o.amount).toBe(5420); e2(o.mp).toBe(207.9);
+});
