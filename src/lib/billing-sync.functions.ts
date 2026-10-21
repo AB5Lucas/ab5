@@ -10,7 +10,7 @@ export const syncBillingNow = createServerFn({ method: "POST" }).middleware([req
   return executeBillingSync({ lovableKey, excelKey }, "manual");
 });
 export const syncIndustryNow = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
-  .inputValidator((d: { month?: string } | undefined) => ({ month: d?.month && /^\d{4}-\d{2}$/.test(d.month) ? d.month : undefined }))
+  .inputValidator((d: { month?: string | undefined } | undefined) => ({ month: d?.month && /^\d{4}-\d{2}$/.test(d.month) ? d.month : undefined }))
   .handler(async ({ context, data }) => {
   const [{ data: a }, { data: b }] = await Promise.all([
     context.supabase.rpc("can_access_page", { _path: "/relatorios/sincronizacao" }),
