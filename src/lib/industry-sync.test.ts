@@ -26,4 +26,9 @@ describe("indústria", () => {
     const inv = parseInvoices([row(23.28), row(5.34)]);
     expect(inv).toHaveLength(1); expect(inv[0]?.amount).toBe(28.62); expect(inv[0]?.invoice).toBe("28613"); expect(inv[0]?.order).toBe("27423");
   });
+  it("ignora notas de cobrança de obras", () => {
+    const row = (nf: string, d: string) => { const r: unknown[] = Array(44).fill(""); r[1] = nf; r[7] = 46303; r[16] = "027570"; r[25] = d; r[43] = 100; return r; };
+    const inv = parseInvoices([row("1616", "SERVICOS COBRANCA OBRAS 3,5%"), row("1677", "SERVICOS DA INDUSTRIA ISS 3%")]);
+    expect(inv.map(i => i.invoice)).toEqual(["1677"]);
+  });
 });
