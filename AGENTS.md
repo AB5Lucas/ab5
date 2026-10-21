@@ -29,3 +29,4 @@
 - Billing: Excel feeds atomic billing_sync_process; readers exclude sync_cancelled; stable billing_client_key resolves billing_client_equivalences. Edits reprocess notes without silently moving posted links. Why: shared mapping and financial history.
 - Daily billing uses the managed authenticated route, request-scoped execution context and persisted run state. Why: no dependency on an open browser.
 - /relatorios (Alocações) keeps its URL when moved in the menu. Why: preserve permissions and links.
+- Indústria billing: industry-sync.ts/.server.ts read Excel files by month folder (tolerance 7 days) into industry_orders/industry_invoices; industry_sync_apply upserts MP (materiais) and faturamento work_entries keyed by industry_order_id/industry_invoice_id. Why: idempotent costs without touching the Serviços sync.
