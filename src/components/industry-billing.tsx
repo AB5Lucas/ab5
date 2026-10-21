@@ -83,8 +83,8 @@ export function IndustryBilling() {
   const counts = [{ l: "Notas", v: all.length, I: CheckCircle2 }, { l: "Lançadas", v: all.filter((n: any) => n.status === "posted").length, I: CheckCircle2 }, { l: "Pendentes", v: all.filter((n: any) => n.status === "pending").length, I: CircleHelp }, { l: "Total faturado", v: brl(rows.reduce((a: number, n: any) => a + Number(n.amount), 0)), I: CheckCircle2 }];
   return <div className="space-y-5 pt-2"><SyncBar source="faturamento" />
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{counts.map(({ l, v, I }) => <div key={l} className="rounded-md border border-border bg-card p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>{l}</span><I className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums">{v}</p></div>)}</div>
-    <Tabs defaultValue="notes"><TabsList><TabsTrigger value="notes">Notas</TabsTrigger><TabsTrigger value="runs">Execuções</TabsTrigger></TabsList>
-      <TabsContent value="notes" className="space-y-4">
+    <Tabs defaultValue="notes" className="w-full"><TabsList><TabsTrigger value="notes">Notas</TabsTrigger><TabsTrigger value="runs">Execuções</TabsTrigger></TabsList>
+      <TabsContent value="notes" className="w-full space-y-4">
         <div className="flex flex-wrap items-end gap-3"><div className="min-w-48 flex-1"><Label htmlFor="ind-search">NF, pedido ou cliente</Label><Input id="ind-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar" /></div>
           <div className="flex gap-1">{[["all", "Todas"], ["posted", "Lançadas"], ["pending", "Pendentes"]].map(([k, v]) => <Button key={k} size="sm" variant={state === k ? "default" : "outline"} onClick={() => setState(k!)}>{v}</Button>)}</div></div>
         <div className="w-full overflow-x-auto"><Table className="w-full"><TableHeader><TableRow>{["Emissão", "NF", "Cliente", "Pedido", "Valor", "Itens", "Situação", "Serviço"].map(h => <TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader>
