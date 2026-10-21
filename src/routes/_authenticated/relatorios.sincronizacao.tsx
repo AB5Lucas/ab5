@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { BillingEquivalences } from "@/components/billing-equivalences";
+import { IndustryBilling } from "@/components/industry-billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,10 +23,11 @@ import { fetchAll } from "@/lib/results-engine";
 import type { Database } from "@/integrations/supabase/types";
 type Note = Database["public"]["Tables"]["billing_sync_notes"]["Row"];
 export const Route = createFileRoute("/_authenticated/relatorios/sincronizacao")({ head: () => ({ meta: [
-  { title: "Sincronização de Faturamentos | AB5 Hub" }, { name: "description", content: "Conciliação, cancelamentos e histórico dos faturamentos da AB5 desde outubro de 2026." },
-  { property: "og:title", content: "Sincronização de Faturamentos | AB5 Hub" }, { property: "og:description", content: "Acompanhamento da integração de faturamentos, pedidos e orçamentos." },
+  { title: "Faturamento | AB5 Hub" }, { name: "description", content: "Conciliação, cancelamentos e histórico dos faturamentos da AB5 desde outubro de 2026." },
+  { property: "og:title", content: "Faturamento | AB5 Hub" }, { property: "og:description", content: "Acompanhamento da integração de faturamentos, pedidos e orçamentos." },
   { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
 ] }), component: SynchronizationPage });
+function SynchronizationPage(){return <div className="space-y-5"><PageHeader title="Faturamento"/><Tabs defaultValue="servicos"><TabsList><TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="industria">Indústria</TabsTrigger></TabsList><TabsContent value="servicos"><ServicesBilling/></TabsContent><TabsContent value="industria"><IndustryBilling/></TabsContent></Tabs></div>;}
 const brl = (n: number | null) => n === null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const sheetRow = (n: { original: unknown }) => String((n.original as Record<string, unknown> | null)?.["row"] ?? "—");
 const date = (s: string | null) => s ? new Date(s.includes("T") ? s : `${s}T12:00:00Z`).toLocaleString("pt-BR", s.includes("T") ? { dateStyle: "short", timeStyle: "short" } : { dateStyle: "short" }) : "—";
@@ -38,13 +40,13 @@ function Status({ state }: { state: string }) {
 function Filter({label,value,onChange,options}:{label:string;value:string;onChange:(s:string)=>void;options:Record<string,string>}) {
   return <div className="w-48"><Label>{label}</Label><Select value={value} onValueChange={onChange}><SelectTrigger aria-label={label}><SelectValue/></SelectTrigger><SelectContent>{Object.entries(options).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>;
 }
-function SynchronizationPage() {
+function ServicesBilling() {
   const qc=useQueryClient();const {isAdmin}=useCurrentUser();const sync=useServerFn(syncBillingNow);
   const [start,setStart]=useState(BILLING_START);const [end,setEnd]=useState("");const [search,setSearch]=useState("");const [client,setClient]=useState("all");const [state,setState]=useState("all");const [method,setMethod]=useState("all");
   const [sort,setSort]=useState("date-desc");const [page,setPage]=useState(0);const [detail,setDetail]=useState<Note|null>(null);const [tolerance,setTolerance]=useState("");
   const refresh=async()=>{await Promise.all([qc.invalidateQueries({queryKey:["billing-sync"]}),qc.invalidateQueries({queryKey:["work-result"]}),qc.invalidateQueries({queryKey:["fin-active"]}),qc.invalidateQueries({queryKey:["orders-all-v3"]})]);};
   const notes=useQuery({queryKey:["billing-sync","notes"],queryFn:()=>fetchAll<Note>((a,b)=>supabase.from("billing_sync_notes").select("*").order("last_attempt_at",{ascending:false}).order("id").range(a,b)),refetchInterval:15000});
-  const runs=useQuery({queryKey:["billing-sync","runs"],queryFn:async()=>{const {data,error}=await supabase.from("billing_sync_runs").select("*").order("started_at",{ascending:false}).limit(100);if(error)throw error;return data??[];},refetchInterval:15000});
+  const runs=useQuery({queryKey:["billing-sync","runs"],queryFn:async()=>{const {data,error}=await supabase.from("billing_sync_runs").select("*").eq("category","servicos").order("started_at",{ascending:false}).limit(100);if(error)throw error;return data??[];},refetchInterval:15000});
   const settings=useQuery({queryKey:["billing-sync","settings"],queryFn:async()=>{const {data,error}=await supabase.from("billing_sync_settings").select("*").eq("id",true).maybeSingle();if(error)throw error;return data;}});
   const history=useQuery({queryKey:["billing-sync","history",detail?.id],enabled:!!detail,queryFn:async()=>{if(!detail)return [];return fetchAll((a,b)=>supabase.from("billing_sync_history").select("*").eq("note_id",detail.id).order("happened_at",{ascending:false}).range(a,b));}});
   const execute=useMutation({mutationFn:()=>sync(),onSuccess:async result=>{toast.success(result.status==="running"?"Já existe uma sincronização em andamento":"Sincronização concluída");await refresh();},onError:async(e:Error)=>{toast.error(e.message);await refresh();}});
@@ -60,12 +62,12 @@ function SynchronizationPage() {
     const csv=[headers,...cells].map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(";")).join("\r\n");const url=URL.createObjectURL(new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="sincronizacao-faturamentos.csv";a.click();URL.revokeObjectURL(url);
   }
   return <div className="space-y-5">
-    <PageHeader title="Sincronização" actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportNotes} disabled={!filtered.length}><Download className="h-4 w-4"/>Exportar</Button><Button onClick={()=>execute.mutate()} disabled={execute.isPending||last?.status==="running"}><RefreshCw className={`h-4 w-4 ${execute.isPending?"animate-spin":""}`}/>{execute.isPending?"Sincronizando…":"Sincronizar agora"}</Button></div>}/>
-    <div className="flex flex-wrap justify-between gap-4 border-b border-border pb-4 text-sm"><div><p className="font-medium">VENDAS SERVIÇOS 2026 .xlsx</p><p className="text-muted-foreground">Início da operação: 01/10/2026 · Consulta diária às 06h</p></div><div><p>Última execução: <strong>{date(last?.started_at??null)}</strong></p><p className="text-muted-foreground">{last?`${runStatus[last.status]??last.status} · ${last.analyzed} analisadas · ${last.inserted} novas · ${last.updated} atualizadas · ${last.cancelled} canceladas`:"Nenhuma execução registrada"}</p></div></div>
+    <div className="flex justify-end">{<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportNotes} disabled={!filtered.length}><Download className="h-4 w-4"/>Exportar</Button><Button onClick={()=>execute.mutate()} disabled={execute.isPending||last?.status==="running"}><RefreshCw className={`h-4 w-4 ${execute.isPending?"animate-spin":""}`}/>{execute.isPending?"Sincronizando…":"Sincronizar agora"}</Button></div>}</div>
+    <div className="flex flex-wrap justify-between gap-4 border-b border-border pb-4 text-sm"><div><p className="font-medium">{last?.file_path||"VENDAS SERVIÇOS (ano atual).xlsx"}</p><p className="text-muted-foreground">Início da operação: 01/10/2026 · Consulta diária às 06h</p></div><div><p>Última execução: <strong>{date(last?.started_at??null)}</strong></p><p className="text-muted-foreground">{last?`${runStatus[last.status]??last.status} · ${last.analyzed} analisadas · ${last.inserted} novas · ${last.updated} atualizadas · ${last.cancelled} canceladas`:"Nenhuma execução registrada"}</p></div></div>
     {last?.error_message&&<div role="alert" className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{last.error_message}</div>}
     {(notes.error||runs.error)&&<div role="alert" className="text-sm text-destructive">Não foi possível carregar o acompanhamento. <Button variant="link" onClick={()=>refresh()}>Tentar novamente</Button></div>}
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{counts.map(({label,value,Icon})=><div key={label} className="rounded-md border border-border bg-card p-4"><div className="flex items-center justify-between gap-2 text-sm text-muted-foreground"><span>{label}</span><Icon className="h-4 w-4"/></div><p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p></div>)}</div>
-    <Tabs defaultValue="notes"><TabsList><TabsTrigger value="notes">Notas fiscais</TabsTrigger><TabsTrigger value="runs">Execuções</TabsTrigger><TabsTrigger value="equivalences">Equivalências</TabsTrigger></TabsList><TabsContent value="equivalences"><BillingEquivalences names={all.map(n=>n.client_name)} reprocess={async()=>{const result=await sync();await refresh();return result;}} /></TabsContent><TabsContent value="notes" className="space-y-4">
+    <Tabs defaultValue="notes"><TabsList><TabsTrigger value="notes">Notas</TabsTrigger><TabsTrigger value="runs">Execuções</TabsTrigger><TabsTrigger value="equivalences">Equivalências</TabsTrigger></TabsList><TabsContent value="equivalences"><BillingEquivalences names={all.map(n=>n.client_name)} reprocess={async()=>{const result=await sync();await refresh();return result;}} /></TabsContent><TabsContent value="notes" className="space-y-4">
       <div className="flex flex-wrap items-end gap-3"><div><Label htmlFor="sync-start">De</Label><Input id="sync-start" type="date" min={BILLING_START} value={start} onChange={e=>update(setStart)(e.target.value||BILLING_START)} className="w-40"/></div><div><Label htmlFor="sync-end">Até</Label><Input id="sync-end" type="date" min={start} value={end} onChange={e=>update(setEnd)(e.target.value)} className="w-40"/></div><div className="min-w-48 flex-1"><Label htmlFor="sync-search">NFSe, pedido, orçamento ou texto</Label><Input id="sync-search" value={search} onChange={e=>update(setSearch)(e.target.value)} placeholder="Pesquisar"/></div>
         <Filter label="Cliente" value={client} onChange={update(setClient)} options={{all:"Todos os clientes",...Object.fromEntries([...new Set(all.map(n=>n.client_name))].sort().map(c=>[c,c]))}}/>
         <Filter label="Situação" value={state} onChange={update(setState)} options={{all:"Todas as situações",issues:"Erros e divergências",...BILLING_STATES}}/>

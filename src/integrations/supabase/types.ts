@@ -1109,12 +1109,17 @@ export type Database = {
         Row: {
           analyzed: number
           cancelled: number
+          category: string
           error_message: string | null
           errors: number
+          file_path: string | null
           finished_at: string | null
           id: string
+          ignored: number
           inserted: number
           pending: number
+          ref_month: string | null
+          source: string
           started_at: string
           status: string
           trigger_kind: string
@@ -1123,12 +1128,17 @@ export type Database = {
         Insert: {
           analyzed?: number
           cancelled?: number
+          category?: string
           error_message?: string | null
           errors?: number
+          file_path?: string | null
           finished_at?: string | null
           id?: string
+          ignored?: number
           inserted?: number
           pending?: number
+          ref_month?: string | null
+          source?: string
           started_at?: string
           status?: string
           trigger_kind?: string
@@ -1137,12 +1147,17 @@ export type Database = {
         Update: {
           analyzed?: number
           cancelled?: number
+          category?: string
           error_message?: string | null
           errors?: number
+          file_path?: string | null
           finished_at?: string | null
           id?: string
+          ignored?: number
           inserted?: number
           pending?: number
+          ref_month?: string | null
+          source?: string
           started_at?: string
           status?: string
           trigger_kind?: string
@@ -2285,6 +2300,124 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      industry_invoices: {
+        Row: {
+          amount: number
+          client_name: string
+          created_at: string
+          id: string
+          invoice_number: string
+          issue: string | null
+          issued_at: string
+          items: Json
+          order_id: string | null
+          order_number: string | null
+          ref_month: string
+          source_file: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          client_name: string
+          created_at?: string
+          id?: string
+          invoice_number: string
+          issue?: string | null
+          issued_at: string
+          items?: Json
+          order_id?: string | null
+          order_number?: string | null
+          ref_month: string
+          source_file?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          client_name?: string
+          created_at?: string
+          id?: string
+          invoice_number?: string
+          issue?: string | null
+          issued_at?: string
+          items?: Json
+          order_id?: string | null
+          order_number?: string | null
+          ref_month?: string
+          source_file?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "industry_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      industry_orders: {
+        Row: {
+          amount: number
+          client_name: string
+          created_at: string
+          id: string
+          issue: string | null
+          order_date: string | null
+          order_number: string
+          raw_material: number | null
+          ref_month: string
+          service_code: string | null
+          source_file: string | null
+          status: string
+          updated_at: string
+          work_id: string | null
+        }
+        Insert: {
+          amount?: number
+          client_name: string
+          created_at?: string
+          id?: string
+          issue?: string | null
+          order_date?: string | null
+          order_number: string
+          raw_material?: number | null
+          ref_month: string
+          service_code?: string | null
+          source_file?: string | null
+          status?: string
+          updated_at?: string
+          work_id?: string | null
+        }
+        Update: {
+          amount?: number
+          client_name?: string
+          created_at?: string
+          id?: string
+          issue?: string | null
+          order_date?: string | null
+          order_number?: string
+          raw_material?: number | null
+          ref_month?: string
+          service_code?: string | null
+          source_file?: string | null
+          status?: string
+          updated_at?: string
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industry_orders_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       medical_leaves: {
         Row: {
@@ -3870,6 +4003,8 @@ export type Database = {
           description: string | null
           entry_date: string
           id: string
+          industry_invoice_id: string | null
+          industry_order_id: string | null
           split_group: string | null
           split_note: string | null
           split_total: number | null
@@ -3886,6 +4021,8 @@ export type Database = {
           description?: string | null
           entry_date: string
           id?: string
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
@@ -3902,6 +4039,8 @@ export type Database = {
           description?: string | null
           entry_date?: string
           id?: string
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
@@ -3911,6 +4050,20 @@ export type Database = {
           work_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "work_entries_industry_invoice_id_fkey"
+            columns: ["industry_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "industry_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_entries_industry_order_id_fkey"
+            columns: ["industry_order_id"]
+            isOneToOne: false
+            referencedRelation: "industry_orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "work_entries_sync_note_id_fkey"
             columns: ["sync_note_id"]
@@ -4297,6 +4450,16 @@ export type Database = {
           client_id: string
           to_emails: string[]
         }[]
+      }
+      industry_sync_apply: {
+        Args: {
+          p_file: string
+          p_month: string
+          p_rows: Json
+          p_run: string
+          p_source: string
+        }
+        Returns: Json
       }
       is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }

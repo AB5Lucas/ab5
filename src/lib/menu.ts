@@ -58,7 +58,7 @@ const RAW_GROUPS: MenuGroup[] = [
     items: [
       { title: "Fechamento", url: "/fechamentos/financeiro" },
       { title: "Pedidos", url: "/fechamentos/suzano" },
-      { title: "Sincronização", url: "/relatorios/sincronizacao" },
+      { title: "Faturamento", url: "/relatorios/sincronizacao" },
     ],
   },
   { label: "Relatórios", icon: FileBarChart, items: [{ title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Premiações", url: "/fechamento" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
