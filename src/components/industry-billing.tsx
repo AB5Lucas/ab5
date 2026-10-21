@@ -37,7 +37,7 @@ function SyncBar({ source }: { source: "pedidos" | "faturamento" }) {
   const runs = useRuns(); const sync = useSync(); const [month, setMonth] = useState(curMonth());
   const last = runs.data?.find(r => r.source === source);
   return <>
-    <div className="flex flex-wrap items-end justify-end gap-2"><div><Label htmlFor={`ym-${source}`}>Mês de referência</Label><Input id={`ym-${source}`} type="month" min="2026-10" value={month} onChange={e => setMonth(e.target.value || curMonth())} className="w-40" /></div>
+    <div className="flex flex-wrap items-end justify-end gap-2"><div><Label htmlFor={`ym-${source}`}>Mês de referência</Label><Input id={`ym-${source}`} type="month" min="2026-01" value={month} onChange={e => setMonth(e.target.value || curMonth())} className="w-40" /></div>
       <Button onClick={() => sync.mutate(month)} disabled={sync.isPending}><RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} />{sync.isPending ? "Sincronizando…" : "Sincronizar agora"}</Button></div>
     <div className="flex flex-wrap justify-between gap-4 border-b border-border pb-4 text-sm">
       <div><p className="font-medium">{last?.file_path?.split("/").pop() ?? (source === "pedidos" ? "AA MÊS.xlsx (PCP/PROGRAMAÇÃO)" : "Fat. Por Vendedor.xls")}</p><p className="text-muted-foreground">{last?.file_path ?? "—"} · Consulta diária às 06h</p></div>
