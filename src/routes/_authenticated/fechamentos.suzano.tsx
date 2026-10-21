@@ -168,7 +168,7 @@ function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
       <div className="flex flex-wrap items-end gap-3 p-3">
         <div><Label>Nº do pedido</Label><input className="flex h-9 w-48 rounded-md border border-input bg-background px-3 text-sm" value={fNum} onChange={(e) => setFNum(e.target.value)} placeholder="Buscar" /></div>
         <div><Label>Mês</Label><input type="month" className="flex h-9 w-44 rounded-md border border-input bg-background px-3 text-sm" value={fMonth} onChange={(e) => setFMonth(e.target.value)} /></div>
-        <div>
+        <div className="flex flex-col">
           <Label>Status</Label>
           <Popover>
             <PopoverTrigger asChild>
