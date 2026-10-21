@@ -267,6 +267,13 @@
       "when": 1792522470112,
       "tag": "0037_hiring_mail_recipients",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792576993771,
+      "tag": "0038_migrate_merged_tab_page_access",
+      "breakpoints": true
     }
   ]
 }
