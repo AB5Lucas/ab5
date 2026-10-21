@@ -31,4 +31,8 @@ describe("indústria", () => {
     const inv = parseInvoices([row("1616", "SERVICOS COBRANCA OBRAS 3,5%"), row("1677", "SERVICOS DA INDUSTRIA ISS 3%")]);
     expect(inv.map(i => i.invoice)).toEqual(["1677"]);
   });
+  it("planilha antiga sem DIV: lê pelo cabeçalho e pelo texto do cliente", () => {
+    const rows = [["FR","OP","ENTRADA","CLIENTE","Qtd","DIV","PREV. MP","%","MP REAL","%2","FAT. R$","REALIZ. R$","DATA PREV","TERM EFETIVO"], [1, 25405, 0, "ROSSI LOJA 19 - carrinhos", 10, "VENDA", 0, 0, 59.2, 0, 0, 1623.49, 0, 46087]];
+    const o = parseOrders(rows).orders[0]; expect(o?.service).toBe("Carrinhos"); expect(o?.mp).toBe(59.2); expect(o?.amount).toBe(1623.49);
+  });
 });

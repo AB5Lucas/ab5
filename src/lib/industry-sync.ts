@@ -46,19 +46,31 @@ export type IndustryOrder = { order: string; client: string; code: string; servi
 const num = (v: unknown) => { const c = moneyCents(v); return c === null ? null : c / 100; };
 
 /** Sheet "Dados": B=OP, D=Cliente, G=DIV, J=MP, M=Valor, O=Data. */
+/** Older sheets have no DIV code (e.g. "VENDA"); infer the service from the client/material text. */
+export function serviceFromText(text: unknown): string | null {
+  const t = String(text ?? "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/CARRINHO|\bCARR\b/.test(t)) return "Carrinhos";
+  if (/REMOCAO|\bREM\b/.test(t)) return "Remoção";
+  if (/\bJATO\b/.test(t)) return "Jato";
+  if (/\bPLIQ|\bPLQ\b/.test(t)) return "Pliq";
+  return null;
+}
 export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignored: number } {
   const h = rows.findIndex(r => String(r[1] ?? "").trim().toUpperCase() === "OP");
+  const head = (rows[h] ?? []).map(v => String(v ?? "").trim().toUpperCase());
+  const col = (names: string[], def: number) => { const i = head.findIndex(x => names.includes(x)); return i >= 0 ? i : def; };
+  const cClient = col(["CLIENTE"], 3), cDiv = col(["DIV"], 6), cMp = col(["MP REAL"], 9), cAmt = col(["REALIZ. R$"], 12), cDate = col(["DATA FINAL", "TERM EFETIVO"], 14), cMat = col(["MATERIAL"], -1);
   const out = new Map<string, IndustryOrder>(); let ignored = 0;
   for (const r of rows.slice(h + 1)) {
     const raw = String(r[1] ?? "").trim();
     if (!/^\d+$/.test(raw)) { if (raw) ignored++; continue; }
     const order = stripZeros(raw);
-    const code = String(r[6] ?? "").trim();
-    const service = classifyService(code);
-    const amount = r[12] === "" || r[12] == null ? 0 : num(r[12]); const mp = r[9] === "" || r[9] == null ? null : num(r[9]);
-    const date = r[14] === "" ? null : excelDate(r[14]);
+    const code = String(r[cDiv] ?? "").trim();
+    const service = classifyService(code) ?? serviceFromText(`${r[cClient] ?? ""} ${cMat >= 0 ? r[cMat] ?? "" : ""}`);
+    const amount = r[cAmt] === "" || r[cAmt] == null ? 0 : num(r[cAmt]); const mp = r[cMp] === "" || r[cMp] == null ? null : num(r[cMp]);
+    const date = r[cDate] === "" || r[cDate] == null ? null : excelDate(r[cDate]);
     const issue = !service ? `Código de serviço desconhecido: ${code || "vazio"}` : amount === null ? "Valor inválido" : undefined;
-    out.set(order, { order, client: String(r[3] ?? "").trim() || "Cliente não informado", code, service, amount: amount ?? 0, mp, date, ...(issue ? { issue } : {}) });
+    out.set(order, { order, client: String(r[cClient] ?? "").trim() || "Cliente não informado", code, service, amount: amount ?? 0, mp, date, ...(issue ? { issue } : {}) });
   }
   return { orders: [...out.values()], ignored };
 }
