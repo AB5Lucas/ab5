@@ -11,8 +11,11 @@ export const Route = createFileRoute("/api/public/jobs/billing-sync")({
     if (!lovableKey || !excelKey) return Response.json({ error: "Excel connection missing" }, { status: 503 });
     const { executeBillingSync } = await import("@/lib/billing-sync.server");
     const { deferBilling } = await import("@/lib/billing-background.server");
-    const work = executeBillingSync({ lovableKey, excelKey }, "daily");
-    const background = work.catch(error => console.error("Billing sync failed", error));
+    const { executeIndustrySync } = await import("@/lib/industry-sync.server");
+    const services = executeBillingSync({ lovableKey, excelKey }, "daily");
+    const industry = executeIndustrySync({ lovableKey, excelKey }, "daily").catch(error => console.error("Industry sync failed", error));
+    const work = services.finally(() => industry);
+    const background = Promise.allSettled([services, industry]).then(r => { if (r[0].status === "rejected") console.error("Billing sync failed", r[0].reason); });
     // Nitro's Cloudflare adapter attaches the execution context to the request.
     if ("waitUntil" in request && typeof request.waitUntil === "function") {
       request.waitUntil(background);
