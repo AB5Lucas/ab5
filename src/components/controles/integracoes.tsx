@@ -203,12 +203,13 @@ export function IntegrationsPage() {
         const hit =
           (p?.full_name ?? "").toLowerCase().includes(q) ||
           clientName.toLowerCase().includes(q) ||
+          (p.position_id ? positionById.get(p.position_id) ?? "" : "").toLowerCase().includes(q) ||
           (qDigits.length >= 3 && onlyDigits(p?.cpf ?? "").includes(qDigits));
         if (!hit) return false;
       }
       return true;
     });
-  }, [integrations.data, search, clientFilter, statusFilter, personById, clientById, today]);
+  }, [integrations.data, search, clientFilter, statusFilter, personById, clientById, positionById, today]);
 
   const summary = useMemo(() => {
     const s = { total: filtered.length, valid: 0, expiring: 0, expired: 0, documentation: 0 };
@@ -427,7 +428,7 @@ export function IntegrationsPage() {
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-8"
-            placeholder="Buscar por nome, CPF ou cliente"
+            placeholder="Buscar por nome, CPF, cliente ou função"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
