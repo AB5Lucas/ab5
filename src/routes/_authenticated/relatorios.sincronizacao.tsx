@@ -27,7 +27,7 @@ export const Route = createFileRoute("/_authenticated/relatorios/sincronizacao")
   { property: "og:title", content: "Faturamento | AB5 Hub" }, { property: "og:description", content: "Acompanhamento da integração de faturamentos, pedidos e orçamentos." },
   { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
 ] }), component: SynchronizationPage });
-function SynchronizationPage(){return <div className="space-y-5"><PageHeader title="Faturamento"/><Tabs defaultValue="servicos"><TabsList><TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="industria">Indústria</TabsTrigger></TabsList><TabsContent value="servicos"><ServicesBilling/></TabsContent><TabsContent value="industria"><IndustryBilling/></TabsContent></Tabs></div>;}
+function SynchronizationPage(){return <div className="space-y-5"><PageHeader title="Faturamento"/><Tabs defaultValue="servicos" className="w-full"><TabsList><TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="industria">Indústria</TabsTrigger></TabsList><TabsContent value="servicos"><ServicesBilling/></TabsContent><TabsContent value="industria"><IndustryBilling/></TabsContent></Tabs></div>;}
 const brl = (n: number | null) => n === null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const sheetRow = (n: { original: unknown }) => String((n.original as Record<string, unknown> | null)?.["row"] ?? "—");
 const date = (s: string | null) => s ? new Date(s.includes("T") ? s : `${s}T12:00:00Z`).toLocaleString("pt-BR", s.includes("T") ? { dateStyle: "short", timeStyle: "short" } : { dateStyle: "short" }) : "—";
