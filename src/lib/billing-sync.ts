@@ -67,11 +67,18 @@ export function parseBillingRows(rows: unknown[][]): { notes: BillingNote[]; ign
   }
   const grouped = new Map<string, BillingNote[]>();
   for (const n of notes) grouped.set(n.key, [...(grouped.get(n.key) ?? []), n]);
-  return { notes: [...grouped.values()].map(group => {
-    const first = group[0];
-    if (!first) throw new Error("Grupo de notas vazio");
-    const equal = group.every(n => JSON.stringify([n.issuedAt,n.client,n.order,n.quote,n.amountCents,n.cancelled]) === JSON.stringify([first.issuedAt,first.client,first.order,first.quote,first.amountCents,first.cancelled]));
-    return equal ? first : { ...first, error: "Mesmo identificador de nota em linhas com informações diferentes" };
-  }), ignored, invalid };
+  // Mesma NF em linhas diferentes (outro pedido/valor) é lançada separadamente; a primeira mantém a chave original.
+  const out: BillingNote[] = [];
+  for (const group of grouped.values()) {
+    const seen = new Map<string, BillingNote>();
+    for (const n of group) {
+      const sig = JSON.stringify([n.issuedAt, n.client, n.order, n.quote, n.amountCents]);
+      const prev = seen.get(sig);
+      if (prev) { if (prev.cancelled !== n.cancelled) prev.error = "Mesma nota repetida com situação de cancelamento diferente"; continue; }
+      const key = seen.size === 0 ? n.key : `${n.key}|L-${documentKey(n.order || n.quote) || "x"}-${n.amountCents}`;
+      const note = { ...n, key }; seen.set(sig, note); out.push(note);
+    }
+  }
+  return { notes: out, ignored, invalid };
 }
 export function activeFinancialEntries<T extends { sync_cancelled?: boolean }>(entries: T[]): T[] { return entries.filter(e => !e.sync_cancelled); }

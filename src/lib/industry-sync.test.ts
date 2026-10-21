@@ -21,10 +21,14 @@ describe("indústria", () => {
     const rows = [["", "OP"], ["", "REC", "", "X", "", "", "CARR", "", "", 10, "", "", 100, "", 46300], ["", 27493, "", "TINTI", "", "", "CARR", "", "", 3402, "", "", 10200, "", 46300]];
     const r = parseOrders(rows); expect(r.orders.map(o => o.order)).toEqual(["27493"]); expect(r.ignored).toBe(1); expect(r.orders[0]?.mp).toBe(3402);
   });
-  it("com coluna Faturamento, os pedidos vêm dela (vários viram um só)", () => {
+  it("coluna Faturamento com vários pedidos rateia o valor entre eles", () => {
     const rows: unknown[][] = [["", "OP", "", "CLIENTE", "", "", "DIV", "", "", "MP REAL", "", "", "REALIZ. R$", "FATURAMENTO"], ["", "REC", "", "A LOPES", "", "", "JATO", "", "", 544.38, "", "", 3353.57, "027618 / 27619"]];
     const o = parseOrders(rows).orders;
-    expect(o).toHaveLength(1); expect(o[0]?.order).toBe("27618"); expect(o[0]?.aliases).toEqual(["27619"]); expect(o[0]?.amount).toBe(3353.57);
+    expect(o.map(x => x.order)).toEqual(["27618", "27619"]); expect(o.map(x => x.amount)).toEqual([1676.79, 1676.78]); expect(o[0]?.service).toBe("Jato");
+  });
+  it("coluna Faturamento vazia usa a OP da coluna B; sem nenhuma, ignora", () => {
+    const rows: unknown[][] = [["", "OP", "", "CLIENTE", "", "", "DIV", "", "", "MP REAL", "", "", "REALIZ. R$", "FATURAMENTO"], ["", 27700, "", "X", "", "", "JATO", "", "", 0, "", "", 100, ""], ["", "REC", "", "Y", "", "", "JATO", "", "", 0, "", "", 50, ""]];
+    const r = parseOrders(rows); expect(r.orders.map(x => x.order)).toEqual(["27700"]); expect(r.ignored).toBe(1);
   });
   it("sem coluna Faturamento, a coluna B com vários números é ignorada", () => {
     const rows: unknown[][] = [["", "OP", "", "CLIENTE", "", "", "DIV"], ["", "27618 / 27619", "", "A LOPES", "", "", "JATO"]];

@@ -22,6 +22,7 @@ describe("regras da fonte de faturamentos",()=>{
   it("não aceita valor monetário inválido",()=>{expect(moneyCents("#REF!")).toBeNull();});
   it("não duplica nota idêntica da fonte",()=>{expect(parseBillingRows([header,row("01/10/2026",1),row("01/10/2026",1)]).notes).toHaveLength(1);});
   it("marca nota duplicada conflitante para revisão sem escolher silenciosamente",()=>{expect(parseBillingRows([header,row("01/10/2026",1),row("01/10/2026",1,"SIM")]).notes[0]?.error).toBeDefined();});
+  it("mesma NF com outro valor/pedido lança as duas linhas",()=>{const n=parseBillingRows([header,row("01/10/2026",1695,"NÃO",37299.35),row("01/10/2026",1695,"NÃO",28848.11)]).notes;expect(n).toHaveLength(2);expect(n.every(x=>!x.error)).toBe(true);expect(new Set(n.map(x=>x.key)).size).toBe(2);});
   it("identifica nota cancelada na primeira leitura",()=>{expect(parseBillingRows([header,row("01/10/2026",1,"SIM")]).notes[0]?.cancelled).toBe(true);});
   it("cancelamento não compõe faturamento financeiro ativo e não altera valor original",()=>{
     const rows=[{amount:3000,sync_cancelled:true},{amount:4000,sync_cancelled:false}];

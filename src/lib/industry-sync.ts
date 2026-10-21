@@ -60,31 +60,35 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
   const head = (rows[h] ?? []).map(v => String(v ?? "").trim().toUpperCase());
   const col = (names: string[], def: number) => { const i = head.findIndex(x => names.includes(x)); return i >= 0 ? i : def; };
   const cClient = col(["CLIENTE"], 3), cDiv = col(["DIV"], 6), cMp = col(["MP REAL"], 9), cAmt = col(["REALIZ. R$"], 12), cDate = col(["DATA FINAL", "TERM EFETIVO"], 14), cMat = col(["MATERIAL"], -1);
-  // When the sheet has a "FATURAMENTO" column, order numbers come from it (may list several, summed as one order); otherwise column B.
+  // Order numbers come from "FATURAMENTO" when filled; otherwise from column B (OP). Several numbers split the line value equally.
   const cFat = col(["FATURAMENTO"], -1);
   const out = new Map<string, IndustryOrder>(); let ignored = 0;
   for (const r of rows.slice(h + 1)) {
-    const raw = String((cFat >= 0 ? r[cFat] : r[1]) ?? "").trim();
-    const valid = cFat >= 0 ? /^\d+(\s*[\/,;e&+\-]\s*\d+)*$/i.test(raw) : /^\d+$/.test(raw);
-    if (!valid) { if (raw) ignored++; continue; }
+    const fat = cFat >= 0 ? String(r[cFat] ?? "").trim() : "";
+    const op = String(r[1] ?? "").trim();
+    const multi = /^\d+(\s*[\/,;e&+\-]\s*\d+)*$/i;
+    const raw = fat && multi.test(fat) ? fat : /^\d+$/.test(op) ? op : "";
+    if (!raw) { if (fat || op) ignored++; continue; }
     const nums = [...new Set(raw.match(/\d+/g)!.map(stripZeros))];
-    const order = nums[0]!; const aliases = nums.slice(1);
     const code = String(r[cDiv] ?? "").trim();
     const service = classifyService(code) ?? serviceFromText(`${r[cClient] ?? ""} ${cMat >= 0 ? r[cMat] ?? "" : ""}`);
-    const amount = r[cAmt] === "" || r[cAmt] == null ? 0 : num(r[cAmt]); const mp = r[cMp] === "" || r[cMp] == null ? null : num(r[cMp]);
+    const amountAll = r[cAmt] === "" || r[cAmt] == null ? 0 : num(r[cAmt]); const mpAll = r[cMp] === "" || r[cMp] == null ? null : num(r[cMp]);
     const date = r[cDate] === "" || r[cDate] == null ? null : excelDate(r[cDate]);
-    const issue = !service ? `Código de serviço desconhecido: ${code || "vazio"}` : amount === null ? "Valor inválido" : undefined;
-    const prev = out.get(order);
-    if (prev) {
-      // Same OP on several lines (items): sum value and raw material.
-      prev.amount = Math.round((prev.amount + (amount ?? 0)) * 100) / 100;
-      if (mp !== null) prev.mp = Math.round(((prev.mp ?? 0) + mp) * 100) / 100;
-      if (date && (!prev.date || date > prev.date)) prev.date = date;
-      if (!prev.service && service) { prev.service = service; prev.code = code; delete prev.issue; }
-      for (const a of aliases) if (!prev.aliases.includes(a)) prev.aliases.push(a);
-      continue;
-    }
-    out.set(order, { order, aliases, client: String(r[cClient] ?? "").trim() || "Cliente não informado", code, service, amount: amount ?? 0, mp, date, ...(issue ? { issue } : {}) });
+    const issue = !service ? `Código de serviço desconhecido: ${code || "vazio"}` : amountAll === null ? "Valor inválido" : undefined;
+    const share = (v: number, i: number) => { const c = Math.round(v * 100); const base = Math.floor(c / nums.length); return (base + (i < c - base * nums.length ? 1 : 0)) / 100; };
+    nums.forEach((order, i) => {
+      const amount = share(amountAll ?? 0, i); const mp = mpAll === null ? null : share(mpAll, i);
+      const prev = out.get(order);
+      if (prev) {
+        // Same OP on several lines (items): sum value and raw material.
+        prev.amount = Math.round((prev.amount + amount) * 100) / 100;
+        if (mp !== null) prev.mp = Math.round(((prev.mp ?? 0) + mp) * 100) / 100;
+        if (date && (!prev.date || date > prev.date)) prev.date = date;
+        if (!prev.service && service) { prev.service = service; prev.code = code; delete prev.issue; }
+        return;
+      }
+      out.set(order, { order, aliases: [], client: String(r[cClient] ?? "").trim() || "Cliente não informado", code, service, amount, mp, date, ...(issue ? { issue } : {}) });
+    });
   }
   return { orders: [...out.values()], ignored };
 }
