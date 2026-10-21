@@ -66,7 +66,7 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
     // A cell may hold several orders ("27618 / 27619"): they are one order whose value is the sum.
     if (!/^\d+(\s*[\/,;e&+\-]\s*\d+)*$/i.test(raw)) { if (raw) ignored++; continue; }
     const nums = [...new Set(raw.match(/\d+/g)!.map(stripZeros))];
-    const order = nums[0]; const aliases = nums.slice(1);
+    const order = nums[0]!; const aliases = nums.slice(1);
     const code = String(r[cDiv] ?? "").trim();
     const service = classifyService(code) ?? serviceFromText(`${r[cClient] ?? ""} ${cMat >= 0 ? r[cMat] ?? "" : ""}`);
     const amount = r[cAmt] === "" || r[cAmt] == null ? 0 : num(r[cAmt]); const mp = r[cMp] === "" || r[cMp] == null ? null : num(r[cMp]);
