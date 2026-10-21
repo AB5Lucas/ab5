@@ -65,11 +65,16 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
 
 export type IndustryInvoice = { invoice: string; date: string; order: string; client: string; amount: number; items: { order: string; amount: number }[] };
 /** Fat. Por Vendedor: B=NF, H=Emissão, M=Cliente, Q=Pedido, AR=Valor. Items of the same NF+date are summed. */
+export function isWorksBilling(desc: unknown) {
+  return String(desc ?? "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes("SERVICOS COBRANCA OBRAS");
+}
 export function parseInvoices(rows: unknown[][]): IndustryInvoice[] {
   const map = new Map<string, IndustryInvoice>();
   for (const r of rows) {
     const nf = String(r[1] ?? "").trim();
     if (!/^\d+$/.test(nf)) continue;
+    // Medições de obras (Serviços) não pertencem ao faturamento fabril.
+    if (isWorksBilling(r[25])) continue;
     const date = excelDate(r[7]); const cents = moneyCents(r[43]);
     if (!date || cents === null) continue;
     const invoice = stripZeros(nf); const order = stripZeros(r[16]);
