@@ -2362,6 +2362,7 @@ export type Database = {
       }
       industry_orders: {
         Row: {
+          aliases: string[]
           amount: number
           client_name: string
           created_at: string
@@ -2378,6 +2379,7 @@ export type Database = {
           work_id: string | null
         }
         Insert: {
+          aliases?: string[]
           amount?: number
           client_name: string
           created_at?: string
@@ -2394,6 +2396,7 @@ export type Database = {
           work_id?: string | null
         }
         Update: {
+          aliases?: string[]
           amount?: number
           client_name?: string
           created_at?: string
