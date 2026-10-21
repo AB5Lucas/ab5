@@ -2368,6 +2368,7 @@ export type Database = {
           created_at: string
           id: string
           issue: string | null
+          manual_work_id: string | null
           order_date: string | null
           order_number: string
           raw_material: number | null
@@ -2385,6 +2386,7 @@ export type Database = {
           created_at?: string
           id?: string
           issue?: string | null
+          manual_work_id?: string | null
           order_date?: string | null
           order_number: string
           raw_material?: number | null
@@ -2402,6 +2404,7 @@ export type Database = {
           created_at?: string
           id?: string
           issue?: string | null
+          manual_work_id?: string | null
           order_date?: string | null
           order_number?: string
           raw_material?: number | null
@@ -2413,6 +2416,13 @@ export type Database = {
           work_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "industry_orders_manual_work_id_fkey"
+            columns: ["manual_work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "industry_orders_work_id_fkey"
             columns: ["work_id"]
@@ -4453,6 +4463,14 @@ export type Database = {
           client_id: string
           to_emails: string[]
         }[]
+      }
+      industry_invoice_launch: {
+        Args: { _invoice: string; _work: string }
+        Returns: number
+      }
+      industry_order_assign: {
+        Args: { _order: string; _work: string }
+        Returns: number
       }
       industry_sync_apply: {
         Args: {

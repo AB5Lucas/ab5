@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, CheckCircle2, CircleHelp, AlertTriangle, Clock } from "lucide-react";
+import { ArrowRight, RefreshCw, CheckCircle2, CircleHelp, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { syncIndustryNow } from "@/lib/billing-sync.functions";
 import { fetchAll } from "@/lib/results-engine";
@@ -56,9 +57,27 @@ function RunsTable() {
     <TableBody>{runs.data?.map(r => <TableRow key={r.id}><TableCell className="whitespace-nowrap">{date(r.started_at)}</TableCell><TableCell>{SOURCE[r.source] ?? r.source}</TableCell><TableCell>{r.ref_month}</TableCell><TableCell className="max-w-64 truncate" title={r.file_path ?? ""}>{r.file_path?.split("/").pop()}</TableCell><TableCell className="whitespace-nowrap">{r.status === "waiting" && <Clock className="mr-1 inline h-3 w-3" />}{r.status.includes("error") && <AlertTriangle className="mr-1 inline h-3 w-3 text-destructive" />}{RUN_STATUS[r.status] ?? r.status}</TableCell><TableCell>{r.analyzed}</TableCell><TableCell>{r.inserted}</TableCell><TableCell>{r.updated}</TableCell><TableCell>{r.ignored}</TableCell><TableCell>{r.pending}</TableCell><TableCell>{r.errors}</TableCell><TableCell className="min-w-48">{r.error_message || "—"}</TableCell></TableRow>)}</TableBody></Table></div>;
 }
 
+function useIndustryWorks() {
+  return useQuery({ queryKey: ["industry-sync", "works"], queryFn: async () => {
+    const { data, error } = await supabase.from("works").select("id, name, clients!inner(name)").ilike("clients.name", "INDUSTRIA").neq("status", "cancelled").order("name");
+    if (error) throw error; return (data ?? []).map((w: any) => ({ id: w.id as string, name: w.name as string }));
+  } });
+}
+function Launch({ id, works }: { id: string; works: { id: string; name: string }[] }) {
+  const qc = useQueryClient(); const [work, setWork] = useState<string>("");
+  const sel = work || works.find(w => w.name === "Venda")?.id || "";
+  const m = useMutation({ mutationFn: async () => { const { error } = await supabase.rpc("industry_invoice_launch", { _invoice: id, _work: sel }); if (error) throw error; },
+    onSuccess: async () => { toast.success("Pedido criado e faturamento lançado"); await qc.invalidateQueries({ queryKey: ["industry-sync"] }); await qc.invalidateQueries({ queryKey: ["work-result"] }); },
+    onError: (e: Error) => toast.error(e.message) });
+  return <div className="flex items-center gap-1"><Select value={sel} onValueChange={setWork}><SelectTrigger className="h-8 w-36" aria-label="Serviço"><SelectValue placeholder="Serviço" /></SelectTrigger>
+    <SelectContent>{works.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent></Select>
+    <Button size="icon" className="h-8 w-8" title="Lançar" aria-label="Lançar" disabled={!sel || m.isPending} onClick={() => m.mutate()}><ArrowRight className="h-4 w-4" /></Button></div>;
+}
+
 export function IndustryBilling() {
   const [search, setSearch] = useState(""); const [state, setState] = useState("all");
   const inv = useQuery({ queryKey: ["industry-sync", "invoices"], refetchInterval: 15000, queryFn: () => fetchAll<any>((a, b) => supabase.from("industry_invoices").select("*").order("issued_at", { ascending: false }).order("id").range(a, b)) });
+  const works = useIndustryWorks();
   const all = inv.data ?? [];
   const rows = useMemo(() => all.filter((n: any) => (state === "all" || n.status === state) && `${n.invoice_number} ${n.order_number ?? ""} ${n.client_name}`.toLowerCase().includes(search.toLowerCase())), [all, state, search]);
   const counts = [{ l: "Notas", v: all.length, I: CheckCircle2 }, { l: "Lançadas", v: all.filter((n: any) => n.status === "posted").length, I: CheckCircle2 }, { l: "Pendentes", v: all.filter((n: any) => n.status === "pending").length, I: CircleHelp }, { l: "Total faturado", v: brl(rows.reduce((a: number, n: any) => a + Number(n.amount), 0)), I: CheckCircle2 }];
@@ -68,9 +87,9 @@ export function IndustryBilling() {
       <TabsContent value="notes" className="space-y-4">
         <div className="flex flex-wrap items-end gap-3"><div className="min-w-48 flex-1"><Label htmlFor="ind-search">NF, pedido ou cliente</Label><Input id="ind-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar" /></div>
           <div className="flex gap-1">{[["all", "Todas"], ["posted", "Lançadas"], ["pending", "Pendentes"]].map(([k, v]) => <Button key={k} size="sm" variant={state === k ? "default" : "outline"} onClick={() => setState(k!)}>{v}</Button>)}</div></div>
-        <div className="overflow-x-auto"><Table><TableHeader><TableRow>{["Emissão", "NF", "Cliente", "Pedido", "Valor", "Itens", "Situação", "Motivo"].map(h => <TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader>
-          <TableBody>{rows.map((n: any) => <TableRow key={n.id}><TableCell>{date(n.issued_at)}</TableCell><TableCell className="font-medium">{n.invoice_number}</TableCell><TableCell>{n.client_name}</TableCell><TableCell>{n.order_number || "—"}</TableCell><TableCell className="text-right tabular-nums">{brl(n.amount)}</TableCell><TableCell>{(n.items as unknown[]).length}</TableCell><TableCell><State s={n.status} /></TableCell><TableCell>{n.issue || "—"}</TableCell></TableRow>)}
-            {!rows.length && <TableRow><TableCell colSpan={8} className="py-12 text-center text-muted-foreground">{inv.isLoading ? "Carregando…" : "Nenhuma nota encontrada"}</TableCell></TableRow>}</TableBody></Table></div>
+        <div className="overflow-x-auto"><Table><TableHeader><TableRow>{["Emissão", "NF", "Cliente", "Pedido", "Valor", "Itens", "Situação"].map(h => <TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader>
+          <TableBody>{rows.map((n: any) => <TableRow key={n.id}><TableCell>{date(n.issued_at)}</TableCell><TableCell className="font-medium">{n.invoice_number}</TableCell><TableCell>{n.client_name}</TableCell><TableCell>{n.order_number || "—"}</TableCell><TableCell className="text-right tabular-nums">{brl(n.amount)}</TableCell><TableCell>{(n.items as unknown[]).length}</TableCell><TableCell><div className="flex items-center gap-2"><State s={n.status} issue={n.issue} />{n.status === "pending" && <Launch id={n.id} works={works.data ?? []} />}</div></TableCell></TableRow>)}
+            {!rows.length && <TableRow><TableCell colSpan={7} className="py-12 text-center text-muted-foreground">{inv.isLoading ? "Carregando…" : "Nenhuma nota encontrada"}</TableCell></TableRow>}</TableBody></Table></div>
       </TabsContent><TabsContent value="runs"><RunsTable /></TabsContent></Tabs>
   </div>;
 }
