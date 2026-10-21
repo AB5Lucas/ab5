@@ -80,13 +80,19 @@ export type IndustryInvoice = { invoice: string; date: string; order: string; cl
 export function isWorksBilling(desc: unknown) {
   return String(desc ?? "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes("SERVICOS COBRANCA OBRAS");
 }
+/** Clientes faturados pela aba Serviços: nunca entram no faturamento da Indústria. */
+export const SERVICES_ONLY_CLIENTS = ["TENNECO"];
+export function isServicesClient(client: unknown) {
+  const c = String(client ?? "").toUpperCase();
+  return SERVICES_ONLY_CLIENTS.some(k => c.includes(k));
+}
 export function parseInvoices(rows: unknown[][]): IndustryInvoice[] {
   const map = new Map<string, IndustryInvoice>();
   for (const r of rows) {
     const nf = String(r[1] ?? "").trim();
     if (!/^\d+$/.test(nf)) continue;
     // Medições de obras (Serviços) não pertencem ao faturamento fabril.
-    if (isWorksBilling(r[25])) continue;
+    if (isWorksBilling(r[25]) || isServicesClient(r[12])) continue;
     const date = excelDate(r[7]); const cents = moneyCents(r[43]);
     if (!date || cents === null) continue;
     const invoice = stripZeros(nf); const order = stripZeros(r[16]);

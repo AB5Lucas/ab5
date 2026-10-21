@@ -35,4 +35,8 @@ describe("indústria", () => {
     const rows = [["FR","OP","ENTRADA","CLIENTE","Qtd","DIV","PREV. MP","%","MP REAL","%2","FAT. R$","REALIZ. R$","DATA PREV","TERM EFETIVO"], [1, 25405, 0, "ROSSI LOJA 19 - carrinhos", 10, "VENDA", 0, 0, 59.2, 0, 0, 1623.49, 0, 46087]];
     const o = parseOrders(rows).orders[0]; expect(o?.service).toBe("Carrinhos"); expect(o?.mp).toBe(59.2); expect(o?.amount).toBe(1623.49);
   });
+  it("ignora Tenneco (faturada em Serviços)", () => {
+    const row = (nf: string, c: string) => { const r: unknown[] = Array(44).fill(""); r[1] = nf; r[7] = 46303; r[12] = c; r[16] = "027544"; r[43] = 100; return r; };
+    expect(parseInvoices([row("1592", "TENNECO MOGI MIRIM"), row("1593", "PINHALENSE")]).map(i => i.invoice)).toEqual(["1593"]);
+  });
 });
