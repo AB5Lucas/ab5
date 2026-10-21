@@ -4464,6 +4464,10 @@ export type Database = {
           to_emails: string[]
         }[]
       }
+      industry_add_work_order: {
+        Args: { _date: string; _number: string; _value: number; _work: string }
+        Returns: undefined
+      }
       industry_invoice_launch: {
         Args: { _invoice: string; _work: string }
         Returns: number

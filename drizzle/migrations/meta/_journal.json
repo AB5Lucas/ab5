@@ -309,6 +309,13 @@
       "when": 1792613133925,
       "tag": "0043_industry_manual_launch_bypass",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792613255995,
+      "tag": "0044_industry_launch_work_order",
+      "breakpoints": true
     }
   ]
 }
