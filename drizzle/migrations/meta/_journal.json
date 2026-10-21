@@ -288,6 +288,13 @@
       "when": 1792602796616,
       "tag": "0040_industry_mp_to_materia_prima",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792609999000,
+      "tag": "0041_industry_order_aliases",
+      "breakpoints": true
     }
   ]
 }

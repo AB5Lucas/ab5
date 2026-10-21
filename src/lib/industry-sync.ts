@@ -42,7 +42,7 @@ export function missingStatus(ym: string, today: string, tolerance = TOLERANCE_D
   return days < tolerance ? "waiting" : "access_error";
 }
 
-export type IndustryOrder = { order: string; client: string; code: string; service: string | null; amount: number; mp: number | null; date: string | null; issue?: string };
+export type IndustryOrder = { order: string; aliases: string[]; client: string; code: string; service: string | null; amount: number; mp: number | null; date: string | null; issue?: string };
 const num = (v: unknown) => { const c = moneyCents(v); return c === null ? null : c / 100; };
 
 /** Sheet "Dados": B=OP, D=Cliente, G=DIV, J=MP, M=Valor, O=Data. */
@@ -63,8 +63,10 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
   const out = new Map<string, IndustryOrder>(); let ignored = 0;
   for (const r of rows.slice(h + 1)) {
     const raw = String(r[1] ?? "").trim();
-    if (!/^\d+$/.test(raw)) { if (raw) ignored++; continue; }
-    const order = stripZeros(raw);
+    // A cell may hold several orders ("27618 / 27619"): they are one order whose value is the sum.
+    if (!/^\d+(\s*[\/,;e&+\-]\s*\d+)*$/i.test(raw)) { if (raw) ignored++; continue; }
+    const nums = [...new Set(raw.match(/\d+/g)!.map(stripZeros))];
+    const order = nums[0]!; const aliases = nums.slice(1);
     const code = String(r[cDiv] ?? "").trim();
     const service = classifyService(code) ?? serviceFromText(`${r[cClient] ?? ""} ${cMat >= 0 ? r[cMat] ?? "" : ""}`);
     const amount = r[cAmt] === "" || r[cAmt] == null ? 0 : num(r[cAmt]); const mp = r[cMp] === "" || r[cMp] == null ? null : num(r[cMp]);
@@ -77,9 +79,10 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
       if (mp !== null) prev.mp = Math.round(((prev.mp ?? 0) + mp) * 100) / 100;
       if (date && (!prev.date || date > prev.date)) prev.date = date;
       if (!prev.service && service) { prev.service = service; prev.code = code; delete prev.issue; }
+      for (const a of aliases) if (!prev.aliases.includes(a)) prev.aliases.push(a);
       continue;
     }
-    out.set(order, { order, client: String(r[cClient] ?? "").trim() || "Cliente não informado", code, service, amount: amount ?? 0, mp, date, ...(issue ? { issue } : {}) });
+    out.set(order, { order, aliases, client: String(r[cClient] ?? "").trim() || "Cliente não informado", code, service, amount: amount ?? 0, mp, date, ...(issue ? { issue } : {}) });
   }
   return { orders: [...out.values()], ignored };
 }

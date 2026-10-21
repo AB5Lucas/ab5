@@ -21,6 +21,11 @@ describe("indústria", () => {
     const rows = [["", "OP"], ["", "REC", "", "X", "", "", "CARR", "", "", 10, "", "", 100, "", 46300], ["", 27493, "", "TINTI", "", "", "CARR", "", "", 3402, "", "", 10200, "", 46300]];
     const r = parseOrders(rows); expect(r.orders.map(o => o.order)).toEqual(["27493"]); expect(r.ignored).toBe(1); expect(r.orders[0]?.mp).toBe(3402);
   });
+  it("vários pedidos na mesma célula viram um só pedido com o valor da linha", () => {
+    const rows: unknown[][] = [["", "OP", "", "CLIENTE", "", "", "DIV", "", "", "MP REAL", "", "", "REALIZ. R$"], ["", "027618 / 27619", "", "A LOPES", "", "", "JATO", "", "", 544.38, "", "", 3353.57]];
+    const o = parseOrders(rows).orders;
+    expect(o).toHaveLength(1); expect(o[0]?.order).toBe("27618"); expect(o[0]?.aliases).toEqual(["27619"]); expect(o[0]?.amount).toBe(3353.57);
+  });
   it("soma itens da mesma nota", () => {
     const row = (v: number) => { const r: unknown[] = Array(44).fill(""); r[1] = "000028613"; r[7] = 46303; r[12] = "SÃO GABRIEL"; r[16] = "027423"; r[43] = v; return r; };
     const inv = parseInvoices([row(23.28), row(5.34)]);
