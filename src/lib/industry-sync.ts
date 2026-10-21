@@ -60,11 +60,13 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
   const head = (rows[h] ?? []).map(v => String(v ?? "").trim().toUpperCase());
   const col = (names: string[], def: number) => { const i = head.findIndex(x => names.includes(x)); return i >= 0 ? i : def; };
   const cClient = col(["CLIENTE"], 3), cDiv = col(["DIV"], 6), cMp = col(["MP REAL"], 9), cAmt = col(["REALIZ. R$"], 12), cDate = col(["DATA FINAL", "TERM EFETIVO"], 14), cMat = col(["MATERIAL"], -1);
+  // When the sheet has a "FATURAMENTO" column, order numbers come from it (may list several, summed as one order); otherwise column B.
+  const cFat = col(["FATURAMENTO"], -1);
   const out = new Map<string, IndustryOrder>(); let ignored = 0;
   for (const r of rows.slice(h + 1)) {
-    const raw = String(r[1] ?? "").trim();
-    // A cell may hold several orders ("27618 / 27619"): they are one order whose value is the sum.
-    if (!/^\d+(\s*[\/,;e&+\-]\s*\d+)*$/i.test(raw)) { if (raw) ignored++; continue; }
+    const raw = String((cFat >= 0 ? r[cFat] : r[1]) ?? "").trim();
+    const valid = cFat >= 0 ? /^\d+(\s*[\/,;e&+\-]\s*\d+)*$/i.test(raw) : /^\d+$/.test(raw);
+    if (!valid) { if (raw) ignored++; continue; }
     const nums = [...new Set(raw.match(/\d+/g)!.map(stripZeros))];
     const order = nums[0]!; const aliases = nums.slice(1);
     const code = String(r[cDiv] ?? "").trim();
