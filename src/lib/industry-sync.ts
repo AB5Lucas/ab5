@@ -70,6 +70,15 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
     const amount = r[cAmt] === "" || r[cAmt] == null ? 0 : num(r[cAmt]); const mp = r[cMp] === "" || r[cMp] == null ? null : num(r[cMp]);
     const date = r[cDate] === "" || r[cDate] == null ? null : excelDate(r[cDate]);
     const issue = !service ? `Código de serviço desconhecido: ${code || "vazio"}` : amount === null ? "Valor inválido" : undefined;
+    const prev = out.get(order);
+    if (prev) {
+      // Same OP on several lines (items): sum value and raw material.
+      prev.amount = Math.round((prev.amount + (amount ?? 0)) * 100) / 100;
+      if (mp !== null) prev.mp = Math.round(((prev.mp ?? 0) + mp) * 100) / 100;
+      if (date && (!prev.date || date > prev.date)) prev.date = date;
+      if (!prev.service && service) { prev.service = service; prev.code = code; delete prev.issue; }
+      continue;
+    }
     out.set(order, { order, client: String(r[cClient] ?? "").trim() || "Cliente não informado", code, service, amount: amount ?? 0, mp, date, ...(issue ? { issue } : {}) });
   }
   return { orders: [...out.values()], ignored };
