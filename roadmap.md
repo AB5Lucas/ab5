@@ -32,4 +32,4 @@
 - [x] Apagar dados operacionais e estoque de andaimes (manter catálogo e responsáveis)
 - [x] Treinamentos/ASO/Integrações: não alertar vencimentos de colaboradores inativos
 - [x] Ao agendar treinamento/ASO/integração: avisar se colaborador estiver de férias ou afastado (período)
-- [ ] Faturamento > Serviços: filtros idênticos aos da Indústria
+- [x] Faturamento > Serviços: filtros idênticos aos da Indústria
