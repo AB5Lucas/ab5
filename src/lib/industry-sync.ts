@@ -55,7 +55,7 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
     const order = stripZeros(raw);
     const code = String(r[6] ?? "").trim();
     const service = classifyService(code);
-    const amount = num(r[12]); const mp = r[9] === "" || r[9] == null ? null : num(r[9]);
+    const amount = r[12] === "" || r[12] == null ? 0 : num(r[12]); const mp = r[9] === "" || r[9] == null ? null : num(r[9]);
     const date = r[14] === "" ? null : excelDate(r[14]);
     const issue = !service ? `Código de serviço desconhecido: ${code || "vazio"}` : amount === null ? "Valor inválido" : undefined;
     out.set(order, { order, client: String(r[3] ?? "").trim() || "Cliente não informado", code, service, amount: amount ?? 0, mp, date, ...(issue ? { issue } : {}) });
