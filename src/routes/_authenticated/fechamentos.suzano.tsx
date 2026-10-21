@@ -9,6 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Filter } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { monthEnd } from "@/lib/results-engine";
 import { billingMatchesOrder } from "@/lib/billing-sync";
@@ -141,7 +145,7 @@ function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
   const qc = useQueryClient();
   const [fNum, setFNum] = useState("");
   const [fMonth, setFMonth] = useState("");
-  const [fSt, setFSt] = useState("all");
+  const [fSt, setFSt] = useState<string[]>([]);
   const { canWrite } = useCurrentUser();
   const [sel, setSel] = useState<any>(null);
   const [fd, setFd] = useState({ date: new Date().toISOString().slice(0, 10), amount: "", workId: "" });
@@ -166,15 +170,30 @@ function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
         <div><Label>Mês</Label><input type="month" className="flex h-9 w-44 rounded-md border border-input bg-background px-3 text-sm" value={fMonth} onChange={(e) => setFMonth(e.target.value)} /></div>
         <div>
           <Label>Status</Label>
-          <Select value={fSt} onValueChange={setFSt}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem><SelectItem value="Em aberto">Em aberto</SelectItem>
-              <SelectItem value="Parcial">Parcial</SelectItem><SelectItem value="Faturado">Faturado</SelectItem>
-            </SelectContent>
-          </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-40 justify-start">
+                <Filter className="h-4 w-4" /> Status
+                {fSt.length > 0 && <Badge variant="secondary">{fSt.length}</Badge>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-52">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={!fSt.length} onCheckedChange={() => setFSt([])} />
+                  <span>Todos</span>
+                </label>
+                {["Em aberto", "Parcial", "Faturado"].map((k) => (
+                  <label key={k} className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={fSt.includes(k)} onCheckedChange={(c) => setFSt(c ? [...fSt, k] : fSt.filter((t) => t !== k))} />
+                    <span>{k}</span>
+                  </label>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
-        {(fNum || fMonth || fSt !== "all") && <Button variant="ghost" onClick={() => { setFNum(""); setFMonth(""); setFSt("all"); }}>Limpar</Button>}
+        {(fNum || fMonth || fSt.length > 0) && <Button variant="ghost" onClick={() => { setFNum(""); setFMonth(""); setFSt([]); }}>Limpar</Button>}
       </div>
       <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
         <DialogContent className="max-w-sm">
@@ -209,7 +228,7 @@ function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
           {(q.data ?? []).filter((r) => {
             const p = r.total ? (r.billed / r.total) * 100 : 0;
             const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
-            return (!fNum || norm(r.number).includes(norm(fNum))) && (!fMonth || r.months.includes(fMonth)) && (fSt === "all" || st === fSt) && (!clientId || clientId === "all" || r.clientId === clientId) && (!workId || r.workIds.includes(workId));
+            return (!fNum || norm(r.number).includes(norm(fNum))) && (!fMonth || r.months.includes(fMonth)) && (!fSt.length || fSt.includes(st)) && (!clientId || clientId === "all" || r.clientId === clientId) && (!workId || r.workIds.includes(workId));
           }).map((r) => {
             const p = r.total ? (r.billed / r.total) * 100 : 0;
             const st = r.billed <= 0 ? "Em aberto" : p >= 99.995 ? "Faturado" : "Parcial";
