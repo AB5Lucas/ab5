@@ -274,6 +274,13 @@
       "when": 1792576993771,
       "tag": "0038_migrate_merged_tab_page_access",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792598123208,
+      "tag": "0039_industry_sync",
+      "breakpoints": true
     }
   ]
 }
