@@ -70,12 +70,13 @@ export function parseBillingRows(rows: unknown[][]): { notes: BillingNote[]; ign
   // Mesma NF em linhas diferentes (outro pedido/valor) é lançada separadamente; a primeira mantém a chave original.
   const out: BillingNote[] = [];
   for (const group of grouped.values()) {
-    const seen = new Set<string>();
+    const seen = new Map<string, BillingNote>();
     for (const n of group) {
       const sig = JSON.stringify([n.issuedAt, n.client, n.order, n.quote, n.amountCents]);
-      if (seen.has(sig)) continue;
+      const prev = seen.get(sig);
+      if (prev) { if (prev.cancelled !== n.cancelled) prev.error = "Mesma nota repetida com situação de cancelamento diferente"; continue; }
       const key = seen.size === 0 ? n.key : `${n.key}|L-${documentKey(n.order || n.quote) || "x"}-${n.amountCents}`;
-      seen.add(sig); out.push({ ...n, key });
+      const note = { ...n, key }; seen.set(sig, note); out.push(note);
     }
   }
   return { notes: out, ignored, invalid };
