@@ -252,8 +252,9 @@ export async function attendancePdf(lists: ListSnapshot[]) {
       doc.setFontSize(11);
       doc.text("REGISTRO DE PRESENÇA", L + (CW - 40) / 2, 30.5, { align: "center" });
       if (lg) {
-        const h = 10, w = Math.min(34, (lg.w / lg.h) * h);
-        doc.addImage(lg.data, "PNG", R - 20 - w / 2, 18, w, h);
+        let h = 18, w = (lg.w / lg.h) * h;
+        if (w > 36) { w = 36; h = (lg.h / lg.w) * w; }
+        doc.addImage(lg.data, "PNG", R - 20 - w / 2, 23 - h / 2, w, h);
       }
       doc.rect(L, 38, CW, 16);
       doc.line(L, 46, R, 46);
