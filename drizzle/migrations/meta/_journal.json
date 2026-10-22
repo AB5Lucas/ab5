@@ -344,6 +344,13 @@
       "when": 1792673140065,
       "tag": "0048_industry_sync_apply_splits",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792674256522,
+      "tag": "0049_industry_order_lines",
+      "breakpoints": true
     }
   ]
 }
