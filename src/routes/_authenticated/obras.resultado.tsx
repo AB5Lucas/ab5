@@ -843,8 +843,14 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                 <Lbl>Nº Pedido</Lbl>
                 <span>
                   {(() => {
-                    const n = Array.isArray(w.orders) ? w.orders.length : 0;
-                    return n > 1 ? `${n} pedidos` : w.order_number || "—";
+                    const all = (Array.isArray(w.orders) ? w.orders : []) as any[];
+                    const list = hasPeriod
+                      ? all.filter((o) => o?.date && isResultMonth(String(o.date).slice(0, 7), fromMonth, untilMonth, selectedMonths))
+                      : all;
+                    const n = list.length;
+                    if (n > 1) return `${n} pedidos`;
+                    if (n === 1) return String(list[0]?.number ?? "—");
+                    return hasPeriod && all.length ? "—" : w.order_number || "—";
                   })()}
                 </span>
                 <Lbl>Nº Orç. AB5</Lbl>
