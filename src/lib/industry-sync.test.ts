@@ -62,3 +62,16 @@ t2("importa apenas pedidos com valor na coluna M (REALIZ. R$)", () => {
   const r = po2(rows);
   e2(r.orders.map(o => o.order)).toEqual(["27493"]); e2(r.orders[0]!.mp).toBe(10);
 });
+
+describe("OP dividida entre setores", () => {
+  it("rateia o valor pelo setor (DIV) de cada linha; o maior setor é o principal", () => {
+    const h = ["", "OP", "", "Cliente", "", "", "DIV", "", "", "MP", "", "FAT. R$", "REALIZ. R$", "", "Data"];
+    const rows = [h,
+      [1, 27536, 0, "ROSSI LOJA 14", "CESTOS", 0, "REN", 0, 0, 25.1, 0, 690.68, 690.68, 0, 46297],
+      [1, 27536, 0, "ROSSI LOJA 14", "CARRINHOS", 0, "CARR", 0, 0, 257.6, 0, 2398.94, 2398.94, 0, 46304]];
+    const { orders } = parseOrders(rows as any);
+    const o = orders.find(x => x.order === "27536")!;
+    expect(o.service).toBe("Carrinhos");
+    expect(o.splits?.map(p => [p.service, p.amount])).toEqual([["Carrinhos", 2398.94], ["PPO", 690.68]]);
+  });
+});
