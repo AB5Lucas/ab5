@@ -316,6 +316,13 @@
       "when": 1792613255995,
       "tag": "0044_industry_launch_work_order",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792667169252,
+      "tag": "0045_industry_orders_guard",
+      "breakpoints": true
     }
   ]
 }
