@@ -416,11 +416,24 @@ function AppointmentsPage() {
         // Integração: confere somente o cliente do agendamento
         clientIds = row.client_id ? [row.client_id] : [];
       } else {
-        const { data: integrations } = await supabase
-          .from("client_integrations")
-          .select("client_id")
-          .eq("collaborator_id", row.collaborator_id);
-        clientIds = [...new Set<string>((integrations ?? []).map((i) => i.client_id))];
+        const [{ data: integrations }, { data: scheduled }] = await Promise.all([
+          supabase.from("client_integrations").select("client_id").eq("collaborator_id", row.collaborator_id),
+          // Integrações agendadas também entram: o aceite libera a escalação nesse cliente.
+          supabase
+            .from("appointments")
+            .select("client_id, type")
+            .eq("collaborator_id", row.collaborator_id)
+            .eq("status", "agendado")
+            .not("client_id", "is", null),
+        ]);
+        clientIds = [
+          ...new Set<string>([
+            ...(integrations ?? []).map((i) => i.client_id),
+            ...(scheduled ?? [])
+              .filter((a) => String(a.type).toLowerCase().startsWith("integ"))
+              .map((a) => a.client_id as string),
+          ]),
+        ];
       }
       if (clientIds.length > 0) {
         const { error: checksError } = await supabase
