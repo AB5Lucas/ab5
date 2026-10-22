@@ -76,8 +76,11 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
     const nums = [...new Set(raw.match(/\d+/g)!.map(stripZeros))];
     const code = String(r[cDiv] ?? "").trim();
     const service = classifyService(code) ?? serviceFromText(`${r[cClient] ?? ""} ${cMat >= 0 ? r[cMat] ?? "" : ""}`);
-    const vAmt = pick(r, cAmt, cAmtF), vMp = pick(r, cMp, cMpF), vDate = pick(r, cDate, cDateF);
-    const amountAll = blank(vAmt) ? 0 : num(vAmt); const mpAll = blank(vMp) ? null : num(vMp);
+    // Only orders with a realized value (column M, REALIZ. R$) are imported.
+    const vAmt = r[cAmt];
+    if (blank(vAmt) || !num(vAmt)) { ignored++; continue; }
+    const vMp = pick(r, cMp, cMpF), vDate = pick(r, cDate, cDateF);
+    const amountAll = num(vAmt); const mpAll = blank(vMp) ? null : num(vMp);
     const date = blank(vDate) ? null : excelDate(vDate);
     const issue = !service ? `Código de serviço desconhecido: ${code || "vazio"}` : amountAll === null ? "Valor inválido" : undefined;
     const share = (v: number, i: number) => { const c = Math.round(v * 100); const base = Math.floor(c / nums.length); return (base + (i < c - base * nums.length ? 1 : 0)) / 100; };

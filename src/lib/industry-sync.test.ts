@@ -56,9 +56,9 @@ describe("indústria", () => {
 
 import { parseOrders as po2 } from "./industry-sync";
 import { test as t2, expect as e2 } from "vitest";
-t2("usa FAT. R$ e PREV. MP quando REALIZ. R$ e MP REAL estão vazios", () => {
+t2("importa apenas pedidos com valor na coluna M (REALIZ. R$)", () => {
   const head = ["FR","OP","ENTRADA","Cliente","Material","Qtd","DIV","PREV. MP","%","MP REAL","%2","FAT. R$","REALIZ. R$","DATA PREV","DATA FINAL","FATURAMENTO"];
-  const rows: unknown[][] = [head, ["", 27515, "", "PINHALENSE", "", "", "PPO N", 207.9, "", "", "", 5420, "", 46294, "", 27514]];
-  const o = po2(rows).orders[0]!;
-  e2(o.order).toBe("27514"); e2(o.amount).toBe(5420); e2(o.mp).toBe(207.9);
+  const rows: unknown[][] = [head, ["", 27515, "", "PINHALENSE", "", "", "PPO N", 207.9, "", "", "", 5420, "", 46294, "", 27514], ["", 27493, "", "TINTI", "", "", "CARR", 10, "", "", "", 10200, 10200, 46294, "", ""]];
+  const r = po2(rows);
+  e2(r.orders.map(o => o.order)).toEqual(["27493"]); e2(r.orders[0]!.mp).toBe(10);
 });
