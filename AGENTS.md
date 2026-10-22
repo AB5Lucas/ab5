@@ -29,3 +29,4 @@
 - Billing (Serviços): Excel feeds atomic billing_sync_process; readers exclude sync_cancelled; billing_client_key resolves equivalences; daily run via cron route with persisted run state. Why: shared mapping, history, no open browser needed.
 - /relatorios (Alocações) keeps its URL when moved in the menu. Why: preserve permissions and links.
 - Indústria billing: industry-sync(.server).ts read monthly Excel files into industry_orders/invoices; industry_sync_apply upserts work_entries keyed by industry_order_id/invoice_id. Why: idempotent, separate from Serviços.
+- Indústria: an OP whose rows have different DIV sectors is stored once with industry_orders.splits; the mirror trigger and industry_sync_parts give each sector its own order value, raw material and proportional invoice share (work_entries.industry_part_ref). Why: each service keeps only its share of the order.
