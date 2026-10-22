@@ -2368,6 +2368,7 @@ export type Database = {
           created_at: string
           id: string
           issue: string | null
+          lines: Json | null
           manual_work_id: string | null
           order_date: string | null
           order_number: string
@@ -2387,6 +2388,7 @@ export type Database = {
           created_at?: string
           id?: string
           issue?: string | null
+          lines?: Json | null
           manual_work_id?: string | null
           order_date?: string | null
           order_number: string
@@ -2406,6 +2408,7 @@ export type Database = {
           created_at?: string
           id?: string
           issue?: string | null
+          lines?: Json | null
           manual_work_id?: string | null
           order_date?: string | null
           order_number?: string

@@ -30,3 +30,4 @@
 - /relatorios (Alocações) keeps its URL when moved in the menu. Why: preserve permissions and links.
 - Indústria billing: industry-sync(.server).ts read monthly Excel files into industry_orders/invoices; industry_sync_apply upserts work_entries keyed by industry_order_id/invoice_id. Why: idempotent, separate from Serviços.
 - Indústria: an OP whose rows have different DIV sectors is stored once with industry_orders.splits; the mirror trigger and industry_sync_parts give each sector its own order value, raw material and proportional invoice share (work_entries.industry_part_ref). Why: each service keeps only its share of the order.
+- Indústria orders: every spreadsheet line is mirrored as its own works.orders entry (industry_orders.lines) with the exact sheet value; works_consolidate_orders and industry_fit_work_order are no-ops. Why: orders must match the PCP sheet line by line, never summed or raised to the invoice.
