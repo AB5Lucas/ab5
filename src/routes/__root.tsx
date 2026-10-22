@@ -38,10 +38,21 @@ function NotFoundComponent() {
   );
 }
 
+const STALE_RE = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk/i;
+function reloadForNewVersion() {
+  if (typeof window === "undefined") return false;
+  const last = Number(sessionStorage.getItem("ab5-stale-reload") || 0);
+  if (Date.now() - last < 30000) return false;
+  sessionStorage.setItem("ab5-stale-reload", String(Date.now()));
+  window.location.reload();
+  return true;
+}
+
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
+    if (STALE_RE.test(String(error?.message ?? error)) && reloadForNewVersion()) return;
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
@@ -125,6 +136,14 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+
+  useEffect(() => {
+    const onPreload = (e: Event) => {
+      if (reloadForNewVersion()) e.preventDefault();
+    };
+    window.addEventListener("vite:preloadError", onPreload);
+    return () => window.removeEventListener("vite:preloadError", onPreload);
+  }, []);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
