@@ -4523,6 +4523,10 @@ export type Database = {
         Returns: undefined
       }
       rdo_undo_absence: { Args: { _wf_id: string }; Returns: undefined }
+      relocate_allocation_client: {
+        Args: { _alloc_id: string; _client_id: string }
+        Returns: undefined
+      }
       set_transport_passenger: {
         Args: {
           _client_id: string
