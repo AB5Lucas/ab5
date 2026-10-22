@@ -42,7 +42,10 @@ export function missingStatus(ym: string, today: string, tolerance = TOLERANCE_D
   return days < tolerance ? "waiting" : "access_error";
 }
 
-export type IndustryOrder = { order: string; aliases: string[]; client: string; code: string; service: string | null; amount: number; mp: number | null; date: string | null; issue?: string };
+export type IndustryOrder = { order: string; aliases: string[]; client: string; code: string; service: string | null; amount: number; mp: number | null; date: string | null; issue?: string;
+  splits?: { service: string; code: string; amount: number; mp: number | null }[];
+  /** Each spreadsheet line of the OP, kept separate with its exact value. */
+  lines?: { service: string; amount: number; date: string | null }[] };
 const num = (v: unknown) => { const c = moneyCents(v); return c === null ? null : c / 100; };
 
 /** Sheet "Dados": B=OP, D=Cliente, G=DIV, J=MP, M=Valor, O=Data. */
