@@ -2375,6 +2375,7 @@ export type Database = {
           ref_month: string
           service_code: string | null
           source_file: string | null
+          splits: Json | null
           status: string
           updated_at: string
           work_id: string | null
@@ -2393,6 +2394,7 @@ export type Database = {
           ref_month: string
           service_code?: string | null
           source_file?: string | null
+          splits?: Json | null
           status?: string
           updated_at?: string
           work_id?: string | null
@@ -2411,6 +2413,7 @@ export type Database = {
           ref_month?: string
           service_code?: string | null
           source_file?: string | null
+          splits?: Json | null
           status?: string
           updated_at?: string
           work_id?: string | null
@@ -4018,6 +4021,8 @@ export type Database = {
           id: string
           industry_invoice_id: string | null
           industry_order_id: string | null
+          industry_part: string | null
+          industry_part_ref: string | null
           split_group: string | null
           split_note: string | null
           split_total: number | null
@@ -4036,6 +4041,8 @@ export type Database = {
           id?: string
           industry_invoice_id?: string | null
           industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
@@ -4054,6 +4061,8 @@ export type Database = {
           id?: string
           industry_invoice_id?: string | null
           industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
@@ -4476,6 +4485,7 @@ export type Database = {
         Args: { _order: string; _work: string }
         Returns: number
       }
+      industry_part_work: { Args: { _service: string }; Returns: string }
       industry_sync_apply: {
         Args: {
           p_file: string
@@ -4486,6 +4496,7 @@ export type Database = {
         }
         Returns: Json
       }
+      industry_sync_parts: { Args: { _oid: string }; Returns: undefined }
       is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_hiring_rh: { Args: never; Returns: boolean }
