@@ -414,7 +414,7 @@ export function IntegrationsPage() {
         description="Aptidão dos colaboradores para trabalhar em cada cliente. Serviços do mesmo cliente aproveitam a mesma integração."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => void copyNameList(`Integrações${clientFilter !== "all" ? " " + (clientById.get(clientFilter) ?? "").toUpperCase() : ""}`, filtered.map((r) => personById.get(r.collaborator_id)?.full_name))}>
+            <Button variant="outline" onClick={() => void copyNameList(`Integrações${clientFilter !== "all" ? " " + (clientById.get(clientFilter) ?? "").toUpperCase() : ""}`, statusFilter === "missing" ? missing.map((p) => p.full_name) : filtered.map((r) => personById.get(r.collaborator_id)?.full_name))}>
               <Copy className="h-4 w-4" />
               Copiar nomes
             </Button>

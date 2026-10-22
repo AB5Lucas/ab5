@@ -374,7 +374,7 @@ export function TrainingsPage() {
         description="Catálogo de treinamentos e controle de validade por colaborador."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => void copyNameList(`Treinamentos${trainingIds.length ? " " + (trainings.data ?? []).filter((t) => trainingIds.includes(t.id)).map((t) => t.name.toUpperCase()).join(", ") : ""}`, filtered.map((r) => nameById.get(r.collaborator_id)))}>
+            <Button variant="outline" onClick={() => void copyNameList(`Treinamentos${trainingIds.length ? " " + (trainings.data ?? []).filter((t) => trainingIds.includes(t.id)).map((t) => t.name.toUpperCase()).join(", ") : ""}`, filter === "missing" ? [...new Set(missing.map((m) => nameById.get(m.personId)))] : filtered.map((r) => nameById.get(r.collaborator_id)))}>
               <Copy className="h-4 w-4" />
               Copiar nomes
             </Button>
