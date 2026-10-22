@@ -351,6 +351,13 @@
       "when": 1792674256522,
       "tag": "0049_industry_order_lines",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792674330001,
+      "tag": "0050_stop_consolidating_orders",
+      "breakpoints": true
     }
   ]
 }
