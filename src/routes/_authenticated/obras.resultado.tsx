@@ -603,7 +603,17 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
 
   const last = calc?.last;
   const billed = last?.billing ?? 0;
-  const order = monthlyInfo ? monthlyInfo.order : calc?.order ?? 0;
+  // Geral: serviços mensais somam os pedidos do período; os demais usam o valor do pedido
+  const allOrder = (() => {
+    if (!isAll) return null;
+    const inP = (ym: string) => !hasPeriod || isResultMonth(ym, fromMonth, untilMonth, selectedMonths);
+    const svcs = (works.data ?? []).filter((x: any) => workIds.includes(x.id));
+    if (!svcs.some((s: any) => s.monthly_enabled)) return null;
+    return svcs.reduce((a: number, s: any) => a + (s.monthly_enabled
+      ? ((Array.isArray(s.orders) ? s.orders : []) as any[]).filter((o) => o?.date && inP(String(o.date).slice(0, 7))).reduce((b, o) => b + Number(o.value ?? 0), 0)
+      : Number(s.order_value ?? 0)), 0);
+  })();
+  const order = monthlyInfo ? monthlyInfo.order : allOrder ?? calc?.order ?? 0;
   const shownOrder = order;
 
   const expRange = () => {
