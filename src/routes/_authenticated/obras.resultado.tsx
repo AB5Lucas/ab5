@@ -367,7 +367,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   const calc = useMemo(() => {
     if (!calcRt || !monthlyInfo) return calcRt;
     // Mensal: custo orçado = pedidos do período × BDI (distribuído como em Custos BDI)
-    const bb = bdiBudget(monthlyInfo.order, Object.fromEntries(calcRt.items.map((i) => [i.key, i.real])));
+    const bb = bdiBudget(monthlyInfo.order, Object.fromEntries(calcRt.items.map((i) => [i.key, i.real])), { weights: (hhSavedWork as any)?.budget_items?.weights });
     const items = calcRt.items.map((i) => {
       const b = bb[i.key] ?? 0;
       return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
@@ -395,6 +395,11 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   const [quoteNo, setQuoteNo] = useState("");
   const [itemStrs, setItemStrs] = useState<Record<string, string>>({});
   const [bdiOn, setBdiOn] = useState(false);
+  const [weightStrs, setWeightStrs] = useState<Record<string, string>>({});
+  const weightsObj = () => {
+    const w = Object.fromEntries(ITEMS.map((it) => [it.key, num(weightStrs[it.key] ?? "")]));
+    return Object.values(w).some((v) => v > 0) ? w : undefined;
+  };
   const itemsSum = ITEMS.reduce((a, it) => a + num(itemStrs[it.key] ?? ""), 0);
   /** Custos BDI: preenche os campos agora; com o BDI ativo, o orçado é recalculado sozinho a cada pedido. */
   const applyBdi = () => {
@@ -403,7 +408,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     const real = Object.fromEntries((calc?.items ?? []).map((i) => [i.key, i.real]));
     setItemStrs((cur) => {
       const saved = Object.fromEntries(Object.entries(cur).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, num(v)]));
-      const b = bdiBudget(order, real, saved);
+      const b = bdiBudget(order, real, { ...saved, weights: weightsObj() });
       return Object.fromEntries(ITEMS.map((it) => [it.key, Number(b[it.key] ?? 0).toFixed(2).replace(".", ",")]));
     });
   };
@@ -443,7 +448,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
           order_number: list.map((o) => o.number.trim()).filter(Boolean).join(" / ") || null,
           quote_number: quoteNo.trim() || null,
           budget_cost: bdiOn ? Math.round(ordersSum * BDI_RATE * 100) / 100 : itemsSum,
-          budget_items: { ...Object.fromEntries(ITEMS.map((it) => [it.key, num(itemStrs[it.key] ?? "")])), bdi: bdiOn ? 1 : 0 },
+          budget_items: { ...Object.fromEntries(ITEMS.map((it) => [it.key, num(itemStrs[it.key] ?? "")])), bdi: bdiOn ? 1 : 0, ...(weightsObj() ? { weights: weightsObj() } : {}) },
         } as any)
         .eq("id", workId);
       if (error) throw error;
@@ -590,6 +595,8 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     const bi = (w?.budget_items ?? {}) as Record<string, number>;
     setBdiOn(Number(bi["bdi"] ?? 0) === 1);
     setItemStrs(Object.fromEntries(ITEMS.map((it) => [it.key, f(bi[it.key])])));
+    const wt = ((bi as any).weights ?? {}) as Record<string, number>;
+    setWeightStrs(Object.fromEntries(ITEMS.map((it) => [it.key, wt[it.key] != null ? String(wt[it.key]) : ""])));
   };
 
   useEffect(() => {
@@ -706,7 +713,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   })();
   const monthlyBudgetOrder = monthlyInfo?.order ?? allMonthlyOrders;
   const monthlyBudget = monthlyBudgetOrder != null
-    ? bdiBudget(monthlyBudgetOrder, Object.fromEntries((calc?.items ?? []).map((i) => [i.key, i.real])))
+    ? bdiBudget(monthlyBudgetOrder, Object.fromEntries((calc?.items ?? []).map((i) => [i.key, i.real])), { weights: (hhSavedWork as any)?.budget_items?.weights })
     : undefined;
   const scaledItems = displayedBudgetItems(calc?.items ?? [], progFrac, monthlyBudget);
   const totBudget = scaledItems.reduce((sum, item) => sum + item.budget, 0);
@@ -1325,6 +1332,17 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
             <Switch checked={bdiOn} onCheckedChange={(v) => { setBdiOn(v); if (v) applyBdi(); }} />
             Custos BDI (pedido × 0,5885) — recalculado automaticamente a cada novo pedido
           </label>
+          {bdiOn && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Pesos desta obra (%) — ponto de partida; 75% da divisão acompanha o gasto real. Vazio = padrão 40/20/10/30.</p>
+              <div className="grid grid-cols-5 gap-2">
+                {ITEMS.map((it) => (
+                  <Field key={it.key} label={`${relabel(it.key, it.label)} %`} value={weightStrs[it.key] ?? ""} onChange={(v) => setWeightStrs((s) => ({ ...s, [it.key]: v }))} />
+                ))}
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={applyBdi}>Recalcular com os pesos</Button>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             Total orçado: <span className="font-semibold text-foreground">{brl(itemsSum)}</span>
           </p>

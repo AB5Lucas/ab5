@@ -454,6 +454,26 @@ export function SchedulePlannerBoard({
   });
 
   const entries = statusEntries.data ?? [];
+  // Obra de origem de quem foi tirado pelo RDO (folga/falta etc.), lida ao vivo do RDO.
+  const rdoOrigin = useQuery({
+    queryKey: ["rdo-absence-origin", date],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("rdo_workforce")
+        .select("collaborator_id, works(name, clients(name))")
+        .eq("report_date", date)
+        .eq("present", false)
+        .not("reported_reason", "is", null);
+      if (error) throw error;
+      const m = new Map<string, string[]>();
+      for (const r of (data ?? []) as any[]) {
+        const n = [r.works?.clients?.name, r.works?.name].filter(Boolean).join(" · ");
+        if (n) m.set(r.collaborator_id, [...(m.get(r.collaborator_id) ?? []), n]);
+      }
+      return m;
+    },
+  });
+  const [openEntry, setOpenEntry] = useState<string | null>(null);
 
   const workVt = useQuery({
     queryKey: ["work-vt", scheduleId],
@@ -1999,11 +2019,18 @@ export function SchedulePlannerBoard({
                         className="flex items-center gap-1.5 px-2 py-1 text-xs"
                       >
                         {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setOpenEntry((s) => (s === entry.id ? null : entry.id))}>
                           <p className="truncate text-xs font-medium leading-tight">{p?.full_name ?? "—"}</p>
                           <p className="truncate text-[10px] leading-tight text-muted-foreground">
                             {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
                           </p>
+                          {openEntry === entry.id && (
+                            <p className="text-[10px] leading-tight text-primary">
+                              {rdoOrigin.data?.get(entry.collaborator_id)?.length
+                                ? `Escalado em: ${rdoOrigin.data.get(entry.collaborator_id)!.join(", ")}`
+                                : "Não veio do RDO"}
+                            </p>
+                          )}
                         </div>
                         {vtBoxDefault(b.key) !== null && personDot(b.key, entry.collaborator_id)}
                         {editable && (
