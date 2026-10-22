@@ -843,8 +843,14 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                 <Lbl>Nº Pedido</Lbl>
                 <span>
                   {(() => {
-                    const n = Array.isArray(w.orders) ? w.orders.length : 0;
-                    return n > 1 ? `${n} pedidos` : w.order_number || "—";
+                    const all = (Array.isArray(w.orders) ? w.orders : []) as any[];
+                    const list = hasPeriod
+                      ? all.filter((o) => o?.date && isResultMonth(String(o.date).slice(0, 7), fromMonth, untilMonth, selectedMonths))
+                      : all;
+                    const n = list.length;
+                    if (n > 1) return `${n} pedidos`;
+                    if (n === 1) return String(list[0]?.number ?? "—");
+                    return hasPeriod && all.length ? "—" : w.order_number || "—";
                   })()}
                 </span>
                 <Lbl>Nº Orç. AB5</Lbl>
@@ -1238,7 +1244,10 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
               </Button>
             </div>
             <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-            {orderList.map((o, i) => (
+            {orderList.map((o, i) => {
+              const inPer = !moOn || !hasPeriod || !o.date || isResultMonth(String(o.date).slice(0, 7), fromMonth, untilMonth, selectedMonths);
+              if (!inPer) return null;
+              return (
               <div key={i} className="flex items-center gap-2">
                 <Input placeholder="Nº Pedido" value={o.number} onChange={(e) => setOrderList((l) => l.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))} />
                 {moOn && (
@@ -1249,11 +1258,16 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
-            ))}
+              );
+            })}
             </div>
             <p className="text-sm text-muted-foreground">
-              Valor do pedido (soma):{" "}
-              <span className="font-semibold text-foreground">{brl(ordersSum)}</span>
+              Valor do pedido (soma{moOn && hasPeriod ? " do período" : ""}):{" "}
+              <span className="font-semibold text-foreground">
+                {brl(moOn && hasPeriod
+                  ? orderList.filter((o) => !o.date || isResultMonth(String(o.date).slice(0, 7), fromMonth, untilMonth, selectedMonths)).reduce((a, o) => a + num(o.value), 0)
+                  : ordersSum)}
+              </span>
             </p>
             <p className="text-xs text-muted-foreground">O valor faturado vem do botão Faturamentos.</p>
           </div>
