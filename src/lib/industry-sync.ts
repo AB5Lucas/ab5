@@ -87,6 +87,7 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
     nums.forEach((order, i) => {
       const amount = share(amountAll ?? 0, i); const mp = mpAll === null ? null : share(mpAll, i);
       const prev = out.get(order);
+      const addLine = (o: IndustryOrder) => { (o.lines ??= []).push({ service: service ?? "", amount, date }); };
       const addPart = (o: IndustryOrder) => {
         const key = service ?? "";
         const parts = (o.splits ??= []);
@@ -100,11 +101,11 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
         if (mp !== null) prev.mp = Math.round(((prev.mp ?? 0) + mp) * 100) / 100;
         if (date && (!prev.date || date > prev.date)) prev.date = date;
         if (!prev.service && service) { prev.service = service; prev.code = code; delete prev.issue; }
-        addPart(prev);
+        addPart(prev); addLine(prev);
         return;
       }
       const o: IndustryOrder = { order, aliases: [], client: String(r[cClient] ?? "").trim() || "Cliente não informado", code, service, amount, mp, date, ...(issue ? { issue } : {}) };
-      addPart(o); out.set(order, o);
+      addPart(o); addLine(o); out.set(order, o);
     });
   }
   // OP split across sectors (DIV): each sector keeps its own value; the largest is the main service.
