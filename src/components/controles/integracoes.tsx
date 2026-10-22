@@ -211,6 +211,27 @@ export function IntegrationsPage() {
     });
   }, [integrations.data, search, clientFilter, statusFilter, personById, clientById, positionById, today]);
 
+  // "Não possuem": colaboradores ativos sem integração no cliente filtrado (ou sem nenhuma).
+  const missing = useMemo(() => {
+    if (statusFilter !== "missing") return [];
+    const has = new Set(
+      (integrations.data ?? [])
+        .filter((r) => clientFilter === "all" || r.client_id === clientFilter)
+        .map((r) => r.collaborator_id),
+    );
+    const q = search.trim().toLowerCase();
+    const qDigits = onlyDigits(search);
+    return (collaborators.data ?? []).filter((p) => {
+      if (has.has(p.id)) return false;
+      if (!q) return true;
+      return (
+        p.full_name.toLowerCase().includes(q) ||
+        (p.position_id ? positionById.get(p.position_id) ?? "" : "").toLowerCase().includes(q) ||
+        (qDigits.length >= 3 && onlyDigits(p.cpf ?? "").includes(qDigits))
+      );
+    });
+  }, [statusFilter, integrations.data, clientFilter, collaborators.data, search, positionById]);
+
   const summary = useMemo(() => {
     const s = { total: filtered.length, valid: 0, expiring: 0, expired: 0, documentation: 0 };
     filtered.forEach((r) => {
@@ -456,6 +477,7 @@ export function IntegrationsPage() {
             <SelectItem value="expiring">Próxima do vencimento</SelectItem>
             <SelectItem value="expired">Vencida</SelectItem>
             <SelectItem value="documentation">Documentação</SelectItem>
+            <SelectItem value="missing">Não possuem</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -467,7 +489,6 @@ export function IntegrationsPage() {
               <TableHead>Colaborador</TableHead>
               <TableHead className="hidden lg:table-cell">Função</TableHead>
               <TableHead>Cliente</TableHead>
-              
               <TableHead className="hidden md:table-cell">Integração</TableHead>
               <TableHead className="hidden md:table-cell">Validade</TableHead>
               <TableHead>Status</TableHead>
@@ -482,14 +503,33 @@ export function IntegrationsPage() {
                 </TableCell>
               </TableRow>
             )}
-            {!integrations.isLoading && filtered.length === 0 && (
+            {!integrations.isLoading && (statusFilter === "missing" ? missing.length === 0 : filtered.length === 0) && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                  Nenhuma integração encontrada.
+                  {statusFilter === "missing" ? "Todos possuem a integração." : "Nenhuma integração encontrada."}
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((r) => {
+            {statusFilter === "missing" && missing.map((p) => (
+              <TableRow key={`missing-${p.id}`}>
+                <TableCell className="font-medium">{p.full_name}</TableCell>
+                <TableCell className="hidden lg:table-cell">{p.position_id ? positionById.get(p.position_id) ?? "—" : "—"}</TableCell>
+                <TableCell>{clientFilter !== "all" ? clientById.get(clientFilter) ?? "—" : "—"}</TableCell>
+                <TableCell className="hidden md:table-cell">—</TableCell>
+                <TableCell className="hidden md:table-cell">—</TableCell>
+                <TableCell><Badge variant="secondary">Não possui</Badge></TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <AppointmentDialog
+                      type="integracao"
+                      iconOnly
+                      initialValues={{ collaborator_id: p.id, ...(clientFilter !== "all" ? { client_id: clientFilter } : {}) }}
+                    />
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {statusFilter !== "missing" && filtered.map((r) => {
               const p = personById.get(r.collaborator_id);
               const st = statusOf(r.expires_at, today, r.documentation);
               

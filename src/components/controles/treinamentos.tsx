@@ -190,7 +190,7 @@ export function TrainingsPage() {
   const [rDate, setRDate] = useState(today());
   const [rDoc, setRDoc] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "valid" | "expiring" | "expired">("all");
+  const [filter, setFilter] = useState<"all" | "valid" | "expiring" | "expired" | "missing">("all");
   const [personSearch, setPersonSearch] = useState("");
   const [trainingIds, setTrainingIds] = useState<string[]>([]);
 
@@ -275,6 +275,29 @@ export function TrainingsPage() {
     }
     return true;
   });
+
+  /** "Não possuem": colaboradores ativos sem os treinamentos filtrados (ou sem nenhum). */
+  const missing = useMemo(() => {
+    if (filter !== "missing") return [] as { personId: string; trainingId: string | null }[];
+    const byPerson = new Map<string, Set<string>>();
+    for (const r of records.data ?? []) {
+      const set = byPerson.get(r.collaborator_id) ?? new Set<string>();
+      set.add(r.training_id);
+      byPerson.set(r.collaborator_id, set);
+    }
+    const q = normText(personSearch);
+    const out: { personId: string; trainingId: string | null }[] = [];
+    for (const p of people.data ?? []) {
+      if (q && !normText(p.full_name).includes(q)) continue;
+      const has = byPerson.get(p.id);
+      if (trainingIds.length === 0) {
+        if (!has || has.size === 0) out.push({ personId: p.id, trainingId: null });
+      } else {
+        for (const t of trainingIds) if (!has?.has(t)) out.push({ personId: p.id, trainingId: t });
+      }
+    }
+    return out;
+  }, [filter, records.data, people.data, personSearch, trainingIds]);
 
   async function importRecords(rows: ImportRow[]) {
     const errors: string[] = [];
@@ -428,6 +451,7 @@ export function TrainingsPage() {
                   <SelectItem value="valid">Válidos</SelectItem>
                   <SelectItem value="expiring">A vencer (30 dias)</SelectItem>
                   <SelectItem value="expired">Vencidos</SelectItem>
+                  <SelectItem value="missing">Não possuem</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -450,6 +474,31 @@ export function TrainingsPage() {
                   <TableRow>
                     <TableCell colSpan={6} className="text-sm text-muted-foreground">Carregando...</TableCell>
                   </TableRow>
+                ) : filter === "missing" ? (
+                  missing.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-sm text-muted-foreground">Todos possuem o treinamento.</TableCell>
+                    </TableRow>
+                  ) : (
+                    missing.map((m) => (
+                      <TableRow key={`missing-${m.personId}-${m.trainingId ?? "none"}`}>
+                        <TableCell className="font-medium">{nameById.get(m.personId) ?? "—"}</TableCell>
+                        <TableCell>{m.trainingId ? nameById.get(m.trainingId) ?? "—" : "Nenhum treinamento"}</TableCell>
+                        <TableCell className="hidden md:table-cell">—</TableCell>
+                        <TableCell className="hidden md:table-cell">—</TableCell>
+                        <TableCell><Badge variant="secondary">Não possui</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            <AppointmentDialog
+                              type="treinamento"
+                              iconOnly
+                              initialValues={{ collaborator_id: m.personId, ...(m.trainingId ? { training_id: m.trainingId } : {}) }}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )
                 ) : filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-sm text-muted-foreground">Nenhum registro encontrado.</TableCell>
