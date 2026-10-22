@@ -477,6 +477,7 @@ export function IntegrationsPage() {
             <SelectItem value="expiring">Próxima do vencimento</SelectItem>
             <SelectItem value="expired">Vencida</SelectItem>
             <SelectItem value="documentation">Documentação</SelectItem>
+            <SelectItem value="missing">Não possuem</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -488,7 +489,6 @@ export function IntegrationsPage() {
               <TableHead>Colaborador</TableHead>
               <TableHead className="hidden lg:table-cell">Função</TableHead>
               <TableHead>Cliente</TableHead>
-              
               <TableHead className="hidden md:table-cell">Integração</TableHead>
               <TableHead className="hidden md:table-cell">Validade</TableHead>
               <TableHead>Status</TableHead>
@@ -503,14 +503,33 @@ export function IntegrationsPage() {
                 </TableCell>
               </TableRow>
             )}
-            {!integrations.isLoading && filtered.length === 0 && (
+            {!integrations.isLoading && (statusFilter === "missing" ? missing.length === 0 : filtered.length === 0) && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                  Nenhuma integração encontrada.
+                  {statusFilter === "missing" ? "Todos possuem a integração." : "Nenhuma integração encontrada."}
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((r) => {
+            {statusFilter === "missing" && missing.map((p) => (
+              <TableRow key={`missing-${p.id}`}>
+                <TableCell className="font-medium">{p.full_name}</TableCell>
+                <TableCell className="hidden lg:table-cell">{p.position_id ? positionById.get(p.position_id) ?? "—" : "—"}</TableCell>
+                <TableCell>{clientFilter !== "all" ? clientById.get(clientFilter) ?? "—" : "—"}</TableCell>
+                <TableCell className="hidden md:table-cell">—</TableCell>
+                <TableCell className="hidden md:table-cell">—</TableCell>
+                <TableCell><Badge variant="secondary">Não possui</Badge></TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <AppointmentDialog
+                      type="integracao"
+                      iconOnly
+                      initialValues={{ collaborator_id: p.id, client_id: clientFilter !== "all" ? clientFilter : undefined }}
+                    />
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {statusFilter !== "missing" && filtered.map((r) => {
               const p = personById.get(r.collaborator_id);
               const st = statusOf(r.expires_at, today, r.documentation);
               
