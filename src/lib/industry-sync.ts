@@ -61,7 +61,7 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
   const col = (names: string[], def: number) => { const i = head.findIndex(x => names.includes(x)); return i >= 0 ? i : def; };
   const cClient = col(["CLIENTE"], 3), cDiv = col(["DIV"], 6), cMp = col(["MP REAL"], 9), cAmt = col(["REALIZ. R$"], 12), cDate = col(["DATA FINAL", "TERM EFETIVO"], 14), cMat = col(["MATERIAL"], -1);
   // Fallbacks when realized values are blank: FAT. R$ for value, PREV. MP for raw material, DATA PREV for date.
-  const cAmtF = col(["FAT. R$"], -1), cMpF = col(["PREV. MP"], -1), cDateF = col(["DATA PREV"], -1);
+  const cMpF = col(["PREV. MP"], -1), cDateF = col(["DATA PREV"], -1);
   const blank = (v: unknown) => v === "" || v == null;
   const pick = (r: unknown[], a: number, b: number) => !blank(r[a]) ? r[a] : b >= 0 ? r[b] : "";
   // Order numbers come from "FATURAMENTO" when filled; otherwise from column B (OP). Several numbers split the line value equally.
