@@ -624,19 +624,29 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
 }
 
 export const BDI_RATE = 0.5885;
-/** Custos BDI: total = pedido × 0,5885, pesos 4/2/1/3 (MO/transp./ferram./mat.); com custos realizados,
- * metade padrão e metade proporcional ao realizado; com andaime e sem ferramentas, ferramentas vira andaimes. */
+export const BDI_DEFAULT_WEIGHTS: Record<string, number> = { mo: 40, transporte: 20, ferramentas: 10, materiais: 30, andaimes: 0 };
+/** Share of the split driven by the real costs of the work (rest follows the work's weights). */
+export const BDI_REAL_SHARE = 0.75;
+/** Custos BDI dinâmico: total = pedido × 0,5885 (fixo). Ponto de partida = pesos da obra (saved.weights,
+ * padrão 40/20/10/30); com custos realizados, 25% segue os pesos e 75% o realizado. */
 export function bdiBudget(order: number, realIn: Partial<Record<string, number>>, saved?: Record<string, any>): Record<string, number> {
   // Item zerado manualmente com BDI ativo fica fora do orçado (não é redistribuído)
   const zeroed = new Set(["mo", "transporte", "ferramentas", "materiais"].filter((k) => saved && saved[k] != null && Number(saved[k]) === 0));
   const real = Object.fromEntries(ITEMS.map((it) => [it.key, Math.max(0, Number(realIn[it.key] ?? 0) || 0)])) as Record<string, number>;
-  const w: Record<string, number> = { mo: 4, transporte: 2, ferramentas: 1, materiais: 3, andaimes: 0 };
-  if ((real["andaimes"] ?? 0) > 0 && !(real["ferramentas"] ?? 0)) { w["andaimes"] = w["ferramentas"]!; w["ferramentas"] = 0; }
-  const realTotal = ITEMS.reduce((a, it) => a + (real[it.key] ?? 0), 0);
-  if (realTotal > 0) for (const it of ITEMS) w[it.key] = 0.5 * w[it.key]! + 0.5 * (10 * (real[it.key] ?? 0)) / realTotal;
-  const sumW = ITEMS.reduce((a, it) => a + w[it.key]!, 0) || 1;
+  const custom = saved?.["weights"] && typeof saved["weights"] === "object" ? (saved["weights"] as Record<string, number>) : null;
+  const w: Record<string, number> = Object.fromEntries(ITEMS.map((it) => [it.key, Math.max(0, Number(custom?.[it.key] ?? BDI_DEFAULT_WEIGHTS[it.key]) || 0)]));
+  if (!custom && (real["andaimes"] ?? 0) > 0 && !(real["ferramentas"] ?? 0)) { w["andaimes"] = w["ferramentas"]!; w["ferramentas"] = 0; }
+  for (const k of zeroed) w[k] = 0;
+  const baseSum = ITEMS.reduce((a, it) => a + w[it.key]!, 0) || 1;
+  const realTotal = ITEMS.reduce((a, it) => a + (zeroed.has(it.key) ? 0 : real[it.key] ?? 0), 0);
+  const share: Record<string, number> = {};
+  for (const it of ITEMS) {
+    const b = w[it.key]! / baseSum;
+    const r = realTotal > 0 && !zeroed.has(it.key) ? (real[it.key] ?? 0) / realTotal : b;
+    share[it.key] = realTotal > 0 ? (1 - BDI_REAL_SHARE) * b + BDI_REAL_SHARE * r : b;
+  }
   const total = order * BDI_RATE;
-  return Object.fromEntries(ITEMS.map((it) => [it.key, zeroed.has(it.key) ? 0 : Math.round(((total * w[it.key]!) / sumW) * 100) / 100]));
+  return Object.fromEntries(ITEMS.map((it) => [it.key, zeroed.has(it.key) ? 0 : Math.round(total * share[it.key]! * 100) / 100]));
 }
 
 /** Custos orçados ajustados como em Resultados (Faturamento Parcial, Mensal). */
@@ -649,7 +659,7 @@ export function adjustedItems(work: any, base: NonNullable<ReturnType<typeof bui
   }
   if (work.monthly_enabled) {
     const total = ((Array.isArray(work.orders) ? work.orders : []) as any[]).reduce((a, o) => a + Number(o.value ?? 0), 0);
-    const bb = bdiBudget(total, Object.fromEntries(items.map((i) => [i.key, i.real])));
+    const bb = bdiBudget(total, Object.fromEntries(items.map((i) => [i.key, i.real])), { weights: work.budget_items?.weights });
     items = items.map((i) => ({ ...i, budget: bb[i.key] ?? 0 }));
   }
   return items.map((i) => ({ ...i, used: i.budget ? (i.real / i.budget) * 100 : i.real ? 100 : 0 }));
