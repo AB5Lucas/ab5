@@ -337,6 +337,13 @@
       "when": 1792673080090,
       "tag": "0047_industry_order_splits",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1792673140065,
+      "tag": "0048_industry_sync_apply_splits",
+      "breakpoints": true
     }
   ]
 }
