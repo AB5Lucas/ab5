@@ -211,6 +211,27 @@ export function IntegrationsPage() {
     });
   }, [integrations.data, search, clientFilter, statusFilter, personById, clientById, positionById, today]);
 
+  // "Não possuem": colaboradores ativos sem integração no cliente filtrado (ou sem nenhuma).
+  const missing = useMemo(() => {
+    if (statusFilter !== "missing") return [];
+    const has = new Set(
+      (integrations.data ?? [])
+        .filter((r) => clientFilter === "all" || r.client_id === clientFilter)
+        .map((r) => r.collaborator_id),
+    );
+    const q = search.trim().toLowerCase();
+    const qDigits = onlyDigits(search);
+    return (collaborators.data ?? []).filter((p) => {
+      if (has.has(p.id)) return false;
+      if (!q) return true;
+      return (
+        p.full_name.toLowerCase().includes(q) ||
+        (p.position_id ? positionById.get(p.position_id) ?? "" : "").toLowerCase().includes(q) ||
+        (qDigits.length >= 3 && onlyDigits(p.cpf ?? "").includes(qDigits))
+      );
+    });
+  }, [statusFilter, integrations.data, clientFilter, collaborators.data, search, positionById]);
+
   const summary = useMemo(() => {
     const s = { total: filtered.length, valid: 0, expiring: 0, expired: 0, documentation: 0 };
     filtered.forEach((r) => {
