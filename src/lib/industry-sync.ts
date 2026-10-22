@@ -84,7 +84,7 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
     const date = blank(vDate) ? null : excelDate(vDate);
     if (!date) { ignored++; continue; }
     const vAmt = r[cAmt];
-    const vMp = pick(r, cMp, cMpF);
+    const vMp = r[cMp]; void pick; void cMpF;
     const amountAll = blank(vAmt) ? 0 : num(vAmt); const mpAll = blank(vMp) ? null : num(vMp);
     void cDateF;
     const issue = !service ? `Código de serviço desconhecido: ${code || "vazio"}` : amountAll === null ? "Valor inválido" : undefined;
