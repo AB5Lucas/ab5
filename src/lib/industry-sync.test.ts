@@ -22,12 +22,12 @@ describe("indústria", () => {
     const r = parseOrders(rows); expect(r.orders.map(o => o.order)).toEqual(["27493"]); expect(r.ignored).toBe(1); expect(r.orders[0]?.mp).toBe(3402);
   });
   it("coluna Faturamento com vários pedidos rateia o valor entre eles", () => {
-    const rows: unknown[][] = [["", "OP", "", "CLIENTE", "", "", "DIV", "", "", "MP REAL", "", "", "REALIZ. R$", "FATURAMENTO"], ["", "REC", "", "A LOPES", "", "", "JATO", "", "", 544.38, "", "", 3353.57, "027618 / 27619"]];
+    const rows: unknown[][] = [["", "OP", "", "CLIENTE", "", "", "DIV", "", "", "MP REAL", "", "", "REALIZ. R$", "FATURAMENTO"], ["", "REC", "", "A LOPES", "", "", "JATO", "", "", 544.38, "", "", 3353.57, "027618 / 27619", 46300]];
     const o = parseOrders(rows).orders;
     expect(o.map(x => x.order)).toEqual(["27618", "27619"]); expect(o.map(x => x.amount)).toEqual([1676.79, 1676.78]); expect(o[0]?.service).toBe("Jato");
   });
   it("coluna Faturamento vazia usa a OP da coluna B; sem nenhuma, ignora", () => {
-    const rows: unknown[][] = [["", "OP", "", "CLIENTE", "", "", "DIV", "", "", "MP REAL", "", "", "REALIZ. R$", "FATURAMENTO"], ["", 27700, "", "X", "", "", "JATO", "", "", 0, "", "", 100, ""], ["", "REC", "", "Y", "", "", "JATO", "", "", 0, "", "", 50, ""]];
+    const rows: unknown[][] = [["", "OP", "", "CLIENTE", "", "", "DIV", "", "", "MP REAL", "", "", "REALIZ. R$", "FATURAMENTO"], ["", 27700, "", "X", "", "", "JATO", "", "", 0, "", "", 100, "", 46300], ["", "REC", "", "Y", "", "", "JATO", "", "", 0, "", "", 50, "", 46300]];
     const r = parseOrders(rows); expect(r.orders.map(x => x.order)).toEqual(["27700"]); expect(r.ignored).toBe(1);
   });
   it("sem coluna Faturamento, a coluna B com vários números é ignorada", () => {
@@ -56,11 +56,11 @@ describe("indústria", () => {
 
 import { parseOrders as po2 } from "./industry-sync";
 import { test as t2, expect as e2 } from "vitest";
-t2("importa apenas pedidos com valor na coluna M (REALIZ. R$)", () => {
+t2("importa pedidos com data na coluna O, mesmo com valor 0; sem data, ignora", () => {
   const head = ["FR","OP","ENTRADA","Cliente","Material","Qtd","DIV","PREV. MP","%","MP REAL","%2","FAT. R$","REALIZ. R$","DATA PREV","DATA FINAL","FATURAMENTO"];
-  const rows: unknown[][] = [head, ["", 27515, "", "PINHALENSE", "", "", "PPO N", 207.9, "", "", "", 5420, "", 46294, "", 27514], ["", 27493, "", "TINTI", "", "", "CARR", 10, "", "", "", 10200, 10200, 46294, "", ""]];
+  const rows: unknown[][] = [head, ["", 27515, "", "PINHALENSE", "", "", "PPO N", 207.9, "", "", "", 5420, 5420, 46294, "", ""], ["", 27493, "", "TINTI", "", "", "CARR", 10, "", "", "", 10200, "", 46294, 46300, ""]];
   const r = po2(rows);
-  e2(r.orders.map(o => o.order)).toEqual(["27493"]); e2(r.orders[0]!.mp).toBe(10);
+  e2(r.orders.map(o => o.order)).toEqual(["27493"]); e2(r.orders[0]!.amount).toBe(0);
 });
 
 describe("OP dividida entre setores", () => {
