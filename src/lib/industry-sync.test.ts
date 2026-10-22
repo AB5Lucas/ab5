@@ -75,3 +75,8 @@ describe("OP dividida entre setores", () => {
     expect(o.splits?.map(p => [p.service, p.amount])).toEqual([["Carrinhos", 2398.94], ["PPO", 690.68]]);
   });
 });
+t2("matéria-prima vem só da coluna J (MP REAL), sem usar PREV. MP", () => {
+  const head = ["FR","OP","ENTRADA","Cliente","Material","Qtd","DIV","PREV. MP","%","MP REAL","%2","FAT. R$","REALIZ. R$","DATA PREV","DATA FINAL","FATURAMENTO"];
+  const rows = [head, [1, 27621, 0, "TENDA", "", 1, "PPO", 2392, 0, "", 0, 0, 1000, 0, 46300, ""]];
+  e2(po2(rows).orders[0]?.mp).toBeNull();
+});
