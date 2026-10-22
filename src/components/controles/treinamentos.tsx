@@ -492,7 +492,7 @@ export function TrainingsPage() {
                             <AppointmentDialog
                               type="treinamento"
                               iconOnly
-                              initialValues={{ collaborator_id: m.personId, training_id: m.trainingId ?? undefined }}
+                              initialValues={{ collaborator_id: m.personId, ...(m.trainingId ? { training_id: m.trainingId } : {}) }}
                             />
                           </div>
                         </TableCell>

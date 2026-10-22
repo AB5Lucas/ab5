@@ -523,7 +523,7 @@ export function IntegrationsPage() {
                     <AppointmentDialog
                       type="integracao"
                       iconOnly
-                      initialValues={{ collaborator_id: p.id, client_id: clientFilter !== "all" ? clientFilter : undefined }}
+                      initialValues={{ collaborator_id: p.id, ...(clientFilter !== "all" ? { client_id: clientFilter } : {}) }}
                     />
                   </div>
                 </TableCell>
