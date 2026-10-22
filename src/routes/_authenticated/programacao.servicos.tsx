@@ -408,6 +408,62 @@ function ServicesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const [relocate, setRelocate] = useState<{ id: string; name: string } | null>(null);
+  const [otherClient, setOtherClient] = useState("");
+  const allClients = useQuery({
+    queryKey: ["relocate-clients"],
+    enabled: !!relocate,
+    queryFn: async () => (await supabase.from("clients").select("id, name").eq("active", true).order("name")).data ?? [],
+  });
+  const findClient = (n: string) => allClients.data?.find((c) => c.name.trim().toUpperCase() === n);
+  const relocateTo = useMutation({
+    mutationFn: async (target: string) => {
+      const { error } = await supabase.rpc("relocate_allocation_client" as any, { _alloc_id: relocate!.id, _client_id: target });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Colaborador remanejado");
+      setRelocate(null);
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["servicos-weekend-ctx"] });
+      qc.invalidateQueries({ queryKey: ["servicos-clients"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const relocateDialog = (
+    <Dialog open={!!relocate} onOpenChange={(o) => !o && setRelocate(null)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Remanejar {relocate?.name}</DialogTitle></DialogHeader>
+        <p className="text-sm text-muted-foreground">Para onde o colaborador vai?</p>
+        <div className="grid grid-cols-2 gap-2">
+          {["PATIO", "INDUSTRIA"].map((n) => {
+            const c = findClient(n);
+            return (
+              <Button key={n} variant="outline" className="h-14 text-base" disabled={!c || c.id === clientId || relocateTo.isPending} onClick={() => c && relocateTo.mutate(c.id)}>
+                {n === "PATIO" ? "Pátio" : "Indústria"}
+              </Button>
+            );
+          })}
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Outro cliente</Label>
+          <Select value={otherClient} onValueChange={setOtherClient}>
+            <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
+            <SelectContent>
+              {(allClients.data ?? []).filter((c) => c.id !== clientId && !["PATIO", "INDUSTRIA"].includes(c.name.trim().toUpperCase())).map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" className="text-destructive" disabled={removeDay.isPending} onClick={() => { removeDay.mutate(relocate!.id); setRelocate(null); }}>Só remover do dia</Button>
+          <Button disabled={!otherClient || relocateTo.isPending} onClick={() => relocateTo.mutate(otherClient)}>Remanejar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   const effText = useMemo(() => {
     const lines = [`*${clientName.toUpperCase()} - EFETIVO*`, dayLabel, ""];
     visible.forEach((w) => {
@@ -444,7 +500,7 @@ function ServicesPage() {
         <p className="truncate text-[10px] leading-tight text-muted-foreground">{a.positions?.name ?? "Sem função"}</p>
       </div>
       {isWeekend && (
-        <Button type="button" variant="ghost" size="icon" aria-label="Remover do dia" title="Remover do dia" className="size-9 shrink-0 p-0 text-muted-foreground hover:text-destructive md:size-3 [&_svg]:size-5 md:[&_svg]:size-3" onClick={() => removeDay.mutate(a.id)}>
+        <Button type="button" variant="ghost" size="icon" aria-label="Remanejar" title="Remanejar para outro cliente" className="size-9 shrink-0 p-0 text-muted-foreground hover:text-destructive md:size-3 [&_svg]:size-5 md:[&_svg]:size-3" onClick={() => { setRelocate({ id: a.id, name: a.collaborators?.full_name ?? "" }); setOtherClient(""); }}>
           <X />
         </Button>
       )}
@@ -453,6 +509,7 @@ function ServicesPage() {
 
   return (
     <div className="space-y-4">
+      {relocateDialog}
       <PageHeader title="Serviços" description="Divida os colaboradores escalados no cliente entre os serviços do dia." />
       <div className="panel flex flex-wrap items-end gap-3 p-3">
         <div className="flex items-end gap-1">
