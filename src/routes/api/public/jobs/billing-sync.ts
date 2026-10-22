@@ -5,7 +5,15 @@ export const Route = createFileRoute("/api/public/jobs/billing-sync")({
     const failure = await authenticateCronRequest(request);
     if (failure) return failure;
     const body = await request.json().catch(() => null);
-    if (!body || body.kind !== "daily") return Response.json({ error: "Invalid request" }, { status: 400 });
+    if (!body || !["daily", "industry"].includes(body.kind)) return Response.json({ error: "Invalid request" }, { status: 400 });
+    if (body.kind === "industry") {
+      // Reprocess specific Indústria months (cron-secret protected).
+      const months = Array.isArray(body.months) ? body.months.filter((m: unknown) => typeof m === "string" && /^\d{4}-\d{2}$/.test(m)) : [];
+      const lk = process.env["LOVABLE_API_KEY"]; const ek = process.env["MICROSOFT_EXCEL_API_KEY"];
+      if (!months.length || !lk || !ek) return Response.json({ error: "Invalid request" }, { status: 400 });
+      const { executeIndustrySync } = await import("@/lib/industry-sync.server");
+      return Response.json(await executeIndustrySync({ lovableKey: lk, excelKey: ek }, "manual", months));
+    }
     const lovableKey = process.env["LOVABLE_API_KEY"];
     const excelKey = process.env["MICROSOFT_EXCEL_API_KEY"];
     if (!lovableKey || !excelKey) return Response.json({ error: "Excel connection missing" }, { status: 503 });
