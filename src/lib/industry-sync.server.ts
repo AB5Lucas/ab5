@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { invoiceFolderName, missingStatus, monthsToSync, ordersFileName, parseInvoices, parseOrders } from "./industry-sync";
+import { invoiceFolderName, missingStatus, monthsToSync, ordersFileName, parseInvoices, parseOrders, parseWorksBillingRows } from "./industry-sync";
 
 type Credentials = { lovableKey: string; excelKey: string };
 export const DRIVE = "/drives/b!5V4Lk-rJCUCH4KwrKzBCgQtORfWyeVZNr7N5qacwdyb7xsyD9fxASIPz40EKW7xL";
@@ -37,7 +37,8 @@ async function runOne(source: "pedidos" | "faturamento", ym: string, today: stri
   try {
     const buf = await graph(`${DRIVE}/root:/${enc(file)}:/content`, c, true);
     const wb = XLSX.read(new Uint8Array(buf), { cellDates: false });
-    const sheet = source === "pedidos" ? (wb.Sheets["Dados"] ?? null) : wb.Sheets[wb.SheetNames[0]!];
+    const firstSheet = wb.SheetNames[0];
+    const sheet = source === "pedidos" ? (wb.Sheets["Dados"] ?? null) : firstSheet ? wb.Sheets[firstSheet] : null;
     if (!sheet) throw new Error("Aba 'Dados' não encontrada na planilha de pedidos");
     const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "" });
     let payload: unknown[]; let ignored = 0;
@@ -45,6 +46,18 @@ async function runOne(source: "pedidos" | "faturamento", ym: string, today: stri
     else payload = parseInvoices(rows);
     const { data, error: e2 } = await supabaseAdmin.rpc("industry_sync_apply", { p_run: run.id, p_source: source, p_month: ym, p_file: file, p_rows: JSON.parse(JSON.stringify(payload)) });
     if (e2) throw e2;
+    if (source === "faturamento") {
+      const notes = parseWorksBillingRows(rows);
+      if (notes.length) {
+        const { data: servicesRun, error: runError } = await supabaseAdmin.from("billing_sync_runs").insert({ category: "servicos", source: "faturamento", ref_month: ym, file_path: file, trigger_kind: kind, status: "running" }).select("id").single();
+        if (runError) throw runError;
+        const { error: servicesError } = await supabaseAdmin.rpc("billing_sync_import_external", { p_run: servicesRun.id, p_notes: JSON.parse(JSON.stringify(notes)) });
+        if (servicesError) {
+          await supabaseAdmin.from("billing_sync_runs").update({ status: "error", finished_at: new Date().toISOString(), errors: 1, error_message: servicesError.message }).eq("id", servicesRun.id);
+          throw servicesError;
+        }
+      }
+    }
     await supabaseAdmin.from("billing_sync_runs").update({ ignored }).eq("id", run.id);
     return { source, ym, ...(data as object) };
   } catch (err) {

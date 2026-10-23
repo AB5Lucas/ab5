@@ -1,7 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { classifyService, invoiceFolderName, missingStatus, monthsToSync, ordersFileName, parseInvoices, parseOrders, stripZeros } from "./industry-sync";
+import { classifyService, invoiceFolderName, missingStatus, monthsToSync, ordersFileName, parseInvoices, parseOrders, parseWorksBillingRows, stripZeros } from "./industry-sync";
 
 describe("indústria", () => {
+  for (const description of ["SERVICOS COBRANCA OBRAS 3%", "SERVICOS OBRAS EXTERNAS MANUT/REPARO"]) {
+    it(`encaminha ${description} somente para Serviços`, () => {
+      const r: unknown[] = Array(44).fill("");
+      r[1] = "001702"; r[7] = "2026-10-23"; r[12] = "MOINHO"; r[16] = "8395"; r[25] = description; r[43] = 1602.82;
+      expect(parseInvoices([r])).toEqual([]);
+      expect(parseWorksBillingRows([r])[0]).toMatchObject({ invoice: "1702", issuedAt: "2026-10-23", client: "MOINHO", order: "8395", amountCents: 160282 });
+    });
+  }
+  it("agrupa itens da mesma NF e pedido e conserva a chave ao atualizar valores", () => {
+    const r: unknown[] = Array(44).fill("");
+    r[1] = "1702"; r[7] = "2026-10-23"; r[12] = "MOINHO"; r[16] = "8395"; r[25] = "SERVIÇOS OBRAS EXTERNAS MANUT/REPARO"; r[43] = 100;
+    const second = [...r]; second[43] = 50;
+    expect(parseWorksBillingRows([r, second])).toHaveLength(1);
+    expect(parseWorksBillingRows([r, second])[0]?.amountCents).toBe(15000);
+    expect(parseWorksBillingRows([r, second])[0]?.key).toBe(parseWorksBillingRows([r])[0]?.key);
+  });
   it("remove zeros à esquerda", () => { expect(stripZeros("00012345")).toBe("12345"); expect(stripZeros("027578")).toBe("27578"); });
   it("classifica serviços", () => {
     for (const c of ["PPO", "N", "REN", "PPO N", " ppo  n "]) expect(classifyService(c)).toBe("PPO");

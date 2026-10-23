@@ -4438,6 +4438,10 @@ export type Database = {
         Returns: string
       }
       billing_quote_key: { Args: { v: string }; Returns: string }
+      billing_sync_import_external: {
+        Args: { p_notes: Json; p_run: string }
+        Returns: Json
+      }
       billing_sync_process: {
         Args: { p_notes: Json; p_run: string }
         Returns: Json
