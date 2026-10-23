@@ -33,3 +33,4 @@
 - [x] Treinamentos/ASO/Integrações: não alertar vencimentos de colaboradores inativos
 - [x] Ao agendar treinamento/ASO/integração: avisar se colaborador estiver de férias ou afastado (período)
 - [x] Faturamento > Serviços: filtros idênticos aos da Indústria
+- [ ] Faturamento: encaminhar cobrança de obras e obras externas manut/reparo da fonte Indústria para Serviços sem duplicar.
