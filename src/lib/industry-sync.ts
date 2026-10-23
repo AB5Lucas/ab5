@@ -172,8 +172,8 @@ export function parseInvoices(rows: unknown[][]): IndustryInvoice[] {
   return [...map.values()];
 }
 
-/** Notas já lançadas na Serviços têm prioridade: a mesma NF (número + emissão) sai da Indústria. */
-export function dropServicesInvoices(list: IndustryInvoice[], services: { invoice: string; date: string }[]) {
-  const keys = new Set(services.map(s => `${stripZeros(s.invoice)}|${s.date}`));
-  return list.filter(i => !keys.has(`${i.invoice}|${i.date}`));
+/** Notas já lançadas na Serviços têm prioridade: a mesma NF (só o número) sai da Indústria. */
+export function dropServicesInvoices(list: IndustryInvoice[], services: { invoice: string; date?: string }[]) {
+  const keys = new Set(services.map(s => stripZeros(String(s.invoice ?? ""))).filter(Boolean));
+  return list.filter(i => !keys.has(stripZeros(String(i.invoice))));
 }
