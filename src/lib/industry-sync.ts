@@ -1,4 +1,4 @@
-import { excelDate, moneyCents } from "./billing-sync";
+import { BILLING_START, documentKey, excelDate, moneyCents, type BillingNote } from "./billing-sync";
 
 export const MONTHS = ["JANEIRO","FEVEREIRO","MARÇO","ABRIL","MAIO","JUNHO","JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO"];
 export const MONTHS_SHORT = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
@@ -127,7 +127,24 @@ export function parseOrders(rows: unknown[][]): { orders: IndustryOrder[]; ignor
 export type IndustryInvoice = { invoice: string; date: string; order: string; client: string; amount: number; items: { order: string; amount: number }[] };
 /** Fat. Por Vendedor: B=NF, H=Emissão, M=Cliente, Q=Pedido, AR=Valor. Items of the same NF+date are summed. */
 export function isWorksBilling(desc: unknown) {
-  return String(desc ?? "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes("SERVICOS COBRANCA OBRAS");
+  const text = String(desc ?? "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+  return text.includes("SERVICOS COBRANCA OBRAS") || text.includes("SERVICOS OBRAS EXTERNAS MANUT/REPARO");
+}
+/** Works invoices from the industry report use the Serviços matching and audit flow. */
+export function parseWorksBillingRows(rows: unknown[][]): BillingNote[] {
+  const notes = new Map<string, BillingNote>();
+  for (const [index, raw] of rows.entries()) {
+    if (!isWorksBilling(raw[25])) continue;
+    const invoice = stripZeros(raw[1]); const issuedAt = excelDate(raw[7]);
+    const amountCents = moneyCents(raw[43]); const client = String(raw[12] ?? "").trim();
+    if (!/^\d+$/.test(invoice) || !issuedAt || issuedAt < BILLING_START || amountCents === null || amountCents <= 0 || !client) continue;
+    const order = stripZeros(raw[16]);
+    const key = ["INDUSTRIA-OBRAS", issuedAt, documentKey(invoice), client.toUpperCase(), documentKey(order)].join("|");
+    const existing = notes.get(key);
+    if (existing) existing.amountCents += amountCents;
+    else notes.set(key, { key, invoice, issuedAt, client, order, quote: "", amountCents, cancelled: false, raw, row: index + 1 });
+  }
+  return [...notes.values()];
 }
 /** Clientes faturados pela aba Serviços: nunca entram no faturamento da Indústria. */
 export const SERVICES_ONLY_CLIENTS = ["TENNECO"];
