@@ -4437,6 +4437,7 @@ export type Database = {
         Args: { p_order: string; p_quote: string; p_work: string }
         Returns: string
       }
+      billing_purge_cross_duplicates: { Args: never; Returns: Json }
       billing_quote_key: { Args: { v: string }; Returns: string }
       billing_sync_import_external: {
         Args: { p_notes: Json; p_run: string }
