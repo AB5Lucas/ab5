@@ -103,4 +103,8 @@ describe("prioridade da Serviços", () => {
     const list = [{ invoice: "1702", date: "2026-10-10", order: "8395", client: "MOINHO", amount: 10, items: [] }, { invoice: "1703", date: "2026-10-10", order: "1", client: "X", amount: 5, items: [] }];
     expect(_drop(list, [{ invoice: "01702", date: "2026-10-10" }]).map(i => i.invoice)).toEqual(["1703"]);
   });
+  it("remove mesmo com data de emissão diferente", () => {
+    const list = [{ invoice: "1700", date: "2026-10-21", order: "27607", client: "MARS", amount: 10, items: [] }];
+    expect(_drop(list, [{ invoice: "1700", date: "2026-10-07" }])).toEqual([]);
+  });
 });

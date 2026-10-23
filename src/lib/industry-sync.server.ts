@@ -45,8 +45,7 @@ async function runOne(source: "pedidos" | "faturamento", ym: string, today: stri
     if (source === "pedidos") { const p = parseOrders(rows); payload = p.orders; ignored = p.ignored; }
     else {
       const inv = parseInvoices(rows);
-      const dates = [...new Set(inv.map(i => i.date))];
-      const { data: svc, error: se } = dates.length ? await supabaseAdmin.from("billing_sync_notes").select("invoice_number, issued_at").eq("cancelled", false).not("source_key", "like", "INDUSTRIA-OBRAS%").in("issued_at", dates) : { data: [], error: null };
+      const { data: svc, error: se } = await supabaseAdmin.from("billing_sync_notes").select("invoice_number, issued_at").eq("cancelled", false).not("source_key", "like", "INDUSTRIA-OBRAS%").not("invoice_number", "is", null);
       if (se) throw se;
       payload = dropServicesInvoices(inv, (svc ?? []).map(n => ({ invoice: n.invoice_number, date: n.issued_at })));
       ignored = inv.length - payload.length;
