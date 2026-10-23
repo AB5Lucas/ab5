@@ -48,7 +48,7 @@ export async function executeBillingSync(credentials: Credentials, kind: string)
       rows.push(...page.values);
     }
     const parsed = parseBillingRows(rows);
-    const { data, error } = await supabaseAdmin.rpc("billing_sync_process", { p_run: runId, p_notes: JSON.parse(JSON.stringify(parsed.notes)) });
+    const { data, error } = await supabaseAdmin.rpc("billing_sync_import_external", { p_run: runId, p_notes: JSON.parse(JSON.stringify(parsed.notes)) });
     if (error) throw error;
     if (parsed.invalid) {
       await supabaseAdmin.from("billing_sync_history").insert({ run_id: runId, action: "invalid_dates", snapshot: { invalid: parsed.invalid, reason: "Linhas sem data de emissão válida não foram importadas" } });

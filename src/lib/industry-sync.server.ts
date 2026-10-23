@@ -51,7 +51,7 @@ async function runOne(source: "pedidos" | "faturamento", ym: string, today: stri
       if (notes.length) {
         const { data: servicesRun, error: runError } = await supabaseAdmin.from("billing_sync_runs").insert({ category: "servicos", source: "faturamento", ref_month: ym, file_path: file, trigger_kind: kind, status: "running" }).select("id").single();
         if (runError) throw runError;
-        const { error: servicesError } = await supabaseAdmin.rpc("billing_sync_import_external" as never, { p_run: servicesRun.id, p_notes: JSON.parse(JSON.stringify(notes)) } as never);
+        const { error: servicesError } = await supabaseAdmin.rpc("billing_sync_import_external", { p_run: servicesRun.id, p_notes: JSON.parse(JSON.stringify(notes)) });
         if (servicesError) {
           await supabaseAdmin.from("billing_sync_runs").update({ status: "error", finished_at: new Date().toISOString(), errors: 1, error_message: servicesError.message }).eq("id", servicesRun.id);
           throw servicesError;

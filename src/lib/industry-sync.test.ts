@@ -8,7 +8,6 @@ describe("indústria", () => {
       r[1] = "001702"; r[7] = "2026-10-23"; r[12] = "MOINHO"; r[16] = "8395"; r[25] = description; r[43] = 1602.82;
       expect(parseInvoices([r])).toEqual([]);
       expect(parseWorksBillingRows([r])[0]).toMatchObject({ invoice: "1702", issuedAt: "2026-10-23", client: "MOINHO", order: "8395", amountCents: 160282 });
-      expect(parseWorksBillingRows([r])[0]?.key).toBe(parseWorksBillingRows([r])[0]?.key);
     });
   }
   it("agrupa itens da mesma NF e pedido e conserva a chave ao atualizar valores", () => {
