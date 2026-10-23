@@ -96,3 +96,11 @@ t2("matéria-prima vem só da coluna J (MP REAL), sem usar PREV. MP", () => {
   const rows = [head, [1, 27621, 0, "TENDA", "", 1, "PPO", 2392, 0, "", 0, 0, 1000, 0, 46300, ""]];
   e2(po2(rows).orders[0]?.mp).toBeNull();
 });
+
+import { dropServicesInvoices as _drop } from "./industry-sync";
+describe("prioridade da Serviços", () => {
+  it("remove da Indústria a NF já lançada na Serviços", () => {
+    const list = [{ invoice: "1702", date: "2026-10-10", order: "8395", client: "MOINHO", amount: 10, items: [] }, { invoice: "1703", date: "2026-10-10", order: "1", client: "X", amount: 5, items: [] }];
+    expect(_drop(list, [{ invoice: "01702", date: "2026-10-10" }]).map(i => i.invoice)).toEqual(["1703"]);
+  });
+});
