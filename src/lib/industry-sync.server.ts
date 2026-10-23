@@ -64,6 +64,7 @@ async function runOne(source: "pedidos" | "faturamento", ym: string, today: stri
         }
       }
     }
+    await supabaseAdmin.rpc("billing_purge_cross_duplicates");
     await supabaseAdmin.from("billing_sync_runs").update({ ignored }).eq("id", run.id);
     return { source, ym, ...(data as object) };
   } catch (err) {
