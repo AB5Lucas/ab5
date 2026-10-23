@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { invoiceFolderName, missingStatus, monthsToSync, ordersFileName, parseInvoices, parseOrders, parseWorksBillingRows } from "./industry-sync";
+import { dropServicesInvoices, invoiceFolderName, missingStatus, monthsToSync, ordersFileName, parseInvoices, parseOrders, parseWorksBillingRows } from "./industry-sync";
 
 type Credentials = { lovableKey: string; excelKey: string };
 export const DRIVE = "/drives/b!5V4Lk-rJCUCH4KwrKzBCgQtORfWyeVZNr7N5qacwdyb7xsyD9fxASIPz40EKW7xL";
@@ -43,7 +43,14 @@ async function runOne(source: "pedidos" | "faturamento", ym: string, today: stri
     const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "" });
     let payload: unknown[]; let ignored = 0;
     if (source === "pedidos") { const p = parseOrders(rows); payload = p.orders; ignored = p.ignored; }
-    else payload = parseInvoices(rows);
+    else {
+      const inv = parseInvoices(rows);
+      const dates = [...new Set(inv.map(i => i.date))];
+      const { data: svc, error: se } = dates.length ? await supabaseAdmin.from("billing_sync_notes").select("invoice_number, issued_at").eq("cancelled", false).not("source_key", "like", "INDUSTRIA-OBRAS%").in("issued_at", dates) : { data: [], error: null };
+      if (se) throw se;
+      payload = dropServicesInvoices(inv, (svc ?? []).map(n => ({ invoice: n.invoice_number, date: n.issued_at })));
+      ignored = inv.length - payload.length;
+    }
     const { data, error: e2 } = await supabaseAdmin.rpc("industry_sync_apply", { p_run: run.id, p_source: source, p_month: ym, p_file: file, p_rows: JSON.parse(JSON.stringify(payload)) });
     if (e2) throw e2;
     if (source === "faturamento") {
