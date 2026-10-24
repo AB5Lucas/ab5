@@ -209,7 +209,7 @@ function DashboardPage() {
       services: workSet.size,
       total: active.length,
       allocated: allocated.size,
-      vac: mapLeave(p.vac),
+      vac: mapLeave(p.vac).filter((r: any) => r.end_date >= today),
       med: mapLeave(p.med),
       clientBars,
       clientDetail,
