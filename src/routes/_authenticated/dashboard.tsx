@@ -85,7 +85,7 @@ function DashboardPage() {
         fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("clients").select("id, name").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("asos").select("collaborator_id, exam_date, expires_at").range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at, documentation").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("collaborator_trainings").select("collaborator_id, training_id, completed_at, expires_at, trainings(name)").range(a, b)),
       ]);
       return { people, works, clients, asos, integ, trains };
@@ -190,7 +190,7 @@ function DashboardPage() {
     };
     latest(b.asos, (r: any) => r.collaborator_id, (r: any) => r.expires_at).forEach((r: any) =>
       push(r.collaborator_id, "ASO", "—", r.exam_date, r.expires_at, `a${r.collaborator_id}`));
-    latest(b.integ, (r: any) => `${r.collaborator_id}|${r.client_id}`, (r: any) => r.expires_at).forEach((r: any) =>
+    latest(b.integ, (r: any) => `${r.collaborator_id}|${r.client_id}`, (r: any) => r.expires_at).filter((r: any) => !r.documentation).forEach((r: any) =>
       push(r.collaborator_id, "Integração", client.get(r.client_id) ?? "—", r.integration_date, r.expires_at, `i${r.collaborator_id}${r.client_id}`));
     latest(b.trains, (r: any) => `${r.collaborator_id}|${r.training_id}`, (r: any) => r.expires_at).forEach((r: any) =>
       push(r.collaborator_id, `Treinamento — ${r.trainings?.name ?? ""}`, "—", r.completed_at, r.expires_at, `t${r.collaborator_id}${r.training_id}`));
