@@ -393,6 +393,13 @@
       "when": 1792752790366,
       "tag": "0055_billing_purge_cross_duplicates",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1792846515705,
+      "tag": "0056_weekend_bonus_respect_manual",
+      "breakpoints": true
     }
   ]
 }
