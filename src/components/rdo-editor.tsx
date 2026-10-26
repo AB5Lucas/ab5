@@ -65,7 +65,7 @@ export const workLabel = (w: { name: string; clients: { name: string } | null })
 /** Cria/sincroniza o RDO da obra+data com a Programação e mostra o preenchimento por etapas. */
 export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
   const qc = useQueryClient();
-  const { user, profile, canWrite } = useCurrentUser();
+  const { user, profile, canWrite, isCliente } = useCurrentUser();
   const [step, setStep] = useState(0);
 
   const rdo = useQuery({
@@ -144,7 +144,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
   });
 
   const r = rdo.data;
-  const editable = !!r && (r.status === "draft" || canWrite);
+  const editable = !!r && !isCliente && (r.status === "draft" || canWrite);
 
   const defaultTimes = useMemo(() => {
     if (r?.shift === "night") return { entry: NIGHT_ENTRY, exit: NIGHT_EXIT };
@@ -214,9 +214,11 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
         <p className="text-sm text-muted-foreground">
           Programação do dia: <b>{planned.data?.allocs.length ?? 0}</b> colaborador(es) escalado(s) nesta obra.
         </p>
-        <Button size="lg" className="w-full sm:w-auto" onClick={() => create.mutate()} disabled={create.isPending}>
-          <Plus className="h-5 w-5" /> Criar RDO
-        </Button>
+        {!isCliente && (
+          <Button size="lg" className="w-full sm:w-auto" onClick={() => create.mutate()} disabled={create.isPending}>
+            <Plus className="h-5 w-5" /> Criar RDO
+          </Button>
+        )}
       </div>
     );
   }
@@ -940,6 +942,7 @@ function MediaStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
 /* ---------------- Assinaturas ---------------- */
 
 function SignaturesStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
+  const { isCliente } = useCurrentUser();
   const sigs = useQuery({
     queryKey: ["rdo-sigs", rdoId],
     queryFn: async () => (await supabase.from("rdo_signatures").select("*").eq("rdo_id", rdoId)).data ?? [],
@@ -949,7 +952,7 @@ function SignaturesStep({ rdoId, editable }: { rdoId: string; editable: boolean 
       <h2 className="font-display text-base uppercase">Assinaturas</h2>
       <div className="grid gap-4 md:grid-cols-2">
         <SignatureBox rdoId={rdoId} kind="ab5" title="Responsável AB5" existing={sigs.data?.find((s) => s.kind === "ab5")} editable={editable} />
-        <SignatureBox rdoId={rdoId} kind="client" title="Responsável cliente" existing={sigs.data?.find((s) => s.kind === "client")} editable={editable} />
+        <SignatureBox rdoId={rdoId} kind="client" title="Responsável cliente" existing={sigs.data?.find((s) => s.kind === "client")} editable={editable || isCliente} />
       </div>
     </div>
   );
