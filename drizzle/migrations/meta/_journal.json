@@ -407,6 +407,13 @@
       "when": 1793011164028,
       "tag": "0057_servicos_driver_bonus_default",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793014109103,
+      "tag": "0058_add_cliente_role",
+      "breakpoints": true
     }
   ]
 }

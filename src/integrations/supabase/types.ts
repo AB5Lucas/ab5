@@ -4577,6 +4577,7 @@ export type Database = {
         | "viewer"
         | "encarregado"
         | "coordenador"
+        | "cliente"
       bonus_calculation_type: "daily" | "trip" | "round_trip" | "overnight"
       collaborator_status: "active" | "inactive"
       confirmation_status: "confirmed" | "pending"
@@ -4720,7 +4721,14 @@ export const Constants = {
   public: {
     Enums: {
       allocation_source: ["base_team", "copied_previous_day", "manual"],
-      app_role: ["admin", "programmer", "viewer", "encarregado", "coordenador"],
+      app_role: [
+        "admin",
+        "programmer",
+        "viewer",
+        "encarregado",
+        "coordenador",
+        "cliente",
+      ],
       bonus_calculation_type: ["daily", "trip", "round_trip", "overnight"],
       collaborator_status: ["active", "inactive"],
       confirmation_status: ["confirmed", "pending"],
