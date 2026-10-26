@@ -3,12 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, type AppRole } from "@/hooks/use-auth";
 
 /** Perfis configuráveis na página Acessos (encarregado segue regra própria: só Externo). */
-export const CONFIG_ROLES: AppRole[] = ["admin", "coordenador", "encarregado", "programmer", "viewer"];
+export const CONFIG_ROLES: AppRole[] = ["admin", "coordenador", "encarregado", "programmer", "viewer", "cliente"];
 
 /** Sem configuração salva: perfis antigos mantêm acesso total; Coordenador começa sem nada. */
 export function defaultAllowed(role: AppRole, url: string) {
   if (role === "encarregado") return url.startsWith("/externo");
   if (role === "coordenador") return false;
+  if (role === "cliente") return url === "/externo/relatorio-diario";
   if (url === "/admin/acessos" || url === "/fechamentos/financeiro") return role === "admin";
   return true;
 }

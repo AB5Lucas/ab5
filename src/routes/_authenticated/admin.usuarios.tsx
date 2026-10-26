@@ -66,6 +66,8 @@ function UsersPage() {
               ? "coordenador"
             : list.includes("encarregado")
               ? "encarregado"
+              : list.includes("cliente")
+              ? "cliente"
               : "viewer";
         return { ...p, role };
       });
@@ -177,7 +179,7 @@ function UsersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {(["admin", "programmer", "coordenador", "viewer", "encarregado"] as AppRole[]).map((r) => (
+                        {(["admin", "programmer", "coordenador", "viewer", "encarregado", "cliente"] as AppRole[]).map((r) => (
                           <SelectItem key={r} value={r}>
                             {ROLE_LABEL[r]}
                           </SelectItem>
@@ -187,7 +189,7 @@ function UsersPage() {
                   ) : (
                     <Badge variant="secondary">{ROLE_LABEL[u.role]}</Badge>
                   )}
-                  {isAdmin && (u.role === "encarregado" || u.role === "coordenador") && <ForemanWorksButton userId={u.id} name={u.full_name || u.email} />}
+                  {isAdmin && (u.role === "encarregado" || u.role === "coordenador" || u.role === "cliente") && <ForemanWorksButton userId={u.id} name={u.full_name || u.email} perWork={u.role === "cliente"} />}
                 </TableCell>
                 <TableCell>
                   <Switch

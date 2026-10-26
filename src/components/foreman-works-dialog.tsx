@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 /** Administrador escolhe quais obras o encarregado pode acessar no RDO. */
-export function ForemanWorksButton({ userId, name }: { userId: string; name: string }) {
+export function ForemanWorksButton({ userId, name, perWork = false }: { userId: string; name: string; perWork?: boolean }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const qc = useQueryClient();
@@ -18,7 +18,7 @@ export function ForemanWorksButton({ userId, name }: { userId: string; name: str
   const works = useQuery({
     queryKey: ["fw-works-all"],
     queryFn: async () => {
-      const { data } = await supabase.from("works").select("id, client_id, clients(name)");
+      const { data } = await supabase.from("works").select("id, name, client_id, clients(name)");
       return data ?? [];
     },
   });
@@ -32,11 +32,12 @@ export function ForemanWorksButton({ userId, name }: { userId: string; name: str
 
   // Agrupa os serviços por cliente
   const clients = (() => {
-    const map = new Map<string, { id: string; name: string; workIds: string[] }>();
+    const map = new Map<string, { id: string; name: string; workIds: string[]; works: { id: string; name: string }[] }>();
     for (const w of works.data ?? []) {
       if (!w.client_id) continue;
-      const c = map.get(w.client_id) ?? { id: w.client_id, name: w.clients?.name ?? "—", workIds: [] };
+      const c = map.get(w.client_id) ?? { id: w.client_id, name: w.clients?.name ?? "—", workIds: [], works: [] };
       c.workIds.push(w.id);
+      c.works.push({ id: w.id, name: w.name ?? "—" });
       map.set(w.client_id, c);
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -60,7 +61,7 @@ export function ForemanWorksButton({ userId, name }: { userId: string; name: str
   const linkedList = clients.filter((c) => c.workIds.some((id) => linked.data?.has(id)));
 
   // Cliente atribuído vale para todos os serviços dele: completa os que faltarem ao carregar
-  const missing = linkedList.flatMap((c) => c.workIds.filter((id) => !linked.data?.has(id)));
+  const missing = perWork ? [] : linkedList.flatMap((c) => c.workIds.filter((id) => !linked.data?.has(id)));
   const missingKey = missing.join(",");
   useEffect(() => {
     if (!missing.length) return;
@@ -74,21 +75,35 @@ export function ForemanWorksButton({ userId, name }: { userId: string; name: str
   return (
     <>
       <Button variant="outline" size="sm" className="mt-1" onClick={() => setOpen(true)}>
-        <Building2 className="h-3.5 w-3.5" /> Clientes{works.data && linked.data ? ` (${linkedList.length})` : ""}
+        <Building2 className="h-3.5 w-3.5" /> {perWork ? "Serviços" : "Clientes"}
+        {works.data && linked.data ? ` (${perWork ? linked.data.size : linkedList.length})` : ""}
       </Button>
       {works.data && linked.data && (
         <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-          {linkedList.length ? linkedList.map((c) => c.name).join(", ") : "Nenhum cliente atribuído"}
+          {perWork
+            ? linkedList.flatMap((c) => c.works.filter((w) => linked.data?.has(w.id)).map((w) => `${c.name} - ${w.name}`)).join(", ") || "Nenhum serviço atribuído"
+            : linkedList.length ? linkedList.map((c) => c.name).join(", ") : "Nenhum cliente atribuído"}
         </p>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Clientes de {name}</DialogTitle>
+            <DialogTitle>{perWork ? "Serviços" : "Clientes"} de {name}</DialogTitle>
           </DialogHeader>
           <Input placeholder="Buscar cliente..." value={search} onChange={(e) => setSearch(e.target.value)} />
           <div className="max-h-96 space-y-1 overflow-y-auto">
-            {list.map((c) => (
+            {perWork && list.map((c) => (
+              <div key={c.id} className="py-1">
+                <p className="px-2 text-xs font-semibold uppercase text-muted-foreground">{c.name}</p>
+                {c.works.map((w) => (
+                  <label key={w.id} className="flex cursor-pointer items-center gap-2 rounded px-4 py-1.5 text-sm hover:bg-muted">
+                    <Checkbox checked={!!linked.data?.has(w.id)} onCheckedChange={(v) => toggle.mutate({ workIds: [w.id], on: !!v })} />
+                    {w.name}
+                  </label>
+                ))}
+              </div>
+            ))}
+            {!perWork && list.map((c) => (
               <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
                 <Checkbox
                   checked={c.workIds.some((id) => linked.data?.has(id))}

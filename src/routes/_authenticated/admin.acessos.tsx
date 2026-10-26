@@ -34,6 +34,7 @@ function pickRole(list: AppRole[]): AppRole {
   if (list.includes("programmer")) return "programmer";
   if (list.includes("coordenador")) return "coordenador";
   if (list.includes("encarregado")) return "encarregado";
+  if (list.includes("cliente")) return "cliente";
   return "viewer";
 }
 

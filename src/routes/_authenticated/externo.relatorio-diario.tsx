@@ -46,6 +46,14 @@ function RdoPage() {
         const { data } = await supabase.from("works").select(sel).eq("active", true);
         return data ?? [];
       }
+      if (role === "cliente") {
+        // Cargo Cliente: só os serviços marcados, um a um
+        const { data: links } = await supabase.from("foreman_works").select("work_id").eq("user_id", user!.id);
+        const ids = (links ?? []).map((l) => l.work_id);
+        if (!ids.length) return [];
+        const { data } = await supabase.from("works").select(sel).in("id", ids).eq("active", true);
+        return data ?? [];
+      }
       // Cliente atribuído libera todos os serviços ativos desse cliente
       const { data: links } = await supabase.from("foreman_works").select("works(client_id)").eq("user_id", user!.id);
       const clientIds = [...new Set((links ?? []).map((l: any) => l.works?.client_id).filter(Boolean))] as string[];

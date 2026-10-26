@@ -4508,6 +4508,7 @@ export type Database = {
       industry_sync_parts: { Args: { _oid: string }; Returns: undefined }
       is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
+      is_cliente: { Args: never; Returns: boolean }
       is_hiring_rh: { Args: never; Returns: boolean }
       move_allocation_service: {
         Args: { _alloc_id: string; _work_id: string }
@@ -4577,6 +4578,7 @@ export type Database = {
         | "viewer"
         | "encarregado"
         | "coordenador"
+        | "cliente"
       bonus_calculation_type: "daily" | "trip" | "round_trip" | "overnight"
       collaborator_status: "active" | "inactive"
       confirmation_status: "confirmed" | "pending"
@@ -4720,7 +4722,14 @@ export const Constants = {
   public: {
     Enums: {
       allocation_source: ["base_team", "copied_previous_day", "manual"],
-      app_role: ["admin", "programmer", "viewer", "encarregado", "coordenador"],
+      app_role: [
+        "admin",
+        "programmer",
+        "viewer",
+        "encarregado",
+        "coordenador",
+        "cliente",
+      ],
       bonus_calculation_type: ["daily", "trip", "round_trip", "overnight"],
       collaborator_status: ["active", "inactive"],
       confirmation_status: ["confirmed", "pending"],
