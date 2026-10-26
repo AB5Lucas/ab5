@@ -4466,6 +4466,7 @@ export type Database = {
         Args: { _client_id: string; _name: string }
         Returns: string
       }
+      driver_bonus_default: { Args: { _driver_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

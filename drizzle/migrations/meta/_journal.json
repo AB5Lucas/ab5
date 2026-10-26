@@ -400,6 +400,13 @@
       "when": 1792846515705,
       "tag": "0056_weekend_bonus_respect_manual",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1793011164028,
+      "tag": "0057_servicos_driver_bonus_default",
+      "breakpoints": true
     }
   ]
 }
