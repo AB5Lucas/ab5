@@ -4508,6 +4508,7 @@ export type Database = {
       industry_sync_parts: { Args: { _oid: string }; Returns: undefined }
       is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
+      is_cliente: { Args: never; Returns: boolean }
       is_hiring_rh: { Args: never; Returns: boolean }
       move_allocation_service: {
         Args: { _alloc_id: string; _work_id: string }

@@ -414,6 +414,13 @@
       "when": 1793014109103,
       "tag": "0058_add_cliente_role",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793014134762,
+      "tag": "0059_cliente_role_permissions",
+      "breakpoints": true
     }
   ]
 }
