@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  ArrowUpDown,
   Camera,
   Check,
   ChevronLeft,
@@ -832,6 +833,7 @@ function ScaffoldDialog({ rdoId, open, edit, onClose }: { rdoId: string; open: b
 function MediaStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
   const qc = useQueryClient();
   const [uploading, setUploading] = useState(false);
+  const [reversed, setReversed] = useState(false);
   const media = useQuery({
     queryKey: ["rdo-media", rdoId],
     queryFn: async () => {
@@ -891,7 +893,12 @@ function MediaStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
 
   return (
     <div className="space-y-3">
-      <h2 className="font-display text-base uppercase">Fotos e vídeos</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-display text-base uppercase">Fotos e vídeos</h2>
+        <Button type="button" size="icon" variant="outline" aria-label="Inverter ordem" title="Inverter ordem" onClick={() => setReversed((r) => !r)}>
+          <ArrowUpDown className="h-4 w-4" />
+        </Button>
+      </div>
       {editable && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {picker("Tirar foto", <Camera className="h-5 w-5" />, "image/*", "environment")}
@@ -902,7 +909,7 @@ function MediaStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
       )}
       {uploading && <p className="text-xs text-muted-foreground">Enviando...</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {(media.data ?? []).map((m) => (
+        {(reversed ? [...(media.data ?? [])].reverse() : media.data ?? []).map((m) => (
           <div key={m.id} className="space-y-1 rounded-md border border-border p-2">
             {m.kind === "video" ? (
               <video src={m.url} controls className="aspect-video w-full rounded bg-black" />
