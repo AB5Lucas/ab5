@@ -140,6 +140,14 @@ function Page() {
         continue;
       }
       const e = toMin(w.entry_time), ee = toMin(expEntry);
+      {
+        // Cumpriu a carga do dia (ex.: 05:00–15:00 no lugar de 07:00–17:00): não é atraso nem saída antecipada.
+        const xs = toMin(w.exit_time), xe = toMin(expExit);
+        if (e !== null && ee !== null && xs !== null && xe !== null) {
+          const worked = (xs - e + 1440) % 1440, expected = (xe - ee + 1440) % 1440;
+          if (expected > 0 && worked >= expected) continue;
+        }
+      }
       if (e !== null && ee !== null && e - ee > TOLERANCE && !(night && e < 12 * 60))
         add("atraso", `Entrada ${hhmm(w.entry_time)} (previsto ${hhmm(expEntry)})`);
       let x = toMin(w.exit_time), xx = toMin(expExit);
