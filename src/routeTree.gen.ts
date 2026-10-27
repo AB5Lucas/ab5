@@ -56,6 +56,7 @@ import { Route as AuthenticatedProgramacaoServicosRouteImport } from './routes/_
 import { Route as AuthenticatedRelatoriosIndexRouteImport } from './routes/_authenticated/relatorios.index'
 import { Route as AuthenticatedRelatoriosAjustePontoRouteImport } from './routes/_authenticated/relatorios.ajuste-ponto'
 import { Route as AuthenticatedRelatoriosSincronizacaoRouteImport } from './routes/_authenticated/relatorios.sincronizacao'
+import { Route as AuthenticatedRelatoriosValeAlimentacaoRouteImport } from './routes/_authenticated/relatorios.vale-alimentacao'
 import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authenticated/veiculos.index'
 import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_authenticated/veiculos.motoristas'
 import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
@@ -334,6 +335,12 @@ const AuthenticatedRelatoriosSincronizacaoRoute =
     path: '/relatorios/sincronizacao',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedRelatoriosValeAlimentacaoRoute =
+  AuthenticatedRelatoriosValeAlimentacaoRouteImport.update({
+    id: '/relatorios/vale-alimentacao',
+    path: '/relatorios/vale-alimentacao',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVeiculosIndexRoute =
   AuthenticatedVeiculosIndexRouteImport.update({
     id: '/veiculos/',
@@ -408,6 +415,7 @@ export interface FileRoutesByFullPath {
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
   '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
+  '/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
@@ -461,6 +469,7 @@ export interface FileRoutesByTo {
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
   '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
+  '/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
@@ -516,6 +525,7 @@ export interface FileRoutesById {
   '/_authenticated/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
   '/_authenticated/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/_authenticated/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
+  '/_authenticated/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/_authenticated/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
   '/_authenticated/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
@@ -571,6 +581,7 @@ export interface FileRouteTypes {
     | '/programacao/servicos'
     | '/relatorios/ajuste-ponto'
     | '/relatorios/sincronizacao'
+    | '/relatorios/vale-alimentacao'
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
@@ -624,6 +635,7 @@ export interface FileRouteTypes {
     | '/programacao/servicos'
     | '/relatorios/ajuste-ponto'
     | '/relatorios/sincronizacao'
+    | '/relatorios/vale-alimentacao'
     | '/veiculos/motoristas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
@@ -678,6 +690,7 @@ export interface FileRouteTypes {
     | '/_authenticated/programacao/servicos'
     | '/_authenticated/relatorios/ajuste-ponto'
     | '/_authenticated/relatorios/sincronizacao'
+    | '/_authenticated/relatorios/vale-alimentacao'
     | '/_authenticated/veiculos/motoristas'
     | '/_authenticated/veiculos/relatorios'
     | '/_authenticated/veiculos/transporte'
@@ -1028,6 +1041,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRelatoriosSincronizacaoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/relatorios/vale-alimentacao': {
+      id: '/_authenticated/relatorios/vale-alimentacao'
+      path: '/relatorios/vale-alimentacao'
+      fullPath: '/relatorios/vale-alimentacao'
+      preLoaderRoute: typeof AuthenticatedRelatoriosValeAlimentacaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/veiculos/': {
       id: '/_authenticated/veiculos/'
       path: '/veiculos'
@@ -1106,6 +1126,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProgramacaoServicosRoute: typeof AuthenticatedProgramacaoServicosRoute
   AuthenticatedRelatoriosAjustePontoRoute: typeof AuthenticatedRelatoriosAjustePontoRoute
   AuthenticatedRelatoriosSincronizacaoRoute: typeof AuthenticatedRelatoriosSincronizacaoRoute
+  AuthenticatedRelatoriosValeAlimentacaoRoute: typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   AuthenticatedVeiculosMotoristasRoute: typeof AuthenticatedVeiculosMotoristasRoute
   AuthenticatedVeiculosRelatoriosRoute: typeof AuthenticatedVeiculosRelatoriosRoute
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
@@ -1169,6 +1190,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedRelatoriosAjustePontoRoute,
   AuthenticatedRelatoriosSincronizacaoRoute:
     AuthenticatedRelatoriosSincronizacaoRoute,
+  AuthenticatedRelatoriosValeAlimentacaoRoute:
+    AuthenticatedRelatoriosValeAlimentacaoRoute,
   AuthenticatedVeiculosMotoristasRoute: AuthenticatedVeiculosMotoristasRoute,
   AuthenticatedVeiculosRelatoriosRoute: AuthenticatedVeiculosRelatoriosRoute,
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
