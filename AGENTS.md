@@ -22,7 +22,6 @@
 - Certificados (/demandas/certificados): source of trainings is collaborator_trainings.completed_at; issued certificates/lists store a frozen snapshot (training_certificates, attendance_lists) and reissue adds a version. Why: history never changes when cadastros change.
 - Contratações (/demandas/contratacoes): abrir = can_access_page; RH (atualizar status, e-mails) = is_hiring_rh() (admin/programador); cada evento grava hiring_request_events e o trigger registra a tentativa em hiring_email_log (único por evento, evita duplicidade). Por quê: histórico completo sem permissões paralelas.
 - Custos BDI: budget_items.bdi = 1 marks the service; bdiBudget keeps order × BDI_RATE total and splits it by per-work weights (budget_items.weights, else defaults) blended with real costs (BDI_REAL_SHARE); recomputed on every read. Why: balance MO/transport per work without changing the final margin.
-
 - Financeiro opens Resultados with the exact selected month list; changing the detail period clears that list and uses the new range. Why: drill-down must preserve the report period, including nonconsecutive months.
 - Resultados uses result-budget.ts to derive displayed budget items and totals for both the table and chart. Why: monthly budgets must not be scaled a second time by progress.
 - Night premium: laborCost takes night hours from nightHours(entry, exit, break) for RDO rows of night services (rdos.shift='night' or works.night_shift). Why: one labor-cost formula shared by results and financeiro.
@@ -30,7 +29,5 @@
 - Works-description invoices read from the industry report are routed through billing_sync_import_external and the Serviços engine, with cross-source invoice identity checks. Why: one posting owner and no duplicate financial entries across spreadsheets.
 - /relatorios (Alocações) keeps its URL when moved in the menu. Why: preserve permissions and links.
 - Indústria billing: industry-sync(.server).ts read monthly Excel files into industry_orders/invoices; industry_sync_apply upserts work_entries keyed by industry_order_id/invoice_id. Why: idempotent, separate from Serviços.
-- Indústria: an OP whose rows have different DIV sectors is stored once with industry_orders.splits; the mirror trigger and industry_sync_parts give each sector its own order value, raw material and proportional invoice share (work_entries.industry_part_ref). Why: each service keeps only its share of the order.
-- Indústria orders: every spreadsheet line is mirrored as its own works.orders entry (industry_orders.lines) with the exact sheet value; works_consolidate_orders and industry_fit_work_order are no-ops. Why: orders must match the PCP sheet line by line, never summed or raised to the invoice.
-- Indústria raw material comes only from column J (MP REAL); PREV. MP is never used as fallback. Why: MP must match the PCP sheet exactly.
+- Indústria orders: each PCP line is its own works.orders entry with the exact sheet value (never summed/raised); multi-sector OPs split via industry_orders.splits + industry_sync_parts; raw material only from column J. Why: values must match the PCP sheet per service.
 - VT/prêmio motorista: src/lib/transport-rules.ts decides per client/day — built transport (transport_passengers) wins over Programação dots and the Transporte toggle. Why: one rule shared by Fechamento and Premiações.
