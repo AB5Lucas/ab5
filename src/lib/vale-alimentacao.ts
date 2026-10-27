@@ -4,7 +4,22 @@ export type VASettings = {
   unjustified_reasons: string[]; justified_reasons: string[]; abono_reasons: string[];
 };
 export type JustRow = { date: string; reg: string; name: string; reason: string };
-export type PunchRow = { date: string; name: string; punches: string[]; discountMin: number; lateMin: number; earlyMin: number };
+export type PunchRow = { date: string; name: string; punches: string[]; pending?: boolean; discountMin: number; lateMin: number; earlyMin: number };
+
+const toMin = (s: string) => { const m = s.match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+/** Batida "PEN" (pendente): o ponto ignora o horário; recalcula atraso/saída pelos horários registrados (entrada 07:00, saída 17:00 seg–qui / 16:00 sex; jornada cumprida não penaliza). */
+export function recomputePending(r: PunchRow, dow: number): PunchRow {
+  if (!r.pending) return r;
+  const t = r.punches.map(toMin).filter((x): x is number => x != null);
+  if (t.length < 2) return r;
+  const first = t[0]!, last = t[t.length - 1]!;
+  const expectedExit = dow === 5 ? 16 * 60 : 17 * 60;
+  let worked = 0; for (let i = 0; i + 1 < t.length; i += 2) worked += t[i + 1]! - t[i]!;
+  const expectedWork = expectedExit - 7 * 60 - 60;
+  if (worked >= expectedWork) return { ...r, lateMin: 0, earlyMin: 0, discountMin: 0 };
+  const lateMin = Math.max(0, first - 7 * 60), earlyMin = Math.max(0, expectedExit - last);
+  return { ...r, lateMin, earlyMin, discountMin: lateMin + earlyMin };
+}
 export type VAPerson = { id: string; reg: string; name: string };
 export type VAEvent = { date: string; kind: "injustificada" | "justificada" | "atraso"; reason: string; detail: string };
 export type VALine = VAPerson & { unjust: number; just: number; late: number; pct: number; value: number; events: VAEvent[] };
@@ -50,11 +65,12 @@ export function computeVA(people: VAPerson[], just: JustRow[], punches: PunchRow
     else if (ju.has(reason)) push(p.id, { date: r.date, kind: "justificada", reason: r.reason, detail: r.reason });
   }
   const lateDays = new Set<string>();
-  for (const r of punches) {
-    const p = byName.get(norm(r.name));
+  for (const raw of punches) {
+    const p = byName.get(norm(raw.name));
     if (!p) continue;
-    const dow = new Date(`${r.date}T12:00:00Z`).getUTCDay();
+    const dow = new Date(`${raw.date}T12:00:00Z`).getUTCDay();
     if (dow === 0 || dow === 6) continue;
+    const r = recomputePending(raw, dow);
     if (!(r.discountMin > 0)) continue;
     if (r.lateMin < s.tolerance_min && r.earlyMin < s.tolerance_min) continue;
     const k = `${p.id}|${r.date}`;

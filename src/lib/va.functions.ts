@@ -55,6 +55,6 @@ export const loadVASheets = createServerFn({ method: "POST" }).middleware([requi
     const ar = rowsOf(a!, "Worksheet"); const ah = (ar[0] ?? []).map((h) => String(h).trim().toLowerCase());
     const ad = ci(ah, "data"), an = ci(ah, "funcion"), desc = ci(ah, "descont"), at = ah.findIndex((x) => x === "atrasos"), sa = ci(ah, "saída antecipada", "saida antecipada");
     const pIdx = ah.map((x, i) => (/^\d+º (entrada|saída|saida)/.test(x) ? i : -1)).filter((i) => i >= 0);
-    const punches: PunchRow[] = ar.slice(1).map((r) => ({ date: isoFromCell(r[ad]) ?? "", name: String(r[an] ?? "").trim(), punches: pIdx.map((i) => String(r[i] ?? "").replace(/[a-z]$/i, "").trim()), discountMin: minFromCell(r[desc]), lateMin: at >= 0 ? minFromCell(r[at]) : 0, earlyMin: sa >= 0 ? minFromCell(r[sa]) : 0 })).filter((r) => r.date && r.name);
+    const punches: PunchRow[] = ar.slice(1).map((r) => ({ date: isoFromCell(r[ad]) ?? "", name: String(r[an] ?? "").trim(), punches: pIdx.map((i) => String(r[i] ?? "").replace(/[a-z]+$/i, "").trim()), pending: pIdx.some((i) => /pen\s*$/i.test(String(r[i] ?? ""))), discountMin: minFromCell(r[desc]), lateMin: at >= 0 ? minFromCell(r[at]) : 0, earlyMin: sa >= 0 ? minFromCell(r[sa]) : 0 })).filter((r) => r.date && r.name);
     return { found: true as const, folder: p.folder, missing, just, punches };
   });
