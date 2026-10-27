@@ -8,6 +8,9 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+const TYPE_OPTS = [{ v: "active", l: "Ativos" }, { v: "inactive", l: "Inativos" }, { v: "efetivo", l: "Efetivos" }, { v: "pj", l: "PJs" }, { v: "intermitente", l: "Intermitentes" }];
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -212,7 +215,7 @@ function CollaboratorsPage() {
   const { canWrite, isAdmin } = useCurrentUser();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("active");
+  const [typeFilter, setTypeFilter] = useState<string[]>(["active"]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Collaborator | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -254,13 +257,16 @@ function CollaboratorsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (collaborators.data ?? []).filter((c) => {
-      if (statusFilter !== "all" && c.status !== statusFilter) return false;
+      const st = typeFilter.filter((t) => t === "active" || t === "inactive");
+      const ct = typeFilter.filter((t) => t !== "active" && t !== "inactive");
+      if (st.length && !st.includes(c.status)) return false;
+      if (ct.length && !ct.includes(((c as { contract_type?: string | null }).contract_type ?? "efetivo"))) return false;
       if (!q) return true;
-      return [c.full_name, c.social_name, c.registration_number, c.cpf, c.email]
+      return [c.full_name, c.social_name, c.registration_number, c.cpf, c.position_id ? nameById.get(c.position_id) : null]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [collaborators.data, search, statusFilter]);
+  }, [collaborators.data, search, typeFilter, nameById]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -418,20 +424,26 @@ function CollaboratorsPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nome, matrícula, CPF ou e-mail"
+            placeholder="Buscar por nome, matrícula, CPF ou função"
             className="pl-9"
           />
         </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Somente ativos</SelectItem>
-            <SelectItem value="inactive">Somente inativos</SelectItem>
-            <SelectItem value="all">Todos</SelectItem>
-          </SelectContent>
-        </Select>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-52 justify-between">
+              {typeFilter.length ? typeFilter.map((t) => TYPE_OPTS.find((o) => o.v === t)?.l).join(", ") : "Todos"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-56 space-y-1 p-2">
+            {TYPE_OPTS.map((o) => (
+              <label key={o.v} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                <Checkbox checked={typeFilter.includes(o.v)} onCheckedChange={(v) => setTypeFilter((cur) => (v ? [...cur, o.v] : cur.filter((x) => x !== o.v)))} />
+                {o.l}
+              </label>
+            ))}
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => setTypeFilter([])}>Todos</Button>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="panel overflow-x-auto">

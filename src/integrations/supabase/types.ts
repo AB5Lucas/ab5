@@ -2314,6 +2314,7 @@ export type Database = {
           order_id: string | null
           order_number: string | null
           ref_month: string
+          reversed_at: string | null
           source_file: string | null
           status: string
           updated_at: string
@@ -2330,6 +2331,7 @@ export type Database = {
           order_id?: string | null
           order_number?: string | null
           ref_month: string
+          reversed_at?: string | null
           source_file?: string | null
           status?: string
           updated_at?: string
@@ -2346,6 +2348,7 @@ export type Database = {
           order_id?: string | null
           order_number?: string | null
           ref_month?: string
+          reversed_at?: string | null
           source_file?: string | null
           status?: string
           updated_at?: string
@@ -3741,6 +3744,45 @@ export type Database = {
         }
         Relationships: []
       }
+      va_settings: {
+        Row: {
+          abono_reasons: string[]
+          base_value: number
+          id: boolean
+          justified_reasons: string[]
+          pct1: number
+          pct2: number
+          pct3: number
+          tolerance_min: number
+          unjustified_reasons: string[]
+          updated_at: string
+        }
+        Insert: {
+          abono_reasons?: string[]
+          base_value?: number
+          id?: boolean
+          justified_reasons?: string[]
+          pct1?: number
+          pct2?: number
+          pct3?: number
+          tolerance_min?: number
+          unjustified_reasons?: string[]
+          updated_at?: string
+        }
+        Update: {
+          abono_reasons?: string[]
+          base_value?: number
+          id?: boolean
+          justified_reasons?: string[]
+          pct1?: number
+          pct2?: number
+          pct3?: number
+          tolerance_min?: number
+          unjustified_reasons?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vacations: {
         Row: {
           collaborator_id: string
@@ -4489,6 +4531,10 @@ export type Database = {
       industry_invoice_launch: {
         Args: { _invoice: string; _work: string }
         Returns: number
+      }
+      industry_invoice_reverse: {
+        Args: { _invoice: string }
+        Returns: undefined
       }
       industry_order_assign: {
         Args: { _order: string; _work: string }

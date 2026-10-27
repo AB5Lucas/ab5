@@ -61,8 +61,8 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Faturamento", url: "/relatorios/sincronizacao" },
     ],
   },
-  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Premiações", url: "/fechamento" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
-  { label: "Demandas", icon: ClipboardList, items: [{ title: "Alocações", url: "/relatorios" }, { title: "Certificados", url: "/demandas/certificados" }, { title: "Dashboard", url: "/dashboard" }] },
+  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto" }, { title: "Premiações", url: "/fechamento" }, { title: "Vale Alimentação", url: "/relatorios/vale-alimentacao" }] },
+  { label: "Demandas", icon: ClipboardList, items: [{ title: "Alocações", url: "/relatorios" }, { title: "Certificados", url: "/demandas/certificados" }, { title: "Relatório Diário", url: "/externo/relatorio-diario" }] },
   {
     label: "Andaimes",
     icon: Boxes,

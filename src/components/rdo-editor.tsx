@@ -81,7 +81,13 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
     queryKey: ["rdo-planned", work.id, date],
     queryFn: async () => {
       const { data: s } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
-      if (!s) return { scheduleId: null as string | null, blocked: new Set<string>(), allocs: [] as { id: string; collaborator_id: string; position_id: string | null; collaborators: { position_id: string | null } | null; lastPos: string | null }[] };
+      // Quem faz integração no cliente desta obra no dia também entra no RDO dela.
+      const { data: integ } = await supabase.from("appointments").select("collaborator_id, work_id, collaborators(position_id)")
+        .eq("type", "integracao").eq("scheduled_date", date).neq("status", "cancelado")
+        .or(work.client_id ? `work_id.eq.${work.id},and(work_id.is.null,client_id.eq.${work.client_id})` : `work_id.eq.${work.id}`);
+      const integAllocs = (integ ?? []).filter((a) => a.collaborator_id).map((a) => ({ id: null as unknown as string, collaborator_id: a.collaborator_id!, position_id: null as string | null, collaborators: (a.collaborators as { position_id: string | null } | null) ?? null, lastPos: null as string | null }));
+      const integIds = new Set(integAllocs.map((a) => a.collaborator_id));
+      if (!s) return { scheduleId: null as string | null, blocked: new Set<string>(), allocs: integAllocs as { id: string; collaborator_id: string; position_id: string | null; collaborators: { position_id: string | null } | null; lastPos: string | null }[] };
       const { data: raw } = await supabase
         .from("daily_allocations")
         .select("id, collaborator_id, position_id, collaborators(position_id)")
@@ -102,10 +108,12 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
         for (const o of off.data ?? []) if ((o.end_date ?? o.date) >= date) blocked.add(o.collaborator_id);
         for (const v of vac.data ?? []) blocked.add(v.collaborator_id);
         for (const m of med.data ?? []) blocked.add(m.collaborator_id);
-        for (const a of appt.data ?? []) if (a.collaborator_id) blocked.add(a.collaborator_id);
-        for (const b of boxes.data ?? []) if (b.box_key === "treinamento" || b.box_key.startsWith("integracao")) blocked.add(b.collaborator_id);
+        for (const a of appt.data ?? []) if (a.collaborator_id && !integIds.has(a.collaborator_id)) blocked.add(a.collaborator_id);
+        for (const b of boxes.data ?? []) if ((b.box_key === "treinamento" || b.box_key.startsWith("integracao")) && !integIds.has(b.collaborator_id)) blocked.add(b.collaborator_id);
       }
-      const data = (raw ?? []).filter((a) => !blocked.has(a.collaborator_id));
+      const allocated = (raw ?? []).filter((a) => !blocked.has(a.collaborator_id));
+      const have = new Set(allocated.map((a) => a.collaborator_id));
+      const data = [...allocated, ...integAllocs.filter((a) => !have.has(a.collaborator_id))];
       // Última função usada no RDO deste serviço (mantida para os próximos RDOs)
       const { data: prev } = await supabase
         .from("rdo_workforce")
