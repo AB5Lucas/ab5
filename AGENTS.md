@@ -33,3 +33,4 @@
 - Indústria: an OP whose rows have different DIV sectors is stored once with industry_orders.splits; the mirror trigger and industry_sync_parts give each sector its own order value, raw material and proportional invoice share (work_entries.industry_part_ref). Why: each service keeps only its share of the order.
 - Indústria orders: every spreadsheet line is mirrored as its own works.orders entry (industry_orders.lines) with the exact sheet value; works_consolidate_orders and industry_fit_work_order are no-ops. Why: orders must match the PCP sheet line by line, never summed or raised to the invoice.
 - Indústria raw material comes only from column J (MP REAL); PREV. MP is never used as fallback. Why: MP must match the PCP sheet exactly.
+- VT/prêmio motorista: src/lib/transport-rules.ts decides per client/day — built transport (transport_passengers) wins over Programação dots and the Transporte toggle. Why: one rule shared by Fechamento and Premiações.
