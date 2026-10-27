@@ -53,7 +53,7 @@ function Report() {
   const [q, setQ] = useState("");
   const load = useServerFn(loadVASheets);
   const settings = useSettings();
-  const sheets = useQuery({ queryKey: ["va-sheets", ym], queryFn: () => load({ data: { ym } }), retry: false });
+  const sheets = useQuery({ queryKey: ["va-sheets", ym], queryFn: () => load({ data: { ym } }), retry: false, staleTime: 0, gcTime: 0, refetchOnMount: "always" });
   const people = useQuery({ queryKey: ["va-people"], queryFn: async () => {
     const { data, error } = await supabase.from("collaborators").select("id, registration_number, full_name, contract_type").eq("status", "active").order("full_name");
     if (error) throw error;
