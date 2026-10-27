@@ -71,7 +71,7 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
       if (!sched) return { people: 0, mo: 0, transport: 0, vt: 0 };
       const sibIds = clientId ? ((await supabase.from("works").select("id").eq("client_id", clientId)).data ?? []).map((x) => x.id) : workIds;
       const [allocs, wf, vs, client] = await Promise.all([
-        supabase.from("daily_allocations").select("work_id, collaborator_id, collaborators(salary, contract_type)").eq("schedule_id", sched.id).in("work_id", sibIds),
+        supabase.from("daily_allocations").select("work_id, collaborator_id, collaborators(salary, contract_type, no_overtime_premium)").eq("schedule_id", sched.id).in("work_id", sibIds),
         supabase.from("rdo_workforce").select("work_id, collaborator_id, present, worked_hours").eq("report_date", picked!).in("work_id", workIds),
         clientId ? supabase.from("vehicle_schedules").select("km, trips, work_id, vehicles(km_rate)").eq("schedule_date", picked!).eq("client_id", clientId) : Promise.resolve({ data: [] as any[] }),
         clientId ? supabase.from("clients").select("has_toll, toll_amount").eq("id", clientId).maybeSingle() : Promise.resolve({ data: null as any }),
@@ -85,7 +85,7 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
       let mo = 0;
       for (const a of mine) {
         const h = hrs.get(`${a.work_id}|${a.collaborator_id}`) ?? 8;
-        mo += laborCost(h, Number(a.collaborators?.salary ?? 0), a.collaborators?.contract_type === "pj", picked!, hol);
+        mo += laborCost(h, Number(a.collaborators?.salary ?? 0), a.collaborators?.contract_type === "pj", picked!, hol, 0, !!a.collaborators?.no_overtime_premium);
       }
       const toll = client.data?.has_toll ? Number(client.data.toll_amount ?? 0) : 0;
       let transport = 0;

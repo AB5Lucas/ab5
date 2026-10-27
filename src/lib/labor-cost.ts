@@ -26,10 +26,11 @@ export function nightHours(entry?: string | null, exit?: string | null, breakMin
   return Math.round((Math.min(worked, Math.max(0, overlap - breakMin)) / 60) * 100) / 100;
 }
 
-export function laborCost(hours: number, rate: number, isPj: boolean, date: string, holidays: Set<string>, nightH = 0) {
+export function laborCost(hours: number, rate: number, isPj: boolean, date: string, holidays: Set<string>, nightH = 0, noPremium = false) {
   const dow = new Date(date + "T12:00:00").getDay();
   let eq: number;
-  if (dow === 0 || holidays.has(date)) eq = hours * 2;
+  if (noPremium) eq = hours;
+  else if (dow === 0 || holidays.has(date)) eq = hours * 2;
   else if (dow === 6) eq = hours * 1.6;
   else eq = Math.min(hours, STANDARD_HOURS) + Math.max(0, hours - STANDARD_HOURS) * 1.6;
   eq += Math.min(nightH, hours) * NIGHT_PREMIUM;
