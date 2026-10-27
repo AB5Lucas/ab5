@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, RefreshCw, CheckCircle2, CircleHelp, AlertTriangle, Clock } from "lucide-react";
+import { ArrowRight, Undo2, RefreshCw, CheckCircle2, CircleHelp, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,13 @@ function useIndustryWorks() {
     if (error) throw error; return (data ?? []).map((w: any) => ({ id: w.id as string, name: w.name as string }));
   } });
 }
+function Reverse({ id, nf }: { id: string; nf: string }) {
+  const qc = useQueryClient();
+  const m = useMutation({ mutationFn: async () => { const { error } = await (supabase.rpc as any)("industry_invoice_reverse", { _invoice: id }); if (error) throw error; },
+    onSuccess: async () => { toast.success("Faturamento estornado e devolvido às pendências"); await qc.invalidateQueries({ queryKey: ["industry-sync"] }); await qc.invalidateQueries({ queryKey: ["work-result"] }); },
+    onError: (e: Error) => toast.error(e.message) });
+  return <Button size="icon" variant="outline" className="h-8 w-8" title="Estornar" aria-label={`Estornar NF ${nf}`} disabled={m.isPending} onClick={() => { if (confirm(`Estornar a NF ${nf}? Ela volta para as pendências para ser realocada.`)) m.mutate(); }}><Undo2 className="h-4 w-4" /></Button>;
+}
 function Launch({ id, works }: { id: string; works: { id: string; name: string }[] }) {
   const qc = useQueryClient(); const [work, setWork] = useState<string>("");
   const sel = work || works.find(w => w.name === "Venda")?.id || "";
@@ -88,7 +95,7 @@ export function IndustryBilling() {
         <div className="flex flex-wrap items-end gap-3"><div className="min-w-48 flex-1"><Label htmlFor="ind-search">NF, pedido ou cliente</Label><Input id="ind-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar" /></div>
           <div className="flex gap-1">{[["all", "Todas"], ["posted", "Lançadas"], ["pending", "Pendentes"]].map(([k, v]) => <Button key={k} size="sm" variant={state === k ? "default" : "outline"} onClick={() => setState(k!)}>{v}</Button>)}</div></div>
         <div className="w-full overflow-x-auto"><Table className="w-full"><TableHeader><TableRow>{["Emissão", "NF", "Cliente", "Pedido", "Valor", "Itens", "Situação", "Serviço"].map(h => <TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader>
-          <TableBody>{rows.map((n: any) => <TableRow key={n.id}><TableCell>{date(n.issued_at)}</TableCell><TableCell className="font-medium">{n.invoice_number}</TableCell><TableCell>{n.client_name}</TableCell><TableCell>{n.order_number || "—"}</TableCell><TableCell className="text-right tabular-nums">{brl(n.amount)}</TableCell><TableCell>{(n.items as unknown[]).length}</TableCell><TableCell><State s={n.status} issue={n.issue} /></TableCell><TableCell>{n.status === "pending" ? <Launch id={n.id} works={works.data ?? []} /> : "—"}</TableCell></TableRow>)}
+          <TableBody>{rows.map((n: any) => <TableRow key={n.id}><TableCell>{date(n.issued_at)}</TableCell><TableCell className="font-medium">{n.invoice_number}</TableCell><TableCell>{n.client_name}</TableCell><TableCell>{n.order_number || "—"}</TableCell><TableCell className="text-right tabular-nums">{brl(n.amount)}</TableCell><TableCell>{(n.items as unknown[]).length}</TableCell><TableCell><State s={n.status} issue={n.issue} /></TableCell><TableCell>{n.status === "pending" ? <Launch id={n.id} works={works.data ?? []} /> : n.status === "posted" ? <Reverse id={n.id} nf={n.invoice_number} /> : "—"}</TableCell></TableRow>)}
             {!rows.length && <TableRow><TableCell colSpan={8} className="py-12 text-center text-muted-foreground">{inv.isLoading ? "Carregando…" : "Nenhuma nota encontrada"}</TableCell></TableRow>}</TableBody></Table></div>
       </TabsContent><TabsContent value="runs"><RunsTable /></TabsContent></Tabs>
   </div>;
