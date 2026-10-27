@@ -421,6 +421,13 @@
       "when": 1793014134762,
       "tag": "0059_cliente_role_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793122269433,
+      "tag": "0060_va_settings_and_invoice_reverse",
+      "breakpoints": true
     }
   ]
 }
