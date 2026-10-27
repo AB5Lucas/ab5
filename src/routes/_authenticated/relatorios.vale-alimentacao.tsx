@@ -106,18 +106,19 @@ function Report() {
 
 function Rules() {
   const settings = useSettings(); const qc = useQueryClient();
-  const [f, setF] = useState<Record<string, string> | null>(null);
+  type Form = { base_value: string; tolerance_min: string; pct1: string; pct2: string; pct3: string; unjustified_reasons: string; justified_reasons: string; abono_reasons: string };
+  const [f, setF] = useState<Form | null>(null);
   const s = settings.data;
-  const v = f ?? (s ? { base_value: String(s.base_value).replace(".", ","), tolerance_min: String(s.tolerance_min), pct1: String(s.pct1), pct2: String(s.pct2), pct3: String(s.pct3), unjustified_reasons: s.unjustified_reasons.join("\n"), justified_reasons: s.justified_reasons.join("\n"), abono_reasons: s.abono_reasons.join("\n") } : null);
+  const v: Form | null = f ?? (s ? { base_value: String(s.base_value).replace(".", ","), tolerance_min: String(s.tolerance_min), pct1: String(s.pct1), pct2: String(s.pct2), pct3: String(s.pct3), unjustified_reasons: s.unjustified_reasons.join("\n"), justified_reasons: s.justified_reasons.join("\n"), abono_reasons: s.abono_reasons.join("\n") } : null);
   const save = useMutation({ mutationFn: async () => {
     if (!v) return;
     const num = (x: string) => { const n = Number(x.replace(",", ".")); if (isNaN(n) || n < 0) throw new Error("Valores inválidos"); return n; };
     const list = (x: string) => x.split("\n").map((t) => t.trim()).filter(Boolean);
-    const { error } = await (supabase as any).from("va_settings").upsert({ id: true, base_value: num(v.base_value!), tolerance_min: Math.round(num(v.tolerance_min!)), pct1: num(v.pct1!), pct2: num(v.pct2!), pct3: num(v.pct3!), unjustified_reasons: list(v.unjustified_reasons!), justified_reasons: list(v.justified_reasons!), abono_reasons: list(v.abono_reasons!), updated_at: new Date().toISOString() });
+    const { error } = await (supabase as any).from("va_settings").upsert({ id: true, base_value: num(v.base_value), tolerance_min: Math.round(num(v.tolerance_min)), pct1: num(v.pct1), pct2: num(v.pct2), pct3: num(v.pct3), unjustified_reasons: list(v.unjustified_reasons), justified_reasons: list(v.justified_reasons), abono_reasons: list(v.abono_reasons), updated_at: new Date().toISOString() });
     if (error) throw error;
   }, onSuccess: () => { toast.success("Regras salvas"); setF(null); qc.invalidateQueries({ queryKey: ["va-settings"] }); }, onError: (e: Error) => toast.error(e.message) });
   if (!v) return <p className="pt-4 text-sm text-muted-foreground">Carregando…</p>;
-  const set = (k: string) => (e: { target: { value: string } }) => setF({ ...v, [k]: e.target.value });
+  const set = (k: keyof Form) => (e: { target: { value: string } }) => setF({ ...v, [k]: e.target.value });
   return <div className="max-w-3xl space-y-4 pt-2">
     <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
       <div><Label>Valor do VA (R$)</Label><Input value={v.base_value} onChange={set("base_value")} inputMode="decimal" /></div>
