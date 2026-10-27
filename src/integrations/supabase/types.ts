@@ -1463,6 +1463,7 @@ export type Database = {
           hire_date: string | null
           id: string
           is_driver: boolean
+          no_overtime_premium: boolean
           notes: string | null
           phone: string | null
           photo_url: string | null
@@ -1493,6 +1494,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           is_driver?: boolean
+          no_overtime_premium?: boolean
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
@@ -1523,6 +1525,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           is_driver?: boolean
+          no_overtime_premium?: boolean
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
