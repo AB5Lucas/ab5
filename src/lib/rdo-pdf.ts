@@ -63,6 +63,18 @@ const GREY: [number, number, number] = [110, 110, 110];
 async function toDataUrl(url: string): Promise<string | null> {
   try {
     const blob = await (await fetch(url)).blob();
+    try {
+      // Aplica a orientação EXIF nos pixels para o PDF sair igual à tela.
+      const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+      const c = document.createElement("canvas");
+      c.width = bmp.width;
+      c.height = bmp.height;
+      c.getContext("2d")!.drawImage(bmp, 0, 0);
+      bmp.close();
+      return c.toDataURL("image/jpeg", 0.88);
+    } catch {
+      /* segue com o arquivo original */
+    }
     return await new Promise((res) => {
       const r = new FileReader();
       r.onload = () => res(r.result as string);
