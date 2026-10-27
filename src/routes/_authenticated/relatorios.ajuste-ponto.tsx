@@ -105,7 +105,8 @@ function Page() {
       const rdo = w.rdos;
       const work = rdo?.works;
       const dow = new Date(w.report_date + "T12:00:00").getDay();
-      const weekend = [0, 6].includes(dow);
+      // Sexta, sábado e domingo: saída padrão reduzida (16h).
+      const weekend = [0, 5, 6].includes(dow);
       // Colaborador em turno próprio (fora do Padrão): o horário previsto vem do turno dele.
       const own = w.collaborators?.shift_id ? shiftMap.get(w.collaborators.shift_id) : undefined;
       const ownDay = own ? own[String(dow)] : undefined;

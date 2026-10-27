@@ -150,7 +150,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
   const defaultTimes = useMemo(() => {
     if (r?.shift === "night") return { entry: NIGHT_ENTRY, exit: NIGHT_EXIT };
     const wd = new Date(date + "T12:00:00").getDay();
-    const exit = (wd === 0 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
+    const exit = (wd === 0 || wd === 5 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
     return { entry: work.entry_time?.slice(0, 5) ?? "07:00", exit: exit?.slice(0, 5) ?? "17:00" };
   }, [date, work, r?.shift]);
 
@@ -232,7 +232,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
         <Select value={r.shift ?? "day"} onValueChange={async (v) => {
           updateRdo.mutate({ shift: v });
           const wd = new Date(date + "T12:00:00").getDay();
-          const dayExit = (wd === 0 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
+          const dayExit = (wd === 0 || wd === 5 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
           const t = v === "night" ? { entry_time: NIGHT_ENTRY, exit_time: NIGHT_EXIT } : { entry_time: work.entry_time?.slice(0, 5) ?? "07:00", exit_time: dayExit?.slice(0, 5) ?? "17:00" };
           await supabase.from("rdo_workforce").update(t).eq("rdo_id", r.id);
           qc.invalidateQueries({ queryKey: ["rdo-team", r.id] });
@@ -360,7 +360,7 @@ function AddWorker({ rdoId, night, work, date, existing }: { rdoId: string; nigh
   });
   const add = useMutation({
     mutationFn: async (p: { id: string; position_id: string | null }) => {
-      const exit = (wd === 0 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
+      const exit = (wd === 0 || wd === 5 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
       const { error } = await supabase.rpc("rdo_add_worker" as never, {
         _rdo_id: rdoId,
         _collaborator_id: p.id,
