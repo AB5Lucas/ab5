@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { normalizePhoto, rotatePhoto, getMediaReversed, setMediaReversed } from "@/lib/rdo-images";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle,
-  ArrowUpDown,
+  ArrowUpDown, RotateCw,
   Camera,
   Check,
   ChevronLeft,
@@ -835,7 +836,10 @@ function ScaffoldDialog({ rdoId, open, edit, onClose }: { rdoId: string; open: b
 function MediaStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
   const qc = useQueryClient();
   const [uploading, setUploading] = useState(false);
-  const [reversed, setReversed] = useState(false);
+  const [reversed, setReversedState] = useState(false);
+  useEffect(() => setReversedState(getMediaReversed(rdoId)), [rdoId]);
+  const setReversed = (f: (r: boolean) => boolean) => setReversedState((r) => { const v = f(r); setMediaReversed(rdoId, v); return v; });
+  const [rotating, setRotating] = useState<string | null>(null);
   const media = useQuery({
     queryKey: ["rdo-media", rdoId],
     queryFn: async () => {
@@ -855,8 +859,10 @@ function MediaStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
       for (const file of Array.from(files)) {
         const kind = file.type.startsWith("video") ? "video" : "photo";
         const ext = file.name.split(".").pop() || (kind === "video" ? "mp4" : "jpg");
-        const path = `${rdoId}/${crypto.randomUUID()}.${ext}`;
-        const { error } = await supabase.storage.from("rdo-media").upload(path, file, { contentType: file.type });
+        const body = kind === "photo" ? await normalizePhoto(file) : file;
+        const isJpeg = kind === "photo" && body !== file;
+        const path = `${rdoId}/${crypto.randomUUID()}.${isJpeg ? "jpg" : ext}`;
+        const { error } = await supabase.storage.from("rdo-media").upload(path, body, { contentType: isJpeg ? "image/jpeg" : file.type });
         if (error) throw error;
         const { error: e2 } = await supabase.from("rdo_media").insert({ rdo_id: rdoId, kind, storage_path: path });
         if (e2) throw e2;
@@ -878,6 +884,23 @@ function MediaStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rdo-media", rdoId] }),
   });
+  async function rotate(m: { id: string; storage_path: string; url: string }) {
+    setRotating(m.id);
+    try {
+      const blob = await rotatePhoto(m.url);
+      const path = `${rdoId}/${crypto.randomUUID()}.jpg`;
+      const { error } = await supabase.storage.from("rdo-media").upload(path, blob, { contentType: "image/jpeg" });
+      if (error) throw error;
+      const { error: e2 } = await supabase.from("rdo_media").update({ storage_path: path }).eq("id", m.id);
+      if (e2) throw e2;
+      await supabase.storage.from("rdo-media").remove([m.storage_path]);
+      qc.invalidateQueries({ queryKey: ["rdo-media", rdoId] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setRotating(null);
+    }
+  }
   const describe = useMutation({
     mutationFn: async ({ id, description }: { id: string; description: string }) => {
       const { error } = await supabase.from("rdo_media").update({ description: description || null }).eq("id", id);
@@ -925,6 +948,11 @@ function MediaStep({ rdoId, editable }: { rdoId: string; editable: boolean }) {
                 disabled={!editable}
                 onBlur={(e) => e.target.value !== (m.description ?? "") && describe.mutate({ id: m.id, description: e.target.value })}
               />
+              {editable && m.kind === "photo" && (
+                <Button variant="ghost" size="icon" disabled={rotating === m.id} onClick={() => void rotate(m)} aria-label="Girar foto" title="Girar foto">
+                  <RotateCw className={cn("h-4 w-4", rotating === m.id && "animate-spin")} />
+                </Button>
+              )}
               {editable && (
                 <Button variant="ghost" size="icon" onClick={() => remove.mutate(m)} aria-label="Excluir">
                   <Trash2 className="h-4 w-4 text-destructive" />

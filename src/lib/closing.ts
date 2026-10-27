@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildDistanceLookup } from "@/lib/city-distance";
+import { loadBuiltTransport, vtFor, driverBonusFor } from "@/lib/transport-rules";
 
 /** Fechamento: competência = dia 26 do mês anterior até 25 do mês selecionado. */
 export function periodOf(month: string) {
@@ -52,7 +53,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
 
   const [allocs, entries, workVt, boxVtR, personVtR, holidays, daysOff, vacations, leaves, rdoWf, vtRules, tbRules, adjs] = await Promise.all([
     ids.length ? all<any>((f, t) => supabase.from("daily_allocations")
-      .select("collaborator_id, schedule_id, work_id, driver, overnight, vt_override, travel_bonus_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled, travel_bonus_enabled), works(name, city, distance_km, clients(name, city, distance_km))")
+      .select("collaborator_id, schedule_id, work_id, driver, overnight, vt_override, travel_bonus_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled, travel_bonus_enabled), works(name, city, distance_km, client_id, clients(name, city, distance_km))")
       .in("schedule_id", ids).order("id").range(f, t)) : [],
     ids.length ? all<any>((f, t) => supabase.from("daily_status_entries")
       .select("schedule_id, collaborator_id, box_key, collaborators(full_name, registration_number)").in("schedule_id", ids).order("id").range(f, t)) : [],
@@ -71,6 +72,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
   ]);
   const { data: cityDist } = await supabase.from("city_distances").select("city_a, city_b, km");
   const distFor = buildDistanceLookup(cityDist ?? []);
+  const transport = await loadBuiltTransport(start, end);
   const { data: trW } = ids.length ? await supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("schedule_id", ids) : { data: [] as any[] };
   const travelWork = new Map((trW ?? []).map((v: any) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
 
@@ -133,7 +135,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     if (a.driver) r.driver = true;
     const cc = a.collaborators;
     const base = cc?.vt_enabled === false ? false : (vtWork.get(`${a.schedule_id}|${a.work_id}`) || (cc?.city ?? "").toLowerCase().includes("pouso alegre"));
-    const pays = a.vt_override ?? base;
+    const pays = vtFor(transport, a.works?.client_id, date, a.collaborator_id, !!(a.vt_override ?? base));
     r.vtRows.push({ date, work, pays: !!pays, value: pays ? perDay(a.driver, 1) : 0 });
     const dist = distFor(cc?.city, a.works?.clients?.city ?? a.works?.city, Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0));
     const travelOn = a.travel_bonus_override ?? ((travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? prizeFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)) > 0));
@@ -157,13 +159,13 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
   }
   // Prêmio Motorista: 1 por dia dirigido (faixa pela km do dia), somado ao VT
   const [{ data: vsch }, { data: dbr }] = await Promise.all([
-    supabase.from("vehicle_schedules").select("driver_id, schedule_date, km, collaborators(full_name, registration_number)")
-      .gte("schedule_date", start).lt("schedule_date", end).eq("driver_bonus", true).eq("is_external", false),
+    supabase.from("vehicle_schedules").select("driver_id, client_id, driver_bonus, schedule_date, km, collaborators(full_name, registration_number, contract_type)")
+      .gte("schedule_date", start).lt("schedule_date", end).eq("is_external", false),
     supabase.from("driver_bonus_rules").select("*").eq("active", true),
   ]);
   const dDays = new Map<string, { c: any; days: Map<string, number> }>();
   for (const v of (vsch ?? []) as any[]) {
-    if (!v.driver_id) continue;
+    if (!driverBonusFor(transport, v, v.collaborators?.contract_type === "pj")) continue;
     const e = dDays.get(v.driver_id) ?? { c: v.collaborators, days: new Map<string, number>() };
     e.days.set(v.schedule_date, (e.days.get(v.schedule_date) ?? 0) + (Number(v.km ?? 0) || 0));
     dDays.set(v.driver_id, e);

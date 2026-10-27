@@ -1,3 +1,4 @@
+import { loadBuiltTransport, driverBonusFor } from "@/lib/transport-rules";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -127,13 +128,13 @@ export function DriverBonusPage() {
       const { data, error } = await supabase
         .from("vehicle_schedules")
         .select(
-          "driver_id, schedule_date, is_external, driver_bonus, km, trips, collaborators(full_name, registration_number), clients(has_toll, toll_amount, trips_per_day)",
+          "driver_id, client_id, schedule_date, is_external, driver_bonus, km, trips, collaborators(full_name, registration_number, contract_type), clients(has_toll, toll_amount, trips_per_day)",
         )
         .gte("schedule_date", start)
         .lt("schedule_date", end)
-        .eq("driver_bonus", true)
         .eq("is_external", false);
       if (error) throw error;
+      const transport = await loadBuiltTransport(start, end);
 
       type Entry = { name: string; reg: string; days: Map<string, { km: number; toll: number }> };
       const map = new Map<string, Entry>();
@@ -145,6 +146,7 @@ export function DriverBonusPage() {
           collaborators: { full_name: string; registration_number: string } | null;
           clients: { has_toll: boolean | null; toll_amount: number | null; trips_per_day: number | null } | null;
         };
+        if (!driverBonusFor(transport, r as any, (r as any).collaborators?.contract_type === "pj")) continue;
         if (!row.driver_id) continue;
         const entry =
           map.get(row.driver_id) ?? {

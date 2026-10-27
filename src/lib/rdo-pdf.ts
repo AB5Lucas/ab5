@@ -1,3 +1,4 @@
+import { getMediaReversed } from "@/lib/rdo-images";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { RDO_STATUS_LABEL, SCAFFOLD_OPS, reasonLabel, positionLabel } from "@/lib/rdo";
@@ -274,8 +275,9 @@ export async function exportRdoPdf(rdoId: string) {
     para(rdo.notes);
   }
 
-  const photos = (media ?? []).filter((m) => m.kind === "photo");
-  const videos = (media ?? []).filter((m) => m.kind === "video");
+  const ordered = getMediaReversed(rdoId) ? [...(media ?? [])].reverse() : media ?? [];
+  const photos = ordered.filter((m) => m.kind === "photo");
+  const videos = ordered.filter((m) => m.kind === "video");
   if (photos.length || videos.length) section("Registro fotográfico");
   const colW = (W - 2 * M - 6) / 2;
   let col = 0;
