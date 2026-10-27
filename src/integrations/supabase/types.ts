@@ -3744,6 +3744,27 @@ export type Database = {
         }
         Relationships: []
       }
+      va_overrides: {
+        Row: {
+          collaborator_id: string
+          updated_at: string
+          value: number
+          ym: string
+        }
+        Insert: {
+          collaborator_id: string
+          updated_at?: string
+          value: number
+          ym: string
+        }
+        Update: {
+          collaborator_id?: string
+          updated_at?: string
+          value?: number
+          ym?: string
+        }
+        Relationships: []
+      }
       va_settings: {
         Row: {
           abono_reasons: string[]
