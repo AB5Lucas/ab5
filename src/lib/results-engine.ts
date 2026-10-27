@@ -60,7 +60,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
         supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", workIds).order("entry_date", { ascending: false }),
-        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, city, vt_enabled, travel_bonus_enabled").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
         w.client_id ? supabase.from("works").select("id, monthly_enabled, night_shift").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
@@ -204,6 +204,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const idSet = new Set(workIds);
     const rate = new Map<string, number>(d.people.map((p: any) => [p.id, Number(p.salary ?? 0)]));
     const pj = new Set<string>(d.people.filter((p: any) => p.contract_type === "pj").map((p: any) => p.id));
+    const noPrem = new Set<string>(d.people.filter((p: any) => p.no_overtime_premium).map((p: any) => p.id));
     const enc = (id: string) => (pj.has(id) ? 1 : ENCARGOS);
     // Horas vêm do RDO de qualquer serviço do cliente (um RDO pode cobrir a equipe toda)
     const rdoKey = new Map<string, any>(
@@ -275,7 +276,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const r = rdoKey.get(`${id}|${date}`);
       const isNight = r?.present && (r.rdos?.shift === "night" || nightWorks.has(r.work_id));
       const nh = isNight ? nightHours(r.entry_time?.slice(0, 5), r.exit_time?.slice(0, 5), r.break_minutes ?? 60) : 0;
-      const cost = laborCost(hours, rate.get(id) ?? 0, pj.has(id), date, hol, nh);
+      const cost = laborCost(hours, rate.get(id) ?? 0, pj.has(id), date, hol, nh, noPrem.has(id));
       addLabor(id, hours, cost, frac);
       bump(date.slice(0, 7), "labor", cost * frac);
     };

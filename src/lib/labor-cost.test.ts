@@ -5,3 +5,8 @@ describe("adicional noturno", () => {
   it("turno diurno não tem horas noturnas", () => expect(nightHours("07:00", "17:00", 60)).toBe(0));
   it("noturno paga +50% nas horas 22h-05h", () => expect(laborCost(7, 10, true, "2026-10-20", new Set(), 6)).toBe(100));
 });
+
+describe("exceção sem adicional", () => {
+  it("domingo pago como hora normal", () => expect(laborCost(8, 10, true, "2026-10-18", new Set(), 0, true)).toBe(80));
+  it("feriado pago como hora normal", () => expect(laborCost(8, 10, true, "2026-10-20", new Set(["2026-10-20"]), 0, true)).toBe(80));
+});
