@@ -102,10 +102,10 @@ function Report() {
 
   return <div className="space-y-4 pt-2">
     <div className="flex flex-wrap items-end gap-3">
-      <div><Label htmlFor="va-ym">Competência</Label><Input id="va-ym" type="month" value={ym} onChange={(e) => e.target.value && setYm(e.target.value)} className="w-44" /></div>
+      <div className="flex flex-col gap-1.5"><Label htmlFor="va-ym">Competência</Label><Input id="va-ym" type="month" value={ym} onChange={(e) => e.target.value && setYm(e.target.value)} className="w-44" /></div>
       <p className="pb-2 text-sm text-muted-foreground">{MONTHS[per.m - 1]}/{per.y}: {br(per.from)} a {br(per.to)}</p>
-      <div className="min-w-48 flex-1"><Label htmlFor="va-q">Nome ou matrícula</Label><Input id="va-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pesquisar" /></div>
-      <div><Label>Tipo</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-48 justify-start">{types.length === 3 ? "Todos" : types.length ? types.map((t) => TYPE_LABEL[t]).join(", ") : "Nenhum"}</Button></PopoverTrigger>
+      <div className="flex min-w-48 flex-1 flex-col gap-1.5"><Label htmlFor="va-q">Nome ou matrícula</Label><Input id="va-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pesquisar" /></div>
+      <div className="flex flex-col gap-1.5"><Label>Tipo</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-48 justify-start">{types.length === 3 ? "Todos" : types.length ? types.map((t) => TYPE_LABEL[t]).join(", ") : "Nenhum"}</Button></PopoverTrigger>
         <PopoverContent className="w-48 space-y-2">{Object.entries(TYPE_LABEL).map(([k, lbl]) => <label key={k} className="flex items-center gap-2 text-sm"><Checkbox checked={types.includes(k)} onCheckedChange={(c) => setTypes((t) => c ? [...t, k] : t.filter((x) => x !== k))} />{lbl}</label>)}</PopoverContent></Popover></div>
       <Button variant="outline" onClick={exportXlsx} disabled={!lines.length}><Download className="h-4 w-4" />Exportar planilha</Button>
     </div>
