@@ -6,7 +6,8 @@ import { TurnosPage } from "@/components/colaboradores/turnos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
+import { collaboratorNamesText, matchesPositions } from "@/lib/collaborator-list";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -216,6 +217,9 @@ function CollaboratorsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string[]>(["active"]);
+  const [positionFilter, setPositionFilter] = useState<string[]>([]);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Collaborator | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -261,12 +265,30 @@ function CollaboratorsPage() {
       const ct = typeFilter.filter((t) => t !== "active" && t !== "inactive");
       if (st.length && !st.includes(c.status)) return false;
       if (ct.length && !ct.includes(((c as { contract_type?: string | null }).contract_type ?? "efetivo"))) return false;
+      if (!matchesPositions(c.position_id, positionFilter)) return false;
       if (!q) return true;
       return [c.full_name, c.social_name, c.registration_number, c.cpf, c.position_id ? nameById.get(c.position_id) : null]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [collaborators.data, search, typeFilter, nameById]);
+  }, [collaborators.data, search, typeFilter, positionFilter, nameById]);
+
+  async function copyNames(includePosition: boolean) {
+    if (!filtered.length) {
+      toast.error("Nenhum nome para copiar.");
+      return;
+    }
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(collaboratorNamesText(filtered, nameById, includePosition));
+      toast.success(`${filtered.length} nome(s) copiado(s).`);
+      setCopyOpen(false);
+    } catch {
+      toast.error("Não foi possível copiar. Permita o acesso à área de transferência e tente novamente.");
+    } finally {
+      setCopying(false);
+    }
+  }
 
   const save = useMutation({
     mutationFn: async () => {
@@ -400,6 +422,10 @@ function CollaboratorsPage() {
         description="Cadastro de colaboradores, vínculo com função, departamento e supervisão."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setCopyOpen(true)} disabled={collaborators.isLoading || !filtered.length}>
+              <Copy className="h-4 w-4" />
+              Copiar nomes
+            </Button>
             {canWrite && (
               <ImportDialog
                 entity="colaboradores"
@@ -418,20 +444,27 @@ function CollaboratorsPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[220px] flex-1">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[220px] flex-1 space-y-1.5">
+          <Label htmlFor="collaborators-search">Busca</Label>
+          <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            id="collaborators-search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome, matrícula, CPF ou função"
             className="pl-9"
           />
+          </div>
         </div>
+        <div className="w-full space-y-1.5 sm:w-52">
+        <Label htmlFor="collaborators-type">Tipo</Label>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="w-52 justify-between">
-              {typeFilter.length ? typeFilter.map((t) => TYPE_OPTS.find((o) => o.v === t)?.l).join(", ") : "Todos"}
+            <Button id="collaborators-type" variant="outline" className="w-full justify-between">
+              <span className="truncate">{typeFilter.length ? typeFilter.map((t) => TYPE_OPTS.find((o) => o.v === t)?.l).join(", ") : "Todos"}</span>
+              <ChevronDown className="h-4 w-4 shrink-0" />
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-56 space-y-1 p-2">
@@ -444,7 +477,40 @@ function CollaboratorsPage() {
             <Button variant="ghost" size="sm" className="w-full" onClick={() => setTypeFilter([])}>Todos</Button>
           </PopoverContent>
         </Popover>
+        </div>
+        <div className="w-full space-y-1.5 sm:w-64">
+          <Label htmlFor="collaborators-positions">Funções</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button id="collaborators-positions" variant="outline" className="w-full justify-between">
+                <span className="truncate">{positionFilter.length === 0 ? "Todas" : positionFilter.length === 1 ? nameById.get(positionFilter[0] ?? "") ?? "Sem função" : `${positionFilter.length} selecionadas`}</span>
+                <ChevronDown className="h-4 w-4 shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-2">
+              <div className="max-h-72 overflow-y-auto space-y-1">
+                {[...(lookups.data?.positions ?? []), { id: NONE, name: "Sem função" }].map((position) => (
+                  <label key={position.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                    <Checkbox checked={positionFilter.includes(position.id)} onCheckedChange={(checked) => setPositionFilter((current) => checked ? [...current, position.id] : current.filter((id) => id !== position.id))} />
+                    {position.name}
+                  </label>
+                ))}
+              </div>
+              <Button variant="ghost" size="sm" className="mt-1 w-full" onClick={() => setPositionFilter([])}>Todas</Button>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
+
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Como deseja copiar?</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-3">
+            <Button variant="outline" disabled={copying} onClick={() => copyNames(false)}><Copy className="h-4 w-4" />Somente nomes</Button>
+            <Button disabled={copying} onClick={() => copyNames(true)}><Copy className="h-4 w-4" />Nomes e funções</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="panel overflow-x-auto">
         <Table>
