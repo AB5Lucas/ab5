@@ -4547,6 +4547,10 @@ export type Database = {
         Args: { p_order: string; p_quote: string; p_work: string }
         Returns: string
       }
+      billing_note_replace: {
+        Args: { _entry: string; _note: string }
+        Returns: undefined
+      }
       billing_purge_cross_duplicates: { Args: never; Returns: Json }
       billing_quote_key: { Args: { v: string }; Returns: string }
       billing_sync_import_external: {
