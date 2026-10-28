@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { Download, Plus, Trash2 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -78,9 +79,35 @@ export function PrizeHoursPage() {
     const existing = entryMap.get(`${id}:${date}`);
     setSelected((current) => [...current, { id, hours: existing ? String(existing.hours) : commonHours }]);
   }
+  function exportSheet() {
+    const workbook = XLSX.utils.book_new();
+    const visibleIds = new Set(rows.map((person) => person.id));
+    const detailRows = entries.filter((entry) => visibleIds.has(entry.collaborator_id)).map((entry) => {
+      const person = people.find((person) => person.id === entry.collaborator_id);
+      return [person?.registration_number ?? "", person?.full_name ?? "", entry.entry_date, Number(entry.hours), Number(entry.hourly_rate), Number(entry.multiplier), prizeAmount(Number(entry.hours), Number(entry.hourly_rate), Number(entry.multiplier))];
+    });
+    const detail = XLSX.utils.aoa_to_sheet([["Matrícula", "Funcionário", "Data", "Horas", "Valor hora (R$)", "Multiplicador", "Premiação (R$)"], ...detailRows]);
+    detailRows.forEach((row, index) => {
+      const r = index + 2;
+      detail[`G${r}`] = { t: "n", f: `ROUND(D${r}*E${r}*F${r},2)`, v: row[6], z: '"R$" #,##0.00' };
+      const cell = detail[`E${r}`]; if (cell) cell.z = '"R$" #,##0.00';
+    });
+    detail["!cols"] = [{ wch: 15 }, { wch: 45 }, { wch: 14 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 20 }];
+    const main = XLSX.utils.aoa_to_sheet([["Matrícula", "Funcionário", ...dates.map((day) => `${br(day)} (h)`), "Total premiação (R$)"], ...rows.map((person) => [person.registration_number, person.full_name, ...dates.map((day) => Number(entryMap.get(`${person.id}:${day}`)?.hours ?? 0)), entries.filter((entry) => entry.collaborator_id === person.id).reduce((sum, entry) => sum + prizeAmount(Number(entry.hours), Number(entry.hourly_rate), Number(entry.multiplier)), 0)])]);
+    const totalColumn = XLSX.utils.encode_col(dates.length + 2);
+    rows.forEach((person, index) => {
+      const address = `${totalColumn}${index + 2}`;
+      const cell = main[address];
+      if (cell) { cell.f = `SUMIF(Detalhamento!A2:A${Math.max(detailRows.length + 1, 2)},A${index + 2},Detalhamento!G2:G${Math.max(detailRows.length + 1, 2)})`; cell.z = '"R$" #,##0.00'; }
+    });
+    main["!cols"] = [{ wch: 15 }, { wch: 45 }, ...dates.map(() => ({ wch: 14 })), { wch: 24 }];
+    XLSX.utils.book_append_sheet(workbook, main, "Horas Prêmio");
+    XLSX.utils.book_append_sheet(workbook, detail, "Detalhamento");
+    XLSX.writeFile(workbook, `Horas_Premio_${month}.xlsx`);
+  }
   if (!allowed) return null;
   return <div className="space-y-4">
-    <PageHeader title="Horas Prêmio" description={`${br(start)} a ${br(end)} · ${month.slice(0, 4)}`} actions={<Button disabled={!data.data} onClick={() => { setDate(""); setSelected([]); setCommonHours("8"); setPersonSearch(""); setOpen(true); }}><Plus className="h-4 w-4" />Adicionar HP</Button>} />
+    <PageHeader title="Horas Prêmio" description={`${br(start)} a ${br(end)} · ${month.slice(0, 4)}`} actions={<div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!data.data || data.isError} onClick={exportSheet}><Download className="h-4 w-4" />Exportar planilha</Button><Button disabled={!data.data} onClick={() => { setDate(""); setSelected([]); setCommonHours("8"); setPersonSearch(""); setOpen(true); }}><Plus className="h-4 w-4" />Adicionar HP</Button></div>} />
     <div className="flex flex-wrap items-end gap-3">
       <div className="space-y-1.5"><Label htmlFor="hp-month">Competência</Label><Input id="hp-month" type="month" value={month} onChange={(event) => { if (event.target.value) setMonth(event.target.value); }} /></div>
       <div className="min-w-56 flex-1 space-y-1.5"><Label htmlFor="hp-search">Nome ou matrícula</Label><Input id="hp-search" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
