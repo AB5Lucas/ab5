@@ -1,3 +1,3 @@
-- [ ] Adicionar filtro múltiplo de funções em Colaboradores, com título acima.
-- [ ] Adicionar cópia da lista filtrada com escolha entre nomes e nomes com funções.
-- [ ] Verificar filtros e cópia na tela.
+- [x] Adicionar filtro múltiplo de funções em Colaboradores, com título acima.
+- [x] Adicionar cópia da lista filtrada com escolha entre nomes e nomes com funções.
+- [x] Verificar filtros e cópia na tela.
