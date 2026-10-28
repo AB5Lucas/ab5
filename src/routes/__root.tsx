@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { createPreloadRecoveryHandler } from "@/lib/route-preload-recovery";
 
 
 function NotFoundComponent() {
@@ -139,9 +140,7 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const onPreload = (e: Event) => {
-      if (reloadForNewVersion()) e.preventDefault();
-    };
+    const onPreload = createPreloadRecoveryHandler(reloadForNewVersion);
     window.addEventListener("vite:preloadError", onPreload);
     return () => window.removeEventListener("vite:preloadError", onPreload);
   }, []);
