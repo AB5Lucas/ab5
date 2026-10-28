@@ -4,3 +4,4 @@
 - [ ] Criar Horas Prêmio com acesso exclusivo a administradores e programadores.
 - [ ] Listar funcionários por competência 26–25 e lançar horas em grupo com ajustes individuais.
 - [ ] Validar valores, permissões e lançamento completo na tela.
+- [ ] Adicionar e verificar exportação de Horas Prêmio como planilha.
