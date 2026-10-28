@@ -1,36 +1,3 @@
-- Transporte: finalidade EM OBRA / BACKUP / PESSOAL / VENDEDOR no lugar do cliente; backup pode ficar sem motorista
-- [x] RDO (Externo > Relatório Diário)
-- [x] Encarregado/coordenador veem só suas obras em Serviços e Resultados
-- [x] Prêmio motorista automático ao adicionar carro no fim de semana (Montar Transporte)
-- [x] Remover aba Requisitos e suas dependências
-- [x] Andaimes etapa 1: Inventário e Estoque
-- [x] Andaimes etapa 2: Solicitações e Romaneios
-- [x] Revisar redefinição de senha pelo admin (Maycon: credenciais inválidas)
-- [x] Andaimes: integrar romaneios em Solicitações e aprovações sequenciais de Sidnei, André e solicitante; validar fluxo e estoque
-- [ ] Andaimes etapa 3: Acompanhamento (montagem, renovação, desmontagem)
-- [ ] Andaimes etapa 4: Patrimônio (valores, custo de locação, rateio, integração com Resultados)
-- [x] Excluir a aba Auditoria
-
-- [x] Demandas > Contratações (solicitações, status, histórico, destinatários por cliente)
-- [x] Contratações: data do dia e nº automático no formulário
-- [ ] Contratações: envio real dos e-mails (aguarda configurar domínio de e-mail ab5.com.br)
-- [x] Resultados: coordenador vê só obras com acesso
-- [ ] Faturamentos: rotina criada e agendada; ativação no site publicado depende de publicar a atualização
-- [x] Relatórios > Sincronização: filtros, detalhes, indicadores, exportação e tolerância administrativa
-- [x] Mover Alocações para Demandas preservando URL e acessos
-- [x] Validar carga real e repetição sem duplicidades: 6 lançamentos; 17 testes aprovados, detalhes e exportação conferidos
-- [ ] Faturamentos: revisar 8 divergências de cliente, 13 notas sem correspondência e 7 linhas sem nota/valor na origem
-- [x] Faturamentos: reconhecer SPAL JUNDIAI como COCA e reprocessar notas existentes (1591, 1680 e 1681 lançadas)
-- [x] Sincronização: aba Equivalências com clientes da fonte sem repetição e vínculo ao cadastro; gravação e reprocessamento conferidos na tela
-- [ ] Validar cancelamento, reativação e conciliação financeira com cenários isolados de integração (não exercitados com notas reais)
-- [x] Página inicial com nome AB5 Hub
-- [x] Menu: Premiações em Relatórios (2ª), Sincronização em Fechamentos
-- [x] Prêmio Motorista/Viagem e VT viraram sub abas de Premiações; grupo Benefícios removido
-- [x] Grupo Fechamentos → Financeiro; página Financeiro → Fechamento
-- [x] Sub aba Premiações renomeada; Frota/Motoristas/Relatórios viraram sub abas de Transporte; grupo Veículos removido
-- [x] Grupo Agendamentos → Documentação; página Agendamentos → Controles com sub abas ASOs/Integrações/Treinamentos
-- [x] Apagar dados operacionais e estoque de andaimes (manter catálogo e responsáveis)
-- [x] Treinamentos/ASO/Integrações: não alertar vencimentos de colaboradores inativos
-- [x] Ao agendar treinamento/ASO/integração: avisar se colaborador estiver de férias ou afastado (período)
-- [x] Faturamento > Serviços: filtros idênticos aos da Indústria
-- [x] Faturamento: encaminhar cobrança de obras e obras externas manut/reparo da fonte Indústria para Serviços sem duplicar (30 testes; aplicação aos dados na próxima sincronização).
+- [x] Adicionar filtro múltiplo de funções em Colaboradores, com título acima.
+- [x] Adicionar cópia da lista filtrada com escolha entre nomes e nomes com funções.
+- [x] Verificar filtros e cópia na tela.
