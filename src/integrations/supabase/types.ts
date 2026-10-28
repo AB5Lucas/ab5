@@ -2506,6 +2506,50 @@ export type Database = {
         }
         Relationships: []
       }
+      prize_hours: {
+        Row: {
+          collaborator_id: string
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          hourly_rate: number
+          hours: number
+          id: string
+          multiplier: number
+          updated_at: string
+        }
+        Insert: {
+          collaborator_id: string
+          created_at?: string
+          created_by?: string | null
+          entry_date: string
+          hourly_rate?: number
+          hours: number
+          id?: string
+          multiplier?: number
+          updated_at?: string
+        }
+        Update: {
+          collaborator_id?: string
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          hourly_rate?: number
+          hours?: number
+          id?: string
+          multiplier?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prize_hours_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rdo_media: {
         Row: {
           created_at: string

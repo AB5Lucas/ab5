@@ -442,6 +442,13 @@
       "when": 1793126032398,
       "tag": "0062_collaborator_no_overtime",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1793188494904,
+      "tag": "0063_prize_hours",
+      "breakpoints": true
     }
   ]
 }
