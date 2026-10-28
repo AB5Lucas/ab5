@@ -32,4 +32,5 @@
 - VT/prêmio motorista: src/lib/transport-rules.ts decides per client/day — built transport (transport_passengers) wins over Programação dots and the Transporte toggle. Why: one rule shared by Fechamento and Premiações.
 - Vale Alimentação reads the month's ponto sheets live (va.functions.ts, paths in vaPaths); rules in src/lib/vale-alimentacao.ts; only parameters in va_settings. Why: no report without the month's sheets.
 - Indústria estorno sets industry_invoices.reversed_at; sync skips it until relaunched. Why: stays pending for reallocation.
-- Collaborator list filtering and copy formatting use src/lib/collaborator-list.ts; copy consumes the displayed filtered rows. Why: both copy formats must match the visible list.
+- Collaborator copy uses filtered rows via collaborator-list.ts. Why: matches the list.
+- HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.

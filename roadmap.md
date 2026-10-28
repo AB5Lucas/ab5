@@ -1,3 +1,7 @@
 - [x] Adicionar filtro múltiplo de funções em Colaboradores, com título acima.
 - [x] Adicionar cópia da lista filtrada com escolha entre nomes e nomes com funções.
 - [x] Verificar filtros e cópia na tela.
+- [x] Criar Horas Prêmio com acesso exclusivo a administradores e programadores.
+- [x] Listar funcionários por competência 26–25 e lançar horas em grupo com ajustes individuais.
+- [x] Validar valores, permissões e lançamento completo na tela.
+- [x] Adicionar e verificar exportação de Horas Prêmio como planilha.

@@ -20,6 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DriverBonusPage } from "@/components/premiacoes/premio-motorista";
 import { BonusPage } from "@/components/premiacoes/premio-viagem";
 import { VoucherPage } from "@/components/premiacoes/vale-transporte";
+import { PrizeHoursPage } from "@/components/premiacoes/horas-premio";
+import { canManagePrizeHours } from "@/lib/prize-hours";
 import { loadClosing, periodOf, type Adjustment, type ClosingRow } from "@/lib/closing";
 
 export const Route = createFileRoute("/_authenticated/fechamento")({
@@ -43,21 +45,25 @@ const TABS = [
   { v: "premio-motorista", l: "Prêmio Motorista" },
   { v: "premio-viagem", l: "Prêmio Viagem" },
   { v: "vale-transporte", l: "Vale Transporte" },
+  { v: "horas-premio", l: "Horas Prêmio" },
 ] as const;
 type Tab = (typeof TABS)[number]["v"];
 
 function PrizesPage() {
+  const { role } = useCurrentUser();
+  const canHP = canManagePrizeHours(role);
   const { tab = "fechamento" } = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
-    <Tabs value={tab} onValueChange={(v) => navigate({ search: v === "fechamento" ? {} : { tab: v as Tab }, replace: true })}>
+    <Tabs value={tab === "horas-premio" && !canHP ? "fechamento" : tab} onValueChange={(v) => navigate({ search: v === "fechamento" ? {} : { tab: v as Tab }, replace: true })}>
       <TabsList>
-        {TABS.map((t) => <TabsTrigger key={t.v} value={t.v}>{t.l}</TabsTrigger>)}
+        {TABS.filter((t) => t.v !== "horas-premio" || canHP).map((t) => <TabsTrigger key={t.v} value={t.v}>{t.l}</TabsTrigger>)}
       </TabsList>
       <TabsContent value="fechamento" className="mt-4"><ClosingPage /></TabsContent>
       <TabsContent value="premio-motorista" className="mt-4"><DriverBonusPage /></TabsContent>
       <TabsContent value="premio-viagem" className="mt-4"><BonusPage /></TabsContent>
       <TabsContent value="vale-transporte" className="mt-4"><VoucherPage /></TabsContent>
+      {canHP && <TabsContent value="horas-premio" className="mt-4"><PrizeHoursPage /></TabsContent>}
     </Tabs>
   );
 }
