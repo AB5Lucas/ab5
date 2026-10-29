@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, Network } from "lucide-react";
+import { Building2, ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Sidebar,
@@ -46,7 +46,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-            <Network className="h-4 w-4" />
+            <Building2 className="h-4 w-4" />
           </span>
           {!collapsed && (
             <div className="leading-tight">
