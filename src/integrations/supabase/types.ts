@@ -1262,6 +1262,7 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          cc_prefix: string | null
           city: string | null
           created_at: string
           distance_km: number | null
@@ -1283,6 +1284,7 @@ export type Database = {
         Insert: {
           active?: boolean
           address?: string | null
+          cc_prefix?: string | null
           city?: string | null
           created_at?: string
           distance_km?: number | null
@@ -1304,6 +1306,7 @@ export type Database = {
         Update: {
           active?: boolean
           address?: string | null
+          cc_prefix?: string | null
           city?: string | null
           created_at?: string
           distance_km?: number | null
@@ -4340,6 +4343,7 @@ export type Database = {
           address: string | null
           budget_cost: number
           budget_items: Json
+          cc_suffix: string | null
           city: string | null
           client: string | null
           client_id: string | null
@@ -4382,6 +4386,7 @@ export type Database = {
           address?: string | null
           budget_cost?: number
           budget_items?: Json
+          cc_suffix?: string | null
           city?: string | null
           client?: string | null
           client_id?: string | null
@@ -4424,6 +4429,7 @@ export type Database = {
           address?: string | null
           budget_cost?: number
           budget_items?: Json
+          cc_suffix?: string | null
           city?: string | null
           client?: string | null
           client_id?: string | null

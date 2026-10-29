@@ -46,6 +46,7 @@ import { Route as AuthenticatedExternoRelatorioDiarioRouteImport } from './route
 import { Route as AuthenticatedFechamentosFinanceiroRouteImport } from './routes/_authenticated/fechamentos.financeiro'
 import { Route as AuthenticatedFechamentosSuzanoRouteImport } from './routes/_authenticated/fechamentos.suzano'
 import { Route as AuthenticatedObrasIndexRouteImport } from './routes/_authenticated/obras.index'
+import { Route as AuthenticatedObrasComprasRouteImport } from './routes/_authenticated/obras.compras'
 import { Route as AuthenticatedObrasIntegracoesRouteImport } from './routes/_authenticated/obras.integracoes'
 import { Route as AuthenticatedObrasResultadoRouteImport } from './routes/_authenticated/obras.resultado'
 import { Route as AuthenticatedProgramacaoDiariaRouteImport } from './routes/_authenticated/programacao.diaria'
@@ -275,6 +276,12 @@ const AuthenticatedObrasIndexRoute = AuthenticatedObrasIndexRouteImport.update({
   path: '/obras/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedObrasComprasRoute =
+  AuthenticatedObrasComprasRouteImport.update({
+    id: '/obras/compras',
+    path: '/obras/compras',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedObrasIntegracoesRoute =
   AuthenticatedObrasIntegracoesRouteImport.update({
     id: '/obras/integracoes',
@@ -406,6 +413,7 @@ export interface FileRoutesByFullPath {
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
+  '/obras/compras': typeof AuthenticatedObrasComprasRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
   '/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
@@ -460,6 +468,7 @@ export interface FileRoutesByTo {
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
+  '/obras/compras': typeof AuthenticatedObrasComprasRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
   '/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
@@ -516,6 +525,7 @@ export interface FileRoutesById {
   '/_authenticated/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/_authenticated/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/_authenticated/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
+  '/_authenticated/obras/compras': typeof AuthenticatedObrasComprasRoute
   '/_authenticated/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/_authenticated/obras/resultado': typeof AuthenticatedObrasResultadoRoute
   '/_authenticated/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
@@ -572,6 +582,7 @@ export interface FileRouteTypes {
     | '/externo/relatorio-diario'
     | '/fechamentos/financeiro'
     | '/fechamentos/suzano'
+    | '/obras/compras'
     | '/obras/integracoes'
     | '/obras/resultado'
     | '/programacao/diaria'
@@ -626,6 +637,7 @@ export interface FileRouteTypes {
     | '/externo/relatorio-diario'
     | '/fechamentos/financeiro'
     | '/fechamentos/suzano'
+    | '/obras/compras'
     | '/obras/integracoes'
     | '/obras/resultado'
     | '/programacao/diaria'
@@ -681,6 +693,7 @@ export interface FileRouteTypes {
     | '/_authenticated/externo/relatorio-diario'
     | '/_authenticated/fechamentos/financeiro'
     | '/_authenticated/fechamentos/suzano'
+    | '/_authenticated/obras/compras'
     | '/_authenticated/obras/integracoes'
     | '/_authenticated/obras/resultado'
     | '/_authenticated/programacao/diaria'
@@ -971,6 +984,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedObrasIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/obras/compras': {
+      id: '/_authenticated/obras/compras'
+      path: '/obras/compras'
+      fullPath: '/obras/compras'
+      preLoaderRoute: typeof AuthenticatedObrasComprasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/obras/integracoes': {
       id: '/_authenticated/obras/integracoes'
       path: '/obras/integracoes'
@@ -1117,6 +1137,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedExternoRelatorioDiarioRoute: typeof AuthenticatedExternoRelatorioDiarioRoute
   AuthenticatedFechamentosFinanceiroRoute: typeof AuthenticatedFechamentosFinanceiroRoute
   AuthenticatedFechamentosSuzanoRoute: typeof AuthenticatedFechamentosSuzanoRoute
+  AuthenticatedObrasComprasRoute: typeof AuthenticatedObrasComprasRoute
   AuthenticatedObrasIntegracoesRoute: typeof AuthenticatedObrasIntegracoesRoute
   AuthenticatedObrasResultadoRoute: typeof AuthenticatedObrasResultadoRoute
   AuthenticatedProgramacaoDiariaRoute: typeof AuthenticatedProgramacaoDiariaRoute
@@ -1178,6 +1199,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFechamentosFinanceiroRoute:
     AuthenticatedFechamentosFinanceiroRoute,
   AuthenticatedFechamentosSuzanoRoute: AuthenticatedFechamentosSuzanoRoute,
+  AuthenticatedObrasComprasRoute: AuthenticatedObrasComprasRoute,
   AuthenticatedObrasIntegracoesRoute: AuthenticatedObrasIntegracoesRoute,
   AuthenticatedObrasResultadoRoute: AuthenticatedObrasResultadoRoute,
   AuthenticatedProgramacaoDiariaRoute: AuthenticatedProgramacaoDiariaRoute,
