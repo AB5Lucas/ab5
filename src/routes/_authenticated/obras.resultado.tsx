@@ -1,4 +1,5 @@
 import { contractFraction } from "@/lib/contract";
+import { resultWorksForRole } from "@/lib/result-work-access";
 import { isResultMonth } from "@/lib/result-period";
 import { displayedBudgetItems } from "@/lib/result-budget";
 import { loadWorkData, buildBase as engineBuildBase, fetchAll, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, bdiBudget, BDI_RATE, type ItemKey } from "@/lib/results-engine";
@@ -107,16 +108,17 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   });
 
   const works = useQuery({
-    queryKey: ["works-result", role, user?.id],
+    queryKey: ["works-result", role, user?.id, "client-scope"],
     enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("works").select("*, clients(name)").order("name");
       if (error) throw error;
-      // Coordenador só vê as obras atribuídas a ele na aba Usuários
+      // Coordenadores herdam todos os serviços dos clientes atribuídos, inclusive novos.
       if (role === "coordenador" || role === "encarregado") {
-        const { data: mine } = await supabase.from("foreman_works").select("work_id").eq("user_id", user!.id);
-        const ids = new Set((mine ?? []).map((m) => m.work_id));
-        return data.filter((w) => ids.has(w.id));
+        if (!user?.id) return [];
+        const { data: mine, error: scopeError } = await supabase.from("foreman_works").select("work_id, works(client_id)").eq("user_id", user.id);
+        if (scopeError) throw scopeError;
+        return resultWorksForRole(data, role, mine ?? []);
       }
       return data;
     },
