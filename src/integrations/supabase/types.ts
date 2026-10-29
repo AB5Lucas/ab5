@@ -2553,6 +2553,69 @@ export type Database = {
           },
         ]
       }
+      purchase_cc_lines: {
+        Row: {
+          amount: number
+          cc_code: string
+          cc_name: string | null
+          directed_by: string | null
+          file_path: string | null
+          id: string
+          items: Json
+          reason: string | null
+          ref_month: string
+          status: string
+          synced_at: string
+          target_client_id: string | null
+          target_work_id: string | null
+        }
+        Insert: {
+          amount?: number
+          cc_code: string
+          cc_name?: string | null
+          directed_by?: string | null
+          file_path?: string | null
+          id?: string
+          items?: Json
+          reason?: string | null
+          ref_month: string
+          status?: string
+          synced_at?: string
+          target_client_id?: string | null
+          target_work_id?: string | null
+        }
+        Update: {
+          amount?: number
+          cc_code?: string
+          cc_name?: string | null
+          directed_by?: string | null
+          file_path?: string | null
+          id?: string
+          items?: Json
+          reason?: string | null
+          ref_month?: string
+          status?: string
+          synced_at?: string
+          target_client_id?: string | null
+          target_work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_cc_lines_target_client_id_fkey"
+            columns: ["target_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_cc_lines_target_work_id_fkey"
+            columns: ["target_work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rdo_media: {
         Row: {
           created_at: string
@@ -4139,6 +4202,7 @@ export type Database = {
           industry_order_id: string | null
           industry_part: string | null
           industry_part_ref: string | null
+          purchase_cc_id: string | null
           split_group: string | null
           split_note: string | null
           split_total: number | null
@@ -4160,6 +4224,7 @@ export type Database = {
           industry_order_id?: string | null
           industry_part?: string | null
           industry_part_ref?: string | null
+          purchase_cc_id?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
@@ -4181,6 +4246,7 @@ export type Database = {
           industry_order_id?: string | null
           industry_part?: string | null
           industry_part_ref?: string | null
+          purchase_cc_id?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
@@ -4203,6 +4269,13 @@ export type Database = {
             columns: ["industry_order_id"]
             isOneToOne: false
             referencedRelation: "industry_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_entries_purchase_cc_id_fkey"
+            columns: ["purchase_cc_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_cc_lines"
             referencedColumns: ["id"]
           },
           {
