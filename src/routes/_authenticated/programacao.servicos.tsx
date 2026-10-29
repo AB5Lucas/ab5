@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowUp, Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Moon, Plus, Search, Users, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Car, ChevronLeft, ChevronRight, ClipboardList, Copy, GripVertical, ListFilter, Moon, Plus, Search, Users, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { TransportBuilderDialog } from "@/components/transport-builder-dialog";
 import {
@@ -408,6 +408,18 @@ function ServicesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const [clearBox, setClearBox] = useState<{ name: string; ids: string[] } | null>(null);
+  const clearAll = useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        const { error } = await supabase.rpc("unassign_allocation_service", { _alloc_id: id });
+        if (error) throw error;
+      }
+      return ids.length;
+    },
+    onSuccess: (n) => { toast.success(`${n} colaborador(es) retirados do serviço`); setClearBox(null); invalidate(); },
+    onError: (e: Error) => { toast.error(e.message); invalidate(); },
+  });
   const [relocate, setRelocate] = useState<{ id: string; name: string } | null>(null);
   const [otherClient, setOtherClient] = useState("");
   const allClients = useQuery({
@@ -564,6 +576,16 @@ function ServicesPage() {
       </div>
       <p className="text-sm capitalize text-muted-foreground">{formatBR(date)}</p>
 
+      <Dialog open={!!clearBox} onOpenChange={(o) => !o && setClearBox(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Retirar todos do serviço?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Os {clearBox?.ids.length} colaborador(es) de “{clearBox?.name}” voltarão para o efetivo sem serviço.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearBox(null)}>Cancelar</Button>
+            <Button variant="destructive" disabled={clearAll.isPending} onClick={() => clearBox && clearAll.mutate(clearBox.ids)}>Retirar todos</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {clientId && (
         <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
           <div className="grid content-start gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -600,6 +622,18 @@ function ServicesPage() {
                       className="size-9 shrink-0 rounded p-0 text-muted-foreground/60 hover:text-foreground disabled:opacity-30 md:size-[18px] [&_svg]:size-5 md:[&_svg]:size-3.5"
                     >
                       <ArrowUp />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={list.length === 0 || clearAll.isPending}
+                      onClick={() => setClearBox({ name: w.name, ids: list.map((a) => a.id) })}
+                      title="Retirar todos os colaboradores deste serviço"
+                      aria-label="Retirar todos"
+                      className="size-9 shrink-0 rounded p-0 text-muted-foreground/60 hover:text-destructive disabled:opacity-30 md:size-[18px] [&_svg]:size-5 md:[&_svg]:size-3.5"
+                    >
+                      <ArrowDown />
                     </Button>
                     <Button
                       type="button"

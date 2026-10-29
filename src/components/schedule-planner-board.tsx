@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  ArrowDown,
   Ban,
   CalendarDays,
   Check,
@@ -1247,6 +1248,17 @@ export function SchedulePlannerBoard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const [clearBox, setClearBox] = useState<{ label: string; ids: string[] } | null>(null);
+  const clearRows = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("daily_allocations").delete().in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (n) => { toast.success(`${n} colaborador(es) retirados da escalação`); setClearBox(null); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const removeRow = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("daily_allocations").delete().eq("id", id);
@@ -1388,6 +1400,20 @@ export function SchedulePlannerBoard({
 
   return (
     <div className="space-y-4">
+      <AlertDialog open={!!clearBox} onOpenChange={(o) => !o && setClearBox(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirar todos da escalação?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Os {clearBox?.ids.length} colaborador(es) de “{clearBox?.label}” serão retirados da programação deste dia.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" disabled={clearRows.isPending} onClick={() => clearBox && clearRows.mutate(clearBox.ids)}>Retirar todos</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={!!copyAsk} onOpenChange={(v) => !v && setCopyAsk(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1643,6 +1669,22 @@ export function SchedulePlannerBoard({
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
+                    {editable && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
+                        title="Retirar todos os colaboradores deste quadro"
+                        aria-label="Retirar todos"
+                        disabled={workRows.length === 0 || clearRows.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setClearBox({ label: g.label, ids: workRows.map((r) => r.id) });
+                        }}
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
+                    )}
                     <button
                       type="button"
                       title="Copiar nomes e CPF"
