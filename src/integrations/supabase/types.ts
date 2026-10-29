@@ -4141,6 +4141,7 @@ export type Database = {
           split_total: number | null
           sync_cancelled: boolean
           sync_note_id: string | null
+          sync_split_note_id: string | null
           updated_at: string
           work_id: string
         }
@@ -4161,6 +4162,7 @@ export type Database = {
           split_total?: number | null
           sync_cancelled?: boolean
           sync_note_id?: string | null
+          sync_split_note_id?: string | null
           updated_at?: string
           work_id: string
         }
@@ -4181,6 +4183,7 @@ export type Database = {
           split_total?: number | null
           sync_cancelled?: boolean
           sync_note_id?: string | null
+          sync_split_note_id?: string | null
           updated_at?: string
           work_id?: string
         }
@@ -4202,6 +4205,13 @@ export type Database = {
           {
             foreignKeyName: "work_entries_sync_note_id_fkey"
             columns: ["sync_note_id"]
+            isOneToOne: false
+            referencedRelation: "billing_sync_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_entries_sync_split_note_id_fkey"
+            columns: ["sync_split_note_id"]
             isOneToOne: false
             referencedRelation: "billing_sync_notes"
             referencedColumns: ["id"]
