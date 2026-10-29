@@ -27,11 +27,10 @@
 - Night premium: laborCost takes night hours from nightHours(entry, exit, break) for RDO rows of night services (rdos.shift='night' or works.night_shift). Why: one labor-cost formula shared by results and financeiro.
 - Billing (Serviços): Excel feeds atomic billing_sync_process; readers exclude sync_cancelled; billing_client_key resolves equivalences; daily cron run; an order shared by services splits by order value (extra parts in sync_split_note_id). Why: shared mapping, history, no ambiguity.
 - Works-description invoices read from the industry report are routed through billing_sync_import_external and the Serviços engine, with cross-source invoice identity checks. Why: one posting owner and no duplicate financial entries across spreadsheets.
-- Industry sync uses industry_orders/invoices and keyed work_entries. Why: idempotent, separate from Serviços.
-- Indústria orders: each PCP line is its own works.orders entry with the exact sheet value (never summed/raised); multi-sector OPs split via industry_orders.splits + industry_sync_parts; raw material only from column J. Why: match the PCP sheet.
+- Indústria orders: each PCP line is its own works.orders entry with the exact sheet value (never summed/raised); multi-sector OPs split via industry_orders.splits + industry_sync_parts; raw material only from column J. Why: match the PCP sheet. Sync is idempotent (keyed work_entries); estorno sets industry_invoices.reversed_at and sync skips it.
 - VT/prêmio motorista: src/lib/transport-rules.ts decides per client/day — built transport (transport_passengers) wins over Programação dots and the Transporte toggle. Why: one shared rule.
 - Vale Alimentação reads the month's ponto sheets live (va.functions.ts, paths in vaPaths); rules in src/lib/vale-alimentacao.ts; only parameters in va_settings. Why: no report without the month's sheets.
-- Indústria estorno sets industry_invoices.reversed_at; sync skips it until relaunched. Why: reallocation.
 - Collaborator copy uses filtered rows via collaborator-list.ts. Why: matches the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
 - Never cancel vite:preloadError in recovery. Why: it breaks lazy routes.
+- Compras: purchase_cc_lines (month+CC) + rules in purchases.ts; work_entries link via purchase_cc_id, recreated per sync. Why: no duplicates, directions persist.
