@@ -5,4 +5,6 @@
 - [x] Listar funcionários por competência 26–25 e lançar horas em grupo com ajustes individuais.
 - [x] Validar valores, permissões e lançamento completo na tela.
 - [x] Adicionar e verificar exportação de Horas Prêmio como planilha.
-- [x] Corrigir e validar o acesso dos coordenadores a todos os serviços dos clientes autorizados.
+- [x] Corrigir e validar o acesso dos coordenadores a todos os serviços dos clientes autorizados.- [ ] Compras: campos Prefixo CC (cliente) e Sufixo CC (serviço), preenchimento manual.
+- [ ] Compras: aba em Obras, sincronização só pelo botão (SharePoint Compras/RELATÓRIOS), pendentes com cliente/serviço e rateio por horas, filtros Lançados/Pendentes.
+- [ ] Unificar Serviços e Clientes em "Cadastros".
