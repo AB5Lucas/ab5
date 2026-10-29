@@ -187,8 +187,8 @@ function WorksPage() {
   }, [people.data]);
 
   const clientById = useMemo(() => {
-    const map = new Map<string, { name: string; city: string | null; state: string | null }>();
-    (clients.data ?? []).forEach((c) => map.set(c.id, { name: c.name, city: c.city, state: c.state }));
+    const map = new Map<string, { name: string; city: string | null; state: string | null; cc_prefix: string | null }>();
+    (clients.data ?? []).forEach((c) => map.set(c.id, { name: c.name, city: c.city, state: c.state, cc_prefix: c.cc_prefix }));
     return map;
   }, [clients.data]);
 
