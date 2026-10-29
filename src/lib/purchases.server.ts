@@ -32,6 +32,8 @@ async function monthHours(ym: string) {
     const { data, error } = await supabaseAdmin.from("daily_allocations").select("id, work_id").in("schedule_id", ids.slice(i, i + 100)).order("id").range(page * 1000, page * 1000 + 999);
     if (error) throw error;
     for (const a of data ?? []) if (a.work_id) alloc.set(a.work_id, (alloc.get(a.work_id) ?? 0) + 8);
+    if (!data || data.length < 1000) break;
+    }
   }
   for (const [w, h] of alloc) if (!(hours.get(w) ?? 0)) hours.set(w, h);
   return hours;
