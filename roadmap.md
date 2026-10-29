@@ -5,3 +5,4 @@
 - [x] Listar funcionários por competência 26–25 e lançar horas em grupo com ajustes individuais.
 - [x] Validar valores, permissões e lançamento completo na tela.
 - [x] Adicionar e verificar exportação de Horas Prêmio como planilha.
+- [ ] Corrigir e validar o acesso dos coordenadores a todos os serviços dos clientes autorizados.
