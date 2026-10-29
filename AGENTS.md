@@ -25,7 +25,7 @@
 - Financeiro opens Resultados with the exact selected month list. Why: drill-down keeps nonconsecutive periods.
 - Resultados uses result-budget.ts to derive displayed budget items and totals for both the table and chart. Why: monthly budgets must not be scaled a second time by progress.
 - Night premium: laborCost takes night hours from nightHours(entry, exit, break) for RDO rows of night services (rdos.shift='night' or works.night_shift). Why: one labor-cost formula shared by results and financeiro.
-- Billing (Serviços): Excel feeds atomic billing_sync_process; readers exclude sync_cancelled; billing_client_key resolves equivalences; daily run via cron route with persisted run state. Why: shared mapping, history, no open browser needed.
+- Billing (Serviços): Excel feeds atomic billing_sync_process; readers exclude sync_cancelled; billing_client_key resolves equivalences; daily cron run; an order shared by services splits by order value (extra parts in sync_split_note_id). Why: shared mapping, history, no ambiguity.
 - Works-description invoices read from the industry report are routed through billing_sync_import_external and the Serviços engine, with cross-source invoice identity checks. Why: one posting owner and no duplicate financial entries across spreadsheets.
 - Industry sync uses industry_orders/invoices and keyed work_entries. Why: idempotent, separate from Serviços.
 - Indústria orders: each PCP line is its own works.orders entry with the exact sheet value (never summed/raised); multi-sector OPs split via industry_orders.splits + industry_sync_parts; raw material only from column J. Why: values must match the PCP sheet per service.
@@ -35,4 +35,3 @@
 - Collaborator copy uses filtered rows via collaborator-list.ts. Why: matches the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
 - Never cancel vite:preloadError in recovery. Why: cancellation resolves imports to undefined, breaking lazy routes.
-- Billing notes whose order exists in several services of the same client are split: main entry keeps work_entries.sync_note_id, extra parts use sync_split_note_id; each service gets exactly its order value, leftover stays unposted. Why: shared order numbers (e.g. MARS) without ambiguity.
