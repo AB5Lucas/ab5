@@ -85,6 +85,7 @@ type FormState = {
   active: boolean;
   night_shift: boolean;
   notes: string;
+  cc_suffix: string;
 };
 
 const emptyForm: FormState = {
@@ -99,6 +100,7 @@ const emptyForm: FormState = {
   active: true,
   night_shift: false,
   notes: "",
+  cc_suffix: "",
 };
 
 function toForm(w: Work): FormState {
@@ -114,6 +116,7 @@ function toForm(w: Work): FormState {
     active: w.active,
     night_shift: !!w.night_shift,
     notes: w.notes ?? "",
+    cc_suffix: w.cc_suffix ?? "",
   };
 }
 
@@ -157,7 +160,7 @@ function WorksPage() {
   const clients = useQuery({
     queryKey: ["clients-min"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clients").select("id, name, city, state").order("name");
+      const { data, error } = await supabase.from("clients").select("id, name, city, state, cc_prefix").order("name");
       if (error) throw error;
       return data;
     },
@@ -202,6 +205,7 @@ function WorksPage() {
     mutationFn: async () => {
       const parsed = schema.safeParse(form);
       if (!parsed.success) throw new Error(parsed.error.issues[0]!.message);
+      if (form.cc_suffix.trim() && !/^\d{3}$/.test(form.cc_suffix.trim())) throw new Error("Sufixo CC deve ter 3 números");
 
       const payload = {
         client_id: form.client_id,
@@ -215,6 +219,7 @@ function WorksPage() {
         manager_id: ref(form.manager_id),
         active: form.active,
         notes: nn(form.notes),
+        cc_suffix: nn(form.cc_suffix),
       };
 
       if (editing) {
@@ -311,6 +316,7 @@ function WorksPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Serviço</TableHead>
+              <TableHead>CC</TableHead>
               <TableHead className="hidden md:table-cell">Cliente</TableHead>
               <TableHead className="hidden lg:table-cell">Cidade</TableHead>
               <TableHead className="hidden xl:table-cell">Seg–Qui</TableHead>
@@ -323,14 +329,14 @@ function WorksPage() {
           <TableBody>
             {works.isLoading && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!works.isLoading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
                   Nenhum serviço encontrado.
                 </TableCell>
               </TableRow>
@@ -340,6 +346,7 @@ function WorksPage() {
               return (
                 <TableRow key={w.id}>
                   <TableCell className="font-medium">{w.name}</TableCell>
+                  <TableCell className="font-mono text-xs">{w.cc_suffix ? `${(c as { cc_prefix?: string | null } | null)?.cc_prefix ?? "????"}${w.cc_suffix}` : "—"}</TableCell>
                   <TableCell className="hidden md:table-cell">{c?.name ?? w.client ?? "—"}</TableCell>
                   <TableCell className="hidden lg:table-cell">
                     {[c?.city, c?.state].filter(Boolean).join("/") || "—"}
@@ -408,6 +415,11 @@ function WorksPage() {
             <div className="space-y-1 sm:col-span-2">
               <Label>Nome do serviço *</Label>
               <Input value={form.name} onChange={(e) => set("name", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Sufixo CC (3 números)</Label>
+              <Input inputMode="numeric" maxLength={3} placeholder="Ex.: 221" value={form.cc_suffix} onChange={(e) => set("cc_suffix", e.target.value.replace(/\D/g, ""))} />
+              <p className="text-xs text-muted-foreground">CC completo: {(clientById.get(form.client_id) as { cc_prefix?: string | null } | undefined)?.cc_prefix ?? "????"}{form.cc_suffix || "___"}</p>
             </div>
             <div className="space-y-1">
               <Label>Entrada</Label>
