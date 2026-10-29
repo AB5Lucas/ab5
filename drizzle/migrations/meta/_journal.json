@@ -484,6 +484,13 @@
       "when": 1793241561386,
       "tag": "0068_cost_center_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793243055955,
+      "tag": "0069_allow_shared_cc_suffix",
+      "breakpoints": true
     }
   ]
 }
