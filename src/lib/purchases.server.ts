@@ -55,7 +55,20 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
   const r = refs ?? (await loadRefs());
   let hours = hoursCache?.get(line.ref_month);
   if (!hours) { hours = await monthHours(line.ref_month); hoursCache?.set(line.ref_month, hours); }
-  const alloc = allocatePurchase(line.cc_code, Number(line.amount), r.clients, r.works, hours, { client_id: line.target_client_id, work_id: line.target_work_id });
+  let alloc = allocatePurchase(line.cc_code, Number(line.amount), r.clients, r.works, hours, { client_id: line.target_client_id, work_id: line.target_work_id });
+  // Ficaria pendente sem decisão própria: reaproveita a última decisão manual do mesmo centro de custo.
+  if (alloc.status === "pending" && !line.target_client_id && !line.target_work_id) {
+    const { data: prev } = await supabaseAdmin.from("purchase_cc_lines").select("target_client_id, target_work_id")
+      .eq("cc_code", line.cc_code).neq("id", line.id).or("target_client_id.not.is.null,target_work_id.not.is.null")
+      .order("ref_month", { ascending: false }).limit(1).maybeSingle();
+    if (prev) {
+      const again = allocatePurchase(line.cc_code, Number(line.amount), r.clients, r.works, hours, { client_id: prev.target_client_id, work_id: prev.target_work_id });
+      if (again.status === "launched") {
+        alloc = { ...again, reason: "Direcionado como na decisão anterior" };
+        await supabaseAdmin.from("purchase_cc_lines").update({ target_client_id: prev.target_client_id, target_work_id: prev.target_work_id }).eq("id", line.id);
+      }
+    }
+  }
   const del = await supabaseAdmin.from("work_entries").delete().eq("purchase_cc_id", line.id);
   if (del.error) throw del.error;
   if (alloc.parts.length) {
