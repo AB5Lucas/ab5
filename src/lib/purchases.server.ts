@@ -62,7 +62,7 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
       .eq("cc_code", line.cc_code).neq("id", line.id).or("target_client_id.not.is.null,target_work_id.not.is.null")
       .order("ref_month", { ascending: false }).limit(1).maybeSingle();
     if (prev) {
-      const again = allocatePurchase(line.cc_code, Number(line.amount), r.clients, r.works, hours, prev);
+      const again = allocatePurchase(line.cc_code, Number(line.amount), r.clients, r.works, hours, { client_id: prev.target_client_id, work_id: prev.target_work_id });
       if (again.status === "launched") {
         alloc = { ...again, reason: "Direcionado como na decisão anterior" };
         await supabaseAdmin.from("purchase_cc_lines").update({ target_client_id: prev.target_client_id, target_work_id: prev.target_work_id }).eq("id", line.id);
