@@ -85,6 +85,7 @@ type FormState = {
   has_toll: boolean;
   toll_amount: string;
   trips_per_day: string;
+  cc_prefix: string;
 };
 
 const emptyForm: FormState = {
@@ -103,6 +104,7 @@ const emptyForm: FormState = {
   has_toll: false,
   toll_amount: "",
   trips_per_day: "1",
+  cc_prefix: "",
 };
 
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
@@ -139,6 +141,7 @@ function ClientsPage() {
     mutationFn: async () => {
       const parsed = schema.safeParse(form);
       if (!parsed.success) throw new Error(parsed.error.issues[0]!.message);
+      if (form.cc_prefix.trim() && !/^\d{4}$/.test(form.cc_prefix.trim())) throw new Error("Prefixo CC deve ter 4 números");
       const payload = {
         name: form.name.trim(),
         address: nn(form.address),
@@ -155,6 +158,7 @@ function ClientsPage() {
         has_toll: form.has_toll,
         toll_amount: form.has_toll ? Number(form.toll_amount.replace(",", ".")) || 0 : 0,
         trips_per_day: Math.max(1, Number(form.trips_per_day) || 1),
+        cc_prefix: nn(form.cc_prefix),
       };
       if (editing) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editing.id);
@@ -222,6 +226,7 @@ function ClientsPage() {
       has_toll: c.has_toll ?? false,
       toll_amount: c.toll_amount != null ? String(c.toll_amount) : "",
       trips_per_day: String(c.trips_per_day ?? 1),
+      cc_prefix: c.cc_prefix ?? "",
     });
     setOpen(true);
   }
@@ -302,6 +307,7 @@ function ClientsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Cliente</TableHead>
+              <TableHead>Prefixo CC</TableHead>
               <TableHead className="hidden md:table-cell">Endereço</TableHead>
               <TableHead className="hidden lg:table-cell">Cidade</TableHead>
               <TableHead className="hidden lg:table-cell">Distância</TableHead>
@@ -312,14 +318,14 @@ function ClientsPage() {
           <TableBody>
             {clients.isLoading && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!clients.isLoading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                   Nenhum cliente encontrado.
                 </TableCell>
               </TableRow>
@@ -327,6 +333,7 @@ function ClientsPage() {
             {filtered.map((c) => (
               <TableRow key={c.id}>
                 <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell className="font-mono">{c.cc_prefix ?? "—"}</TableCell>
                 <TableCell className="hidden md:table-cell">
                   {[c.address, c.number, c.neighborhood].filter(Boolean).join(", ") || "—"}
                 </TableCell>
@@ -379,6 +386,10 @@ function ClientsPage() {
             <div className="space-y-1 sm:col-span-2">
               <Label>Nome do cliente *</Label>
               <Input value={form.name} onChange={(e) => set("name", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Prefixo CC (4 números)</Label>
+              <Input inputMode="numeric" maxLength={4} placeholder="Ex.: 2004" value={form.cc_prefix} onChange={(e) => set("cc_prefix", e.target.value.replace(/\D/g, ""))} />
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Endereço</Label>
