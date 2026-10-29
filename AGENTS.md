@@ -35,3 +35,4 @@
 - Collaborator copy uses filtered rows via collaborator-list.ts. Why: matches the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
 - Never cancel vite:preloadError in recovery. Why: cancellation resolves imports to undefined, breaking lazy routes.
+- Billing notes whose order exists in several services of the same client are split: main entry keeps work_entries.sync_note_id, extra parts use sync_split_note_id; each service gets exactly its order value, leftover stays unposted. Why: shared order numbers (e.g. MARS) without ambiguity.
