@@ -35,3 +35,4 @@
 - Collaborator copy uses filtered rows via collaborator-list.ts. Why: matches the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
 - Never cancel vite:preloadError in recovery. Why: it breaks lazy routes.
+- Compras (/obras/compras): report lines stored per month+CC in purchase_cc_lines; allocation rules live only in src/lib/purchases.ts and work_entries rows link via purchase_cc_id (recreated on each sync/direction). Why: re-sync never duplicates costs and manual direction survives.
