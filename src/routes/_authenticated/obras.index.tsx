@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Pencil, Plus, Search, Trash2, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { CadastrosTabs } from "@/components/cadastros-tabs";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -267,16 +268,12 @@ function WorksPage() {
 
   return (
     <div className="space-y-4">
+      <CadastrosTabs active="servicos" />
       <PageHeader
-        title="Serviços"
+        title="Cadastros"
         description="Cadastro de serviços por cliente, com horários de entrada e saída."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/clientes">
-                <Building2 className="h-4 w-4" /> Clientes
-              </Link>
-            </Button>
             {canWrite && (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4" /> Novo serviço

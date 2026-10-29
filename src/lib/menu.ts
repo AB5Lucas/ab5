@@ -47,9 +47,9 @@ const RAW_GROUPS: MenuGroup[] = [
     label: "Obras",
     icon: Building2,
     items: [
-      { title: "Serviços", url: "/obras" },
+      { title: "Cadastros", url: "/obras" },
+      { title: "Compras", url: "/obras/compras" },
       { title: "Resultados", url: "/obras/resultado" },
-      { title: "Clientes", url: "/clientes" },
     ],
   },
   {
@@ -107,5 +107,6 @@ export const ALL_MENU_URLS = MENU_GROUPS.flatMap((g) => g.items.map((i) => i.url
 export function menuUrlFor(pathname: string): string | null {
   if (ALL_MENU_URLS.includes(pathname)) return pathname;
   if (pathname.startsWith("/programacao")) return "/programacao/diaria";
+  if (pathname === "/clientes") return "/obras";
   return null;
 }

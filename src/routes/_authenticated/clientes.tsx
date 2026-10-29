@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { CadastrosTabs } from "@/components/cadastros-tabs";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -270,8 +271,9 @@ function ClientsPage() {
 
   return (
     <div className="space-y-4">
+      <CadastrosTabs active="clientes" />
       <PageHeader
-        title="Clientes"
+        title="Cadastros"
         description="Cadastro de clientes: endereço, cidade e distância utilizada nos serviços."
         actions={
           <div className="flex flex-wrap gap-2">
