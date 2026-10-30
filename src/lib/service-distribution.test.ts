@@ -22,15 +22,15 @@ describe("indicadores de Serviços", () => {
   it("não conta clientes sem efetivo ou totalmente distribuídos", () => {
     expect(serviceDistribution(works, [allocation("a1", true)]).pendingClients).toBe(0);
   });
-  it("conta serviços ativos vazios, sem tratar efetivo não distribuído como alocação de serviço", () => {
-    expect(serviceDistribution(works, [allocation("a1", false), allocation("a2", true)]).emptyByClient).toEqual({ a: 1, b: 1, c: 2 });
+  it("sinaliza somente clientes com efetivo ainda não distribuído", () => {
+    expect(serviceDistribution(works, [allocation("a1", false), allocation("a2", true)]).pendingClientIds).toEqual(["a"]);
   });
-  it("remove a bolinha quando todos os serviços ativos têm alocação", () => {
-    expect(serviceDistribution(works, [allocation("a1", true), allocation("a2", true)]).emptyByClient["a"]).toBe(0);
+  it("não sinaliza serviços vazios quando todo o efetivo do cliente está distribuído", () => {
+    expect(serviceDistribution(works, [allocation("a1", true)]).pendingClientIds).toEqual([]);
   });
   it("ignora pessoas indisponíveis, como os quadros de Serviços", () => {
     const result = serviceDistribution(works, [allocation("a1", false), allocation("a2", true)], new Set(["person"]));
     expect(result.pendingClients).toBe(0);
-    expect(result.emptyByClient["a"]).toBe(2);
+    expect(result.pendingClientIds).toEqual([]);
   });
 });

@@ -25,7 +25,6 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { addDays, checkAso, checkIntegration, checkRequirements, fetchScheduleContext, formatBR, pendingForWork, todayISO, workRequiresIntegration } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
 import { SERVICE_BADGE_DATE, useServiceDistribution } from "@/hooks/use-service-distribution";
-import { BadgeDot } from "@/hooks/use-nav-badges";
 
 export const Route = createFileRoute("/_authenticated/programacao/servicos")({
   head: () => ({
@@ -543,8 +542,8 @@ function ServicesPage() {
             <SelectTrigger><SelectValue placeholder={clients.data?.length === 0 ? "Nenhum cliente com efetivo escalado neste dia" : "Selecione o cliente"} /></SelectTrigger>
             <SelectContent>
               {(clients.data ?? []).map((c) => {
-                const count = distribution.data?.emptyByClient[c.id] ?? 0;
-                return <SelectItem key={c.id} value={c.id}><span className="inline-flex items-center gap-1">{c.name}<span title={`${count} serviço(s) ativo(s) sem alocação`}><BadgeDot b={count ? { count, tone: "red" } : undefined} /></span></span></SelectItem>;
+                const pending = distribution.data?.pendingClientIds.includes(c.id) ?? false;
+                return <SelectItem key={c.id} value={c.id}><span className="inline-flex items-center gap-1">{c.name}{pending && <span className="size-2 shrink-0 rounded-full bg-destructive" role="img" aria-label="Efetivo sem serviço definido" title="Efetivo sem serviço definido" />}</span></SelectItem>;
               })}
             </SelectContent>
           </Select>

@@ -15,17 +15,11 @@ export function serviceDistribution(
     activeByClient.set(w.client_id, ids);
   }
   const pendingClients = new Set<string>();
-  const occupied = new Set<string>();
   for (const a of allocations) {
     if (excluded.has(a.collaborator_id)) continue;
     const clientId = byWork.get(a.work_id)?.client_id;
     if (!clientId) continue;
-    if (a.service_assigned) occupied.add(a.work_id);
-    else if ((activeByClient.get(clientId)?.size ?? 0) > 1) pendingClients.add(clientId);
+    if (!a.service_assigned && (activeByClient.get(clientId)?.size ?? 0) > 1) pendingClients.add(clientId);
   }
-  const emptyByClient: Record<string, number> = {};
-  for (const [clientId, ids] of activeByClient) {
-    emptyByClient[clientId] = [...ids].filter((id) => !occupied.has(id)).length;
-  }
-  return { pendingClients: pendingClients.size, emptyByClient };
+  return { pendingClients: pendingClients.size, pendingClientIds: [...pendingClients] };
 }

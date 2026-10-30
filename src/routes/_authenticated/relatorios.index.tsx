@@ -354,11 +354,11 @@ const out: AllocRow[] = [];
               {byWork.map((w) => (
                 <TableRow key={w.key}>
                   <TableCell>
-                    <button type="button" className="text-left text-primary hover:underline" onClick={() => setDetail({ kind: "client", key: w.clientKey, title: w.client })}>{w.client}</button>
+                    <Button variant="link" className="h-auto p-0 text-left text-foreground" onClick={() => setDetail({ kind: "client", key: w.clientKey, title: w.client })}>{w.client}</Button>
                   </TableCell>
                   <TableCell className="font-medium">
                     {w.workId ? (
-                      <button type="button" className="text-left text-primary hover:underline" onClick={() => setDetail({ kind: "work", key: w.workId!, title: `${w.client} · ${w.label}` })}>{w.label}</button>
+                      <Button variant="link" className="h-auto p-0 text-left text-foreground" onClick={() => { if (w.workId) setDetail({ kind: "work", key: w.workId, title: `${w.client} · ${w.label}` }); }}>{w.label}</Button>
                     ) : w.label}
                   </TableCell>
                   <TableCell className="text-right">{w.total}</TableCell>
@@ -366,7 +366,7 @@ const out: AllocRow[] = [];
                   <TableCell className="text-right">{w.overnight}</TableCell>
                   <TableCell className="text-right">
                     {w.workId ? (
-                      <button type="button" className="text-primary hover:underline" onClick={() => setDetail({ kind: "hours", key: w.workId!, title: `Horas trabalhadas · ${w.client} · ${w.label}` })}>{fmtH(w.hours)}</button>
+                      <Button variant="link" className="h-auto p-0 text-foreground" onClick={() => { if (w.workId) setDetail({ kind: "hours", key: w.workId, title: `Horas trabalhadas · ${w.client} · ${w.label}` }); }}>{fmtH(w.hours)}</Button>
                     ) : "—"}
                   </TableCell>
                 </TableRow>
