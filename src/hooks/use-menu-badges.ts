@@ -51,7 +51,7 @@ function useBadgeData() {
       for (const [key, exp] of latest) {
         const [k, cid] = key.split("|");
         if (covered.has(key) || covered.has(`${k}|${cid}`)) continue;
-        if (exp < today) byKind[k].expired++; else if (exp <= warn) byKind[k].expiring++;
+        if (exp < today) byKind[k!]!.expired++; else if (exp <= warn) byKind[k!]!.expiring++;
       }
       const vals = Object.values(byKind);
       const expired = vals.reduce((a, v) => a + v.expired, 0);
@@ -67,7 +67,7 @@ const toBadge = (v?: { expired: number; expiring: number }): MenuBadge | undefin
 /** Contadores das subabas de Documentação. */
 export function useControlBadges() {
   const k = useBadgeData().data?.byKind;
-  return { agendamentos: toBadge(k?.agendamentos), asos: toBadge(k?.aso), integracoes: toBadge(k?.int), treinamentos: toBadge(k?.trn) } as Record<string, MenuBadge | undefined>;
+  return { agendamentos: toBadge(k?.["agendamentos"]), asos: toBadge(k?.["aso"]), integracoes: toBadge(k?.["int"]), treinamentos: toBadge(k?.["trn"]) } as Record<string, MenuBadge | undefined>;
 }
 
 export function useMenuBadges() {
