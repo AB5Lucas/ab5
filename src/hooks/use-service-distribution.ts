@@ -3,7 +3,7 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { todayISO } from "@/lib/scheduling";
-import { mergePendingClients, serviceDistribution, twoWeekRange, type DistributionAllocation, type DistributionWork } from "@/lib/service-distribution";
+import { mergePendingClients, serviceDistribution, recentRange, isTresCoracoes, isWeekend, type DistributionAllocation, type DistributionWork } from "@/lib/service-distribution";
 
 export const SERVICE_BADGE_DATE = ["service-badge-date"];
 
@@ -13,7 +13,7 @@ type Alloc = DistributionAllocation & { schedule_id: string };
 export function useServiceDistribution(selectedDate?: string) {
   const { user, role, loading } = useCurrentUser();
   const today = todayISO();
-  const range = selectedDate ? { start: selectedDate, end: selectedDate } : twoWeekRange(today);
+  const range = selectedDate ? { start: selectedDate, end: selectedDate } : recentRange(today);
   return useQuery({
     queryKey: ["service-distribution", user?.id, role, range.start, range.end],
     enabled: !!user && !loading,
@@ -21,11 +21,13 @@ export function useServiceDistribution(selectedDate?: string) {
     refetchInterval: 60000,
     queryFn: async () => {
       const { start, end } = range;
-      const [schedules, allWorks, links] = await Promise.all([
+      const [schedules, allWorks, links, clientRows] = await Promise.all([
         fetchAll<{ id: string; schedule_date: string }>((a, b) => supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", start).lte("schedule_date", end).order("id").range(a, b)),
         fetchAll<DistributionWork>((a, b) => supabase.from("works").select("id, client_id, active").order("id").range(a, b)),
         role === "admin" || role === "programmer" ? Promise.resolve(null) : fetchAll<{ works: { client_id: string | null } | null }>((a, b) => supabase.from("foreman_works").select("works(client_id)").eq("user_id", user?.id ?? "").order("id").range(a, b)),
+        fetchAll<{ id: string; name: string }>((a, b) => supabase.from("clients").select("id, name").order("id").range(a, b)),
       ]);
+      const tres = new Set(clientRows.filter((c) => isTresCoracoes(c.name)).map((c) => c.id));
       const allowed = links ? new Set(links.map((l) => l.works?.client_id)) : null;
       const works = allowed ? allWorks.filter((w) => allowed.has(w.client_id)) : allWorks;
       if (!schedules.length) return serviceDistribution(works, []);
@@ -47,7 +49,8 @@ export function useServiceDistribution(selectedDate?: string) {
           ...training.filter((t) => t.scheduled_date === date),
           ...trainingBox.filter((t) => t.schedule_id === s.id),
         ].map((r) => r.collaborator_id));
-        return serviceDistribution(works, allocations.filter((a) => a.schedule_id === s.id), excluded);
+        const r = serviceDistribution(works, allocations.filter((a) => a.schedule_id === s.id), excluded);
+        return isWeekend(date) ? r : { pendingClientIds: r.pendingClientIds.filter((id) => !tres.has(id)) };
       });
       return mergePendingClients(days);
     },
