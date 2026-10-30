@@ -23,3 +23,18 @@ export function serviceDistribution(
   }
   return { pendingClients: pendingClients.size, pendingClientIds: [...pendingClients] };
 }
+
+/** Segunda da semana atual até o domingo da semana seguinte (14 dias). */
+export function twoWeekRange(today: string) {
+  const d = new Date(`${today}T12:00:00Z`);
+  const offset = (d.getUTCDay() + 6) % 7;
+  const start = new Date(d.getTime() - offset * 86400000);
+  const end = new Date(start.getTime() + 13 * 86400000);
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+}
+
+/** Une os clientes pendentes de vários dias: cada cliente conta uma única vez. */
+export function mergePendingClients(days: { pendingClientIds: string[] }[]) {
+  const ids = new Set(days.flatMap((d) => d.pendingClientIds));
+  return { pendingClients: ids.size, pendingClientIds: [...ids] };
+}
