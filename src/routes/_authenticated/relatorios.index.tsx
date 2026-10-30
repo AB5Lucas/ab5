@@ -577,7 +577,6 @@ function DetailDialog({ detail, onClose, data, hourRows, workInfo, from, to }: {
                 {view.people.length === 0 && <EmptyRow cols={4} />}
               </TableBody>
             </Table>
-            <p className="text-xs text-muted-foreground">Horas trabalhadas vêm dos RDOs (presentes) do período.</p>
           </div>
         )}
       </DialogContent>
