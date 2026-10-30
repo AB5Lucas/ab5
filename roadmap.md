@@ -12,4 +12,5 @@
 - [x] Cópia da Programação: data de origem editável e lista de quadros com efetivo, todos selecionados inicialmente.
 - [x] Validar regras de VT, seleção e cópia na tela.
 - [x] Serviços: indicador de clientes com efetivo não distribuído e mais de um serviço ativo.
-- [x] Serviços: indicador de serviços ativos sem alocação na lista de clientes; validar contagens e tela.
+- [x] Serviços: ponto vermelho sem número para clientes com efetivo ainda não distribuído, sem contar serviços vazios; validar regra e tela.
+- [x] Alocações: restaurar fonte preta nos links de cliente, serviço e horas, mantendo abertura dos detalhes.
