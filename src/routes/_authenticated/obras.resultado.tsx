@@ -1316,7 +1316,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
       </Dialog>
 
       <Dialog open={dlg === "orcamento"} onOpenChange={(o) => !o && setDlg(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Custos orçados</DialogTitle>
           </DialogHeader>
@@ -1337,9 +1337,12 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
           {bdiOn && (
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Pesos desta obra (%) — ponto de partida; 75% da divisão acompanha o gasto real. Vazio = padrão 40/20/10/30.</p>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-3 md:grid-cols-5">
                 {ITEMS.map((it) => (
-                  <Field key={it.key} label={`${relabel(it.key, it.label)} %`} value={weightStrs[it.key] ?? ""} onChange={(v) => setWeightStrs((s) => ({ ...s, [it.key]: v }))} />
+                  <div key={it.key} className="min-w-0 space-y-1">
+                    <Label className="block whitespace-nowrap text-xs leading-5">{relabel(it.key, it.label)} %</Label>
+                    <Input aria-label={`${relabel(it.key, it.label)} %`} value={weightStrs[it.key] ?? ""} onChange={(e) => setWeightStrs((s) => ({ ...s, [it.key]: e.target.value }))} />
+                  </div>
                 ))}
               </div>
               <Button type="button" variant="outline" size="sm" onClick={applyBdi}>Recalcular com os pesos</Button>
