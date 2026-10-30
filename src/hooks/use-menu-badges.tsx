@@ -62,7 +62,7 @@ function useBadgeData() {
       const vals = Object.values(byKind);
       const expired = vals.reduce((a, v) => a + v.expired, 0);
       const expiring = vals.reduce((a, v) => a + v.expiring, 0);
-      return { conference, byKind, expired, expiring, purchases: purchases.length, orders: orders.length, billing: invoices.length + notes.length };
+      return { conference, byKind, expired, expiring, purchases: purchases.length, orders: orders.length, billing: invoices.length + notes.length, billingInd: invoices.length, billingSrv: notes.length };
     },
   });
 }
@@ -88,4 +88,21 @@ export function useMenuBadges() {
     if (d.billing) out["/relatorios/sincronizacao"] = { count: d.billing, tone: "red" };
   }
   return out;
+}
+
+const red = (n?: number): MenuBadge | undefined => (n ? { count: n, tone: "red" } : undefined);
+
+/** Contadores das subabas de Faturamento. */
+export function useBillingBadges() {
+  const d = useBadgeData().data;
+  return { servicos: red(d?.billingSrv), industria: red(d?.billingInd) } as Record<string, MenuBadge | undefined>;
+}
+
+export function BadgeDot({ b }: { b?: MenuBadge | undefined }) {
+  if (!b) return null;
+  return (
+    <span className={`ml-1.5 min-w-4 rounded-full px-1 text-center text-[10px] font-semibold leading-4 tabular-nums ${b.tone === "red" ? "bg-destructive/85 text-destructive-foreground" : "bg-warning/85 text-warning-foreground"}`}>
+      {b.count > 99 ? "99+" : b.count}
+    </span>
+  );
 }
