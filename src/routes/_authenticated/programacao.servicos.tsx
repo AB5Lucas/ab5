@@ -544,7 +544,7 @@ function ServicesPage() {
             <SelectContent>
               {(clients.data ?? []).map((c) => {
                 const count = distribution.data?.emptyByClient[c.id] ?? 0;
-                return <SelectItem key={c.id} value={c.id}><span className="inline-flex items-center gap-1"><span title={`${count} serviço(s) ativo(s) sem alocação`}><BadgeDot b={count ? { count, tone: "red" } : undefined} /></span>{c.name}</span></SelectItem>;
+                return <SelectItem key={c.id} value={c.id}><span className="inline-flex items-center gap-1">{c.name}<span title={`${count} serviço(s) ativo(s) sem alocação`}><BadgeDot b={count ? { count, tone: "red" } : undefined} /></span></span></SelectItem>;
               })}
             </SelectContent>
           </Select>
