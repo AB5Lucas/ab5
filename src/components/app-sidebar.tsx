@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { MENU_GROUPS } from "@/lib/menu";
 import { useAccess } from "@/hooks/use-access";
+import { useMenuBadges } from "@/hooks/use-menu-badges";
 
 const STORAGE_KEY = "sidebar-closed-groups";
 
@@ -23,6 +24,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { canAccess, loading } = useAccess();
+  const badges = useMenuBadges();
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   useEffect(() => {
     try {
