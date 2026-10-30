@@ -23,12 +23,18 @@ function useBadgeData() {
         safe(fetchAll<any>((a, b) => supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("client_integrations").select("collaborator_id, client_id, expires_at, documentation").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, training_id, client_id, type, scheduled_date").eq("status", "agendado").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("conference_items").select("collaborator_id, training_id, client_id, type").neq("status", "concluido").range(a, b))),
+        safe(fetchAll<any>((a, b) => supabase.from("conference_items").select("id, collaborator_id, training_id, client_id, type").neq("status", "concluido").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("purchase_cc_lines").select("id").eq("status", "pending").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("industry_orders").select("id").eq("status", "pending").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("industry_invoices").select("id").eq("status", "pending").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("billing_sync_notes").select("id").not("status", "in", '("posted","cancelled")').range(a, b))),
       ]);
+      const confIds = new Set(conf.map((c) => c.id));
+      const checks = await safe(fetchAll<any>((a, b) => supabase.from("conference_checks").select("item_id, next_check_date").eq("approved", false).range(a, b)));
+      const nextByItem = new Map<string, string>();
+      for (const c of checks) if (c.next_check_date && confIds.has(c.item_id)) { const cur = nextByItem.get(c.item_id); if (!cur || c.next_check_date < cur) nextByItem.set(c.item_id, c.next_check_date); }
+      const conference = { expired: 0, expiring: 0 };
+      for (const d of nextByItem.values()) { if (d < today) conference.expired++; else if (d === today) conference.expiring++; }
       const active = new Set(colabs.map((c) => c.id));
       const kindOf = (t: string) => { const s = String(t).toLowerCase(); return s.includes("aso") ? "aso" : s.startsWith("trein") ? "trn" : s.startsWith("integ") ? "int" : ""; };
       const covered = new Set<string>();
@@ -56,7 +62,7 @@ function useBadgeData() {
       const vals = Object.values(byKind);
       const expired = vals.reduce((a, v) => a + v.expired, 0);
       const expiring = vals.reduce((a, v) => a + v.expiring, 0);
-      return { byKind, expired, expiring, purchases: purchases.length, orders: orders.length, billing: invoices.length + notes.length };
+      return { conference, byKind, expired, expiring, purchases: purchases.length, orders: orders.length, billing: invoices.length + notes.length };
     },
   });
 }
@@ -76,6 +82,7 @@ export function useMenuBadges() {
   if (d) {
     if (d.expired) out["/agendamentos"] = { count: d.expired, tone: "red" };
     else if (d.expiring) out["/agendamentos"] = { count: d.expiring, tone: "orange" };
+    const c = toBadge(d.conference); if (c) out["/conferencia"] = c;
     if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red" };
     if (d.orders) out["/fechamentos/suzano"] = { count: d.orders, tone: "red" };
     if (d.billing) out["/relatorios/sincronizacao"] = { count: d.billing, tone: "red" };
