@@ -5,6 +5,7 @@ import { Copy, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { workedHours } from "@/lib/rdo";
+import { allocationHours } from "@/lib/allocation-hours";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -68,7 +69,7 @@ type AllocRow = {
   driver: boolean;
   confirmation_status: string;
   daily_schedules: { schedule_date: string } | null;
-  works: { id: string; client_id: string | null; name: string; order_number: string | null; client: string | null; clients: { name: string } | null } | null;
+  works: { id: string; client_id: string | null; name: string; order_number: string | null; client: string | null; entry_time: string | null; exit_time: string | null; exit_time_weekend: string | null; night_shift: boolean | null; clients: { name: string } | null } | null;
   collaborators: { full_name: string } | null;
 };
 
@@ -93,7 +94,7 @@ const out: AllocRow[] = [];
         const { data, error } = await supabase
           .from("daily_allocations")
           .select(
-          "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(id, name, order_number, client, client_id, clients(name)), collaborators(full_name)",
+          "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(id, name, order_number, client, client_id, entry_time, exit_time, exit_time_weekend, night_shift, clients(name)), collaborators(full_name)",
         )
           .gte("daily_schedules.schedule_date", from)
           .lte("daily_schedules.schedule_date", to)
@@ -157,7 +158,7 @@ const out: AllocRow[] = [];
   });
 
   const hours = useQuery({
-    queryKey: ["report-hours", from, to],
+    queryKey: ["report-hours-with-defaults", from, to],
     queryFn: async () => {
       const out: HourRow[] = [];
       for (let off = 0; ; off += 1000) {
@@ -166,22 +167,28 @@ const out: AllocRow[] = [];
           .select("id, work_id, collaborator_id, report_date, entry_time, exit_time, break_minutes, worked_hours, present, collaborators(full_name)")
           .gte("report_date", from)
           .lte("report_date", to)
-          .eq("present", true)
           .order("id")
           .range(off, off + 999);
         if (error) throw error;
         for (const r of (data ?? []) as any[]) {
-          const h = r.worked_hours != null ? Number(r.worked_hours) : workedHours(r.entry_time, r.exit_time, r.break_minutes ?? 60);
+          const h = !r.present ? 0 : r.worked_hours != null ? Number(r.worked_hours) : workedHours(r.entry_time, r.exit_time, r.break_minutes ?? 60);
           out.push({ work_id: r.work_id, collaborator_id: r.collaborator_id, name: r.collaborators?.full_name ?? "—", date: r.report_date, hours: h });
         }
         if (!data || data.length < 1000) break;
       }
-      return out;
+      const reports: { work_id: string; report_date: string }[] = [];
+      for (let off = 0; ; off += 1000) {
+        const { data, error } = await supabase.from("rdos").select("id, work_id, report_date").gte("report_date", from).lte("report_date", to).order("id").range(off, off + 999);
+        if (error) throw error;
+        reports.push(...(data ?? []));
+        if (!data || data.length < 1000) break;
+      }
+      return { records: out, reports };
     },
   });
 
   const data = allocations.data ?? [];
-  const hourRows = hours.data ?? [];
+  const hourRows = useMemo(() => allocationHours(data, hours.data?.records ?? [], hours.data?.reports ?? []), [data, hours.data]);
   const [detail, setDetail] = useState<Detail | null>(null);
 
   const workInfo = useMemo(() => {
