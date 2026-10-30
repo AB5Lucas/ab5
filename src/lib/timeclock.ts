@@ -48,8 +48,8 @@ export async function fetchTimeclockData(from: string, to: string): Promise<Time
       )
       .order("report_date", { ascending: false })
       .range(i, i + 999);
-    if (f.from) q = q.gte("report_date", f.from);
-    if (f.to) q = q.lte("report_date", f.to);
+    if (from) q = q.gte("report_date", from);
+    if (to) q = q.lte("report_date", to);
     const { data, error } = await q;
     if (error) throw error;
     out.push(...(data ?? []));
