@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
-import { addDays, todayISO } from "@/lib/scheduling";
+import { todayISO } from "@/lib/scheduling";
 import { mergePendingClients, serviceDistribution, twoWeekRange, type DistributionAllocation, type DistributionWork } from "@/lib/service-distribution";
 
 export const SERVICE_BADGE_DATE = ["service-badge-date"];
