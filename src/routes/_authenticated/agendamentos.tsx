@@ -43,7 +43,7 @@ import { Tabs as SubTabs, TabsContent as SubTabsContent, TabsList as SubTabsList
 import { IntegrationsPage } from "@/components/controles/integracoes";
 import { TrainingsPage } from "@/components/controles/treinamentos";
 import { AsosPage } from "@/components/controles/asos";
-import { useControlBadges } from "@/hooks/use-menu-badges";
+import { useControlBadges } from "@/hooks/use-nav-badges";
 
 export const Route = createFileRoute("/_authenticated/agendamentos")({
   head: () => ({

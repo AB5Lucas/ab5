@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { MENU_GROUPS } from "@/lib/menu";
 import { useAccess } from "@/hooks/use-access";
-import { useMenuBadges } from "@/hooks/use-menu-badges";
+import { useMenuBadges } from "@/hooks/use-nav-badges";
 
 const STORAGE_KEY = "sidebar-closed-groups";
 

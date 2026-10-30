@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { BadgeDot, useBillingBadges } from "@/hooks/use-menu-badges";
+import { BadgeDot, useBillingBadges } from "@/hooks/use-nav-badges";
 import { BILLING_METHODS, BILLING_STATES, BILLING_START, moneyCents } from "@/lib/billing-sync";
 import { syncBillingNow } from "@/lib/billing-sync.functions";
 import { fetchAll } from "@/lib/results-engine";
