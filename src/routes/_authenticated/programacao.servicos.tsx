@@ -24,6 +24,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { useCurrentUser } from "@/hooks/use-auth";
 import { addDays, checkAso, checkIntegration, checkRequirements, fetchScheduleContext, formatBR, pendingForWork, todayISO, workRequiresIntegration } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
+import { SERVICE_BADGE_DATE, useServiceDistribution } from "@/hooks/use-service-distribution";
+import { BadgeDot } from "@/hooks/use-nav-badges";
 
 export const Route = createFileRoute("/_authenticated/programacao/servicos")({
   head: () => ({
@@ -48,6 +50,10 @@ function ServicesPage() {
   const canWrite = role === "admin" || role === "programmer";
   const qc = useQueryClient();
   const [date, setDate] = useState(todayISO());
+  const distribution = useServiceDistribution(date);
+  useEffect(() => {
+    qc.setQueryData(SERVICE_BADGE_DATE, date);
+  }, [qc, date]);
   // Encarregado entra por padrão no dia seguinte (dia a montar/conferir)
   const { isForeman, loading: userLoading } = useCurrentUser();
   const [dateInit, setDateInit] = useState(false);
@@ -275,6 +281,7 @@ function ServicesPage() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["servicos-day"] });
     qc.invalidateQueries({ queryKey: ["allocations"] });
+    qc.invalidateQueries({ queryKey: ["service-distribution"] });
   };
 
   const move = useMutation({
@@ -535,7 +542,10 @@ function ServicesPage() {
           <Select value={clientId} onValueChange={chooseClient}>
             <SelectTrigger><SelectValue placeholder={clients.data?.length === 0 ? "Nenhum cliente com efetivo escalado neste dia" : "Selecione o cliente"} /></SelectTrigger>
             <SelectContent>
-              {(clients.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              {(clients.data ?? []).map((c) => {
+                const count = distribution.data?.emptyByClient[c.id] ?? 0;
+                return <SelectItem key={c.id} value={c.id}><span className="inline-flex items-center gap-1"><span title={`${count} serviço(s) ativo(s) sem alocação`}><BadgeDot b={count ? { count, tone: "red" } : undefined} /></span>{c.name}</span></SelectItem>;
+              })}
             </SelectContent>
           </Select>
         </div>

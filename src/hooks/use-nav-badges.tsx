@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { addDays, todayISO } from "@/lib/scheduling";
+import { useServiceDistribution } from "@/hooks/use-service-distribution";
 
 export type MenuBadge = { count: number; tone: "red" | "orange" };
 
@@ -78,7 +79,9 @@ export function useControlBadges() {
 
 export function useMenuBadges() {
   const d = useBadgeData().data;
+  const distribution = useServiceDistribution().data;
   const out: Record<string, MenuBadge | undefined> = {};
+  if (distribution?.pendingClients) out["/programacao/servicos"] = { count: distribution.pendingClients, tone: "red" };
   if (d) {
     if (d.expired) out["/agendamentos"] = { count: d.expired, tone: "red" };
     else if (d.expiring) out["/agendamentos"] = { count: d.expiring, tone: "orange" };
