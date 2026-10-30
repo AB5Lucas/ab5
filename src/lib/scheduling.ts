@@ -132,7 +132,7 @@ export async function fetchScheduleContext(date: string) {
     integrations,
     asos,
   ] = await Promise.all([
-    supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, active, clients(name, city, distance_km, requires_integration)").order("name"),
+    supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, active, clients(name, city, distance_km, requires_integration, needs_transport_voucher)").order("name"),
     supabase
       .from("collaborators")
       .select("id, full_name, cpf, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type")
