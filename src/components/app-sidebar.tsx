@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { MENU_GROUPS } from "@/lib/menu";
 import { useAccess } from "@/hooks/use-access";
+import { useMenuBadges } from "@/hooks/use-menu-badges";
 
 const STORAGE_KEY = "sidebar-closed-groups";
 
@@ -23,6 +24,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { canAccess, loading } = useAccess();
+  const badges = useMenuBadges();
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   useEffect(() => {
     try {
@@ -76,16 +78,29 @@ export function AppSidebar() {
             )}
             <SidebarGroupContent className={!collapsed && closed[group.label] ? "hidden" : ""}>
               <SidebarMenu>
-                {group.items.map((item) => (
+                {group.items.map((item) => {
+                  const b = badges[item.url];
+                  return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
-                      <Link to={item.url} className="flex items-center gap-2">
+                      <Link to={item.url} className="relative flex items-center gap-2">
                         <group.icon className="h-4 w-4 shrink-0" />
                         {!collapsed && <span>{item.title}</span>}
+                        {b && (collapsed ? (
+                          <span className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ${b.tone === "red" ? "bg-destructive" : "bg-warning"}`} />
+                        ) : (
+                          <span
+                            title={b.tone === "red" ? "Vencidos/pendentes" : "A vencer"}
+                            className={`ml-auto min-w-4 rounded-full px-1 text-center text-[10px] font-semibold leading-4 tabular-nums ${b.tone === "red" ? "bg-destructive/85 text-destructive-foreground" : "bg-warning/85 text-warning-foreground"}`}
+                          >
+                            {b.count > 99 ? "99+" : b.count}
+                          </span>
+                        ))}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
