@@ -5,6 +5,7 @@ import { contractFraction } from "@/lib/contract";
 import { resplitClient } from "@/lib/resplit";
 import { laborCost, nightHours, ENCARGOS } from "@/lib/labor-cost";
 import { buildDistanceLookup } from "@/lib/city-distance";
+import { workVtDefault } from "@/lib/transport-rules";
 
 /** Motor de cálculo de Resultados — usado pela página Resultados e pelo Financeiro (mesma lógica). */
 export const TAX_RATE = 0.1867;
@@ -68,7 +69,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
             )
           : Promise.resolve([] as any[]),
         w.client_id
-          ? supabase.from("clients").select("name, has_toll, toll_amount, city, distance_km").eq("id", w.client_id).maybeSingle()
+          ? supabase.from("clients").select("name, has_toll, toll_amount, city, distance_km, needs_transport_voucher").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
       ]);
       const [workVt, workTravelRows, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
@@ -320,7 +321,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const person = new Map<string, any>(d.people.map((p: any) => [p.id, p]));
     // Marcação de VT vale para o cliente no dia (qualquer serviço do cliente marcado)
     const workVt = new Map<string, boolean>();
-    for (const r of (d.workVt ?? []) as any[]) if (r.pays_vt) workVt.set(r.schedule_id, true);
+    for (const r of (d.workVt ?? []) as any[]) workVt.set(r.schedule_id, !!workVt.get(r.schedule_id) || r.pays_vt);
     const noVt = new Set<string>((d.noVtRows ?? []).map((r: any) => `${r.schedule_id}|${r.collaborator_id}`));
     const vtDay = (driver: boolean) =>
       (d.vtRules ?? []).reduce((sum: number, r: any) => {
@@ -336,7 +337,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
-      const base = p?.vt_enabled === false ? false : !!workVt.get(a.schedule_id) || pouso;
+      const base = p?.vt_enabled === false ? false : workVtDefault(workVt.get(a.schedule_id), d.client?.needs_transport_voucher) || pouso;
       if (!(a.vt_override ?? base)) continue;
       const cost = vtDay(!!a.driver);
       if (!cost) continue;
