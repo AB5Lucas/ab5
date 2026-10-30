@@ -59,7 +59,6 @@ export async function fetchTimeclockData(from: string, to: string): Promise<Time
   if (error) throw error;
   const { data: shifts } = await supabase.from("work_shifts").select("id, is_default, schedule");
   return { wf: out, adj: adj ?? [], shifts: shifts ?? [] };
-},
 }
 
 export function computeOccurrences(data: TimeclockData | undefined) {
