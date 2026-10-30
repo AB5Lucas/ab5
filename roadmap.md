@@ -6,5 +6,8 @@
 - [x] Validar valores, permissões e lançamento completo na tela.
 - [x] Adicionar e verificar exportação de Horas Prêmio como planilha.
 - [x] Corrigir e validar o acesso dos coordenadores a todos os serviços dos clientes autorizados.- [x] Compras: campos Prefixo CC (cliente) e Sufixo CC (serviço), preenchimento manual.
-- [ ] Compras: aba em Obras, sincronização só pelo botão (SharePoint Compras/RELATÓRIOS), pendentes com cliente/serviço e rateio por horas, filtros Lançados/Pendentes.
+- [x] Compras: aba em Obras, sincronização só pelo botão (SharePoint Compras/RELATÓRIOS), pendentes com cliente/serviço e rateio por horas, filtros Lançados/Pendentes.
 - [x] Unificar Serviços e Clientes em "Cadastros".
+- [x] Corrigir VT de fim de semana da Indústria e atualizar registros ausentes de outubro.
+- [x] Cópia da Programação: data de origem editável e lista de quadros com efetivo, todos selecionados inicialmente.
+- [x] Validar regras de VT, seleção e cópia na tela.

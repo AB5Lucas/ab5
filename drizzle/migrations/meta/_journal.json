@@ -498,6 +498,13 @@
       "when": 1793243936669,
       "tag": "0070_purchase_cc_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1793357441950,
+      "tag": "0071_weekend_allocation_default_vt",
+      "breakpoints": true
     }
   ]
 }

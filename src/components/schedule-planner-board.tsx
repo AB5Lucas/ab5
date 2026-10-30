@@ -23,6 +23,9 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { copyBoxes, selectedCopyRows } from "@/lib/schedule-copy";
+import { workVtDefault } from "@/lib/transport-rules";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -43,7 +46,6 @@ import {
   formatBR,
   formatDateBR,
   todayISO,
-  previousScheduleDay,
   workRequiresIntegration,
   ASO_LABEL,
   INTEGRATION_LABEL,
@@ -485,7 +487,7 @@ export function SchedulePlannerBoard({
       return new Map((data ?? []).map((r) => [r.work_id, r.pays_vt]));
     },
   });
-  const workPaysVt = (workId: string) => workVt.data?.get(workId) ?? false;
+  const workPaysVt = (workId: string) => workVtDefault(workVt.data?.get(workId), ctx.data?.works.find((w) => w.id === workId)?.clients?.needs_transport_voucher);
   // Colaboradores de Pouso Alegre recebem VT por padrão quando escalados em obra.
   // Colaboradores com "Vale Transporte" desligado no cadastro começam sempre sem VT.
   const pousoIds = useQuery({
@@ -1273,24 +1275,50 @@ export function SchedulePlannerBoard({
 
 
   const [confirmCopyPrev, setConfirmCopyPrev] = useState(false);
+  const [copyFrom, setCopyFrom] = useState(addDays(date, -1));
+  const [selectedCopyBoxes, setSelectedCopyBoxes] = useState<Set<string>>(new Set());
+  const copySource = useQuery({
+    queryKey: ["schedule-copy-source", copyFrom],
+    enabled: confirmCopyPrev && !!copyFrom,
+    queryFn: async () => {
+      const { data: source, error } = await supabase.from("daily_schedules").select("id").eq("schedule_date", copyFrom).maybeSingle();
+      if (error) throw error;
+      const getPage = (from: number) => supabase.from("daily_allocations")
+        .select("*, works(id, name, client_id, clients(name))").eq("schedule_id", source?.id ?? "").order("id").range(from, from + 999);
+      const collected: NonNullable<Awaited<ReturnType<typeof getPage>>["data"]> = [];
+      if (source) {
+        for (let from = 0; ; from += 1000) {
+          const page = await getPage(from);
+          if (page.error) throw page.error;
+          collected.push(...(page.data ?? []));
+          if (!page.data || page.data.length < 1000) break;
+        }
+      }
+      return { scheduleId: source?.id, rows: collected };
+    },
+  });
+  const sourceBoxes = useMemo(() => copyBoxes(copySource.data?.rows ?? []), [copySource.data]);
+  useEffect(() => {
+    setSelectedCopyBoxes(new Set(sourceBoxes.map((b) => b.key)));
+  }, [sourceBoxes, confirmCopyPrev]);
+  function openCopyPrevious() {
+    setCopyFrom(addDays(date, -1));
+    setConfirmCopyPrev(true);
+  }
   const copyPrevious = useMutation({
     mutationFn: async () => {
       if (!c) throw new Error("Carregando dados");
-      const prev = previousScheduleDay(date);
-      const { data: prevSchedule } = await supabase
-        .from("daily_schedules")
-        .select("id")
-        .eq("schedule_date", prev)
-        .maybeSingle();
-      if (!prevSchedule) throw new Error("Não existe programação no dia anterior");
-      const { data: prevRows } = await supabase
-        .from("daily_allocations")
-        .select("*")
-        .eq("schedule_id", prevSchedule.id);
-      if (!prevRows || prevRows.length === 0) throw new Error("O dia anterior não tem alocações");
+      const prevSchedule = copySource.data?.scheduleId;
+      if (!prevSchedule) throw new Error("Não existe programação na data selecionada");
+      if (copyFrom === date) throw new Error("Escolha uma data diferente do destino");
+      const prevRows = selectedCopyRows(copySource.data?.rows ?? [], selectedCopyBoxes);
+      if (!prevRows.length) throw new Error("Selecione ao menos um quadro com efetivo");
+      const selectedWorkIds = new Set(prevRows.map((r) => r.work_id));
 
       const id = await ensureSchedule();
-      const existing = new Set(rows.map((r) => r.collaborator_id));
+      const { data: currentRows, error: currentError } = await supabase.from("daily_allocations").select("collaborator_id").eq("schedule_id", id);
+      if (currentError) throw currentError;
+      const existing = new Set((currentRows ?? []).map((r) => r.collaborator_id));
       const inserts = prevRows
         .filter((r) => !c.absences.has(r.collaborator_id))
         .filter((r) => !appointmentByCollaborator.has(r.collaborator_id))
@@ -1310,37 +1338,36 @@ export function SchedulePlannerBoard({
           has_pending_requirement: checkRequirements(c, r.work_id, r.collaborator_id, date).length > 0,
           sort_order: rows.length + i,
         }));
-      if (inserts.length === 0) throw new Error("Nada novo para copiar do dia anterior");
+      if (inserts.length === 0) throw new Error("Nada novo para copiar dos quadros selecionados");
       const { error } = await supabase.from("daily_allocations").insert(inserts);
       if (error) throw error;
-      await supabase.from("daily_schedules").update({ copied_from_schedule_id: prevSchedule.id }).eq("id", id);
-      const { data: prevVt } = await supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", prevSchedule.id);
+      await supabase.from("daily_schedules").update({ copied_from_schedule_id: prevSchedule }).eq("id", id);
+      const { data: prevVt } = await supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", prevSchedule);
       if (prevVt && prevVt.length) {
         const current = workVt.data ?? new Map<string, boolean>();
-        const vtRows = prevVt.filter((v) => !current.has(v.work_id)).map((v) => ({ schedule_id: id, work_id: v.work_id, pays_vt: v.pays_vt }));
+        const vtRows = prevVt.filter((v) => selectedWorkIds.has(v.work_id) && !current.has(v.work_id)).map((v) => ({ schedule_id: id, work_id: v.work_id, pays_vt: v.pays_vt }));
         if (vtRows.length) await supabase.from("schedule_work_vt").upsert(vtRows, { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
       }
       qc.invalidateQueries({ queryKey: ["work-vt", id] });
-      const { data: prevTr } = await supabase.from("schedule_work_travel").select("work_id, pays_bonus").eq("schedule_id", prevSchedule.id);
+      const { data: prevTr } = await supabase.from("schedule_work_travel").select("work_id, pays_bonus").eq("schedule_id", prevSchedule);
       if (prevTr && prevTr.length) {
-        await supabase.from("schedule_work_travel").upsert(prevTr.map((v) => ({ schedule_id: id, work_id: v.work_id, pays_bonus: v.pays_bonus })), { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
+        await supabase.from("schedule_work_travel").upsert(prevTr.filter((v) => selectedWorkIds.has(v.work_id)).map((v) => ({ schedule_id: id, work_id: v.work_id, pays_bonus: v.pays_bonus })), { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
+      }
+      const clientIds = [...new Set(prevRows.map((r) => r.works?.client_id).filter((id): id is string => !!id))];
+      if (clientIds.length) {
+        const { error: visibilityError } = await supabase.from("schedule_client_visibility").upsert(
+          clientIds.map((client_id) => ({ schedule_date: date, client_id, visible: true })),
+          { onConflict: "schedule_date,client_id" },
+        );
+        if (visibilityError) throw visibilityError;
+        qc.invalidateQueries({ queryKey: ["client-visibility", date] });
       }
       qc.invalidateQueries({ queryKey: ["work-travel", id] });
-      const { data: prevBoxVt } = await supabase
-        .from("schedule_box_vt")
-        .select("box_key, pays_vt")
-        .eq("schedule_id", prevSchedule.id);
-      if (prevBoxVt && prevBoxVt.length) {
-        await supabase.from("schedule_box_vt").upsert(
-          prevBoxVt.map((v) => ({ schedule_id: id, box_key: v.box_key, pays_vt: v.pays_vt })),
-          { onConflict: "schedule_id,box_key", ignoreDuplicates: true },
-        );
-        qc.invalidateQueries({ queryKey: ["box-vt", id] });
-      }
       return { count: inserts.length, id };
     },
     onSuccess: (r) => {
-      toast.success(`${r.count} alocação(ões) copiadas do dia anterior`);
+      toast.success(`${r.count} alocação(ões) copiadas de ${formatDateBR(copyFrom)}`);
+      setConfirmCopyPrev(false);
       invalidate(r.id);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1441,14 +1468,38 @@ export function SchedulePlannerBoard({
       <AlertDialog open={confirmCopyPrev} onOpenChange={setConfirmCopyPrev}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Copiar programação do dia anterior?</AlertDialogTitle>
+            <AlertDialogTitle>Copiar programação</AlertDialogTitle>
             <AlertDialogDescription>
-              As pessoas escaladas em {formatDateBR(previousScheduleDay(date))} que ainda não estão neste dia serão adicionadas à programação de {formatDateBR(date)}.
+              Confirmar cópia dos quadros selecionados para {formatDateBR(date)}?
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-3">
+            <label className="block space-y-1 text-sm" htmlFor="copy-source-date">
+              <span className="font-medium">Dia que será copiado</span>
+              <Input id="copy-source-date" type="date" value={copyFrom} disabled={copyPrevious.isPending} onChange={(e) => { setCopyFrom(e.target.value); setSelectedCopyBoxes(new Set()); }} />
+            </label>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Obras com efetivo</p>
+              <div className="max-h-72 overflow-y-auto rounded-md border border-border divide-y divide-border">
+                {copySource.isFetching ? <p className="p-3 text-sm text-muted-foreground">Carregando obras...</p> : copySource.error ? <p className="p-3 text-sm text-destructive">Não foi possível carregar a programação.</p> : sourceBoxes.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Nenhuma obra com efetivo nesta data.</p> : sourceBoxes.map((box) => (
+                  <label key={box.key} className="flex items-center gap-3 px-3 py-2 text-sm">
+                    <Checkbox checked={selectedCopyBoxes.has(box.key)} disabled={copyPrevious.isPending} onCheckedChange={(checked) => setSelectedCopyBoxes((old) => {
+                      const next = new Set(old);
+                      if (checked) next.add(box.key); else next.delete(box.key);
+                      return next;
+                    })} />
+                    <span className="min-w-0 flex-1 break-words">{box.label}</span>
+                    <span className="text-xs text-muted-foreground">{box.count}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <Button onClick={() => { setConfirmCopyPrev(false); copyPrevious.mutate(); }}>Copiar</Button>
+            <Button disabled={copyPrevious.isPending || copySource.isFetching || !!copySource.error || !copyFrom || copyFrom === date || !selectedCopyBoxes.size} onClick={() => copyPrevious.mutate()}>
+              {copyPrevious.isPending ? "Copiando..." : "Copiar"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1565,7 +1616,7 @@ export function SchedulePlannerBoard({
             </DropdownMenuContent>
           </DropdownMenu>
           {editable && (
-            <Button size="sm" variant="outline" onClick={() => setConfirmCopyPrev(true)} disabled={copyPrevious.isPending}>
+            <Button size="sm" variant="outline" onClick={openCopyPrevious} disabled={copyPrevious.isPending}>
               <Copy className="h-4 w-4" /> Copiar dia anterior
             </Button>
           )}

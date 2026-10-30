@@ -8,6 +8,11 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export type BuiltTransport = { built: Set<string>; own: Set<string> };
 
+/** Um registro desligado é explícito; só a ausência de registro herda o cadastro. */
+export function workVtDefault(value: boolean | null | undefined, clientDefault: boolean | null | undefined) {
+  return value ?? clientDefault ?? false;
+}
+
 export async function loadBuiltTransport(start: string, end: string): Promise<BuiltTransport> {
   const built = new Set<string>();
   const own = new Set<string>();

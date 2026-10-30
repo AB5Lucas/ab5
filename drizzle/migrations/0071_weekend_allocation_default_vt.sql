@@ -1,0 +1,3 @@
+CREATE OR REPLACE FUNCTION public.initialize_service_allocation_vt() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ BEGIN IF NEW.service_assigned THEN INSERT INTO public.schedule_work_vt(schedule_id,work_id,pays_vt) SELECT NEW.schedule_id,NEW.work_id,coalesce(c.needs_transport_voucher,false) FROM public.works w JOIN public.clients c ON c.id=w.client_id WHERE w.id=NEW.work_id ON CONFLICT (schedule_id,work_id) DO NOTHING; END IF; RETURN NEW; END; $$;
+REVOKE ALL ON FUNCTION public.initialize_service_allocation_vt() FROM PUBLIC;
+CREATE TRIGGER service_allocation_default_vt AFTER INSERT OR UPDATE OF work_id, service_assigned ON public.daily_allocations FOR EACH ROW EXECUTE FUNCTION public.initialize_service_allocation_vt();
