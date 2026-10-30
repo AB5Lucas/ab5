@@ -1300,10 +1300,9 @@ export function SchedulePlannerBoard({
   const sourceBoxes = useMemo(() => copyBoxes(copySource.data?.rows ?? []), [copySource.data]);
   useEffect(() => {
     setSelectedCopyBoxes(new Set(sourceBoxes.map((b) => b.key)));
-  }, [sourceBoxes]);
+  }, [sourceBoxes, confirmCopyPrev]);
   function openCopyPrevious() {
     setCopyFrom(addDays(date, -1));
-    setSelectedCopyBoxes(new Set());
     setConfirmCopyPrev(true);
   }
   const copyPrevious = useMutation({
@@ -1364,17 +1363,6 @@ export function SchedulePlannerBoard({
         qc.invalidateQueries({ queryKey: ["client-visibility", date] });
       }
       qc.invalidateQueries({ queryKey: ["work-travel", id] });
-      const { data: prevBoxVt } = await supabase
-        .from("schedule_box_vt")
-        .select("box_key, pays_vt")
-        .eq("schedule_id", prevSchedule);
-      if (prevBoxVt && prevBoxVt.length) {
-        await supabase.from("schedule_box_vt").upsert(
-          prevBoxVt.map((v) => ({ schedule_id: id, box_key: v.box_key, pays_vt: v.pays_vt })),
-          { onConflict: "schedule_id,box_key", ignoreDuplicates: true },
-        );
-        qc.invalidateQueries({ queryKey: ["box-vt", id] });
-      }
       return { count: inserts.length, id };
     },
     onSuccess: (r) => {
