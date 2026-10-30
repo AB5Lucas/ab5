@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergePendingClients, serviceDistribution, twoWeekRange, type DistributionWork } from "./service-distribution";
+import { mergePendingClients, serviceDistribution, recentRange, isTresCoracoes, isWeekend, type DistributionWork } from "./service-distribution";
 
 const works: DistributionWork[] = [
   { id: "a1", client_id: "a", active: true },
@@ -34,10 +34,14 @@ describe("indicadores de Serviços", () => {
     expect(result.pendingClientIds).toEqual([]);
   });
 });
-describe("indicador semanal de Serviços", () => {
-  it("cobre da segunda atual ao domingo da próxima semana", () => {
-    expect(twoWeekRange("2026-10-30")).toEqual({ start: "2026-10-26", end: "2026-11-08" });
-    expect(twoWeekRange("2026-11-01")).toEqual({ start: "2026-10-26", end: "2026-11-08" });
+describe("indicador recente de Serviços", () => {
+  it("cobre hoje e os 7 dias anteriores", () => {
+    expect(recentRange("2026-10-30")).toEqual({ start: "2026-10-23", end: "2026-10-30" });
+  });
+  it("Três Corações só conta no fim de semana", () => {
+    expect(isTresCoracoes("TRÊS CORAÇÕES")).toBe(true);
+    expect(isWeekend("2026-10-30")).toBe(false);
+    expect(isWeekend("2026-10-31")).toBe(true);
   });
   it("cliente pendente em vários dias conta só uma vez", () => {
     expect(mergePendingClients([{ pendingClientIds: ["ind"] }, { pendingClientIds: ["ind", "x"] }]).pendingClients).toBe(2);

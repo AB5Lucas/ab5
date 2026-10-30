@@ -24,14 +24,15 @@ export function serviceDistribution(
   return { pendingClients: pendingClients.size, pendingClientIds: [...pendingClients] };
 }
 
-/** Segunda da semana atual até o domingo da semana seguinte (14 dias). */
-export function twoWeekRange(today: string) {
+/** Hoje e os 7 dias anteriores (8 dias, nada à frente). */
+export function recentRange(today: string) {
   const d = new Date(`${today}T12:00:00Z`);
-  const offset = (d.getUTCDay() + 6) % 7;
-  const start = new Date(d.getTime() - offset * 86400000);
-  const end = new Date(start.getTime() + 13 * 86400000);
-  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+  return { start: new Date(d.getTime() - 7 * 86400000).toISOString().slice(0, 10), end: today };
 }
+
+/** Três Corações só é sinalizada no sábado e domingo. */
+export const isTresCoracoes = (name: string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("tres coracoes");
+export const isWeekend = (date: string) => [0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay());
 
 /** Une os clientes pendentes de vários dias: cada cliente conta uma única vez. */
 export function mergePendingClients(days: { pendingClientIds: string[] }[]) {
