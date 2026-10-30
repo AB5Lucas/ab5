@@ -26,11 +26,11 @@ describe("indicadores de Serviços", () => {
     expect(serviceDistribution(works, [allocation("a1", false), allocation("a2", true)]).emptyByClient).toEqual({ a: 1, b: 1, c: 2 });
   });
   it("remove a bolinha quando todos os serviços ativos têm alocação", () => {
-    expect(serviceDistribution(works, [allocation("a1", true), allocation("a2", true)]).emptyByClient.a).toBe(0);
+    expect(serviceDistribution(works, [allocation("a1", true), allocation("a2", true)]).emptyByClient["a"]).toBe(0);
   });
   it("ignora pessoas indisponíveis, como os quadros de Serviços", () => {
     const result = serviceDistribution(works, [allocation("a1", false), allocation("a2", true)], new Set(["person"]));
     expect(result.pendingClients).toBe(0);
-    expect(result.emptyByClient.a).toBe(2);
+    expect(result.emptyByClient["a"]).toBe(2);
   });
 });
