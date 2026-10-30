@@ -31,7 +31,8 @@
 - VT: absent work settings inherit client defaults; Serviços initializes them without overwriting choices; built transport wins. Why: weekend VT stays consistent.
 - Schedule copy filters allocations/benefits by client boxes. Why: chosen date and boxes control copying.
 - Vale Alimentação reads the month's ponto sheets live (va.functions.ts, paths in vaPaths); rules in src/lib/vale-alimentacao.ts; only parameters in va_settings. Why: no report without the month's sheets.
-- Collaborator copy uses filtered rows via collaborator-list.ts. Why: matches the list.
+- Collaborator copy uses filtered rows via collaborator-list.ts to match the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
 - Never cancel vite:preloadError in recovery. Why: it breaks lazy routes.
 - Compras: purchase_cc_lines (month+CC) + rules in purchases.ts; work_entries link via purchase_cc_id, recreated per sync. Why: no duplicates, directions persist.
+- Allocation reports use allocation-hours.ts and RDO headers: estimate hours only without a daily RDO, preserving absences.
