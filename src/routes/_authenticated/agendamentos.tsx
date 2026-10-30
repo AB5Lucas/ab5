@@ -43,6 +43,7 @@ import { Tabs as SubTabs, TabsContent as SubTabsContent, TabsList as SubTabsList
 import { IntegrationsPage } from "@/components/controles/integracoes";
 import { TrainingsPage } from "@/components/controles/treinamentos";
 import { AsosPage } from "@/components/controles/asos";
+import { useControlBadges } from "@/hooks/use-menu-badges";
 
 export const Route = createFileRoute("/_authenticated/agendamentos")({
   head: () => ({
@@ -78,10 +79,23 @@ type CtrlTab = (typeof CTRL_TABS)[number]["v"];
 function ControlsPage() {
   const { tab = "agendamentos" } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const badges = useControlBadges();
   return (
     <SubTabs value={tab} onValueChange={(v) => navigate({ search: v === "agendamentos" ? {} : { tab: v as CtrlTab }, replace: true })}>
       <SubTabsList>
-        {CTRL_TABS.map((t) => <SubTabsTrigger key={t.v} value={t.v}>{t.l}</SubTabsTrigger>)}
+        {CTRL_TABS.map((t) => {
+          const b = badges[t.v];
+          return (
+            <SubTabsTrigger key={t.v} value={t.v} className="gap-1.5">
+              {t.l}
+              {b && (
+                <span className={`min-w-4 rounded-full px-1 text-center text-[10px] font-semibold leading-4 tabular-nums ${b.tone === "red" ? "bg-destructive/85 text-destructive-foreground" : "bg-warning/85 text-warning-foreground"}`}>
+                  {b.count > 99 ? "99+" : b.count}
+                </span>
+              )}
+            </SubTabsTrigger>
+          );
+        })}
       </SubTabsList>
       <SubTabsContent value="agendamentos" className="mt-4"><AppointmentsPage /></SubTabsContent>
       <SubTabsContent value="asos" className="mt-4"><AsosPage /></SubTabsContent>

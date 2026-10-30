@@ -8,8 +8,8 @@ export type MenuBadge = { count: number; tone: "red" | "orange" };
 const WARN_DAYS = 30;
 
 /** Contadores discretos do menu lateral: vencidos (vermelho) ou a vencer (laranja) e pendências de sincronização. */
-export function useMenuBadges() {
-  const q = useQuery({
+function useBadgeData() {
+  return useQuery({
     queryKey: ["menu-badges"],
     refetchInterval: 60000,
     staleTime: 30000,
@@ -44,17 +44,34 @@ export function useMenuBadges() {
       asos.forEach((r) => active.has(r.collaborator_id) && put(`aso|${r.collaborator_id}`, r.expires_at));
       trns.forEach((r) => active.has(r.collaborator_id) && put(`trn|${r.collaborator_id}|${r.training_id}`, r.expires_at));
       ints.forEach((r) => active.has(r.collaborator_id) && !r.documentation && put(`int|${r.collaborator_id}|${r.client_id}`, r.expires_at));
-      let expired = appts.filter((a) => a.scheduled_date < today).length;
-      let expiring = 0;
+      const byKind: Record<string, { expired: number; expiring: number }> = {
+        agendamentos: { expired: appts.filter((a) => a.scheduled_date < today).length, expiring: 0 },
+        aso: { expired: 0, expiring: 0 }, int: { expired: 0, expiring: 0 }, trn: { expired: 0, expiring: 0 },
+      };
       for (const [key, exp] of latest) {
         const [k, cid] = key.split("|");
         if (covered.has(key) || covered.has(`${k}|${cid}`)) continue;
-        if (exp < today) expired++; else if (exp <= warn) expiring++;
+        if (exp < today) byKind[k].expired++; else if (exp <= warn) byKind[k].expiring++;
       }
-      return { expired, expiring, purchases: purchases.length, orders: orders.length, billing: invoices.length + notes.length };
+      const vals = Object.values(byKind);
+      const expired = vals.reduce((a, v) => a + v.expired, 0);
+      const expiring = vals.reduce((a, v) => a + v.expiring, 0);
+      return { byKind, expired, expiring, purchases: purchases.length, orders: orders.length, billing: invoices.length + notes.length };
     },
   });
-  const d = q.data;
+}
+
+const toBadge = (v?: { expired: number; expiring: number }): MenuBadge | undefined =>
+  !v ? undefined : v.expired ? { count: v.expired, tone: "red" } : v.expiring ? { count: v.expiring, tone: "orange" } : undefined;
+
+/** Contadores das subabas de Documentação. */
+export function useControlBadges() {
+  const k = useBadgeData().data?.byKind;
+  return { agendamentos: toBadge(k?.agendamentos), asos: toBadge(k?.aso), integracoes: toBadge(k?.int), treinamentos: toBadge(k?.trn) } as Record<string, MenuBadge | undefined>;
+}
+
+export function useMenuBadges() {
+  const d = useBadgeData().data;
   const out: Record<string, MenuBadge | undefined> = {};
   if (d) {
     if (d.expired) out["/agendamentos"] = { count: d.expired, tone: "red" };
