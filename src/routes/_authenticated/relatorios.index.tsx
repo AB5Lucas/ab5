@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Download } from "lucide-react";
+import { Copy, Download } from "lucide-react";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { workedHours } from "@/lib/rdo";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -65,7 +68,7 @@ type AllocRow = {
   driver: boolean;
   confirmation_status: string;
   daily_schedules: { schedule_date: string } | null;
-  works: { name: string; order_number: string | null; client: string | null; clients: { name: string } | null } | null;
+  works: { id: string; client_id: string | null; name: string; order_number: string | null; client: string | null; clients: { name: string } | null } | null;
   collaborators: { full_name: string } | null;
 };
 
@@ -90,7 +93,7 @@ const out: AllocRow[] = [];
         const { data, error } = await supabase
           .from("daily_allocations")
           .select(
-          "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(name, order_number, client, clients(name)), collaborators(full_name)",
+          "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(id, name, order_number, client, client_id, clients(name)), collaborators(full_name)",
         )
           .gte("daily_schedules.schedule_date", from)
           .lte("daily_schedules.schedule_date", to)
@@ -153,20 +156,57 @@ const out: AllocRow[] = [];
     },
   });
 
+  const hours = useQuery({
+    queryKey: ["report-hours", from, to],
+    queryFn: async () => {
+      const out: HourRow[] = [];
+      for (let off = 0; ; off += 1000) {
+        const { data, error } = await supabase
+          .from("rdo_workforce")
+          .select("id, work_id, collaborator_id, report_date, entry_time, exit_time, break_minutes, worked_hours, present, collaborators(full_name)")
+          .gte("report_date", from)
+          .lte("report_date", to)
+          .eq("present", true)
+          .order("id")
+          .range(off, off + 999);
+        if (error) throw error;
+        for (const r of (data ?? []) as any[]) {
+          const h = r.worked_hours != null ? Number(r.worked_hours) : workedHours(r.entry_time, r.exit_time, r.break_minutes ?? 60);
+          out.push({ work_id: r.work_id, collaborator_id: r.collaborator_id, name: r.collaborators?.full_name ?? "—", date: r.report_date, hours: h });
+        }
+        if (!data || data.length < 1000) break;
+      }
+      return out;
+    },
+  });
+
   const data = allocations.data ?? [];
+  const hourRows = hours.data ?? [];
+  const [detail, setDetail] = useState<Detail | null>(null);
+
+  const workInfo = useMemo(() => {
+    const m = new Map<string, { client: string; clientKey: string; name: string }>();
+    for (const a of data) if (a.works) {
+      const client = a.works.clients?.name ?? a.works.client ?? "Sem cliente";
+      m.set(a.works.id, { client, clientKey: a.works.client_id ?? client, name: a.works.name });
+    }
+    return m;
+  }, [data]);
 
   const byWork = useMemo(() => {
-    const map = new Map<string, { label: string; total: number; overnight: number; days: Set<string> }>();
+    const map = new Map<string, { key: string; label: string; client: string; clientKey: string; workId: string | null; hours: number; total: number; overnight: number; days: Set<string> }>();
     for (const a of data) {
-      const key = a.works ? a.works.name : "Sem serviço";
-      const entry = map.get(key) ?? { label: key, total: 0, overnight: 0, days: new Set<string>() };
+      const key = a.works ? a.works.id : "none";
+      const client = a.works ? a.works.clients?.name ?? a.works.client ?? "Sem cliente" : "—";
+      const entry = map.get(key) ?? { key, label: a.works?.name ?? "Sem serviço", client, clientKey: a.works?.client_id ?? client, workId: a.works?.id ?? null, hours: 0, total: 0, overnight: 0, days: new Set<string>() };
       entry.total += 1;
       if (a.overnight) entry.overnight += 1;
       if (a.daily_schedules?.schedule_date) entry.days.add(a.daily_schedules.schedule_date);
       map.set(key, entry);
     }
-    return [...map.values()].sort((a, b) => b.total - a.total);
-  }, [data]);
+    for (const h of hourRows) { const e = map.get(h.work_id); if (e) e.hours += h.hours; }
+    return [...map.values()].sort((a, b) => a.client.localeCompare(b.client) || b.total - a.total);
+  }, [data, hourRows]);
 
   const byCollaborator = useMemo(() => {
     const map = new Map<string, { label: string; total: number; overnight: number; driver: number }>();
@@ -191,7 +231,7 @@ const out: AllocRow[] = [];
     };
   }, [data]);
 
-  const loading = allocations.isLoading || absences.isLoading;
+  const loading = allocations.isLoading || absences.isLoading || hours.isLoading;
 
   return (
     <div className="space-y-4">
@@ -283,8 +323,8 @@ const out: AllocRow[] = [];
               size="sm"
               onClick={() =>
                 downloadCsv(`relatorio-obras-${from}-a-${to}.csv`, [
-                  ["Obra", "Alocações", "Dias", "Pernoites"],
-                  ...byWork.map((w) => [w.label, w.total, w.days.size, w.overnight]),
+                  ["Cliente", "Serviço", "Alocações", "Dias", "Pernoites", "Horas trabalhadas"],
+                  ...byWork.map((w) => [w.client, w.label, w.total, w.days.size, w.overnight, fmtH(w.hours)]),
                 ])
               }
             >
@@ -295,22 +335,36 @@ const out: AllocRow[] = [];
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Obra</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Serviço</TableHead>
                 <TableHead className="text-right">Alocações</TableHead>
                 <TableHead className="text-right">Dias</TableHead>
                 <TableHead className="text-right">Pernoites</TableHead>
+                <TableHead className="text-right">Horas trabalhadas</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {byWork.map((w) => (
-                <TableRow key={w.label}>
-                  <TableCell className="font-medium">{w.label}</TableCell>
+                <TableRow key={w.key}>
+                  <TableCell>
+                    <button type="button" className="text-left text-primary hover:underline" onClick={() => setDetail({ kind: "client", key: w.clientKey, title: w.client })}>{w.client}</button>
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {w.workId ? (
+                      <button type="button" className="text-left text-primary hover:underline" onClick={() => setDetail({ kind: "work", key: w.workId!, title: `${w.client} · ${w.label}` })}>{w.label}</button>
+                    ) : w.label}
+                  </TableCell>
                   <TableCell className="text-right">{w.total}</TableCell>
                   <TableCell className="text-right">{w.days.size}</TableCell>
                   <TableCell className="text-right">{w.overnight}</TableCell>
+                  <TableCell className="text-right">
+                    {w.workId ? (
+                      <button type="button" className="text-primary hover:underline" onClick={() => setDetail({ kind: "hours", key: w.workId!, title: `Horas trabalhadas · ${w.client} · ${w.label}` })}>{fmtH(w.hours)}</button>
+                    ) : "—"}
+                  </TableCell>
                 </TableRow>
               ))}
-              {!loading && byWork.length === 0 && <EmptyRow cols={4} />}
+              {!loading && byWork.length === 0 && <EmptyRow cols={6} />}
             </TableBody>
           </Table>
         </TabsContent>
@@ -393,6 +447,142 @@ const out: AllocRow[] = [];
           </Table>
         </TabsContent>
       </Tabs>
+
+      <DetailDialog detail={detail} onClose={() => setDetail(null)} data={data} hourRows={hourRows} workInfo={workInfo} from={from} to={to} />
+    </div>
+  );
+}
+
+type HourRow = { work_id: string; collaborator_id: string; name: string; date: string; hours: number };
+type Detail = { kind: "client" | "work" | "hours"; key: string; title: string };
+
+function fmtH(h: number) {
+  return h.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " h";
+}
+
+function DetailDialog({ detail, onClose, data, hourRows, workInfo, from, to }: {
+  detail: Detail | null; onClose: () => void; data: AllocRow[]; hourRows: HourRow[];
+  workInfo: Map<string, { client: string; clientKey: string; name: string }>; from: string; to: string;
+}) {
+  const view = useMemo(() => {
+    if (!detail) return null;
+    const inScope = (workId: string | null | undefined) => {
+      if (!workId) return false;
+      if (detail.kind === "client") return workInfo.get(workId)?.clientKey === detail.key;
+      return workId === detail.key;
+    };
+    const allocs = data.filter((a) => inScope(a.works?.id));
+    const hrs = hourRows.filter((h) => inScope(h.work_id));
+    const people = new Map<string, { name: string; hours: number; days: Set<string>; allocs: number }>();
+    for (const a of allocs) {
+      const k = a.collaborator_id ?? "—";
+      const e = people.get(k) ?? { name: a.collaborators?.full_name ?? "—", hours: 0, days: new Set<string>(), allocs: 0 };
+      e.allocs += 1; people.set(k, e);
+    }
+    for (const h of hrs) {
+      const e = people.get(h.collaborator_id) ?? { name: h.name, hours: 0, days: new Set<string>(), allocs: 0 };
+      e.hours += h.hours; if (h.hours > 0) e.days.add(h.date); people.set(h.collaborator_id, e);
+    }
+    const services = new Map<string, { name: string; allocs: number; hours: number; people: Set<string> }>();
+    for (const a of allocs) {
+      const id = a.works!.id;
+      const e = services.get(id) ?? { name: a.works!.name, allocs: 0, hours: 0, people: new Set<string>() };
+      e.allocs += 1; if (a.collaborator_id) e.people.add(a.collaborator_id); services.set(id, e);
+    }
+    for (const h of hrs) { const e = services.get(h.work_id); if (e) e.hours += h.hours; }
+    const list = [...people.values()].filter((p) => detail.kind !== "hours" || p.hours > 0).sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
+    return {
+      allocs: allocs.length,
+      days: new Set(allocs.map((a) => a.daily_schedules?.schedule_date)).size,
+      overnight: allocs.filter((a) => a.overnight).length,
+      hours: hrs.reduce((s, h) => s + h.hours, 0),
+      people: list,
+      services: [...services.values()].sort((a, b) => b.hours - a.hours),
+    };
+  }, [detail, data, hourRows, workInfo]);
+
+  const copy = async () => {
+    if (!view) return;
+    const text = ["Colaborador\tHoras trabalhadas", ...view.people.map((p) => `${p.name}\t${p.hours.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)].join("\n");
+    await navigator.clipboard.writeText(text);
+    toast.success(`${view.people.length} colaboradores copiados`);
+  };
+
+  return (
+    <Dialog open={!!detail} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{detail?.title}</DialogTitle>
+          <p className="text-sm text-muted-foreground">Período de {fmtDate(from)} a {fmtDate(to)}</p>
+        </DialogHeader>
+        {view && (
+          <div className="space-y-4">
+            {detail?.kind !== "hours" && (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <MiniStat label="Alocações" value={String(view.allocs)} />
+                <MiniStat label="Dias" value={String(view.days)} />
+                <MiniStat label="Pernoites" value={String(view.overnight)} />
+                <MiniStat label="Horas trabalhadas" value={fmtH(view.hours)} />
+              </div>
+            )}
+            {detail?.kind === "client" && (
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>Serviço</TableHead>
+                  <TableHead className="text-right">Alocações</TableHead>
+                  <TableHead className="text-right">Colaboradores</TableHead>
+                  <TableHead className="text-right">Horas</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {view.services.map((s) => (
+                    <TableRow key={s.name}>
+                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className="text-right">{s.allocs}</TableCell>
+                      <TableCell className="text-right">{s.people.size}</TableCell>
+                      <TableCell className="text-right">{fmtH(s.hours)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Colaboradores ({view.people.length}) · {fmtH(view.hours)}</p>
+              <Button variant="outline" size="sm" onClick={copy} disabled={!view.people.length}>
+                <Copy className="h-4 w-4" /> Copiar
+              </Button>
+            </div>
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Colaborador</TableHead>
+                {detail?.kind !== "hours" && <TableHead className="text-right">Alocações</TableHead>}
+                <TableHead className="text-right">Dias trabalhados</TableHead>
+                <TableHead className="text-right">Horas trabalhadas</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {view.people.map((p) => (
+                  <TableRow key={p.name}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    {detail?.kind !== "hours" && <TableCell className="text-right">{p.allocs}</TableCell>}
+                    <TableCell className="text-right">{p.days.size}</TableCell>
+                    <TableCell className="text-right">{fmtH(p.hours)}</TableCell>
+                  </TableRow>
+                ))}
+                {view.people.length === 0 && <EmptyRow cols={4} />}
+              </TableBody>
+            </Table>
+            <p className="text-xs text-muted-foreground">Horas trabalhadas vêm dos RDOs (presentes) do período.</p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border p-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="font-semibold">{value}</p>
     </div>
   );
 }
