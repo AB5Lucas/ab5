@@ -11,5 +11,5 @@
 - [x] Corrigir VT de fim de semana da Indústria e atualizar registros ausentes de outubro.
 - [x] Cópia da Programação: data de origem editável e lista de quadros com efetivo, todos selecionados inicialmente.
 - [x] Validar regras de VT, seleção e cópia na tela.
-- [ ] Serviços: indicador de clientes com efetivo não distribuído e mais de um serviço ativo.
-- [ ] Serviços: indicador de serviços ativos sem alocação na lista de clientes; validar contagens e tela.
+- [x] Serviços: indicador de clientes com efetivo não distribuído e mais de um serviço ativo.
+- [x] Serviços: indicador de serviços ativos sem alocação na lista de clientes; validar contagens e tela.
