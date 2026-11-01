@@ -80,8 +80,12 @@ export function useControlBadges() {
 export function useMenuBadges() {
   const d = useBadgeData().data;
   const distribution = useServiceDistribution().data;
+  const w = useWorkflowBadges().data;
   const out: Record<string, MenuBadge | undefined> = {};
   if (distribution?.pendingClients) out["/programacao/servicos"] = { count: distribution.pendingClients, tone: "red" };
+  if (w?.ponto) out["/relatorios/ajuste-ponto"] = { count: w.ponto, tone: "red" };
+  if (w?.andaimes) out["/andaimes/solicitacoes"] = { count: w.andaimes, tone: "red" };
+  if (w?.hiring) out["/demandas/contratacoes"] = { count: w.hiring, tone: "red" };
   if (d) {
     if (d.expired) out["/agendamentos"] = { count: d.expired, tone: "red" };
     else if (d.expiring) out["/agendamentos"] = { count: d.expiring, tone: "orange" };
@@ -108,4 +112,59 @@ export function BadgeDot({ b }: { b?: MenuBadge | undefined }) {
       {b.count > 99 ? "99+" : b.count}
     </span>
   );
+}
+
+const SEEN_KEY = (uid: string) => `hiring-seen:${uid}`;
+export function readHiringSeen(uid: string): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(SEEN_KEY(uid)) || "{}"); } catch { return {}; }
+}
+/** Marca a solicitação de contratação como vista pelo usuário (zera o aviso dela). */
+export function markHiringSeen(uid: string | undefined, reqId: string) {
+  if (!uid) return;
+  const s = readHiringSeen(uid);
+  s[reqId] = new Date().toISOString();
+  if (!s["__base"]) s["__base"] = s[reqId];
+  localStorage.setItem(SEEN_KEY(uid), JSON.stringify(s));
+  window.dispatchEvent(new Event("hiring-seen"));
+}
+
+/** Avisos individuais: Ajuste de Ponto, Solicitações de andaimes e Contratações. */
+export function useWorkflowBadges() {
+  return useQuery({
+    queryKey: ["workflow-badges"],
+    refetchInterval: 60000,
+    staleTime: 30000,
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) return { ponto: 0, andaimes: 0, hiring: 0 };
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", uid);
+      const rh = (roles ?? []).some((r: any) => r.role === "admin" || r.role === "programmer");
+      const { computeOccurrences, fetchTimeclockData, timeclockDefaultFrom } = await import("@/lib/timeclock");
+      const { flowPendingFor } = await import("@/lib/andaimes");
+      const [tc, flowRoles, reqs, hires] = await Promise.all([
+        fetchTimeclockData(timeclockDefaultFrom(), todayISO()).catch(() => undefined),
+        supabase.from("andam_flow_roles").select("key, user_id").then((r) => r.data ?? []),
+        supabase.from("andam_requests").select("flow_stage, user_id").neq("flow_stage", "encerrada").then((r) => (r.data ?? []) as any[]),
+        supabase.from("hiring_requests").select("id, status, requester_id").then((r) => (r.data ?? []) as any[]),
+      ]);
+      let ponto = 0;
+      if (tc) { const { occs, treated } = computeOccurrences(tc); ponto = occs.filter((o) => !treated.has(o.key)).length; }
+      const ids: any = {};
+      for (const f of flowRoles as any[]) ids[f.key] = f.user_id;
+      const andaimes = reqs.filter((r) => flowPendingFor(r.flow_stage, { ...ids, solicitante: r.user_id }) === uid).length;
+      let hiring = 0;
+      if (rh) hiring = hires.filter((h) => !["atendida", "cancelada"].includes(h.status)).length;
+      else {
+        const mine = hires.filter((h) => h.requester_id === uid).map((h) => h.id);
+        if (mine.length) {
+          const seen = readHiringSeen(uid);
+          if (!seen["__base"]) { seen["__base"] = new Date().toISOString(); localStorage.setItem(SEEN_KEY(uid), JSON.stringify(seen)); }
+          const { data: ev } = await supabase.from("hiring_request_events").select("request_id, user_id, created_at").in("request_id", mine).neq("user_id", uid);
+          hiring = (ev ?? []).filter((e: any) => e.created_at > (seen[e.request_id] ?? seen["__base"]!)).length;
+        }
+      }
+      return { ponto, andaimes, hiring };
+    },
+  });
 }

@@ -1,3 +1,4 @@
+import { markHiringSeen } from "@/hooks/use-nav-badges";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -118,6 +119,8 @@ function Requests({ isRh }: { isRh: boolean }) {
   const [f, setF] = useState({ q: "", client: ALL, work: ALL, position: ALL, requester: ALL, owner: ALL, status: ALL, from: "", to: "", sort: "date" });
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState<Req | null>(null);
+  const qc = useQueryClient();
+  const { user } = useCurrentUser();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [mailing, setMailing] = useState(false);
   const togglePick = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -202,7 +205,7 @@ function Requests({ isRh }: { isRh: boolean }) {
           </TableRow></TableHeader>
           <TableBody>
             {rows.map((r) => (
-              <TableRow key={r.id} className="cursor-pointer" onClick={() => setOpen(r)}>
+              <TableRow key={r.id} className="cursor-pointer" onClick={() => { setOpen(r); markHiringSeen(user?.id, r.id); qc.invalidateQueries({ queryKey: ["workflow-badges"] }); }}>
                 <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={picked.has(r.id)} onCheckedChange={() => togglePick(r.id)} /></TableCell>
                 <TableCell className="font-mono">{num(r.number)}</TableCell>
                 <TableCell>{dt(r.created_at)}</TableCell>
