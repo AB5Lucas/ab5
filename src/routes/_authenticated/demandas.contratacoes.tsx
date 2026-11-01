@@ -1,3 +1,4 @@
+import { markHiringSeen } from "@/hooks/use-nav-badges";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -202,7 +203,7 @@ function Requests({ isRh }: { isRh: boolean }) {
           </TableRow></TableHeader>
           <TableBody>
             {rows.map((r) => (
-              <TableRow key={r.id} className="cursor-pointer" onClick={() => setOpen(r)}>
+              <TableRow key={r.id} className="cursor-pointer" onClick={() => { setOpen(r); markHiringSeen(user?.id, r.id); qc.invalidateQueries({ queryKey: ["workflow-badges"] }); }}>
                 <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={picked.has(r.id)} onCheckedChange={() => togglePick(r.id)} /></TableCell>
                 <TableCell className="font-mono">{num(r.number)}</TableCell>
                 <TableCell>{dt(r.created_at)}</TableCell>
