@@ -68,7 +68,10 @@ function useBadgeData() {
   });
 }
 
+/** Total de pendências (vencidas + a vencer); vermelho se houver ao menos uma vencida. */
 const toBadge = (v?: { expired: number; expiring: number }): MenuBadge | undefined =>
+  !v || !(v.expired + v.expiring) ? undefined : { count: v.expired + v.expiring, tone: v.expired ? "red" : "orange" };
+const conferenceBadge = (v?: { expired: number; expiring: number }): MenuBadge | undefined =>
   !v ? undefined : v.expired ? { count: v.expired, tone: "red" } : v.expiring ? { count: v.expiring, tone: "orange" } : undefined;
 
 /** Contadores das subabas de Documentação. */
@@ -87,9 +90,8 @@ export function useMenuBadges() {
   if (w?.andaimes) out["/andaimes/solicitacoes"] = { count: w.andaimes, tone: "red" };
   if (w?.hiring) out["/demandas/contratacoes"] = { count: w.hiring, tone: "red" };
   if (d) {
-    if (d.expired) out["/agendamentos"] = { count: d.expired, tone: "red" };
-    else if (d.expiring) out["/agendamentos"] = { count: d.expiring, tone: "orange" };
-    const c = toBadge(d.conference); if (c) out["/conferencia"] = c;
+    const docs = toBadge(d); if (docs) out["/agendamentos"] = docs;
+    const c = conferenceBadge(d.conference); if (c) out["/conferencia"] = c;
     if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red" };
     if (d.orders) out["/fechamentos/suzano"] = { count: d.orders, tone: "red" };
     if (d.billing) out["/relatorios/sincronizacao"] = { count: d.billing, tone: "red" };
