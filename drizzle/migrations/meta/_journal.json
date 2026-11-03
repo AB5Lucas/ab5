@@ -505,6 +505,13 @@
       "when": 1793357441950,
       "tag": "0071_weekend_allocation_default_vt",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793701161235,
+      "tag": "0072_format_collaborator_cpf",
+      "breakpoints": true
     }
   ]
 }
