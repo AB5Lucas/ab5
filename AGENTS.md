@@ -35,4 +35,4 @@
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
 - Never cancel vite:preloadError in recovery. Why: it breaks lazy routes.
 - Compras: purchase_cc_lines (month+CC) + rules in purchases.ts; work_entries link via purchase_cc_id, recreated per sync. Why: no duplicates, directions persist.
-- Allocation reports use allocation-hours.ts and RDO headers: estimate hours only without a daily RDO, preserving absences.
+- Allocation reports use allocation-hours.ts/RDO headers for hours; daily PDF shares the table's filtered rows. Why: preserve absences and match exported selections.
