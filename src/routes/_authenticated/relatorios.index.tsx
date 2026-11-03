@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Copy, Download } from "lucide-react";
+import { Copy, Download, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { workedHours } from "@/lib/rdo";
 import { allocationHours } from "@/lib/allocation-hours";
+import { filteredDailyAllocations } from "@/lib/allocation-daily-pdf";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -18,9 +19,9 @@ export const Route = createFileRoute("/_authenticated/relatorios/")({
   head: () => ({
     meta: [
       { title: "Alocações | Programação Operacional" },
-      { name: "description", content: "Relatórios de alocação por obra, por colaborador e de ausências, com exportação em CSV." },
+      { name: "description", content: "Relatórios de alocação por obra, por colaborador e de ausências, com exportação em CSV e PDF do dia a dia." },
       { property: "og:title", content: "Alocações | Programação Operacional" },
-      { property: "og:description", content: "Relatórios de alocação por obra, por colaborador e de ausências, com exportação em CSV." },
+      { property: "og:description", content: "Relatórios de alocação por obra, por colaborador e de ausências, com exportação em CSV e PDF do dia a dia." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -239,6 +240,28 @@ const out: AllocRow[] = [];
   }, [data]);
 
   const loading = allocations.isLoading || absences.isLoading || hours.isLoading;
+  const dailyRows = useMemo(() => filteredDailyAllocations(data, person), [data, person]);
+  const personName = (people.data ?? []).find((p) => p.id === person)?.full_name ?? "Colaborador";
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const exportDailyPdf = async () => {
+    if (!dailyRows.length || exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      const { exportAllocationDailyPdf } = await import("@/lib/allocation-daily-pdf");
+      await exportAllocationDailyPdf(personName, `Período de ${fmtDate(from)} a ${fmtDate(to)}`, dailyRows.map((a) => [
+        a.daily_schedules ? fmtDate(a.daily_schedules.schedule_date) : "—",
+        a.works?.order_number || "—",
+        a.works?.clients?.name ?? a.works?.client ?? "—",
+        a.works?.name ?? "Sem serviço",
+        a.overnight ? "Sim" : "—",
+        a.driver ? "Sim" : "—",
+      ]), `alocacoes-dia-a-dia-${personName.replace(/[^a-zA-Z0-9À-ÿ]+/g, "-")}-${from}-a-${to}.pdf`);
+    } catch {
+      toast.error("Não foi possível exportar o PDF. Tente novamente.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -275,9 +298,12 @@ const out: AllocRow[] = [];
 
       {person && (
         <div className="panel overflow-x-auto p-0">
-          <p className="p-3 text-sm font-medium">
-            Dia a dia de {(people.data ?? []).find((p) => p.id === person)?.full_name}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3">
+            <p className="text-sm font-medium">Dia a dia de {personName}</p>
+            <Button variant="outline" size="sm" onClick={exportDailyPdf} disabled={allocations.isFetching || !!allocations.error || !dailyRows.length || exportingPdf}>
+              <FileDown className="h-4 w-4" /> {exportingPdf ? "Exportando..." : "Exportar PDF"}
+            </Button>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -290,10 +316,7 @@ const out: AllocRow[] = [];
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data
-                .filter((a) => a.collaborator_id === person)
-                .sort((a, b) => (a.daily_schedules?.schedule_date ?? "").localeCompare(b.daily_schedules?.schedule_date ?? ""))
-                .map((a) => (
+              {dailyRows.map((a) => (
                   <TableRow key={a.id}>
                     <TableCell>{a.daily_schedules ? fmtDate(a.daily_schedules.schedule_date) : "—"}</TableCell>
                     <TableCell>{a.works?.order_number || "—"}</TableCell>
