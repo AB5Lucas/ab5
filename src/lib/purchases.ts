@@ -1,11 +1,44 @@
 /** Compras por centro de custo: leitura do relatório e rateio entre serviços. */
-export type CcLine = { cc: string; name: string; amount: number; items: { code: string; desc: string; qty: number; amount: number }[] };
+export type CcItem = { code: string; desc: string; qty: number; amount: number; date?: string | null };
+export type CcLine = { cc: string; name: string; amount: number; items: CcItem[] };
 export type PClient = { id: string; prefix: string | null };
 export type PWork = { id: string; client_id: string; suffix: string | null };
 export type Direction = { client_id?: string | null; work_id?: string | null };
 export type Allocation = { status: "launched" | "pending"; reason: string | null; parts: { work_id: string; amount: number }[] };
 
 const num = (v: unknown) => (typeof v === "number" ? v : Number(String(v ?? "").replace(/\./g, "").replace(",", ".")) || 0);
+
+/** Data da linha do relatório (serial do Excel, Date ou dd/mm/aaaa) → aaaa-mm-dd. */
+function rowDate(cells: unknown[]): string | null {
+  for (const c of cells) {
+    if (c instanceof Date && !isNaN(c.getTime())) return c.toISOString().slice(0, 10);
+    if (typeof c === "string") {
+      const m = c.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    }
+  }
+  return null;
+}
+
+/** Categorias exibidas no filtro de itens de Compras. */
+export const PURCHASE_CATEGORIES = [
+  { key: "mo", label: "Mão de obra" },
+  { key: "materiais", label: "Materiais" },
+  { key: "ferramentas", label: "Ferramentas" },
+  { key: "transporte", label: "Transporte" },
+  { key: "andaimes", label: "Andaimes" },
+] as const;
+export type PurchaseCategory = (typeof PURCHASE_CATEGORIES)[number]["key"];
+
+/** Classificação do item pela descrição/código. */
+export function purchaseCategory(code: string, desc: string): PurchaseCategory {
+  const d = `${desc}`.toLowerCase();
+  if (/^vc/i.test(code) || /ped[aá]gio|combust|gasolina|diesel|etanol|pneu|[oó]leo motor|ve[ií]culo|automot|mec[aâ]nica|funilaria|frete|uber|táxi|taxi|passagem|transporte/.test(d)) return "transporte";
+  if (/andaime|escora|braçadeira|bracadeira|tubo andaime|sapata|rodizio andaime/.test(d)) return "andaimes";
+  if (/m[aã]o de obra|servi[cç]o de|empreitada|mo terceir|prestação|prestacao|diária|diaria/.test(d)) return "mo";
+  if (/furadeira|parafusadeira|esmerilhadeira|serra|broca|disco de corte|chave |alicate|martelo|trena|n[ií]vel|rolo|trincha|pincel|esp[aá]tula|lixadeira|ferramenta|marreta|talhadeira|extensão|extensao|escada/.test(d)) return "ferramentas";
+  return "materiais";
+}
 
 /** Relatório "Compras de Produtos por Centro de Custo" (ABCOM003). */
 export function parsePurchaseReport(rows: unknown[][]): CcLine[] {
@@ -25,7 +58,7 @@ export function parsePurchaseReport(rows: unknown[][]): CcLine[] {
     if (!cur) continue;
     const code = String(cells[2] ?? "");
     if (code && /^[A-Z0-9]{3,}$/i.test(code) && typeof cells[12] === "number") {
-      const it = { code, desc: String(cells[3] ?? "").trim(), qty: num(cells[8]), amount: num(cells[12]) };
+      const it = { code, desc: String(cells[3] ?? "").trim(), qty: num(cells[8]), amount: num(cells[12]), date: rowDate(cells) };
       cur.items.push(it);
       cur.amount = Math.round((cur.amount + it.amount) * 100) / 100;
     }

@@ -107,7 +107,7 @@ export async function executePurchaseSync(c: Credentials) {
   for (const [ym, f] of [...best.entries()].sort()) {
     const file = `${FOLDER}/${f.name}`;
     const buf = await graph(`${DRIVE}/root:/${enc(file)}:/content`, c, true);
-    const wb = XLSX.read(new Uint8Array(buf));
+    const wb = XLSX.read(new Uint8Array(buf), { cellDates: true });
     const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]!]!, { header: 1, raw: true, defval: "" });
     const lines = parsePurchaseReport(rows);
     const { data: existing, error } = await supabaseAdmin.from("purchase_cc_lines").select("id, cc_code").eq("ref_month", ym);
