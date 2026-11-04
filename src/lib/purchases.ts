@@ -8,15 +8,15 @@ export type Allocation = { status: "launched" | "pending"; reason: string | null
 
 const num = (v: unknown) => (typeof v === "number" ? v : Number(String(v ?? "").replace(/\./g, "").replace(",", ".")) || 0);
 
-/** Data da linha do relatório (serial do Excel, Date ou dd/mm/aaaa) → aaaa-mm-dd. */
-function rowDate(cells: unknown[]): string | null {
-  for (const c of cells) {
+/** Data de uma célula identificada pelo cabeçalho, nunca a data de emissão do relatório. */
+function rowDate(c: unknown): string | null {
     if (c instanceof Date && !isNaN(c.getTime())) return c.toISOString().slice(0, 10);
+    if (typeof c === "number" && Number.isFinite(c)) return new Date(Date.UTC(1899, 11, 30) + c * 86400000).toISOString().slice(0, 10);
     if (typeof c === "string") {
       const m = c.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
       if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(c)) return c;
     }
-  }
   return null;
 }
 
@@ -42,11 +42,31 @@ export function purchaseCategory(code: string, desc: string): PurchaseCategory {
 
 /** Relatório "Compras de Produtos por Centro de Custo" (ABCOM003). */
 export function parsePurchaseReport(rows: unknown[][]): CcLine[] {
+  const normalize = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  type Columns = { code: number; desc: number; qty: number; total: number; date?: number };
+  let columns: Columns | null = null;
+  let anchors: { qty: number; total: number } | null = null;
+  const abcom = rows.some((r) => r.some((c) => normalize(c) === "abcom003"));
+  const error = (detail: string) => new Error(`ABCOM003: ${detail}. Importação interrompida para evitar valores incorretos.`);
+  const numeric = (v: unknown) => (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && /^-?(?:R\$\s*)?\d[\d.,]*$/.test(v.trim()));
+  const value = (v: unknown) => num(typeof v === "string" ? v.replace(/R\$\s*/g, "").trim() : v);
   const map = new Map<string, CcLine>();
   let cur: CcLine | null = null;
-  for (const r of rows) {
+  for (const [rowIndex, r] of rows.entries()) {
     const cells = r.map((c) => (typeof c === "string" ? c.trim() : c));
-    const ccIdx = cells.findIndex((c) => c === "Centro Custo:");
+    const labels = cells.map(normalize);
+    const qty = labels.findIndex((c) => /^(quantidade|qtde|qtd|quant)$/.test(c));
+    const total = labels.findIndex((c) => /^(valortotal|vlrtotal|vrtotal|total|totalitem|valortotalitem)$/.test(c));
+    if (qty >= 0 && total >= 0) {
+      const code = labels.findIndex((c) => /^(codigo|cod|codproduto|codigoproduto|codigodoproduto|produto)$/.test(c));
+      const desc = labels.findIndex((c) => /^(descricao|descricaoproduto|descricaodoproduto|nomeproduto)$/.test(c));
+      const date = labels.findIndex((c) => /^(data|datacompra|dataemissao|dtcompra|dtemissao)$/.test(c));
+      anchors = { qty, total };
+      columns = code >= 0 && desc >= 0 ? { code, desc, qty, total, ...(date >= 0 ? { date } : {}) } : null;
+      if (!columns && !abcom) throw error("cabeçalho incompleto: faltam Código/Produto e Descrição");
+      continue;
+    }
+    const ccIdx = labels.findIndex((c) => c === "centrocusto" || c === "centrodecusto");
     if (ccIdx >= 0) {
       const rest = cells.slice(ccIdx + 1).filter((c) => c !== "" && c != null);
       const cc = String(rest[0] ?? "").replace(/\D/g, "");
@@ -56,13 +76,34 @@ export function parsePurchaseReport(rows: unknown[][]): CcLine[] {
       continue;
     }
     if (!cur) continue;
-    const code = String(cells[2] ?? "");
-    if (code && /^[A-Z0-9]{3,}$/i.test(code) && typeof cells[12] === "number") {
-      const it = { code, desc: String(cells[3] ?? "").trim(), qty: num(cells[8]), amount: num(cells[12]), date: rowDate(cells) };
-      cur.items.push(it);
-      cur.amount = Math.round((cur.amount + it.amount) * 100) / 100;
+    if (labels.some((c) => c === "totalcc" || c === "totalcentrocusto")) {
+      const subtotal = cells.filter(numeric);
+      if (subtotal.length !== 1 || Math.abs(cur.amount - value(subtotal[0])) > 0.011) throw error(`total do CC ${cur.cc} não confere na linha ${rowIndex + 1}`);
+      continue;
     }
+    // O exportador ABCOM003 omite Código/Descrição e mescla cabeçalhos em
+    // posições diferentes dos dados. Resolve o layout pelos dois rótulos e
+    // pelas quatro células do item, sem assumir números fixos de coluna.
+    if (!columns && anchors && abcom) {
+      const occupied = cells.map((v, i) => ({ v, i })).filter(({ v }) => v !== "" && v != null);
+      if (occupied.length !== 4 || !/^[A-Z0-9]{3,}$/i.test(String(occupied[0]?.v)) || typeof occupied[1]?.v !== "string" || !numeric(occupied[2]?.v) || !numeric(occupied[3]?.v)) continue;
+      const [code, desc, q, t] = occupied;
+      if (!code || !desc || !q || !t) continue;
+      if (Math.abs(q.i - anchors.qty) > 2 || Math.abs(t.i - anchors.total) > 2 || q.i >= t.i) throw error(`colunas ambíguas na linha ${rowIndex + 1}`);
+      columns = { code: code.i, desc: desc.i, qty: q.i, total: t.i };
+    }
+    if (!columns) {
+      if (cells.some(numeric) && cells.some((c) => typeof c === "string" && /^[A-Z]+\d{3,}$/i.test(c))) throw error("cabeçalho Quantidade e Valor Total não encontrado");
+      continue;
+    }
+    const code = String(cells[columns.code] ?? "");
+    if (!/^[A-Z0-9]{3,}$/i.test(code)) continue;
+    if (!numeric(cells[columns.qty]) || !numeric(cells[columns.total]) || !String(cells[columns.desc] ?? "").trim()) throw error(`item ${code} inválido na linha ${rowIndex + 1}`);
+    const it = { code, desc: String(cells[columns.desc]).trim(), qty: value(cells[columns.qty]), amount: value(cells[columns.total]), date: columns.date == null ? null : rowDate(cells[columns.date]) };
+    cur.items.push(it);
+    cur.amount = Math.round((cur.amount + it.amount) * 100) / 100;
   }
+  if (!anchors) throw error("cabeçalho Quantidade e Valor Total não encontrado");
   return [...map.values()].filter((l) => l.amount !== 0);
 }
 
