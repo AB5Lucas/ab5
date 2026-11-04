@@ -201,7 +201,7 @@ function ComprasPage() {
         <div className="space-y-1"><Label>Categorias</Label>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline"><Filter className="h-4 w-4" /> Categorias{hiddenCats.size > 0 && <Badge variant="secondary">{hiddenCats.size} ocultas</Badge>}</Button>
+              <Button variant="outline"><Filter className="h-4 w-4" /> {hiddenCats.size > 0 ? `${PURCHASE_CATEGORIES.length - hiddenCats.size} selecionadas` : "Todas"}</Button>
             </PopoverTrigger>
             <PopoverContent className="w-60">
               <p className="mb-2 text-xs text-muted-foreground">Marque as categorias exibidas.</p>
