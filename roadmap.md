@@ -26,3 +26,7 @@
 - [x] Compras: mapeamento configurável 2000002/2000003 → 2030999 preservando os nove destinos manuais.
 - [x] Resultados: filtros de data, categoria e descrição com total filtrado; conferido no Jato.
 - [x] Reprocessar outubro (único mês sincronizado), conferir exclusões R$332.410,83 + pendente R$55.000 + lançado R$858.526,57 = relatório R$1.245.937,40; zero custos proibidos, 43 CC conferidos, 93 testes aprovados e telas verificadas.
+- [ ] Unificar andamento mensal 100% e receita/margem por pedido do mês; auditar modos e inconsistências.
+- [ ] Medir Fechamento antes/depois e otimizar consultas compartilhadas/lotes sem alterar custos.
+- [ ] Contador Serviços: ontem até sete dias atrás; testar intervalo compartilhado.
+- [ ] Conferir outubro nas telas, comparar totais e entregar relatório de auditoria e testes.
