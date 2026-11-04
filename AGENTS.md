@@ -34,5 +34,5 @@
 - Collaborator copy uses filtered rows via collaborator-list.ts to match the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
 - Never cancel vite:preloadError in recovery. Why: it breaks lazy routes.
-- Purchases: atomically replace item costs per CC via purchase_replace_entries; keep purchase_cc_id, directions and CC hours; exclude from generic resplit. Why: preserve totals and item identity.
+- Purchases: persist exclusions, CC redirects and item asset decisions; replace summaries/costs atomically; preserve manual targets and exclude generic resplit. Why: reconcile totals and installment competencies.
 - Allocation reports use allocation-hours.ts/RDO headers for hours; daily PDF shares the table's filtered rows. Why: preserve absences and match exported selections.
