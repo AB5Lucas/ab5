@@ -512,6 +512,13 @@
       "when": 1793701161235,
       "tag": "0072_format_collaborator_cpf",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1793826292393,
+      "tag": "0073_industry_purchase_item_costs",
+      "breakpoints": true
     }
   ]
 }
