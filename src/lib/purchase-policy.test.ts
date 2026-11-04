@@ -5,7 +5,7 @@ describe("exclusões em todos os clientes", () => {
   it.each(["VC00001", "VC00214", "SP00064", "SP00010", "RH00062"])("%s já está no km", (code) => expect(exclusionReason(code, DEFAULT_EXCLUSION_RULES)).toBe("Incluso no km rodado"));
   it("RH00043 já está no VT", () => expect(exclusionReason("RH00043", DEFAULT_EXCLUSION_RULES)).toBe("Incluso no VT"));
   it("RH00076 gera custo normalmente, sem exclusão", () => expect(exclusionReason("RH00076", DEFAULT_EXCLUSION_RULES)).toBeNull());
-  it.each(["RH00026", "RH00024", "RH00013", "RH00060", "RH00029", "RH00064", "RH00035"])("%s já está nos encargos", (code) => expect(exclusionReason(code, DEFAULT_EXCLUSION_RULES)).toBe("Incluso nos encargos"));
+  it.each(["RH00026", "RH00024", "RH00013", "RH00060", "RH00029", "RH00064", "RH00035"])("%s é benefício e gera custo, sem exclusão", (code) => expect(exclusionReason(code, DEFAULT_EXCLUSION_RULES)).toBeNull());
   it("permite desativar a regra", () => expect(exclusionReason("VC00214", DEFAULT_EXCLUSION_RULES.map((r) => ({ ...r, active: false })))).toBeNull());
 });
 describe("aquisições", () => {
@@ -13,7 +13,7 @@ describe("aquisições", () => {
   it("Kombi 55000 é ativo antes da exclusão VC", () => expect(detectPurchaseAsset(item("VC00805", "VOLKSWAGEN KOMBI 2011/2012", 55000))).toBe("vehicle"));
   it("limite é inclusivo em 20000", () => { expect(detectPurchaseAsset(item("MF001", "COMPRESSOR", 20000))).toBe("equipment"); expect(detectPurchaseAsset(item("MF001", "COMPRESSOR", 19999.99))).toBeNull(); });
   it.each(["LOCAÇÃO PLATAFORMA ELEVATÓRIA", "SERVIÇOS DE SOLDA", "SERVIÇOS DE FRETES", "GAS GLP GRANEL", "SOMBRITE", "REMOVEDOR MXC-776", "MACACÃO TYVEK", "ENERGIA ELETRICA", "TINTA", "PEÇAS MOTOR"])("%s não é ativo", (desc) => expect(detectPurchaseAsset(item("XX001", desc, 55000))).toBeNull());
-  it("12 parcelas de 55000 fecham centavos", () => { const p = installmentPlan(55000, "2026-10"); expect(p).toHaveLength(12); expect(p[0]).toEqual({ month: "2026-10", amount: 4583.33 }); expect(p[11]).toEqual({ month: "2027-09", amount: 4583.37 }); expect(p.reduce((s, x) => s + Math.round(x.amount * 100), 0)).toBe(5500000); });
+  it("Kombi: decisão em 12 parcelas de 4583,33 desde outubro, última 4583,37", () => { const p = installmentPlan(55000, "2026-10", 12, 4583.33); expect(p).toHaveLength(12); expect(p[0]).toEqual({ month: "2026-10", amount: 4583.33 }); expect(p.slice(0, 11).every((part) => part.amount === 4583.33)).toBe(true); expect(p[11]).toEqual({ month: "2027-09", amount: 4583.37 }); expect(p.reduce((s, x) => s + Math.round(x.amount * 100), 0)).toBe(5500000); });
   it("permite meses e valor editados", () => expect(installmentPlan(55000, "2026-10", 3, 20000).map((p) => p.amount)).toEqual([20000, 20000, 15000]));
   it("rejeita parcelas que ultrapassam o total", () => expect(() => installmentPlan(55000, "2026-10", 12, 5000)).toThrow());
   it("decisão continua identificada após mudar valor e reordenar", () => { const a = item("VC00805", "KOMBI", 55000); const b = item("MF001", "MOTOR", 22000); expect(purchaseItemKeys([a, b])[0]).toBe(purchaseItemKeys([b, { ...a, amount: 56000 }])[1]); });
