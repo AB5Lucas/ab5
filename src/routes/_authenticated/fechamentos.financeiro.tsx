@@ -141,13 +141,8 @@ function FinanceiroPage() {
       const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
       const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as Line[] };
       const upto = buildBase(w, raw, "", lastYm, { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [] }) ?? full;
-      // Mensal com período filtrado: Margem Total = margem mensal do período (soma dos pedidos datados nos meses filtrados)
-      let total = totalMargin(w, upto);
-      if (w.monthly_enabled && months.length > 0) {
-        const rev = monthlyOrderRevenue(w, "", "", yms);
-        const m = rev * (1 - FIN_TAX) - (mo + transport + materials);
-        total = { margin: m, pct: marginPercent(m, rev) };
-      }
+      // Margem total usa todo o histórico até o último mês; margem do período permanece inalterada.
+      const total = totalMargin(w, upto);
       g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: marginPercent(margin, compBilled), total, full, raw });
       by.set(key, g);
     });
