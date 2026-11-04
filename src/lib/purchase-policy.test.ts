@@ -4,7 +4,7 @@ import { DEFAULT_EXCLUSION_RULES, detectPurchaseAsset, effectivePurchaseCc, excl
 describe("exclusões em todos os clientes", () => {
   it.each(["VC00001", "VC00214", "SP00064", "SP00010", "RH00062"])("%s já está no km", (code) => expect(exclusionReason(code, DEFAULT_EXCLUSION_RULES)).toBe("Incluso no km rodado"));
   it("RH00043 já está no VT", () => expect(exclusionReason("RH00043", DEFAULT_EXCLUSION_RULES)).toBe("Incluso no VT"));
-  it("RH00076 é passagem", () => expect(exclusionReason("RH00076", DEFAULT_EXCLUSION_RULES)).toBe("Passagem funcionário"));
+  it("RH00076 gera custo normalmente, sem exclusão", () => expect(exclusionReason("RH00076", DEFAULT_EXCLUSION_RULES)).toBeNull());
   it.each(["RH00026", "RH00024", "RH00013", "RH00060", "RH00029", "RH00064", "RH00035"])("%s já está nos encargos", (code) => expect(exclusionReason(code, DEFAULT_EXCLUSION_RULES)).toBe("Incluso nos encargos"));
   it("permite desativar a regra", () => expect(exclusionReason("VC00214", DEFAULT_EXCLUSION_RULES.map((r) => ({ ...r, active: false })))).toBeNull());
 });

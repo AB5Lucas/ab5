@@ -30,3 +30,5 @@
 - [x] Medir Fechamento antes/depois: 57,75s → 28,45s; consultas 1663 → 411; totais idênticos por serviço.
 - [x] Contador Serviços: ontem até sete dias atrás; teste e consulta real 28/10–03/11 conferidos.
 - [x] Conferir outubro autenticado, comparar totais e entregar relatório dos 93 serviços; 104 testes aprovados. Divergências de alíquota, base de receita e corte de custos aguardam decisão do usuário.
+- [x] Reincluir RH00076 e reprocessar outubro: R$868.430,21 lançados, R$322.507,19 excluídos, Kombi R$55.000 pendente; 9 destinos e redirecionamentos preservados, 43 CC conciliados, zero códigos excluídos em custos; 70 testes e tela autenticada conferidos.
+- [x] Entregar auditoria nominal no chat: 3 mensais sem pedido, 14 custos sem pedido da auditoria anterior, 35 pedidos zero e 13 divergências; indicar que custos são de outubro e Financeiro não foi discriminado nessa comparação.
