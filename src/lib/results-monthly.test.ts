@@ -51,6 +51,7 @@ describe("lotes financeiros preservam contexto e custos por serviço", () => {
     const full = buildBase(amcor, { ...empty, entries }, '', '2026-11', opts);
     if (!full) throw new Error('Missing base');
     expect(full.last?.cost).toBe(108360);
+    expect(full.items.find((item) => item.key === 'andaimes')?.real).toBe(108360);
     expect(totalMargin(amcor, full).margin).toBeCloseTo(145681.938685);
     const october = buildBase(amcor, { ...empty, entries }, '2026-10', '2026-10', opts);
     expect(october?.last?.revenue).toBe(0);
@@ -62,15 +63,29 @@ describe("lotes financeiros preservam contexto e custos por serviço", () => {
     if (!full) throw new Error('Missing base');
     expect(totalMargin(work, full)).toEqual({ margin: -100, pct: null });
   });
-  it("acumulado inclui locação após último andamento sem modificar o cálculo mensal existente", () => {
+  it("mensal inclui locação após último andamento sem mudar a regra de receita", () => {
     const raw = { ...empty, progress: [{ work_id: 'm', month: '2026-09-30', percent: 100 }], entries: [{ work_id: 'm', category: 'andaimes', entry_date: '2026-10-01', amount: 4515 }] };
     const individual = buildBase(w, raw, '2026-10', '2026-10', opts);
     const accumulated = buildBase(w, raw, '', '2026-10', { ...opts, accumulated: true });
-    expect(individual?.last?.cost).toBe(0);
+    expect(individual?.last?.cost).toBe(4515);
     expect(individual?.last?.revenue).toBe(2000);
     expect(accumulated?.last?.cost).toBe(4515);
     if (!accumulated) throw new Error('Missing base');
     expect(totalMargin(w, accumulated).margin).toBeCloseTo(-2075.1);
+  });
+  it("Amcor concilia os 24 itens com a tabela mesmo com andamento encerrado em setembro", () => {
+    const entries = Array.from({ length: 24 }, (_, i) => ({ work_id: 'm', category: 'andaimes', entry_date: new Date(Date.UTC(2024, 11 + i, 1)).toISOString().slice(0, 10), amount: 4515 }));
+    const raw = { ...empty, entries, progress: [{ work_id: 'm', month: '2026-09-30', percent: 100 }] };
+    const full = buildBase(w, raw, '', '', opts);
+    expect(full?.items.find((item) => item.key === 'andaimes')?.real).toBe(108360);
+    expect(full?.entries).toHaveLength(24);
+    expect(full?.entries.reduce((sum, entry) => sum + entry.amount, 0)).toBe(108360);
+    const october = buildBase(w, raw, '', '2026-10', opts);
+    expect(october?.items.find((item) => item.key === 'andaimes')?.real).toBe(103845);
+    expect(october?.entries).toHaveLength(23);
+    const gaps = buildBase(w, raw, '2026-09', '2026-11', { ...opts, selectedMonths: ['2026-09', '2026-11'] });
+    expect(gaps?.items.find((item) => item.key === 'andaimes')?.real).toBe(9030);
+    expect(gaps?.entries.map((entry) => entry.entry_date)).toEqual(['2026-09-01', '2026-11-01']);
   });
   it("filtra só dados próprios, preservando irmãos/transporte do cliente", () => {
     const raw = { ...empty, allocs: [{ work_id: "a" }, { work_id: "b" }], rdoWf: [{ work_id: "a" }, { work_id: "b" }], entries: [{ work_id: "a", amount: 100 }, { work_id: "b", amount: 200 }], sibAllocs: [{ work_id: "a" }, { work_id: "b" }], vs: [{ work_id: null }] };

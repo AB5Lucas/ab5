@@ -1174,7 +1174,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
               </>
             )}
             {detail && (
-              <EntryList entries={(data.data?.entries ?? []).filter((e: any) => entryItem(e.category) === detail && e.entry_date >= periodStart && e.entry_date <= periodEnd)} />
+              <EntryList entries={(calc?.entries ?? []).filter((e: any) => entryItem(e.category) === detail)} />
             )}
           </div>
         </DialogContent>
