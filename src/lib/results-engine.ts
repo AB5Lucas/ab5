@@ -46,7 +46,7 @@ const RESPLIT_AT = new Map<string, number>();
 
 /** Query-scoped shared inputs: no singleton cache across users or requests. */
 export async function loadResultShared() {
-  const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
+  const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce] = await Promise.all([
     fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
     fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("schedule_id, collaborator_id").in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b)),
     fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
@@ -54,9 +54,10 @@ export async function loadResultShared() {
     supabase.from("driver_bonus_rules").select("*").eq("active", true),
     supabase.from("travel_bonus_rules").select("*").eq("active", true),
     supabase.from("city_distances").select("city_a, city_b, km"),
+    fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date").order("id").range(a, b)),
   ]);
   for (const result of [vtRules, dbRules, tbRules, cityDist]) if (result.error) throw result.error;
-  return { people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist };
+  return { people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce };
 }
 
 export function sliceResultRaw(raw: any, workId: string) {
@@ -108,7 +109,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
       const clientName = (client as any).data?.name as string | undefined;
-      const [sibAllocs, sibRdo, integAppts, integBoxes, clientRdos, supportRows] = await Promise.all([
+      const [sibAllocs, sibRdo, integAppts, integBoxes, clientRdos, supportRows, allRdoWorkforce] = await Promise.all([
         sibIds.length
           ? fetchAll<any>((a, b) =>
               supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
@@ -131,11 +132,12 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           : Promise.resolve([] as any[]),
         fetchAll<any>((a, b) => supabase.from("rdos").select("work_id, report_date").in("work_id", [...new Set([...workIds, ...sibIds])]).range(a, b)),
         w.client_id ? supabase.from("result_support_allocations").select("collaborator_id").eq("client_id", w.client_id) : Promise.resolve({ data: [] }),
+        shared ? Promise.resolve(shared.allRdoWorkforce) : fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date").order("id").range(a, b)),
       ]);
       const supportResult = supportRows as { data: { collaborator_id: string }[] | null; error?: unknown };
       if (supportResult.error) throw supportResult.error;
       return {
-        clientRdos, supportIds: (supportResult.data ?? []).map((r) => r.collaborator_id),
+        clientRdos, otherClientRdos: allRdoWorkforce.filter((r: any) => ![...workIds, ...sibIds].includes(r.work_id)), supportIds: (supportResult.data ?? []).map((r) => r.collaborator_id),
         allocs,
         sibAllocs,
         sibRdo,
@@ -237,10 +239,11 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const rdoKey = new Map<string, any>(
       [...(raw.sibRdo ?? []), ...raw.rdoWf].filter((r: any) => r.collaborator_id).map((r: any) => [`${r.collaborator_id}|${r.report_date}`, r]),
     );
-    const clientRdoDays = new Set<string>([...(raw.clientRdos ?? []), ...(raw.sibRdo ?? []), ...raw.rdoWf].map((r: any) => String(r.report_date).slice(0, 10)));
-    const hoursOf = (key: string) => resultHours(rdoKey.get(key), clientRdoDays.has(key.split("|")[1] ?? ""));
+    const workRdoDays = new Set<string>([...(raw.clientRdos ?? []), ...(raw.sibRdo ?? []), ...raw.rdoWf].map((r: any) => `${r.work_id}|${String(r.report_date).slice(0, 10)}`));
+    const elsewhere = new Set<string>((raw.otherClientRdos ?? []).map((r: any) => `${r.collaborator_id}|${r.report_date}`));
+    const hoursOf = (key: string, workId: string) => resultHours(rdoKey.get(key), workRdoDays.has(`${workId}|${key.split("|")[1] ?? ""}`), elsewhere.has(key));
     const supportIds = new Set<string>(raw.supportIds ?? []);
-    const weights = supportDailyWeights(raw.sibAllocs ?? [], [...(raw.sibRdo ?? []), ...raw.rdoWf], raw.clientRdos ?? [], supportIds);
+    const weights = supportDailyWeights(raw.sibAllocs ?? [], [...(raw.sibRdo ?? []), ...raw.rdoWf], raw.clientRdos ?? [], supportIds, raw.otherClientRdos ?? []);
     const sourceAllocs = [...d.allocs, ...(raw.sibAllocs ?? []).filter((a: any) => supportIds.has(a.collaborator_id) && !idSet.has(a.work_id) && okDate(a.daily_schedules?.schedule_date))];
     const fraction = (a: any, dt: string) => supportIds.has(a.collaborator_id) ? supportShare(weights, dt, a.work_id, idSet) : 1;
     const missingRdo: { id: string; workId: string; date: string; name: string; hours: number; removedHours: number; removedCost: number }[] = [];
@@ -320,14 +323,14 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const date = a.daily_schedules?.schedule_date as string | undefined;
       if (!date || (!supportIds.has(a.collaborator_id) && unsplit(date))) continue;
       const key = `${a.collaborator_id}|${date}`;
-      if (!rdoKey.has(key) && clientRdoDays.has(date) && idSet.has(a.work_id) && !missingSeen.has(key)) {
+      if (!rdoKey.has(key) && !elsewhere.has(key) && workRdoDays.has(`${a.work_id}|${date}`) && idSet.has(a.work_id) && !missingSeen.has(key)) {
         missingSeen.add(key);
         missingRdo.push({ id: a.collaborator_id, workId: a.work_id, date, name: d.people.find((p: any) => p.id === a.collaborator_id)?.full_name ?? "—", hours: 0, removedHours: DEFAULT_HOURS, removedCost: laborCost(DEFAULT_HOURS, rate.get(a.collaborator_id) ?? 0, pj.has(a.collaborator_id), date, hol, 0, noPrem.has(a.collaborator_id)) });
       }
       if (seen.has(key)) continue;
       seen.add(key);
       if (supportIds.has(a.collaborator_id) && !weights.get(date)?.size && idSet.has(a.work_id)) supportNoActivity.push({ id: a.collaborator_id, date, workId: a.work_id });
-      const hours = hoursOf(key);
+      const hours = hoursOf(key, a.work_id);
       if (hours > 0) charge(a.collaborator_id, date, hours, fraction(a, date));
     }
     // Pessoa presente no RDO sem escalação em nenhum serviço do cliente: não gera MO em serviço algum
@@ -371,7 +374,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const vtByDate = new Map<string, { people: number; cost: number }>();
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date || (!rdoKey.has(`${a.collaborator_id}|${date}`) && clientRdoDays.has(date)) || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      if (!date || (!rdoKey.has(`${a.collaborator_id}|${date}`) && hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0) || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
@@ -407,7 +410,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       for (const a of raw.sibAllocs ?? []) {
         const dt = a.daily_schedules?.schedule_date as string | undefined;
         if (!dt || !a.work_id || seen.has(`${a.work_id}|${a.collaborator_id}|${dt}`)) continue;
-        addH(a.work_id, dt, hoursOf(`${a.collaborator_id}|${dt}`));
+        addH(a.work_id, dt, hoursOf(`${a.collaborator_id}|${dt}`, a.work_id));
       }
       const shareOf = (date: string) => {
         const m = date.slice(0, 7);
@@ -483,7 +486,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       if (travelSeen.has(key)) continue;
       travelSeen.add(key);
       const r = rdoKey.get(key);
-      if ((r && !r.present) || (!r && clientRdoDays.has(date))) continue;
+      if ((r && !r.present) || (!r && hoursOf(key, a.work_id) <= 0)) continue;
       const p = person.get(a.collaborator_id);
       const travelOn = a.travel_bonus_override ?? ((travelWorkMap.get(`${a.schedule_id}|${a.work_id}`) ?? (d.tbRules ?? []).some((x: any) => inRule(x, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0)))));
       if (!travelOn) continue;

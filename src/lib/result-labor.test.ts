@@ -9,7 +9,7 @@ const calc = (raw: any, id = "a") => buildBase(works.find((w) => w.id === id), s
 describe("escala sem linha no RDO existente", () => {
   it("Marcelo em 27–30/10: remove 32h e respectivos custos/VT/prêmio", () => {
     const allocs = [27, 28, 29, 30].map((d) => alloc("marcelo", "a", `2026-10-${d}`));
-    const raw = { ...empty, allocs, sibAllocs: allocs, people: [{ id: "marcelo", full_name: "Marcelo", salary: 10 }], clientRdos: allocs.map((a) => ({ work_id: "b", report_date: a.daily_schedules.schedule_date })), vtRules: [{ amount: 5, applies_to_collaborators: true }], tbRules: [{ bonus_amount: 25, minimum_distance: 0, maximum_distance: null }] };
+    const raw = { ...empty, allocs, sibAllocs: allocs, people: [{ id: "marcelo", full_name: "Marcelo", salary: 10 }], clientRdos: allocs.map((a) => ({ work_id: "a", report_date: a.daily_schedules.schedule_date })), vtRules: [{ amount: 5, applies_to_collaborators: true }], tbRules: [{ bonus_amount: 25, minimum_distance: 0, maximum_distance: null }] };
     const b = calc(raw);
     expect(b?.tot.labor).toBe(0);
     expect(b?.vtTotal).toBe(0);
@@ -17,10 +17,19 @@ describe("escala sem linha no RDO existente", () => {
     expect(b?.missingRdo.reduce((s, r) => s + r.removedHours, 0)).toBe(32);
     expect(b?.missingRdo.reduce((s, r) => s + r.removedCost, 0)).toBe(832);
   });
-  it("mantém 8h exclusivamente sem RDO do cliente", () => { expect(resultHours(null, false)).toBe(8); expect(resultHours(null, true)).toBe(0); expect(resultHours({ present: false, worked_hours: 8 }, true)).toBe(0); });
+  it("serviço sem RDO mantém 8h, MO, VT e prêmio mesmo com RDO de serviço irmão", () => {
+    const a = alloc("p", "a");
+    const b = calc({ ...empty, allocs: [a], sibAllocs: [a], clientRdos: [{ work_id: "b", report_date: "2026-10-27" }], people: [{ id: "p", salary: 10 }], vtRules: [{ amount: 5, applies_to_collaborators: true }], tbRules: [{ bonus_amount: 25, minimum_distance: 0, maximum_distance: null }] });
+    expect(b?.laborRows[0]?.hours).toBe(8); expect(b?.tot.labor).toBe(208); expect(b?.vtTotal).toBe(5); expect(b?.travelTotal).toBe(25); expect(b?.missingRdo).toHaveLength(0);
+  });
+  it("RDO de outro cliente zera MO/VT/prêmio aqui sem alerta de ausência no próprio serviço", () => {
+    const a = alloc("p", "a");
+    const b = calc({ ...empty, allocs: [a], sibAllocs: [a], otherClientRdos: [{ work_id: "outro", collaborator_id: "p", report_date: "2026-10-27" }], people: [{ id: "p", salary: 10 }], vtRules: [{ amount: 5, applies_to_collaborators: true }], tbRules: [{ bonus_amount: 25, minimum_distance: 0, maximum_distance: null }] });
+    expect(b?.tot.labor).toBe(0); expect(b?.vtTotal).toBe(0); expect(b?.travelTotal).toBe(0); expect(b?.missingRdo).toHaveLength(0);
+  });
   it("linha presente em RDO de serviço irmão prevalece", () => {
     const a = alloc("p", "a");
-    expect(calc({ ...empty, allocs: [a], sibAllocs: [a], people: [{ id: "p", salary: 10 }], sibRdo: [{ work_id: "b", collaborator_id: "p", report_date: "2026-10-27", present: true, worked_hours: 6 }] })?.tot.labor).toBe(156);
+    expect(calc({ ...empty, allocs: [a], sibAllocs: [a], people: [{ id: "p", salary: 10 }], otherClientRdos: [{ work_id: "outro", collaborator_id: "p", report_date: "2026-10-27" }], sibRdo: [{ work_id: "b", collaborator_id: "p", report_date: "2026-10-27", present: true, worked_hours: 6 }] })?.tot.labor).toBe(156);
   });
 });
 describe("margem sem receita", () => {
