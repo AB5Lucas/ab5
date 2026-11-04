@@ -16,4 +16,4 @@
 - [x] Alocações: restaurar fonte preta nos links de cliente, serviço e horas, mantendo abertura dos detalhes.
 - [x] Compras ABCOM003: inspecionar arquivo real e mapear cabeçalhos.
 - [x] Compras ABCOM003: corrigir leitura de valor total, quantidade, descrição e data; testar sem alterar rateio.
-- [ ] Compras ABCOM003: reprocessar meses e conferir totais e direcionamentos manuais.
+- [x] Compras ABCOM003: reprocessar meses e conferir totais e direcionamentos manuais (outubro: R$ 1.245.937,40; 43 CC; sem divergências nos lançamentos).
