@@ -3124,6 +3124,39 @@ export type Database = {
           },
         ]
       }
+      result_support_allocations: {
+        Row: {
+          client_id: string
+          collaborator_id: string
+          created_at: string
+        }
+        Insert: {
+          client_id: string
+          collaborator_id: string
+          created_at?: string
+        }
+        Update: {
+          client_id?: string
+          collaborator_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "result_support_allocations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "result_support_allocations_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_page_access: {
         Row: {
           allowed: boolean
