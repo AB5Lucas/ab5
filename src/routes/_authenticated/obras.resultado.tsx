@@ -184,7 +184,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     // Geral do cliente com serviços mensais: média simples da margem total dos serviços mensais que têm pedido
     if (isAll && data.data) {
       const svcs = (works.data ?? []).filter((x: any) => workIds.includes(x.id));
-      const mensais = svcs.filter((x: any) => x.monthly_enabled && (Array.isArray(x.orders) ? x.orders : []).some((o: any) => o?.date));
+      const mensais = svcs.filter((x: any) => x.monthly_enabled);
       if (mensais.length) {
         const raw: any = data.data;
         const res = mensais.map((s: any) => {
