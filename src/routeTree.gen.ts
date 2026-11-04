@@ -63,6 +63,7 @@ import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_a
 import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
 import { Route as AuthenticatedVeiculosTransporteRouteImport } from './routes/_authenticated/veiculos.transporte'
 import { Route as ApiPublicJobsBillingSyncRouteImport } from './routes/api/public/jobs/billing-sync'
+import { Route as ApiPublicJobsRecurringEntriesRouteImport } from './routes/api/public/jobs/recurring-entries'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -378,6 +379,12 @@ const ApiPublicJobsBillingSyncRoute =
     path: '/api/public/jobs/billing-sync',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicJobsRecurringEntriesRoute =
+  ApiPublicJobsRecurringEntriesRouteImport.update({
+    id: '/api/public/jobs/recurring-entries',
+    path: '/api/public/jobs/recurring-entries',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -433,6 +440,7 @@ export interface FileRoutesByFullPath {
   '/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos/': typeof AuthenticatedVeiculosIndexRoute
   '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
+  '/api/public/jobs/recurring-entries': typeof ApiPublicJobsRecurringEntriesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -488,6 +496,7 @@ export interface FileRoutesByTo {
   '/relatorios': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos': typeof AuthenticatedVeiculosIndexRoute
   '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
+  '/api/public/jobs/recurring-entries': typeof ApiPublicJobsRecurringEntriesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -545,6 +554,7 @@ export interface FileRoutesById {
   '/_authenticated/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/_authenticated/veiculos/': typeof AuthenticatedVeiculosIndexRoute
   '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
+  '/api/public/jobs/recurring-entries': typeof ApiPublicJobsRecurringEntriesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -602,6 +612,7 @@ export interface FileRouteTypes {
     | '/relatorios/'
     | '/veiculos/'
     | '/api/public/jobs/billing-sync'
+    | '/api/public/jobs/recurring-entries'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -657,6 +668,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/veiculos'
     | '/api/public/jobs/billing-sync'
+    | '/api/public/jobs/recurring-entries'
   id:
     | '__root__'
     | '/'
@@ -713,6 +725,7 @@ export interface FileRouteTypes {
     | '/_authenticated/relatorios/'
     | '/_authenticated/veiculos/'
     | '/api/public/jobs/billing-sync'
+    | '/api/public/jobs/recurring-entries'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -721,6 +734,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiPublicJobsBillingSyncRoute: typeof ApiPublicJobsBillingSyncRoute
+  ApiPublicJobsRecurringEntriesRoute: typeof ApiPublicJobsRecurringEntriesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1103,6 +1117,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicJobsBillingSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs/recurring-entries': {
+      id: '/api/public/jobs/recurring-entries'
+      path: '/api/public/jobs/recurring-entries'
+      fullPath: '/api/public/jobs/recurring-entries'
+      preLoaderRoute: typeof ApiPublicJobsRecurringEntriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1233,6 +1254,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiPublicJobsBillingSyncRoute: ApiPublicJobsBillingSyncRoute,
+  ApiPublicJobsRecurringEntriesRoute: ApiPublicJobsRecurringEntriesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

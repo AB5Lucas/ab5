@@ -39,5 +39,5 @@
 - [x] 200 testes aprovados; telas autenticadas de Resultados, cadastro de apoio e Fechamento conferidas; relatórios nominal e planilha de outubro entregues.
 - [x] Restringir Escalado sem RDO ao próprio serviço, bloquear RDO de outro cliente e manter 8h em serviço sem RDO; Marcelo 27–30/10 confirmado na tela autenticada.
 - [x] Outubro comparado nos mesmos 93 serviços: 345→111 casos zerados, 2672→864h, MO removida R$113443,26→R$39405,10; relatórios v2 nominal e XLSX conferidos; 40 testes em 9 arquivos, receita/margem/apoio preservados.
-- [ ] Criar recorrências mensais gerenciáveis, geração agendada/ao abrir e adoção sem duplicatas; Amcor 24 lançamentos até novembro.
-- [ ] Corrigir apenas margem acumulada mensal para todos os custos, verificar telas/testes e reportar Amcor/demais mensais.
+- [x] Recorrências gerenciáveis, geração ao abrir e rotina mensal cadastrada (novo endereço exige publicação); Amcor 22 manuais adotados + outubro/novembro = 24 meses/R$108360, sem duplicatas concorrentes.
+- [x] Margem acumulada mensal usa todo histórico até mês final, sem corte pelo andamento; cálculo individual/receita preservados. Amcor outubro R$118822,18/35,20%, novembro R$114307,18/33,86%; 31 mensais auditados, 5 outros alterados; relatórios MD/XLSX e 34 testes aprovados, telas desktop/mobile verificadas.

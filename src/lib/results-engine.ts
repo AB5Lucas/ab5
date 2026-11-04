@@ -67,6 +67,8 @@ export function sliceResultRaw(raw: any, workId: string) {
 /** Carrega os dados brutos de um serviço (ou de vários, em "Todos os serviços"). */
 export async function loadWorkData(work: any, workIds: string[], canWrite: boolean, shared?: Awaited<ReturnType<typeof loadResultShared>>): Promise<any> {
       const w = work;
+      const generated = await supabase.rpc("generate_recurring_entries", { _work_ids: workIds });
+      if (generated.error) throw generated.error;
       // Rateios vigentes: refaz pelas horas atuais (inclui serviços novos com horas no mês)
       if (canWrite && w.client_id && Date.now() - (RESPLIT_AT.get(w.client_id) ?? 0) > 5 * 60_000) {
         RESPLIT_AT.set(w.client_id, Date.now());
@@ -169,7 +171,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       };
 }
 
-export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[]; selectedMonths?: readonly string[] };
+export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[]; selectedMonths?: readonly string[]; accumulated?: boolean };
 
 /** Contrato: work_id → último dia do mês do último faturamento (custos depois disso não entram). */
 export function contractCutoffs(work: any, entries: any[], isAll: boolean, allWorks?: any[]) {
@@ -209,7 +211,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         const dt = String(p.month).slice(0, 10);
         if (untilMonth && dt > monthEnd(untilMonth)) continue;
         const w = byId.get(p.work_id);
-        if (!w || w.contract_enabled || w.hh_enabled || contractCut.has(p.work_id)) continue;
+        if (!w || w.contract_enabled || w.hh_enabled || (opts.accumulated && w.monthly_enabled) || contractCut.has(p.work_id)) continue;
         if (dt > (lastProg.get(p.work_id) ?? "")) lastProg.set(p.work_id, dt);
       }
       for (const [k, dt] of lastProg) contractCut.set(k, dt);
@@ -728,9 +730,8 @@ export function totalMargin(work: any, full: NonNullable<ReturnType<typeof build
   if (work.monthly_enabled) {
     const lastMonth = full.last.ym;
     const list = ((Array.isArray(work.orders) ? work.orders : []) as any[]).filter((o) => o.date && String(o.date).slice(0, 7) <= lastMonth);
-    const months = new Set(list.map((o) => String(o.date).slice(0, 7)));
     const revenue = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
-    const cost = full.rows.filter((r) => months.has(r.ym)).reduce((a, r) => a + r.monthCost, 0);
+    const cost = full.last.cost;
     const margin = revenue * (1 - TAX_RATE) - cost;
     return { margin, pct: marginPercent(margin, revenue) };
   }

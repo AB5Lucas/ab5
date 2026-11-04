@@ -1,12 +1,13 @@
 import { marginPercent, meanMarginPercent } from "@/lib/result-labor";
 import { MarginPercent } from "@/components/margin-percent";
 import { ResultSupport } from "@/components/result-support";
+import { ResultRecurrences } from "@/components/result-recurrences";
 import { contractFraction } from "@/lib/contract";
 import { resultWorksForRole } from "@/lib/result-work-access";
 import { isResultMonth } from "@/lib/result-period";
 import { displayedBudgetItems } from "@/lib/result-budget";
 import { filterPurchaseEntries } from "@/lib/purchase-policy";
-import { loadWorkData, buildBase as engineBuildBase, fetchAll, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, bdiBudget, BDI_RATE, type ItemKey } from "@/lib/results-engine";
+import { loadWorkData, buildBase as engineBuildBase, fetchAll, totalMargin, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, bdiBudget, BDI_RATE, type ItemKey } from "@/lib/results-engine";
 import { resplitClient, splitDesc } from "@/lib/resplit";
 import { Switch } from "@/components/ui/switch";
 import { useEffect, useMemo, useState } from "react";
@@ -15,7 +16,7 @@ import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Trash2, Plus, Pencil, Check, X, CalendarDays, Download } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X, CalendarDays, Download, Repeat2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -183,8 +184,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     // Geral do cliente com serviços mensais: média simples da margem total dos serviços mensais que têm pedido
     if (isAll && data.data) {
       const svcs = (works.data ?? []).filter((x: any) => workIds.includes(x.id));
-      const mensais = svcs.filter((x: any) => x.monthly_enabled && (Array.isArray(x.orders) ? x.orders : []).some((o: any) => o?.date));
-      const inP = (ym: string) => isResultMonth(ym, fromMonth, untilMonth, selectedMonths);
+      const mensais = svcs.filter((x: any) => x.monthly_enabled);
       if (mensais.length) {
         const raw: any = data.data;
         const res = mensais.map((s: any) => {
@@ -196,14 +196,8 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
             entries: (raw.entries ?? []).filter((e: any) => e.work_id === s.id),
             progress: (raw.progress ?? []).filter((p: any) => p.work_id === s.id),
           };
-          const b = engineBuildBase(s, sub, "", "", { isAll: false, workIds: [s.id], holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [] });
-          const list = (s.orders as any[]).filter((o) => o?.date && inP(String(o.date).slice(0, 7)));
-          if (!list.length) return null;
-          const months = new Set(list.map((o) => String(o.date).slice(0, 7)));
-          const revenue = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
-          const cost = (b?.rows ?? []).filter((r: any) => months.has(String(r.ym).slice(0, 7))).reduce((a: number, r: any) => a + Number(r.monthCost ?? 0), 0);
-          const margin = revenue * (1 - TAX_RATE) - cost;
-          return { margin, pct: marginPercent(margin, revenue) };
+          const b = engineBuildBase(s, sub, "", untilMonth, { isAll: false, workIds: [s.id], holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], accumulated: true });
+          return b?.last ? totalMargin(s, b) : null;
         }).filter(Boolean) as { margin: number; pct: number | null }[];
         if (res.length) return {
           margin: res.reduce((a, r) => a + r.margin, 0),
@@ -213,17 +207,10 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     }
     const mensal = !isAll && w?.monthly_enabled;
     if (!hasPeriod && !mensal) return null;
-    const b = buildBase("", "");
+    const b = engineBuildBase(work, data.data, "", untilMonth, { isAll, workIds, holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], accumulated: true });
     if (!b?.last) return null;
     if (!isAll && w?.monthly_enabled) {
-      // Mensal: só meses com pedido entram (receita = pedidos, custo = custos desses meses)
-      const list = ((Array.isArray(w.orders) ? w.orders : []) as any[]).filter((o) => !selectedMonths.length || (o.date && isResultMonth(String(o.date).slice(0, 7), fromMonth, untilMonth, selectedMonths)));
-      const months = new Set(list.filter((o) => o.date).map((o) => String(o.date).slice(0, 7)));
-      if (!months.size) return null;
-      const revenue = list.filter((o) => o.date).reduce((a, o) => a + Number(o.value ?? 0), 0);
-      const cost = b.rows.filter((r: any) => months.has(String(r.ym).slice(0, 7))).reduce((a: number, r: any) => a + Number(r.monthCost ?? 0), 0);
-      const margin = revenue * (1 - TAX_RATE) - cost;
-      return { margin, pct: marginPercent(margin, revenue) };
+      return totalMargin(w, b);
     }
     const margin = b.last.revenue * (1 - TAX_RATE) - b.last.cost;
     return { margin, pct: marginPercent(margin, b.last.revenue) };
@@ -425,6 +412,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   const [progPct, setProgPct] = useState("");
   const [entry, setEntry] = useState({ date: new Date().toISOString().slice(0, 10), category: "materiais", description: "", amount: "", competence: "" });
   const [compOpen, setCompOpen] = useState(false);
+  const [recurrenceSeed, setRecurrenceSeed] = useState<any>(null);
   // Serviços fora do rateio no resultado geral (por padrão todos participam)
   const [splitOff, setSplitOff] = useState<string[]>([]);
   const [dlg, setDlg] = useState<null | "cliente" | "orcamento" | "andamento" | "lancamentos" | "faturamentos">(null);
@@ -1408,6 +1396,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
           <DialogHeader>
             <DialogTitle>{isBilling ? "Faturamentos" : "Lançamentos"}</DialogTitle>
           </DialogHeader>
+          {!isBilling && <ResultRecurrences key={recurrenceSeed?.id ?? 'recurrences'} workIds={workIds} seed={recurrenceSeed} clearSeed={() => setRecurrenceSeed(null)} onChanged={invalidate} />}
           {isAll && !isBilling && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">O valor será rateado entre os serviços selecionados, proporcional às horas trabalhadas em cada um.</p>
@@ -1483,6 +1472,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                     <TableCell>{e.description ?? "—"}</TableCell>
                     <TableCell className="text-right">{brl(Number(e.amount))}</TableCell>
                     <TableCell className="w-20 whitespace-nowrap">
+                      {!isBilling && !e.recurrence_id && !e.sync_note_id && !e.purchase_cc_id && !e.industry_order_id && !e.industry_invoice_id && !e.split_group && <Button variant="ghost" size="icon" title="Tornar recorrente" aria-label="Tornar recorrente" onClick={() => setRecurrenceSeed(e)}><Repeat2 className="size-4" /></Button>}
                       <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => {
                         setEditingId(e.id);
                         setCompOpen(!!e.doc_date);
