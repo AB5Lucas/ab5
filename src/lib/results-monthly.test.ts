@@ -62,6 +62,16 @@ describe("lotes financeiros preservam contexto e custos por serviço", () => {
     if (!full) throw new Error('Missing base');
     expect(totalMargin(work, full)).toEqual({ margin: -100, pct: null });
   });
+  it("acumulado inclui locação após último andamento sem modificar o cálculo mensal existente", () => {
+    const raw = { ...empty, progress: [{ work_id: 'm', month: '2026-09-30', percent: 100 }], entries: [{ work_id: 'm', category: 'andaimes', entry_date: '2026-10-01', amount: 4515 }] };
+    const individual = buildBase(w, raw, '2026-10', '2026-10', opts);
+    const accumulated = buildBase(w, raw, '', '2026-10', { ...opts, accumulated: true });
+    expect(individual?.last?.cost).toBe(0);
+    expect(individual?.last?.revenue).toBe(2000);
+    expect(accumulated?.last?.cost).toBe(4515);
+    if (!accumulated) throw new Error('Missing base');
+    expect(totalMargin(w, accumulated).margin).toBeCloseTo(-2075.1);
+  });
   it("filtra só dados próprios, preservando irmãos/transporte do cliente", () => {
     const raw = { ...empty, allocs: [{ work_id: "a" }, { work_id: "b" }], rdoWf: [{ work_id: "a" }, { work_id: "b" }], entries: [{ work_id: "a", amount: 100 }, { work_id: "b", amount: 200 }], sibAllocs: [{ work_id: "a" }, { work_id: "b" }], vs: [{ work_id: null }] };
     const a = sliceResultRaw(raw, "a");

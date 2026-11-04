@@ -171,7 +171,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       };
 }
 
-export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[]; selectedMonths?: readonly string[] };
+export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[]; selectedMonths?: readonly string[]; accumulated?: boolean };
 
 /** Contrato: work_id → último dia do mês do último faturamento (custos depois disso não entram). */
 export function contractCutoffs(work: any, entries: any[], isAll: boolean, allWorks?: any[]) {
@@ -211,7 +211,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         const dt = String(p.month).slice(0, 10);
         if (untilMonth && dt > monthEnd(untilMonth)) continue;
         const w = byId.get(p.work_id);
-        if (!w || w.contract_enabled || w.hh_enabled || contractCut.has(p.work_id)) continue;
+        if (!w || w.contract_enabled || w.hh_enabled || (opts.accumulated && w.monthly_enabled) || contractCut.has(p.work_id)) continue;
         if (dt > (lastProg.get(p.work_id) ?? "")) lastProg.set(p.work_id, dt);
       }
       for (const [k, dt] of lastProg) contractCut.set(k, dt);

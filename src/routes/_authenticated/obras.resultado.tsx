@@ -196,7 +196,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
             entries: (raw.entries ?? []).filter((e: any) => e.work_id === s.id),
             progress: (raw.progress ?? []).filter((p: any) => p.work_id === s.id),
           };
-          const b = engineBuildBase(s, sub, "", untilMonth, { isAll: false, workIds: [s.id], holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [] });
+          const b = engineBuildBase(s, sub, "", untilMonth, { isAll: false, workIds: [s.id], holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], accumulated: true });
           return b?.last ? totalMargin(s, b) : null;
         }).filter(Boolean) as { margin: number; pct: number | null }[];
         if (res.length) return {
@@ -207,7 +207,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     }
     const mensal = !isAll && w?.monthly_enabled;
     if (!hasPeriod && !mensal) return null;
-    const b = engineBuildBase(work, data.data, "", untilMonth, { isAll, workIds, holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [] });
+    const b = engineBuildBase(work, data.data, "", untilMonth, { isAll, workIds, holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], accumulated: true });
     if (!b?.last) return null;
     if (!isAll && w?.monthly_enabled) {
       return totalMargin(w, b);

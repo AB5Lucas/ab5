@@ -140,7 +140,7 @@ function FinanceiroPage() {
       const progress = progressUntil(w, full, lastYm);
       const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
       const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as Line[] };
-      const upto = buildBase(w, raw, "", lastYm, { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [] }) ?? full;
+      const upto = buildBase(w, raw, "", lastYm, { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [], accumulated: true }) ?? full;
       // Margem total usa todo o histórico até o último mês; margem do período permanece inalterada.
       const total = totalMargin(w, upto);
       g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: marginPercent(margin, compBilled), total, full, raw });
