@@ -14,6 +14,6 @@
 - [x] Serviços: indicador de clientes com efetivo não distribuído e mais de um serviço ativo.
 - [x] Serviços: ponto vermelho sem número para clientes com efetivo ainda não distribuído, sem contar serviços vazios; validar regra e tela.
 - [x] Alocações: restaurar fonte preta nos links de cliente, serviço e horas, mantendo abertura dos detalhes.
-- [ ] Compras ABCOM003: inspecionar arquivo real e mapear cabeçalhos.
-- [ ] Compras ABCOM003: corrigir leitura de valor total, quantidade, descrição e data; testar sem alterar rateio.
+- [x] Compras ABCOM003: inspecionar arquivo real e mapear cabeçalhos.
+- [x] Compras ABCOM003: corrigir leitura de valor total, quantidade, descrição e data; testar sem alterar rateio.
 - [ ] Compras ABCOM003: reprocessar meses e conferir totais e direcionamentos manuais.

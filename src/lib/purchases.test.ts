@@ -34,7 +34,7 @@ describe("leitura ABCOM003", () => {
   });
   it("lê data serial do Excel na coluna identificada", () => {
     const result = parsePurchaseReport([["Código", "Descrição", "Quantidade", "Valor Total", "Data"], ["Centro Custo:", "2118001"], ["MF02219", "EXAUSTOR", 1, 2600, 46300]]);
-    expect(result[0]?.items[0]?.date).toBe("2026-10-06");
+    expect(result[0]?.items[0]?.date).toBe("2026-10-05");
   });
   it("falha sem cabeçalho financeiro em vez de usar a quantidade", () => {
     expect(() => parsePurchaseReport([realHeader[0] ?? [], realHeader[1] ?? [], realRow({ 2: "MF02219", 5: "EXAUSTOR", 12: 1, 17: 2600 })])).toThrow(/cabeçalho Quantidade e Valor Total não encontrado/);
