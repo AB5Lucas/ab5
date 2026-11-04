@@ -2553,15 +2553,70 @@ export type Database = {
           },
         ]
       }
+      purchase_asset_decisions: {
+        Row: {
+          category: string
+          decided_amount: number
+          decided_by: string | null
+          id: string
+          is_asset: boolean
+          item_key: string
+          mode: string
+          monthly_amount: number | null
+          months: number
+          purchase_cc_id: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          decided_amount?: number
+          decided_by?: string | null
+          id?: string
+          is_asset?: boolean
+          item_key: string
+          mode?: string
+          monthly_amount?: number | null
+          months?: number
+          purchase_cc_id: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          decided_amount?: number
+          decided_by?: string | null
+          id?: string
+          is_asset?: boolean
+          item_key?: string
+          mode?: string
+          monthly_amount?: number | null
+          months?: number
+          purchase_cc_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_asset_decisions_purchase_cc_id_fkey"
+            columns: ["purchase_cc_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_cc_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_cc_lines: {
         Row: {
           amount: number
           cc_code: string
           cc_name: string | null
           directed_by: string | null
+          effective_cc: string | null
+          excluded_amount: number
           file_path: string | null
           id: string
+          item_states: Json
           items: Json
+          launched_amount: number
+          pending_amount: number
           reason: string | null
           ref_month: string
           status: string
@@ -2574,9 +2629,14 @@ export type Database = {
           cc_code: string
           cc_name?: string | null
           directed_by?: string | null
+          effective_cc?: string | null
+          excluded_amount?: number
           file_path?: string | null
           id?: string
+          item_states?: Json
           items?: Json
+          launched_amount?: number
+          pending_amount?: number
           reason?: string | null
           ref_month: string
           status?: string
@@ -2589,9 +2649,14 @@ export type Database = {
           cc_code?: string
           cc_name?: string | null
           directed_by?: string | null
+          effective_cc?: string | null
+          excluded_amount?: number
           file_path?: string | null
           id?: string
+          item_states?: Json
           items?: Json
+          launched_amount?: number
+          pending_amount?: number
           reason?: string | null
           ref_month?: string
           status?: string
@@ -2615,6 +2680,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      purchase_cc_redirects: {
+        Row: {
+          active: boolean
+          id: string
+          source_cc: string
+          target_cc: string
+        }
+        Insert: {
+          active?: boolean
+          id?: string
+          source_cc: string
+          target_cc: string
+        }
+        Update: {
+          active?: boolean
+          id?: string
+          source_cc?: string
+          target_cc?: string
+        }
+        Relationships: []
+      }
+      purchase_exclusion_rules: {
+        Row: {
+          active: boolean
+          id: string
+          match_type: string
+          reason: string
+          value: string
+        }
+        Insert: {
+          active?: boolean
+          id?: string
+          match_type: string
+          reason: string
+          value: string
+        }
+        Update: {
+          active?: boolean
+          id?: string
+          match_type?: string
+          reason?: string
+          value?: string
+        }
+        Relationships: []
       }
       rdo_media: {
         Row: {
@@ -4203,6 +4313,7 @@ export type Database = {
           industry_part: string | null
           industry_part_ref: string | null
           purchase_cc_id: string | null
+          purchase_item_key: string | null
           split_group: string | null
           split_note: string | null
           split_total: number | null
@@ -4225,6 +4336,7 @@ export type Database = {
           industry_part?: string | null
           industry_part_ref?: string | null
           purchase_cc_id?: string | null
+          purchase_item_key?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
@@ -4247,6 +4359,7 @@ export type Database = {
           industry_part?: string | null
           industry_part_ref?: string | null
           purchase_cc_id?: string | null
+          purchase_item_key?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
