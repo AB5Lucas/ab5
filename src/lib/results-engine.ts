@@ -60,7 +60,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, position_id, collaborators(position_id), rdos(shift)").in("work_id", workIds).range(a, b),
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
-        supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", workIds).order("entry_date", { ascending: false }),
+        fetchAll<any>((a, b) => supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", workIds).order("entry_date", { ascending: false }).order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
         w.client_id ? supabase.from("works").select("id, monthly_enabled, night_shift").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
@@ -119,7 +119,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         rdoWf,
         progress: progress.data ?? [],
         // Faturamento com mês de competência: cálculos usam a competência; doc_date guarda a data real
-        entries: activeFinancialEntries(entries.data ?? []).map((e: any) =>
+        entries: activeFinancialEntries(entries).map((e: any) =>
           e.category === "faturamento" && e.competence_month && e.competence_month !== String(e.entry_date).slice(0, 7)
             ? { ...e, doc_date: e.entry_date, entry_date: `${e.competence_month}-01` }
             : e,
