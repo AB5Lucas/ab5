@@ -60,7 +60,7 @@ export async function loadResultShared() {
 }
 
 export function sliceResultRaw(raw: any, workId: string) {
-  return { ...raw, allocs: raw.allocs.filter((r: any) => r.work_id === workId), rdoWf: raw.rdoWf.filter((r: any) => r.work_id === workId), progress: raw.progress.filter((r: any) => r.work_id === workId), entries: raw.entries.filter((r: any) => r.work_id === workId), workTravelRows: raw.workTravelRows.filter((r: any) => r.work_id === workId) };
+  return { ...raw, clientWorkTravelRows: raw.clientWorkTravelRows ?? raw.workTravelRows, allocs: raw.allocs.filter((r: any) => r.work_id === workId), rdoWf: raw.rdoWf.filter((r: any) => r.work_id === workId), progress: raw.progress.filter((r: any) => r.work_id === workId), entries: raw.entries.filter((r: any) => r.work_id === workId), workTravelRows: raw.workTravelRows.filter((r: any) => r.work_id === workId) };
 }
 
 /** Carrega os dados brutos de um serviço (ou de vários, em "Todos os serviços"). */
@@ -157,6 +157,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         client: (client as any).data,
         workVt,
         workTravelRows,
+        clientWorkTravelRows: workTravelRows,
         noVtRows,
         leaves,
         vtRules: vtRules.data ?? [],
@@ -370,7 +371,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const vtByDate = new Map<string, { people: number; cost: number }>();
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date || hoursOf(`${a.collaborator_id}|${date}`) <= 0 || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      if (!date || (!rdoKey.has(`${a.collaborator_id}|${date}`) && clientRdoDays.has(date)) || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
@@ -474,7 +475,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const distFor = buildDistanceLookup(d.cityDist ?? []);
     const travelByDate = new Map<string, { people: number; cost: number }>();
     const travelSeen = new Set<string>();
-    const travelWorkMap = new Map<string, boolean>((d.workTravelRows ?? []).map((v: any) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
+    const travelWorkMap = new Map<string, boolean>((raw.clientWorkTravelRows ?? d.workTravelRows ?? []).map((v: any) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
       if (!date || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
@@ -482,7 +483,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       if (travelSeen.has(key)) continue;
       travelSeen.add(key);
       const r = rdoKey.get(key);
-      if (hoursOf(key) <= 0) continue;
+      if ((r && !r.present) || (!r && clientRdoDays.has(date))) continue;
       const p = person.get(a.collaborator_id);
       const travelOn = a.travel_bonus_override ?? ((travelWorkMap.get(`${a.schedule_id}|${a.work_id}`) ?? (d.tbRules ?? []).some((x: any) => inRule(x, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0)))));
       if (!travelOn) continue;
