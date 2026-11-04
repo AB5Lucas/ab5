@@ -2,6 +2,7 @@ import { contractFraction } from "@/lib/contract";
 import { resultWorksForRole } from "@/lib/result-work-access";
 import { isResultMonth } from "@/lib/result-period";
 import { displayedBudgetItems } from "@/lib/result-budget";
+import { filterPurchaseEntries } from "@/lib/purchase-policy";
 import { loadWorkData, buildBase as engineBuildBase, fetchAll, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, bdiBudget, BDI_RATE, type ItemKey } from "@/lib/results-engine";
 import { resplitClient, splitDesc } from "@/lib/resplit";
 import { Switch } from "@/components/ui/switch";
@@ -736,9 +737,12 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   })();
   const open = (k: NonNullable<typeof dlg>) => canEdit && setDlg(k);
   const isBilling = dlg === "faturamentos";
+  const [entryFilters, setEntryFilters] = useState({ from: "", to: "", category: "", description: "" });
+  const filteredEntries = filterPurchaseEntries((data.data?.entries ?? []).filter((e: any) => (e.category === "faturamento") === isBilling), entryFilters);
   const openEntries = (k: "lancamentos" | "faturamentos") => {
     setEntry((e) => ({ ...e, category: k === "faturamentos" ? "faturamento" : "materiais" }));
     setEditingId(null);
+    setEntryFilters({ from: fromMonth ? `${fromMonth}-01` : "", to: toMonth ? monthEnd(toMonth) : "", category: "", description: "" });
     setDlg(k);
   };
   const clickable = canEdit ? "cursor-pointer rounded-md transition-colors hover:bg-muted/60" : "";
@@ -1399,7 +1403,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
       </Dialog>
 
       <Dialog open={dlg === "lancamentos" || dlg === "faturamentos"} onOpenChange={(o) => !o && setDlg(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isBilling ? "Faturamentos" : "Lançamentos"}</DialogTitle>
           </DialogHeader>
@@ -1457,10 +1461,17 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
               <span className="text-xs text-muted-foreground">Padrão: mês do lançamento</span>
             </div>
           )}
+          <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+            <div className="space-y-1"><Label htmlFor="entries-from">De</Label><Input id="entries-from" type="date" className="w-40" value={entryFilters.from} onChange={(e) => setEntryFilters({ ...entryFilters, from: e.target.value })} /></div>
+            <div className="space-y-1"><Label htmlFor="entries-to">Até</Label><Input id="entries-to" type="date" className="w-40" value={entryFilters.to} onChange={(e) => setEntryFilters({ ...entryFilters, to: e.target.value })} /></div>
+            {!isBilling && <div className="space-y-1"><Label>Tipo</Label><Select value={entryFilters.category || "all"} onValueChange={(category) => setEntryFilters({ ...entryFilters, category: category === "all" ? "" : category })}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem>{ITEMS.map((c) => <SelectItem key={c.key} value={c.key}>{relabel(c.key, c.label)}</SelectItem>)}</SelectContent></Select></div>}
+            <div className="min-w-40 flex-1 space-y-1"><Label htmlFor="entries-search">Buscar descrição</Label><Input id="entries-search" value={entryFilters.description} onChange={(e) => setEntryFilters({ ...entryFilters, description: e.target.value })} /></div>
+          </div>
+          <p className="text-sm font-semibold">{filteredEntries.length} lançamentos · Total filtrado: {brl(filteredEntries.reduce((a: number, e: any) => a + Number(e.amount), 0))}</p>
           <div className="max-h-96 overflow-auto">
             <Table>
               <TableBody>
-                {(data.data?.entries ?? []).filter((e: any) => (e.category === "faturamento") === isBilling).map((e: any) => (
+                {filteredEntries.map((e: any) => (
                   <TableRow key={e.id} className={editingId === e.id ? "bg-muted" : undefined}>
                     <TableCell>
                       {fmtDate(e.doc_date ?? e.entry_date)}
