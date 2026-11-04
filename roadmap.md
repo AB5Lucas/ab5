@@ -21,3 +21,8 @@
 - [x] Indústria: retirar custos de MP dos pedidos e restaurar rótulo Ferramentas; saldo de Ferramentas = zero.
 - [x] Compras: gerar custos por item, classificar Insumos/Materiais e preservar rateio/direcionamentos.
 - [x] Reprocessar todos os meses existentes (outubro), testar e conferir totais, categorias e lançamentos na tela: R$ 1.245.937,40; 3.934 lançamentos; 56 testes.
+- [x] Compras: exclusões editáveis por código/prefixo, visibilidade e totais separados sem duplicar custos.
+- [x] Compras: ativos pendentes com decisão integral/parcelada persistente, competências e horas mensais; gravação testada e Kombi mantida pendente.
+- [x] Compras: mapeamento configurável 2000002/2000003 → 2030999 preservando os nove destinos manuais.
+- [x] Resultados: filtros de data, categoria e descrição com total filtrado; conferido no Jato.
+- [x] Reprocessar outubro (único mês sincronizado), conferir exclusões R$332.410,83 + pendente R$55.000 + lançado R$858.526,57 = relatório R$1.245.937,40; zero custos proibidos, 43 CC conferidos, 93 testes aprovados e telas verificadas.

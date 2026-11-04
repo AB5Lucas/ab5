@@ -519,6 +519,20 @@
       "when": 1793826292393,
       "tag": "0073_industry_purchase_item_costs",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793827405103,
+      "tag": "0074_purchase_exclusions_assets_redirects",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1793827429203,
+      "tag": "0075_purchase_atomic_policy_summary",
+      "breakpoints": true
     }
   ]
 }
