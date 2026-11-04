@@ -351,15 +351,25 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     // rateado entre os serviços do cliente pelas horas trabalhadas (RDO)
     const integTravel = new Map<string, number>();
     {
-      // Rateio por mês: só serviços com horas de RDO no mês da integração recebem parte.
+      // Rateio por mês entre todos os serviços com efetivo no mês (inclui concluídos).
       const allByM = new Map<string, number>();
       const myByM = new Map<string, number>();
-      for (const r of d.sibRdo ?? []) {
-        if (!r.present || !r.report_date) continue;
-        const m = String(r.report_date).slice(0, 7);
-        const h = Number(r.worked_hours ?? 0);
+      // Base: todos os serviços do cliente com pessoas escaladas (RDO; sem RDO = 8h por escalação)
+      const seen = new Set<string>();
+      const addH = (wid: string, date: string, h: number) => {
+        const m = date.slice(0, 7);
         allByM.set(m, (allByM.get(m) ?? 0) + h);
-        if (idSet.has(r.work_id)) myByM.set(m, (myByM.get(m) ?? 0) + h);
+        if (idSet.has(wid)) myByM.set(m, (myByM.get(m) ?? 0) + h);
+      };
+      for (const r of raw.sibRdo ?? []) {
+        if (!r.report_date || !r.collaborator_id) continue;
+        seen.add(`${r.work_id}|${r.collaborator_id}|${r.report_date}`);
+        if (r.present) addH(r.work_id, String(r.report_date), Number(r.worked_hours ?? 0));
+      }
+      for (const a of raw.sibAllocs ?? []) {
+        const dt = a.daily_schedules?.schedule_date as string | undefined;
+        if (!dt || !a.work_id || seen.has(`${a.work_id}|${a.collaborator_id}|${dt}`)) continue;
+        addH(a.work_id, dt, 8);
       }
       const shareOf = (date: string) => {
         const m = date.slice(0, 7);

@@ -143,9 +143,9 @@ function ServicesPage() {
         supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date),
         supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date),
         supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
-        supabase.from("appointments").select("collaborator_id").eq("type", "treinamento").eq("scheduled_date", date).neq("status", "cancelado"),
+        supabase.from("appointments").select("collaborator_id").in("type", ["treinamento", "integracao"]).eq("scheduled_date", date).neq("status", "cancelado"),
         sched
-          ? supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).eq("box_key", "treinamento")
+          ? supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).or("box_key.eq.treinamento,box_key.like.integracao:%")
           : Promise.resolve({ data: [] as { collaborator_id: string }[] }),
       ]);
       // Escalado para treinamento no dia: sai da aba Serviços
