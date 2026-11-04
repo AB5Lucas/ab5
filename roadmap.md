@@ -21,3 +21,8 @@
 - [x] Indústria: retirar custos de MP dos pedidos e restaurar rótulo Ferramentas; saldo de Ferramentas = zero.
 - [x] Compras: gerar custos por item, classificar Insumos/Materiais e preservar rateio/direcionamentos.
 - [x] Reprocessar todos os meses existentes (outubro), testar e conferir totais, categorias e lançamentos na tela: R$ 1.245.937,40; 3.934 lançamentos; 56 testes.
+- [ ] Compras: exclusões editáveis por código/prefixo, visibilidade e totais separados sem duplicar custos.
+- [ ] Compras: ativos pendentes com decisão integral/parcelada persistente, competências e horas mensais.
+- [ ] Compras: mapeamento configurável 2000002/2000003 → 2030999 preservando destinos manuais.
+- [ ] Resultados: filtros de data, categoria e descrição com total filtrado.
+- [ ] Reprocessar meses, conferir antes/depois, exclusões, ativos e totais; executar testes e verificar telas.
