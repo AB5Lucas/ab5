@@ -130,11 +130,15 @@ export function isWorksBilling(desc: unknown) {
   const text = String(desc ?? "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
   return text.includes("SERVICOS COBRANCA OBRAS") || text.includes("SERVICOS OBRAS EXTERNAS MANUT/REPARO");
 }
+/** "SERVICOS COBRANCA OBRAS 3%" já vem da planilha de Serviços: ignorada na Indústria. */
+export function isWorksChargeOnly(desc: unknown) {
+  return String(desc ?? "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes("SERVICOS COBRANCA OBRAS");
+}
 /** Works invoices from the industry report use the Serviços matching and audit flow. */
 export function parseWorksBillingRows(rows: unknown[][]): BillingNote[] {
   const notes = new Map<string, BillingNote>();
   for (const [index, raw] of rows.entries()) {
-    if (!isWorksBilling(raw[25])) continue;
+    if (!isWorksBilling(raw[25]) || isWorksChargeOnly(raw[25])) continue;
     const invoice = stripZeros(raw[1]); const issuedAt = excelDate(raw[7]);
     const amountCents = moneyCents(raw[43]); const client = String(raw[12] ?? "").trim();
     if (!/^\d+$/.test(invoice) || !issuedAt || issuedAt < BILLING_START || amountCents === null || amountCents <= 0 || !client) continue;
