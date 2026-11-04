@@ -547,6 +547,13 @@
       "when": 1793832830975,
       "tag": "0077_monthly_recurring_work_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1793833646338,
+      "tag": "0078_restrict_recurring_generator_privilege",
+      "breakpoints": true
     }
   ]
 }
