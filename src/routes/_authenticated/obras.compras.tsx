@@ -50,7 +50,7 @@ function ComprasPage() {
   const saveAsset = useServerFn(savePurchaseAsset);
   const { canWrite } = useCurrentUser();
   const [asset, setAsset] = useState<{ line: Line; item: CcItem; state: PurchaseItemState } | null>(null);
-  const [assetMode, setAssetMode] = useState<"integral" | "installments">("installments");
+  const [assetMode, setAssetMode] = useState<"pending" | "integral" | "installments">("installments");
   const [assetMonths, setAssetMonths] = useState(12);
   const [assetMonthly, setAssetMonthly] = useState(0);
   const [assetCat, setAssetCat] = useState("materiais");
@@ -68,14 +68,16 @@ function ComprasPage() {
   const data = useQuery({
     queryKey: ["purchase-lines"],
     queryFn: async () => {
-      const [l, c, w] = await Promise.all([
+      const [l, c, w, decisions] = await Promise.all([
         supabase.from("purchase_cc_lines").select("*").order("ref_month", { ascending: false }).order("cc_code"),
         supabase.from("clients").select("id, name, cc_prefix").order("name"),
         supabase.from("works").select("id, name, client_id, active").order("name"),
+        supabase.from("purchase_asset_decisions").select("*"),
       ]);
       if (l.error) throw l.error;
       if (c.error) throw c.error;
       if (w.error) throw w.error;
+      if (decisions.error) throw decisions.error;
       const ids = l.data.map((x) => x.id);
       const entries: { purchase_cc_id: string | null; work_id: string; amount: number }[] = [];
       for (let i = 0; i < ids.length; i += 200) {
@@ -86,7 +88,7 @@ function ComprasPage() {
           if (!e || e.length < 1000) break;
         }
       }
-      return { lines: l.data as Line[], clients: c.data, works: w.data, entries };
+      return { lines: l.data as Line[], clients: c.data, works: w.data, entries, decisions: decisions.data };
     },
   });
 
@@ -143,7 +145,8 @@ function ComprasPage() {
     finally { setBusy(false); }
   }
   function openAsset(line: Line, item: CcItem, state: PurchaseItemState) {
-    setAsset({ line, item, state }); setAssetMode("installments"); setAssetMonths(12); setAssetMonthly(Math.round(item.amount * 100 / 12) / 100); setAssetCat(state.category ?? assetCategory(item));
+    const saved = d?.decisions.find((x) => x.purchase_cc_id === line.id && x.item_key === state.key);
+    setAsset({ line, item, state }); setAssetMode(saved?.mode === "integral" ? "integral" : saved?.mode === "installments" ? "installments" : "installments"); setAssetMonths(saved?.months ?? 12); setAssetMonthly(saved?.monthly_amount ?? Math.round(item.amount * 100 / 12) / 100); setAssetCat(saved?.category ?? state.category ?? assetCategory(item));
   }
   async function decideAsset(isAsset = true) {
     if (!asset || busy) return;
@@ -165,7 +168,7 @@ function ComprasPage() {
     if (!editing || !selClient) return;
     try {
       const st = await direct({ data: { id: editing.id, client_id: selClient, work_id: selWork === ALL ? null : selWork } });
-      toast[st === "launched" ? "success" : "warning"](st === "launched" ? "Compra lançada" : "Ainda pendente: o cliente não teve movimentação no mês. Escolha um serviço.");
+      toast[st === "launched" ? "success" : "warning"](st === "launched" ? "Compra lançada" : "Destino salvo; ainda há itens pendentes de decisão ou destino.");
       if (st === "launched") setEditing(null);
       qc.invalidateQueries({ queryKey: ["purchase-lines"] });
     } catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao direcionar"); }
@@ -250,7 +253,7 @@ function ComprasPage() {
 
       <Dialog open={!!asset} onOpenChange={(o) => !o && setAsset(null)}><DialogContent className="max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>Decisão do ativo · {asset?.item.code}</DialogTitle></DialogHeader>
         <p className="text-sm">{asset?.item.desc} · {asset ? brl(asset.item.amount) : ""}</p>
-        <div className="space-y-1"><Label>Lançamento</Label><Select value={assetMode} onValueChange={(v) => setAssetMode(v as typeof assetMode)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="integral">Integral no mês da compra</SelectItem><SelectItem value="installments">Ratear em parcelas mensais</SelectItem></SelectContent></Select></div>
+        <div className="space-y-1"><Label>Lançamento</Label><Select value={assetMode} onValueChange={(v) => setAssetMode(v as typeof assetMode)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pending">Manter pendente de decisão</SelectItem><SelectItem value="integral">Integral no mês da compra</SelectItem><SelectItem value="installments">Ratear em parcelas mensais</SelectItem></SelectContent></Select></div>
         {assetMode === "installments" && <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><Label>Meses</Label><Input aria-label="Meses do ativo" type="number" min={1} max={120} value={assetMonths} onChange={(e) => { const n = Number(e.target.value); setAssetMonths(n); setAssetMonthly(asset && n > 0 ? Math.round(asset.item.amount * 100 / n) / 100 : 0); }} /></div><div className="space-y-1"><Label>Valor mensal</Label><Input aria-label="Valor mensal do ativo" type="number" step="0.01" value={assetMonthly} onChange={(e) => setAssetMonthly(Number(e.target.value))} /></div></div>}
         <div className="space-y-1"><Label>Categoria</Label><Select value={assetCat} onValueChange={setAssetCat}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PURCHASE_CATEGORIES.map((c) => <SelectItem key={c.key} value={c.key}>{c.key === "andaimes" ? "Insumos / Andaimes" : c.label}</SelectItem>)}</SelectContent></Select></div>
         {previewError ? <p className="text-sm text-destructive">{previewError}</p> : preview.length > 0 && <div className="max-h-40 overflow-auto text-sm">{preview.map((p) => <div key={p.month} className="flex justify-between"><span>{p.month.slice(5)}/{p.month.slice(0, 4)}</span><span>{brl(p.amount)}</span></div>)}</div>}
