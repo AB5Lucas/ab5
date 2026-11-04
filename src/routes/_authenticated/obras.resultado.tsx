@@ -1025,7 +1025,6 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
           <DialogHeader>
             <DialogTitle>Custo realizado — {catLabel(detail ?? "")}</DialogTitle>
           </DialogHeader>
-          {!isBilling && <ResultRecurrences key={recurrenceSeed?.id ?? 'recurrences'} workIds={workIds} seed={recurrenceSeed} clearSeed={() => setRecurrenceSeed(null)} onChanged={invalidate} />}
           <div className="max-h-[70vh] overflow-auto text-sm">
             {detail === "mo" && <ResultSupport clientId={work?.client_id ?? undefined} canWrite={canWrite} />}
             {detail === "mo" && !!calc?.missingRdo.length && <div className="my-3 border-l-2 border-destructive pl-3 text-destructive"><p className="font-semibold">Escalado sem RDO</p>{calc.missingRdo.map((r) => <p key={`${r.id}:${r.workId}:${r.date}`}>{r.name} · {fmtDate(r.date)} · 0h</p>)}</div>}
@@ -1397,6 +1396,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
           <DialogHeader>
             <DialogTitle>{isBilling ? "Faturamentos" : "Lançamentos"}</DialogTitle>
           </DialogHeader>
+          {!isBilling && <ResultRecurrences key={recurrenceSeed?.id ?? 'recurrences'} workIds={workIds} seed={recurrenceSeed} clearSeed={() => setRecurrenceSeed(null)} onChanged={invalidate} />}
           {isAll && !isBilling && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">O valor será rateado entre os serviços selecionados, proporcional às horas trabalhadas em cada um.</p>

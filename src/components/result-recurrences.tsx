@@ -15,7 +15,7 @@ const categories = [{ key: 'mao_obra', label: 'Mão de obra' }, { key: 'terceiro
 export function ResultRecurrences({ workIds, seed, clearSeed, onChanged }: { workIds: string[]; seed: any; clearSeed: () => void; onChanged: () => void }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Recurrence | null>(null);
-  const [form, setForm] = useState({ category: 'andaimes', description: '', amount: '', start: '', end: '', active: true });
+  const [form, setForm] = useState(() => ({ category: seed?.category ?? 'andaimes', description: seed?.description ?? '', amount: seed ? String(seed.amount) : '', start: seed?.entry_date?.slice(0, 7) ?? '', end: '', active: true }));
   const rules = useQuery({ queryKey: ['result-recurrences', workIds], queryFn: async () => {
     const result = await supabase.from('work_entry_recurrences').select('*').in('work_id', workIds).order('start_month');
     if (result.error) throw result.error;
@@ -34,13 +34,12 @@ export function ResultRecurrences({ workIds, seed, clearSeed, onChanged }: { wor
   }, onSuccess: changed, onError: (e) => toast.error(e.message) });
   const end = useMutation({ mutationFn: async (r: Recurrence) => {
     if (!window.confirm(`Encerrar a recorrência “${r.description}”? Os lançamentos existentes serão mantidos.`)) return;
-    const result = await supabase.from('work_entry_recurrences').update({ active: false, end_month: new Date().toISOString().slice(0, 7) + '-01' }).eq('id', r.id);
+    const month = new Date().toISOString().slice(0, 7) + '-01';
+    const result = await supabase.from('work_entry_recurrences').update({ active: false, end_month: month < r.start_month ? r.start_month : month }).eq('id', r.id);
     if (result.error) throw result.error;
   }, onSuccess: changed, onError: (e) => toast.error(e.message) });
   // Seed is keyed by the parent so a new entry always opens a fresh form.
   const openEditor = (r: Recurrence) => { clearSeed(); setEditing(r); setForm({ category: r.category, description: r.description, amount: String(r.amount), start: r.start_month.slice(0, 7), end: r.end_month?.slice(0, 7) ?? '', active: r.active }); };
-  const [initialized, setInitialized] = useState(false);
-  if (seed && !initialized) { setInitialized(true); setForm({ category: seed.category, description: seed.description ?? '', amount: String(seed.amount), start: seed.entry_date.slice(0, 7), end: '', active: true }); }
   return <section className="space-y-3 border-t border-border pt-3">
     <h3 className="flex items-center gap-2 font-semibold"><Repeat2 className="size-4" />Recorrências mensais</h3>
     {(seed || editing) && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
