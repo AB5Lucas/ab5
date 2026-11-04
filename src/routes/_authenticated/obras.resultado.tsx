@@ -50,11 +50,11 @@ const CATEGORIES = [
   { key: "terceiros", label: "Transporte de terceiros" },
   { key: "faturamento", label: "Faturamento" },
 ] as const;
-// Cliente Indústria usa outros nomes para Ferramentas/Andaimes (só rótulo; cálculos iguais)
+// Cliente Indústria chama Andaimes de Insumos (só rótulo; cálculos iguais)
 let INDUSTRIA_LABELS = false;
 const isIndustria = (name?: string | null) => (name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() === "INDUSTRIA";
 const relabel = (k: string, label: string) =>
-  INDUSTRIA_LABELS && k === "ferramentas" ? "Matéria Prima" : INDUSTRIA_LABELS && k === "andaimes" ? "Insumos" : label;
+  INDUSTRIA_LABELS && k === "andaimes" ? "Insumos" : label;
 const catLabel = (k: string) => relabel(k, CATEGORIES.find((c) => c.key === k)?.label ?? k);
 
 

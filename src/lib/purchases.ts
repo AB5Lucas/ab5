@@ -30,14 +30,37 @@ export const PURCHASE_CATEGORIES = [
 ] as const;
 export type PurchaseCategory = (typeof PURCHASE_CATEGORIES)[number]["key"];
 
-/** Classificação do item pela descrição/código. */
-export function purchaseCategory(code: string, desc: string): PurchaseCategory {
-  const d = `${desc}`.toLowerCase();
-  if (/^vc/i.test(code) || /ped[aá]gio|combust|gasolina|diesel|etanol|pneu|[oó]leo motor|ve[ií]culo|automot|mec[aâ]nica|funilaria|frete|uber|táxi|taxi|passagem|transporte/.test(d)) return "transporte";
-  if (/andaime|escora|braçadeira|bracadeira|tubo andaime|sapata|rodizio andaime/.test(d)) return "andaimes";
-  if (/m[aã]o de obra|servi[cç]o de|empreitada|mo terceir|prestação|prestacao|diária|diaria/.test(d)) return "mo";
-  if (/furadeira|parafusadeira|esmerilhadeira|serra|broca|disco de corte|chave |alicate|martelo|trena|n[ií]vel|rolo|trincha|pincel|esp[aá]tula|lixadeira|ferramenta|marreta|talhadeira|extensão|extensao|escada/.test(d)) return "ferramentas";
-  return "materiais";
+export function isIndustryClient(name?: string | null): boolean {
+  return (name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() === "INDUSTRIA";
+}
+
+/** Classificação financeira, compartilhada pela lista e pelos lançamentos. */
+export function purchaseCategory(code: string, industry = false): PurchaseCategory {
+  return industry && ["AE00004", "CBBC279", "AE00001"].includes(code.trim().toUpperCase()) ? "andaimes" : "materiais";
+}
+
+export type PurchaseItemEntry = { work_id: string; category: PurchaseCategory; amount: number; description: string; split_group: string | null; split_total: number | null; split_note: string | null; entry_date: string };
+
+/** Reusa os destinos do CC e as mesmas horas, arredondando o último destino de cada item. */
+export function purchaseItemEntries(items: CcItem[], total: number, allocation: Allocation, hours: Map<string, number>, industryWorkIds: Set<string>, date: string, uuid: () => string = () => crypto.randomUUID()): PurchaseItemEntry[] {
+  if (!items.length) throw new Error("Compra sem itens: sincronize o relatório ABCOM003 novamente.");
+  const expected = Math.round(total * 100);
+  const amounts = items.map((item) => Math.round(Number(item.amount) * 100));
+  const sum = amounts.reduce((a, b) => a + b, 0);
+  if (!Number.isFinite(expected) || amounts.some((v) => !Number.isFinite(v)) || Math.abs(expected - sum) > 1) throw new Error("Total dos itens não confere com o centro de custo.");
+  const last = amounts.length - 1;
+  amounts[last] = (amounts[last] ?? 0) + expected - sum;
+  const ids = allocation.parts.map((p) => p.work_id);
+  return items.flatMap((item, i) => {
+    const amount = (amounts[i] ?? 0) / 100;
+    const group = ids.length > 1 ? uuid() : null;
+    const description = `${item.code} · ${item.desc} · Qtd ${Number(item.qty).toLocaleString("pt-BR")}`;
+    return split(amount, ids, hours).map((part) => ({
+      ...part, category: purchaseCategory(item.code, industryWorkIds.has(part.work_id)), description,
+      entry_date: item.date ?? date, split_group: group, split_total: group ? amount : null,
+      split_note: group ? "Rateio por hora trabalhada" : null,
+    }));
+  });
 }
 
 /** Relatório "Compras de Produtos por Centro de Custo" (ABCOM003). */
