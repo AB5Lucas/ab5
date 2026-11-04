@@ -41,3 +41,4 @@
 - [x] Outubro comparado nos mesmos 93 serviços: 345→111 casos zerados, 2672→864h, MO removida R$113443,26→R$39405,10; relatórios v2 nominal e XLSX conferidos; 40 testes em 9 arquivos, receita/margem/apoio preservados.
 - [x] Recorrências gerenciáveis, geração ao abrir e rotina mensal cadastrada (novo endereço exige publicação); Amcor 22 manuais adotados + outubro/novembro = 24 meses/R$108360, sem duplicatas concorrentes.
 - [x] Margem acumulada mensal usa todo histórico até mês final, sem corte pelo andamento; cálculo individual/receita preservados. Amcor outubro R$118822,18/35,20%, novembro R$114307,18/33,86%; 31 mensais auditados, 5 outros alterados; relatórios MD/XLSX e 34 testes aprovados, telas desktop/mobile verificadas.
+- [ ] Conciliar andaimes Amcor na tabela e detalhes: incluir outubro/novembro após último andamento, respeitando período sem alterar receita; testar e conferir tela autenticada.

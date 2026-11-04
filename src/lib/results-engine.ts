@@ -211,7 +211,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         const dt = String(p.month).slice(0, 10);
         if (untilMonth && dt > monthEnd(untilMonth)) continue;
         const w = byId.get(p.work_id);
-        if (!w || w.contract_enabled || w.hh_enabled || (opts.accumulated && w.monthly_enabled) || contractCut.has(p.work_id)) continue;
+        if (!w || w.contract_enabled || w.hh_enabled || w.monthly_enabled || contractCut.has(p.work_id)) continue;
         if (dt > (lastProg.get(p.work_id) ?? "")) lastProg.set(p.work_id, dt);
       }
       for (const [k, dt] of lastProg) contractCut.set(k, dt);
@@ -679,7 +679,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
-    return { missingRdo, supportNoActivity, rows, last, order, budget: budgetOut, budgetMarginPct: budgetMarginOut, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount, billingMonths: d.entries.filter((e: any) => e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)) as string[] };
+    return { entries: d.entries as any[], missingRdo, supportNoActivity, rows, last, order, budget: budgetOut, budgetMarginPct: budgetMarginOut, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount, billingMonths: d.entries.filter((e: any) => e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)) as string[] };
 }
 
 export const BDI_RATE = 0.5885;
