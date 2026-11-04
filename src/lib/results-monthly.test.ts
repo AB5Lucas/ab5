@@ -45,6 +45,23 @@ describe("andamento e receita mensal compartilhados", () => {
   });
 });
 describe("lotes financeiros preservam contexto e custos por serviço", () => {
+  it("Amcor desconta todos os custos anteriores ao pedido sem alterar o mês individual", () => {
+    const amcor = { ...w, orders: [{ number: '4601344780', date: '2026-08-30', value: 312359.45 }] };
+    const entries = Array.from({ length: 24 }, (_, i) => ({ work_id: 'm', category: 'andaimes', entry_date: new Date(Date.UTC(2024, 11 + i, 1)).toISOString().slice(0, 10), amount: 4515 }));
+    const full = buildBase(amcor, { ...empty, entries }, '', '2026-11', opts);
+    if (!full) throw new Error('Missing base');
+    expect(full.last?.cost).toBe(108360);
+    expect(totalMargin(amcor, full).margin).toBeCloseTo(145681.938685);
+    const october = buildBase(amcor, { ...empty, entries }, '2026-10', '2026-10', opts);
+    expect(october?.last?.revenue).toBe(0);
+    expect(october?.last?.margin).toBe(-4515);
+  });
+  it("mensal sem receita mantém custo e margem percentual indefinida", () => {
+    const work = { ...w, orders: [] };
+    const full = buildBase(work, { ...empty, entries: [{ work_id: 'm', category: 'materiais', entry_date: '2025-01-01', amount: 100 }] }, '', '2026-10', opts);
+    if (!full) throw new Error('Missing base');
+    expect(totalMargin(work, full)).toEqual({ margin: -100, pct: null });
+  });
   it("filtra só dados próprios, preservando irmãos/transporte do cliente", () => {
     const raw = { ...empty, allocs: [{ work_id: "a" }, { work_id: "b" }], rdoWf: [{ work_id: "a" }, { work_id: "b" }], entries: [{ work_id: "a", amount: 100 }, { work_id: "b", amount: 200 }], sibAllocs: [{ work_id: "a" }, { work_id: "b" }], vs: [{ work_id: null }] };
     const a = sliceResultRaw(raw, "a");

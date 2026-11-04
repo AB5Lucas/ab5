@@ -67,6 +67,8 @@ export function sliceResultRaw(raw: any, workId: string) {
 /** Carrega os dados brutos de um serviço (ou de vários, em "Todos os serviços"). */
 export async function loadWorkData(work: any, workIds: string[], canWrite: boolean, shared?: Awaited<ReturnType<typeof loadResultShared>>): Promise<any> {
       const w = work;
+      const generated = await supabase.rpc("generate_recurring_entries", { _work_ids: workIds });
+      if (generated.error) throw generated.error;
       // Rateios vigentes: refaz pelas horas atuais (inclui serviços novos com horas no mês)
       if (canWrite && w.client_id && Date.now() - (RESPLIT_AT.get(w.client_id) ?? 0) > 5 * 60_000) {
         RESPLIT_AT.set(w.client_id, Date.now());
@@ -728,9 +730,8 @@ export function totalMargin(work: any, full: NonNullable<ReturnType<typeof build
   if (work.monthly_enabled) {
     const lastMonth = full.last.ym;
     const list = ((Array.isArray(work.orders) ? work.orders : []) as any[]).filter((o) => o.date && String(o.date).slice(0, 7) <= lastMonth);
-    const months = new Set(list.map((o) => String(o.date).slice(0, 7)));
     const revenue = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
-    const cost = full.rows.filter((r) => months.has(r.ym)).reduce((a, r) => a + r.monthCost, 0);
+    const cost = full.last.cost;
     const margin = revenue * (1 - TAX_RATE) - cost;
     return { margin, pct: marginPercent(margin, revenue) };
   }
