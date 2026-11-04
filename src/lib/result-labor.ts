@@ -34,7 +34,8 @@ export function supportDailyWeights(allocs: any[], rdos: any[], headers: any[], 
     allocated.add(key);
     if (supportIds.has(a.collaborator_id) || seen.has(key)) continue;
     seen.add(key);
-    add(a.work_id, dt, resultHours(byPerson.get(key), days.has(dt)));
+    const rdo = byPerson.get(key);
+    add(rdo?.work_id ?? a.work_id, dt, resultHours(rdo, days.has(dt)));
   }
   // Unscheduled people explicitly present in an RDO are valid activity weights, not extra costs.
   for (const r of rdos) {
