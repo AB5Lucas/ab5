@@ -4835,6 +4835,10 @@ export type Database = {
         Returns: undefined
       }
       prev_business_day: { Args: { _date: string }; Returns: string }
+      purchase_apply_policy: {
+        Args: { _entries: Json; _line: string; _summary: Json }
+        Returns: number
+      }
       purchase_replace_entries: {
         Args: {
           _entries: Json
