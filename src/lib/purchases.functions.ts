@@ -6,8 +6,14 @@ async function guard(supabase: { rpc: (f: "can_access_page", a: { _path: string 
   if (!data) throw new Error("Você não tem acesso a Compras");
 }
 
+async function writeGuard(client: Parameters<typeof guard>[0]) {
+  await guard(client);
+  const { data, error } = await (client as unknown as { rpc: (f: string) => PromiseLike<{ data: unknown; error: unknown }> }).rpc("can_write");
+  if (error || !data) throw new Error("Você não tem acesso de escrita em Compras");
+}
+
 export const syncPurchasesNow = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
-  await guard(context.supabase);
+  await writeGuard(context.supabase);
   const lovableKey = process.env["LOVABLE_API_KEY"], excelKey = process.env["MICROSOFT_EXCEL_API_KEY"];
   if (!lovableKey || !excelKey) throw new Error("Conexão do Excel indisponível");
   const { executePurchaseSync } = await import("./purchases.server");
@@ -21,7 +27,7 @@ export const directPurchase = createServerFn({ method: "POST" }).middleware([req
     return { id: d.id, client_id: d.client_id ?? null, work_id: d.work_id ?? null };
   })
   .handler(async ({ context, data }) => {
-    await guard(context.supabase);
+    await writeGuard(context.supabase);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let client = data.client_id;
     if (data.work_id) {
@@ -32,4 +38,31 @@ export const directPurchase = createServerFn({ method: "POST" }).middleware([req
     if (up.error) throw up.error;
     const { applyLine } = await import("./purchases.server");
     return applyLine(data.id);
+  });
+
+export const reprocessPurchasesNow = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
+  await writeGuard(context.supabase);
+  const { reprocessPurchases } = await import("./purchases.server");
+  return reprocessPurchases();
+});
+
+export const savePurchaseAsset = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator((d: { line_id: string; item_key: string; is_asset: boolean; mode: "pending" | "integral" | "installments"; months: number; monthly_amount: number | null; category: string }) => {
+    if (!d.line_id || !d.item_key || !["pending", "integral", "installments"].includes(d.mode) || !["materiais", "transporte", "ferramentas", "andaimes", "mo"].includes(d.category) || !Number.isInteger(d.months) || d.months < 1 || d.months > 120) throw new Error("Decisão inválida");
+    return d;
+  }).handler(async ({ context, data }) => {
+    await writeGuard(context.supabase);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { purchaseItemKeys, installmentPlan } = await import("./purchase-policy");
+    const { data: line, error } = await supabaseAdmin.from("purchase_cc_lines").select("items,ref_month").eq("id", data.line_id).single();
+    if (error) throw error;
+    const items = line.items as import("./purchases").CcItem[];
+    const index = purchaseItemKeys(items).indexOf(data.item_key);
+    const item = items[index];
+    if (!item) throw new Error("Item não encontrado no relatório atual");
+    if (data.is_asset && data.mode === "installments") installmentPlan(item.amount, line.ref_month, data.months, data.monthly_amount);
+    const up = await supabaseAdmin.from("purchase_asset_decisions").upsert({ purchase_cc_id: data.line_id, item_key: data.item_key, is_asset: data.is_asset, mode: data.mode, months: data.months, monthly_amount: data.monthly_amount, category: data.category, decided_amount: item.amount, decided_by: context.userId, updated_at: new Date().toISOString() }, { onConflict: "purchase_cc_id,item_key" });
+    if (up.error) throw up.error;
+    const { applyLine } = await import("./purchases.server");
+    return applyLine(data.line_id);
   });
