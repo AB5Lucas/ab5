@@ -10,7 +10,6 @@ export const DEFAULT_EXCLUSION_RULES: ExclusionRule[] = [
   { match_type: "prefix", value: "VC", reason: "Incluso no km rodado", active: true },
   ...["SP00064", "SP00010", "RH00062"].map((value): ExclusionRule => ({ match_type: "code", value, reason: "Incluso no km rodado", active: true })),
   { match_type: "code", value: "RH00043", reason: "Incluso no VT", active: true },
-  ...["RH00026", "RH00024", "RH00013", "RH00060", "RH00029", "RH00064", "RH00035"].map((value): ExclusionRule => ({ match_type: "code", value, reason: "Incluso nos encargos", active: true })),
 ];
 
 export function exclusionReason(code: string, rules: ExclusionRule[]): string | null {
