@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
-import { allocatePurchase, parsePurchaseReport, purchaseFileMonth, type PClient, type PWork } from "./purchases";
+import { allocatePurchase, isIndustryClient, parsePurchaseReport, purchaseFileMonth, purchaseItemEntries, type CcItem, type PClient, type PWork } from "./purchases";
 
 type Credentials = { lovableKey: string; excelKey: string };
 const FOLDER = "Compras/RELATÓRIOS";
@@ -41,14 +42,16 @@ async function monthHours(ym: string) {
 
 async function loadRefs() {
   const [c, w] = await Promise.all([
-    supabaseAdmin.from("clients").select("id, cc_prefix"),
+    supabaseAdmin.from("clients").select("id, name, cc_prefix"),
     supabaseAdmin.from("works").select("id, client_id, cc_suffix"),
   ]);
   if (c.error) throw c.error;
   if (w.error) throw w.error;
   const clients: PClient[] = (c.data ?? []).map((x) => ({ id: x.id, prefix: x.cc_prefix }));
-  const works: PWork[] = (w.data ?? []).filter((x) => x.client_id).map((x) => ({ id: x.id, client_id: x.client_id!, suffix: x.cc_suffix }));
-  return { clients, works };
+  const works: PWork[] = (w.data ?? []).flatMap((x) => x.client_id ? [{ id: x.id, client_id: x.client_id, suffix: x.cc_suffix }] : []);
+  const industryClients = new Set((c.data ?? []).filter((x) => isIndustryClient(x.name)).map((x) => x.id));
+  const industryWorkIds = new Set(works.filter((x) => industryClients.has(x.client_id)).map((x) => x.id));
+  return { clients, works, industryWorkIds };
 }
 
 /** Recalcula os lançamentos de uma linha (apaga e recria os gastos dela nos serviços). */
@@ -72,21 +75,11 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
       }
     }
   }
-  const del = await supabaseAdmin.from("work_entries").delete().eq("purchase_cc_id", line.id);
-  if (del.error) throw del.error;
-  if (alloc.parts.length) {
-    const date = monthRange(line.ref_month).to;
-    const group = alloc.parts.length > 1 ? crypto.randomUUID() : null;
-    const ins = await supabaseAdmin.from("work_entries").insert(alloc.parts.map((p) => ({
-      work_id: p.work_id, entry_date: date, competence_month: line.ref_month, category: "materiais", amount: p.amount,
-      description: `Compras CC ${line.cc_code}${line.cc_name ? ` · ${line.cc_name}` : ""}`,
-      purchase_cc_id: line.id, split_group: group, split_total: group ? Number(line.amount) : null,
-      split_note: group ? "Rateio por hora trabalhada" : null,
-    })));
-    if (ins.error) throw ins.error;
-  }
-  const up = await supabaseAdmin.from("purchase_cc_lines").update({ status: alloc.status, reason: alloc.reason }).eq("id", line.id);
-  if (up.error) throw up.error;
+  const entries = alloc.parts.length ? purchaseItemEntries(line.items as CcItem[], Number(line.amount), alloc, hours, r.industryWorkIds, monthRange(line.ref_month).to) : [];
+  // Uma transação por CC: uma falha nunca deixa o mês sem os lançamentos anteriores.
+  const db: SupabaseClient = supabaseAdmin;
+  const result = await db.rpc("purchase_replace_entries", { _line: line.id, _entries: entries, _status: alloc.status, _reason: alloc.reason });
+  if (result.error) throw result.error;
   return alloc.status;
 }
 
@@ -108,7 +101,10 @@ export async function executePurchaseSync(c: Credentials) {
     const file = `${FOLDER}/${f.name}`;
     const buf = await graph(`${DRIVE}/root:/${enc(file)}:/content`, c, true);
     const wb = XLSX.read(new Uint8Array(buf), { cellDates: true });
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]!]!, { header: 1, raw: true, defval: "" });
+    const sheetName = wb.SheetNames[0];
+    const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
+    if (!sheet) throw new Error(`Relatório vazio: ${file}`);
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "" });
     const lines = parsePurchaseReport(rows);
     const { data: existing, error } = await supabaseAdmin.from("purchase_cc_lines").select("id, cc_code").eq("ref_month", ym);
     if (error) throw error;

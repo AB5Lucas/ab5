@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { directPurchase, syncPurchasesNow } from "@/lib/purchases.functions";
-import { PURCHASE_CATEGORIES, purchaseCategory, type CcItem, type PurchaseCategory } from "@/lib/purchases";
+import { PURCHASE_CATEGORIES, isIndustryClient, purchaseCategory, type CcItem, type PurchaseCategory } from "@/lib/purchases";
 
 export const Route = createFileRoute("/_authenticated/obras/compras")({
   head: () => ({
@@ -59,7 +59,7 @@ function ComprasPage() {
     queryFn: async () => {
       const [l, c, w] = await Promise.all([
         supabase.from("purchase_cc_lines").select("id, ref_month, cc_code, cc_name, amount, status, reason, target_client_id, target_work_id, items").order("ref_month", { ascending: false }).order("cc_code"),
-        supabase.from("clients").select("id, name").order("name"),
+        supabase.from("clients").select("id, name, cc_prefix").order("name"),
         supabase.from("works").select("id, name, client_id, active").order("name"),
       ]);
       if (l.error) throw l.error;
@@ -68,9 +68,12 @@ function ComprasPage() {
       const ids = l.data.map((x) => x.id);
       const entries: { purchase_cc_id: string | null; work_id: string; amount: number }[] = [];
       for (let i = 0; i < ids.length; i += 200) {
-        const { data: e, error } = await supabase.from("work_entries").select("purchase_cc_id, work_id, amount").in("purchase_cc_id", ids.slice(i, i + 200));
-        if (error) throw error;
-        entries.push(...(e ?? []));
+        for (let page = 0; ; page++) {
+          const { data: e, error } = await supabase.from("work_entries").select("purchase_cc_id, work_id, amount").in("purchase_cc_id", ids.slice(i, i + 200)).order("id").range(page * 1000, page * 1000 + 999);
+          if (error) throw error;
+          entries.push(...(e ?? []));
+          if (!e || e.length < 1000) break;
+        }
       }
       return { lines: l.data as Line[], clients: c.data, works: w.data, entries };
     },
@@ -92,7 +95,10 @@ function ComprasPage() {
         const ref = date ?? `${l.ref_month}-01`;
         if (from && ref < from) continue;
         if (to && (date ?? `${l.ref_month}-01`) > to) continue;
-        const cat = purchaseCategory(it.code, it.desc);
+        const targetWork = d?.works.find((w) => w.id === l.target_work_id);
+        const clientId = targetWork?.client_id ?? l.target_client_id;
+        const client = clientId ? d?.clients.find((c) => c.id === clientId) : d?.clients.find((c) => c.cc_prefix === l.cc_code.slice(0, 4));
+        const cat = purchaseCategory(it.code, isIndustryClient(client?.name));
         if (hiddenCats.has(cat)) continue;
         if (s && !`${it.code} ${it.desc} ${l.cc_code} ${l.cc_name ?? ""}`.toLowerCase().includes(s)) continue;
         out.push({ line: l, code: it.code, desc: it.desc, qty: Number(it.qty ?? 0), amount: Number(it.amount ?? 0), date, cat });
@@ -166,7 +172,7 @@ function ComprasPage() {
                 {PURCHASE_CATEGORIES.map((c) => (
                   <label key={c.key} className="flex items-center gap-2 text-sm">
                     <Checkbox checked={!hiddenCats.has(c.key)} onCheckedChange={(v) => setHiddenCats((s) => { const n = new Set(s); if (v) n.delete(c.key); else n.add(c.key); return n; })} />
-                    {c.label}
+                    {c.key === "andaimes" ? "Insumos / Andaimes" : c.label}
                   </label>
                 ))}
               </div>
@@ -187,13 +193,13 @@ function ComprasPage() {
             {!data.isLoading && !items.length && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Nenhum item. Clique em Sincronizar.</TableCell></TableRow>}
             {items.map((it, idx) => {
               const l = it.line;
-              const parts = (d?.entries ?? []).filter((e) => e.purchase_cc_id === l.id);
+              const parts = [...new Map((d?.entries ?? []).filter((e) => e.purchase_cc_id === l.id).map((e) => [e.work_id, e])).values()];
               return (
                 <TableRow key={`${l.id}-${idx}`}>
                   <TableCell className="whitespace-nowrap">{it.date ? it.date.split("-").reverse().join("/") : `${l.ref_month.slice(5)}/${l.ref_month.slice(0, 4)}`}</TableCell>
                   <TableCell><span className="font-mono text-xs">{l.cc_code}</span> <span className="text-xs text-muted-foreground">{l.cc_name}</span></TableCell>
                   <TableCell><span className="font-mono text-xs">{it.code}</span> <span className="text-sm">{it.desc}</span></TableCell>
-                  <TableCell className="text-xs">{CAT_LABEL[it.cat]}</TableCell>
+                  <TableCell className="text-xs">{it.cat === "andaimes" ? "Insumos" : CAT_LABEL[it.cat]}</TableCell>
                   <TableCell className="text-right">{it.qty.toLocaleString("pt-BR")}</TableCell>
                   <TableCell className="text-right whitespace-nowrap">{brl(it.amount)}</TableCell>
                   <TableCell>{l.status === "launched" ? <Badge variant="secondary">Lançado</Badge> : <Badge variant="destructive" title={l.reason ?? ""}>Pendente</Badge>}</TableCell>

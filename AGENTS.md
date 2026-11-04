@@ -27,12 +27,12 @@
 - Night premium: laborCost takes night hours from nightHours(entry, exit, break) for RDO rows of night services (rdos.shift='night' or works.night_shift). Why: one labor-cost formula shared by results and financeiro.
 - Billing (Serviços): Excel feeds atomic billing_sync_process; readers exclude sync_cancelled; billing_client_key resolves equivalences; daily cron run; an order shared by services splits by order value (extra parts in sync_split_note_id). Why: shared mapping, history, no ambiguity.
 - Works-description invoices read from the industry report are routed through billing_sync_import_external and the Serviços engine, with cross-source invoice identity checks. Why: one posting owner and no duplicate financial entries across spreadsheets.
-- Industry: PCP rows keep exact separate values; industry_sync_parts splits sectors; MP uses J. Why: match source. Keyed work_entries prevent duplicates; sync skips reversed_at invoices.
+- Industry: PCP rows remain separate; MP is informational, never a cost; sector splits affect invoices only. Why: purchases own MP costs; reversed invoices stay skipped.
 - VT: absent work settings inherit client defaults; Serviços initializes them without overwriting choices; built transport wins. Why: weekend VT stays consistent.
 - Schedule copy filters allocations/benefits by client boxes. Why: chosen date and boxes control copying.
 - Vale Alimentação reads the month's ponto sheets live (va.functions.ts, paths in vaPaths); rules in src/lib/vale-alimentacao.ts; only parameters in va_settings. Why: no report without the month's sheets.
 - Collaborator copy uses filtered rows via collaborator-list.ts to match the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
 - Never cancel vite:preloadError in recovery. Why: it breaks lazy routes.
-- Compras: purchase_cc_lines (month+CC) + rules in purchases.ts; work_entries link via purchase_cc_id, recreated per sync. Why: no duplicates, directions persist.
+- Purchases: atomically replace item costs per CC via purchase_replace_entries; keep purchase_cc_id, directions and CC hours; exclude from generic resplit. Why: preserve totals and item identity.
 - Allocation reports use allocation-hours.ts/RDO headers for hours; daily PDF shares the table's filtered rows. Why: preserve absences and match exported selections.

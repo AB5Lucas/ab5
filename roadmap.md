@@ -17,3 +17,7 @@
 - [x] Compras ABCOM003: inspecionar arquivo real e mapear cabeçalhos.
 - [x] Compras ABCOM003: corrigir leitura de valor total, quantidade, descrição e data; testar sem alterar rateio.
 - [x] Compras ABCOM003: reprocessar meses e conferir totais e direcionamentos manuais (outubro: R$ 1.245.937,40; 43 CC; sem divergências nos lançamentos).
+- [ ] Indústria: conferir e informar custos de MP por mês e outros lançamentos em Ferramentas antes de removê-los.
+- [ ] Indústria: retirar custos de MP dos pedidos e restaurar rótulo Ferramentas.
+- [ ] Compras: gerar custos por item, classificar Insumos/Materiais e preservar rateio/direcionamentos.
+- [ ] Reprocessar todos os meses, testar e conferir totais, categorias e lançamentos na tela.

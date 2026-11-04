@@ -57,7 +57,8 @@ export const splitDesc = (note: string | null | undefined, pct: number, h: numbe
 /** Refaz os rateios de "Todos os serviços" do cliente pelas horas atuais do mês de cada lançamento. */
 export async function resplitClient(workIds: string[]): Promise<boolean> {
   if (!workIds.length) return false;
-  const { data: entries } = await supabase.from("work_entries").select("id, work_id, entry_date, category, amount, split_group, split_total, split_note").in("work_id", workIds).not("split_group", "is", null);
+  // Compras são recalculadas exclusivamente pela sincronização, preservando item e vínculo do CC.
+  const { data: entries } = await supabase.from("work_entries").select("id, work_id, entry_date, category, amount, split_group, split_total, split_note").in("work_id", workIds).not("split_group", "is", null).is("purchase_cc_id", null);
   const groups = new Map<string, any[]>();
   for (const e of entries ?? []) groups.set(e.split_group!, [...(groups.get(e.split_group!) ?? []), e]);
   let changed = false;

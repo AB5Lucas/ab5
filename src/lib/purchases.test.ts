@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allocatePurchase, parsePurchaseReport, purchaseFileMonth } from "./purchases";
+import { allocatePurchase, parsePurchaseReport, purchaseFileMonth, purchaseCategory, purchaseItemEntries } from "./purchases";
 
 const clients = [{ id: "adm", prefix: "2000" }, { id: "mars", prefix: "2004" }, { id: "x", prefix: null }];
 const works = [
@@ -9,6 +9,56 @@ const works = [
   { id: "m3", client_id: "mars", suffix: "221" },
 ];
 const hours = new Map([["adm1", 100], ["m1", 30], ["m2", 10], ["m3", 60]]);
+
+describe("classificação financeira de compras", () => {
+  it.each(["AE00004", "CBBC279", "AE00001"])("%s é Insumos na Indústria", (code) => {
+    expect(purchaseCategory(code, true)).toBe("andaimes");
+  });
+  it.each(["MF02219", "VC00001", "CBBC280", "BROCA", "AD00091"])("%s permanece Materiais na Indústria", (code) => {
+    expect(purchaseCategory(code, true)).toBe("materiais");
+  });
+  it.each(["AE00004", "CBBC279", "AE00001", "MF02219"])("%s permanece Materiais fora da Indústria", (code) => {
+    expect(purchaseCategory(code, false)).toBe("materiais");
+  });
+});
+
+describe("lançamentos de compras por item", () => {
+  const items = [{ code: "AE00001", desc: "ENERGIA", qty: 1, amount: 10.01 }, { code: "MF02219", desc: "EXAUSTOR", qty: 2, amount: 20.02 }];
+  const industry = new Set(["m1", "m2"]);
+  it("rateia cada item nas mesmas horas do CC, com grupos separados e total exato", () => {
+    let group = 0;
+    const a = allocatePurchase("2004223", 30.03, clients, works, hours);
+    const rows = purchaseItemEntries(items, 30.03, a, hours, industry, "2026-10-31", () => `group-${++group}`);
+    expect(rows.map((r) => [r.work_id, r.category, r.amount, r.split_group, r.split_total])).toEqual([
+      ["m1", "andaimes", 7.51, "group-1", 10.01], ["m2", "andaimes", 2.50, "group-1", 10.01],
+      ["m1", "materiais", 15.02, "group-2", 20.02], ["m2", "materiais", 5, "group-2", 20.02],
+    ]);
+    expect(rows.reduce((sum, r) => sum + Math.round(r.amount * 100), 0)).toBe(3003);
+  });
+  it("preserva direcionamento manual e não cria Ferramentas", () => {
+    const a = allocatePurchase("2075011", 30.03, clients, works, hours, { work_id: "m3" });
+    const rows = purchaseItemEntries(items, 30.03, a, hours, new Set(["m3"]), "2026-10-31");
+    expect(rows.map((r) => [r.work_id, r.category, r.amount, r.split_group])).toEqual([["m3", "andaimes", 10.01, null], ["m3", "materiais", 20.02, null]]);
+  });
+  it("fora da Indústria mantém todos os itens em Materiais", () => {
+    const a = allocatePurchase("2000", 30.03, clients, works, hours);
+    expect(purchaseItemEntries(items, 30.03, a, hours, industry, "2026-10-31").map((r) => r.category)).toEqual(["materiais", "materiais"]);
+  });
+  it("corrige um centavo no último item sem alterar o total do CC", () => {
+    const a = allocatePurchase("2000", 30.04, clients, works, hours);
+    expect(purchaseItemEntries(items, 30.04, a, hours, industry, "2026-10-31").map((r) => r.amount)).toEqual([10.01, 20.03]);
+  });
+  it("rejeita totais divergentes antes de substituir lançamentos", () => {
+    const a = allocatePurchase("2000", 31, clients, works, hours);
+    expect(() => purchaseItemEntries(items, 31, a, hours, industry, "2026-10-31")).toThrow("Total dos itens não confere");
+  });
+  it("fecha centavos no último serviço mesmo com divisão em três", () => {
+    const a = allocatePurchase("2004999", 0.02, clients, works, hours);
+    const rows = purchaseItemEntries([{ code: "MF02219", desc: "EXAUSTOR", qty: 1, amount: 0.02 }], 0.02, a, hours, industry, "2026-10-31");
+    expect(rows.map((r) => r.amount)).toEqual([0.01, 0, 0.01]);
+    expect(rows.reduce((sum, r) => sum + Math.round(r.amount * 100), 0)).toBe(2);
+  });
+});
 
 const realRow = (values: Record<number, unknown>): unknown[] => Array.from({ length: 25 }, (_, i) => values[i] ?? "");
 describe("leitura ABCOM003", () => {
