@@ -30,3 +30,5 @@
 - [x] Medir Fechamento antes/depois: 57,75s → 28,45s; consultas 1663 → 411; totais idênticos por serviço.
 - [x] Contador Serviços: ontem até sete dias atrás; teste e consulta real 28/10–03/11 conferidos.
 - [x] Conferir outubro autenticado, comparar totais e entregar relatório dos 93 serviços; 104 testes aprovados. Divergências de alíquota, base de receita e corte de custos aguardam decisão do usuário.
+- [ ] Reincluir RH00076, reprocessar outubro preservando exclusões/destinos e manter Kombi pendente; conferir total e rateios.
+- [ ] Entregar auditoria nominal no chat: mensais sem pedido, custos sem pedido, pedidos zero e divergências.
