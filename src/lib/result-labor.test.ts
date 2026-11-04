@@ -47,4 +47,19 @@ describe("apoio diário incluindo mensais", () => {
     expect(supportShare(m, "2026-10-27", "a", new Set(["a"]))).toBe(0);
   });
   it("sem base conserva o destino da escalação", () => expect(supportShare(new Map(), "2026-10-27", "a", new Set(["a"]))).toBe(1));
+  it("usa o serviço registrado no RDO como peso e mantém marcação de viagem do serviço de origem ao fatiar lotes", () => {
+    const allocations = [alloc("s", "a"), alloc("p", "a")];
+    const rdos = [{ collaborator_id: "p", work_id: "b", report_date: "2026-10-27", present: true, worked_hours: 6 }, { collaborator_id: "s", work_id: "a", report_date: "2026-10-27", present: true, worked_hours: 8 }];
+    const weights = supportDailyWeights(allocations, rdos, [], new Set(["s"]));
+    expect(supportShare(weights, "2026-10-27", "a", new Set(["b"]))).toBe(1);
+    const raw = { ...empty, allocs: allocations.map((a) => ({ ...a, travel_bonus_override: null })), sibAllocs: allocations.map((a) => ({ ...a, travel_bonus_override: null })), sibRdo: rdos, supportIds: ["s"], workTravelRows: [{ work_id: "a", schedule_id: "2026-10-27", pays_bonus: false }], people: [{ id: "s", salary: 10 }, { id: "p", salary: 0 }], tbRules: [{ bonus_amount: 20, minimum_distance: 0, maximum_distance: null }] };
+    expect(calc(raw, "b")?.travelTotal).toBe(0);
+  });
+  it("dias com pesos invertidos usam proporções diárias e não a média mensal", () => {
+    const allocations = [alloc("p1", "a"), alloc("p2", "b"), alloc("p1", "a", "2026-10-28"), alloc("p2", "b", "2026-10-28")];
+    const rdos = allocations.map((a, i) => ({ collaborator_id: a.collaborator_id, work_id: a.work_id, report_date: a.daily_schedules.schedule_date, present: true, worked_hours: [6, 2, 2, 6][i] }));
+    const weights = supportDailyWeights(allocations, rdos, [], new Set());
+    expect(supportShare(weights, "2026-10-27", "a", new Set(["a"]))).toBe(0.75);
+    expect(supportShare(weights, "2026-10-28", "a", new Set(["a"]))).toBe(0.25);
+  });
 });
