@@ -374,7 +374,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const vtByDate = new Map<string, { people: number; cost: number }>();
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date || hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0 || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      if (!date || (!rdoKey.has(`${a.collaborator_id}|${date}`) && hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0) || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
@@ -485,7 +485,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const key = `${a.collaborator_id}|${date}`;
       if (travelSeen.has(key)) continue;
       travelSeen.add(key);
-      if (hoursOf(key, a.work_id) <= 0) continue;
+      const r = rdoKey.get(key);
+      if ((r && !r.present) || (!r && hoursOf(key, a.work_id) <= 0)) continue;
       const p = person.get(a.collaborator_id);
       const travelOn = a.travel_bonus_override ?? ((travelWorkMap.get(`${a.schedule_id}|${a.work_id}`) ?? (d.tbRules ?? []).some((x: any) => inRule(x, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0)))));
       if (!travelOn) continue;
