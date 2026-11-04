@@ -4347,6 +4347,8 @@ export type Database = {
           industry_part_ref: string | null
           purchase_cc_id: string | null
           purchase_item_key: string | null
+          recurrence_id: string | null
+          recurrence_month: string | null
           split_group: string | null
           split_note: string | null
           split_total: number | null
@@ -4370,6 +4372,8 @@ export type Database = {
           industry_part_ref?: string | null
           purchase_cc_id?: string | null
           purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
@@ -4393,6 +4397,8 @@ export type Database = {
           industry_part_ref?: string | null
           purchase_cc_id?: string | null
           purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
           split_group?: string | null
           split_note?: string | null
           split_total?: number | null
@@ -4425,6 +4431,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "work_entries_recurrence_id_fkey"
+            columns: ["recurrence_id"]
+            isOneToOne: false
+            referencedRelation: "work_entry_recurrences"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "work_entries_sync_note_id_fkey"
             columns: ["sync_note_id"]
             isOneToOne: false
@@ -4440,6 +4453,56 @@ export type Database = {
           },
           {
             foreignKeyName: "work_entries_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_entry_recurrences: {
+        Row: {
+          active: boolean
+          amount: number
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string
+          end_month: string | null
+          id: string
+          start_month: string
+          updated_at: string
+          work_id: string
+        }
+        Insert: {
+          active?: boolean
+          amount: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          end_month?: string | null
+          id?: string
+          start_month: string
+          updated_at?: string
+          work_id: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          end_month?: string | null
+          id?: string
+          start_month?: string
+          updated_at?: string
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_entry_recurrences_work_id_fkey"
             columns: ["work_id"]
             isOneToOne: false
             referencedRelation: "works"
@@ -4816,6 +4879,10 @@ export type Database = {
         Returns: string
       }
       driver_bonus_default: { Args: { _driver_id: string }; Returns: boolean }
+      generate_recurring_entries: {
+        Args: { _work_ids?: string[] }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
