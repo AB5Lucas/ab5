@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CornerDownRight, RefreshCw } from "lucide-react";
+import { CornerDownRight, Filter, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -10,10 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { directPurchase, syncPurchasesNow } from "@/lib/purchases.functions";
+import { PURCHASE_CATEGORIES, purchaseCategory, type CcItem, type PurchaseCategory } from "@/lib/purchases";
 
 export const Route = createFileRoute("/_authenticated/obras/compras")({
   head: () => ({
@@ -32,7 +35,9 @@ export const Route = createFileRoute("/_authenticated/obras/compras")({
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const ALL = "__all";
 
-type Line = { id: string; ref_month: string; cc_code: string; cc_name: string | null; amount: number; status: string; reason: string | null; target_client_id: string | null; target_work_id: string | null };
+const CAT_LABEL = Object.fromEntries(PURCHASE_CATEGORIES.map((c) => [c.key, c.label])) as Record<PurchaseCategory, string>;
+
+type Line = { id: string; ref_month: string; cc_code: string; cc_name: string | null; amount: number; status: string; reason: string | null; target_client_id: string | null; target_work_id: string | null; items: unknown };
 
 function ComprasPage() {
   const qc = useQueryClient();
@@ -42,6 +47,9 @@ function ComprasPage() {
   const [month, setMonth] = useState<string>(ALL);
   const [status, setStatus] = useState<string>(ALL);
   const [q, setQ] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [hiddenCats, setHiddenCats] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Line | null>(null);
   const [selClient, setSelClient] = useState<string>("");
   const [selWork, setSelWork] = useState<string>(ALL);
@@ -50,7 +58,7 @@ function ComprasPage() {
     queryKey: ["purchase-lines"],
     queryFn: async () => {
       const [l, c, w] = await Promise.all([
-        supabase.from("purchase_cc_lines").select("id, ref_month, cc_code, cc_name, amount, status, reason, target_client_id, target_work_id").order("ref_month", { ascending: false }).order("cc_code"),
+        supabase.from("purchase_cc_lines").select("id, ref_month, cc_code, cc_name, amount, status, reason, target_client_id, target_work_id, items").order("ref_month", { ascending: false }).order("cc_code"),
         supabase.from("clients").select("id, name").order("name"),
         supabase.from("works").select("id, name, client_id, active").order("name"),
       ]);
@@ -74,9 +82,24 @@ function ComprasPage() {
     return new Map((d?.works ?? []).map((w) => [w.id, `${cn.get(w.client_id ?? "") ?? "—"} · ${w.name}`]));
   }, [d]);
   const months = useMemo(() => [...new Set((d?.lines ?? []).map((l) => l.ref_month))], [d]);
-  const rows = useMemo(() => (d?.lines ?? []).filter((l) =>
-    (month === ALL || l.ref_month === month) && (status === ALL || l.status === status) &&
-    (!q || `${l.cc_code} ${l.cc_name ?? ""}`.toLowerCase().includes(q.toLowerCase()))), [d, month, status, q]);
+  const items = useMemo(() => {
+    const s = q.toLowerCase();
+    const out: { line: Line; code: string; desc: string; qty: number; amount: number; date: string | null; cat: PurchaseCategory }[] = [];
+    for (const l of d?.lines ?? []) {
+      if ((month !== ALL && l.ref_month !== month) || (status !== ALL && l.status !== status)) continue;
+      for (const it of (Array.isArray(l.items) ? l.items : []) as CcItem[]) {
+        const date = it.date ?? null;
+        const ref = date ?? `${l.ref_month}-01`;
+        if (from && ref < from) continue;
+        if (to && (date ?? `${l.ref_month}-01`) > to) continue;
+        const cat = purchaseCategory(it.code, it.desc);
+        if (hiddenCats.has(cat)) continue;
+        if (s && !`${it.code} ${it.desc} ${l.cc_code} ${l.cc_name ?? ""}`.toLowerCase().includes(s)) continue;
+        out.push({ line: l, code: it.code, desc: it.desc, qty: Number(it.qty ?? 0), amount: Number(it.amount ?? 0), date, cat });
+      }
+    }
+    return out.sort((a, b) => (b.date ?? b.line.ref_month).localeCompare(a.date ?? a.line.ref_month) || a.line.cc_code.localeCompare(b.line.cc_code));
+  }, [d, month, status, q, from, to, hiddenCats]);
   const totals = useMemo(() => {
     const base = (d?.lines ?? []).filter((l) => month === ALL || l.ref_month === month);
     const sum = (s?: string) => base.filter((l) => !s || l.status === s).reduce((a, l) => a + Number(l.amount), 0);
@@ -127,32 +150,57 @@ function ComprasPage() {
         <div className="space-y-1"><Label>Mês</Label>
           <Select value={month} onValueChange={setMonth}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value={ALL}>Todos</SelectItem>{months.map((m) => <SelectItem key={m} value={m}>{m.slice(5)}/{m.slice(0, 4)}</SelectItem>)}</SelectContent></Select></div>
+        <div className="space-y-1"><Label>Início</Label><Input type="date" className="w-44" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+        <div className="space-y-1"><Label>Fim</Label><Input type="date" className="w-44" value={to} onChange={(e) => setTo(e.target.value)} /></div>
         <div className="space-y-1"><Label>Status</Label>
           <Select value={status} onValueChange={setStatus}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value={ALL}>Todos</SelectItem><SelectItem value="launched">Lançados</SelectItem><SelectItem value="pending">Pendentes</SelectItem></SelectContent></Select></div>
-        <div className="space-y-1"><Label>Busca</Label><Input className="w-64" placeholder="Centro de custo ou nome" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        <div className="space-y-1"><Label>Categorias</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline"><Filter className="h-4 w-4" /> Categorias{hiddenCats.size > 0 && <Badge variant="secondary">{hiddenCats.size} ocultas</Badge>}</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-60">
+              <p className="mb-2 text-xs text-muted-foreground">Marque as categorias exibidas.</p>
+              <div className="space-y-2">
+                {PURCHASE_CATEGORIES.map((c) => (
+                  <label key={c.key} className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={!hiddenCats.has(c.key)} onCheckedChange={(v) => setHiddenCats((s) => { const n = new Set(s); if (v) n.delete(c.key); else n.add(c.key); return n; })} />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover></div>
+        <div className="space-y-1"><Label>Busca</Label><Input className="w-64" placeholder="Item, código ou centro de custo" value={q} onChange={(e) => setQ(e.target.value)} /></div>
       </div>
+      <p className="text-sm text-muted-foreground">{items.length} itens · {brl(items.reduce((a, i) => a + i.amount, 0))}</p>
       <div className="rounded-lg border border-border">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Mês</TableHead><TableHead>Centro de custo</TableHead><TableHead className="text-right">Valor</TableHead>
+            <TableHead>Data</TableHead><TableHead>Centro de custo</TableHead><TableHead>Item</TableHead><TableHead>Categoria</TableHead>
+            <TableHead className="text-right">Qtd.</TableHead><TableHead className="text-right">Valor</TableHead>
             <TableHead>Status</TableHead><TableHead>Lançado em</TableHead><TableHead className="w-12" />
           </TableRow></TableHeader>
           <TableBody>
-            {data.isLoading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Carregando…</TableCell></TableRow>}
-            {!data.isLoading && !rows.length && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhuma compra. Clique em Sincronizar.</TableCell></TableRow>}
-            {rows.map((l) => {
+            {data.isLoading && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Carregando…</TableCell></TableRow>}
+            {!data.isLoading && !items.length && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Nenhum item. Clique em Sincronizar.</TableCell></TableRow>}
+            {items.map((it, idx) => {
+              const l = it.line;
               const parts = (d?.entries ?? []).filter((e) => e.purchase_cc_id === l.id);
               return (
-                <TableRow key={l.id}>
-                  <TableCell className="whitespace-nowrap">{l.ref_month.slice(5)}/{l.ref_month.slice(0, 4)}</TableCell>
-                  <TableCell><span className="font-mono text-xs">{l.cc_code}</span> <span className="text-sm">{l.cc_name}</span></TableCell>
-                  <TableCell className="text-right whitespace-nowrap">{brl(Number(l.amount))}</TableCell>
+                <TableRow key={`${l.id}-${idx}`}>
+                  <TableCell className="whitespace-nowrap">{it.date ? it.date.split("-").reverse().join("/") : `${l.ref_month.slice(5)}/${l.ref_month.slice(0, 4)}`}</TableCell>
+                  <TableCell><span className="font-mono text-xs">{l.cc_code}</span> <span className="text-xs text-muted-foreground">{l.cc_name}</span></TableCell>
+                  <TableCell><span className="font-mono text-xs">{it.code}</span> <span className="text-sm">{it.desc}</span></TableCell>
+                  <TableCell className="text-xs">{CAT_LABEL[it.cat]}</TableCell>
+                  <TableCell className="text-right">{it.qty.toLocaleString("pt-BR")}</TableCell>
+                  <TableCell className="text-right whitespace-nowrap">{brl(it.amount)}</TableCell>
                   <TableCell>{l.status === "launched" ? <Badge variant="secondary">Lançado</Badge> : <Badge variant="destructive" title={l.reason ?? ""}>Pendente</Badge>}</TableCell>
                   <TableCell className="text-xs">
-                    {parts.length ? parts.map((p, i) => <div key={i}>{workName.get(p.work_id) ?? "—"}{parts.length > 1 ? ` · ${brl(Number(p.amount))}` : ""}</div>) : <span className="text-muted-foreground">{l.reason}</span>}
+                    {parts.length ? parts.map((p, i) => <div key={i}>{workName.get(p.work_id) ?? "—"}</div>) : <span className="text-muted-foreground">{l.reason}</span>}
                   </TableCell>
-                  <TableCell><Button size="icon" variant="ghost" title="Direcionar" onClick={() => openDirect(l)}><CornerDownRight className="h-4 w-4" /></Button></TableCell>
+                  <TableCell><Button size="icon" variant="ghost" title="Direcionar centro de custo" onClick={() => openDirect(l)}><CornerDownRight className="h-4 w-4" /></Button></TableCell>
                 </TableRow>
               );
             })}
