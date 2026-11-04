@@ -12,7 +12,7 @@ import { contractFraction } from "@/lib/contract";
 import { ResultadoPage } from "./obras.resultado";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { buildBase, fetchAll, loadWorkData, monthEnd, totalMargin } from "@/lib/results-engine";
+import { buildBase, fetchAll, loadWorkData, loadResultShared, sliceResultRaw, monthEnd, monthlyOrderRevenue, progressUntil, totalMargin } from "@/lib/results-engine";
 
 export const Route = createFileRoute("/_authenticated/fechamentos/financeiro")({
   head: () => ({
@@ -90,20 +90,31 @@ function FinanceiroPage() {
     active.data?.has(w.id) ||
     (Array.isArray(w.orders) && w.orders.some((o: any) => o?.date && String(o.date).slice(0, 10) >= start && String(o.date).slice(0, 10) <= end)),
   ), [works.data, active.data, start, end]);
-  const raws = useQueries({
-    queries: list.map((w: any) => ({
-      queryKey: ["work-result", w.id, w.id, "vt"],
+  const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 60_000, queryFn: loadResultShared });
+  const clientBatches = useMemo(() => [...new Set(list.map((w: any) => w.client_id ?? w.id))].map((key) => {
+    const selected = list.filter((w: any) => (w.client_id ?? w.id) === key);
+    return { key, work: selected[0], ids: selected.map((w: any) => w.id) };
+  }), [list]);
+  const clientRaws = useQueries({
+    queries: clientBatches.map((batch) => ({
+      queryKey: ["fin-client-raw", batch.key, batch.ids.join(",")],
       staleTime: 60_000,
-      queryFn: () => loadWorkData(w, [w.id], false),
+      enabled: !!shared.data,
+      queryFn: () => loadWorkData(batch.work, batch.ids, false, shared.data),
     })),
   });
-  const loading = works.isLoading || active.isLoading || raws.some((r) => r.isLoading);
+  const rawByWork = useMemo(() => {
+    const out = new Map<string, any>();
+    clientBatches.forEach((batch, index) => { const raw = clientRaws[index]?.data; if (raw) for (const id of batch.ids) out.set(id, sliceResultRaw(raw, id)); });
+    return out;
+  }, [clientBatches, clientRaws]);
+  const loading = works.isLoading || active.isLoading || shared.isLoading || clientRaws.some((r) => r.isPending);
 
   const groups = useMemo(() => {
     const sel = new Set(yms);
     const by = new Map<string, { key: string; name: string; lines: Line[] }>();
     list.forEach((w: any, i: number) => {
-      const raw = raws[i]?.data;
+      const raw = rawByWork.get(w.id);
       if (!raw) return;
       const full = buildBase(w, raw, "", "", { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [] });
       if (!full) return;
@@ -124,18 +135,14 @@ function FinanceiroPage() {
       const hasOrder = (Array.isArray(w.orders) ? w.orders : []).some((o: any) => o?.date && sel.has(String(o.date).slice(0, 7)));
       if (!billed && !compBilled && !mo && !transport && !materials && !hasOrder) return;
       const lastYm = yms[yms.length - 1] ?? `${year}-12`;
-      const progress = w.contract_enabled
-        ? contractFraction((raw.entries as any[]).filter((e) => e.category === "faturamento" && e.entry_date.slice(0, 7) <= lastYm).length, Number(w.contract_months ?? 12)) * 100
-        : full.rows.filter((r) => r.ym <= lastYm).pop()?.progress ?? 0;
+      const progress = progressUntil(w, full, lastYm);
       const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
       const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as Line[] };
       const upto = buildBase(w, raw, "", lastYm, { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [] }) ?? full;
       // Mensal com período filtrado: Margem Total = margem mensal do período (soma dos pedidos datados nos meses filtrados)
       let total = totalMargin(w, upto);
       if (w.monthly_enabled && months.length > 0) {
-        const rev = ((Array.isArray(w.orders) ? w.orders : []) as any[])
-          .filter((o) => o?.date && sel.has(String(o.date).slice(0, 7)))
-          .reduce((a, o) => a + Number(o.value ?? 0), 0);
+        const rev = monthlyOrderRevenue(w, "", "", yms);
         const m = rev * (1 - FIN_TAX) - (mo + transport + materials);
         total = { margin: m, pct: rev ? (m / rev) * 100 : 0 };
       }
@@ -143,7 +150,7 @@ function FinanceiroPage() {
       by.set(key, g);
     });
     return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [list, raws, yms, year, months.length, holidays.data, works.data]);
+  }, [list, rawByWork, yms, year, months.length, holidays.data, works.data]);
 
   const allGroups = groups;
   const shown = useMemo(() => allGroups.filter((g) => !hidden.includes(g.key)), [allGroups, hidden]);

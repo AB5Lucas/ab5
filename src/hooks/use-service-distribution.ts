@@ -9,7 +9,7 @@ export const SERVICE_BADGE_DATE = ["service-badge-date"];
 
 type Alloc = DistributionAllocation & { schedule_id: string };
 
-/** Sem data: menu lateral, conta clientes pendentes da semana atual + próxima. Com data: só aquele dia. */
+/** Sem data: ontem até sete dias atrás. Com data: apenas o dia selecionado na tela. */
 export function useServiceDistribution(selectedDate?: string) {
   const { user, role, loading } = useCurrentUser();
   const today = todayISO();

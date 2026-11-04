@@ -24,10 +24,10 @@ export function serviceDistribution(
   return { pendingClients: pendingClients.size, pendingClientIds: [...pendingClients] };
 }
 
-/** Hoje e os 7 dias anteriores (8 dias, nada à frente). */
+/** Ontem até sete dias atrás (7 dias; hoje nunca entra no contador). */
 export function recentRange(today: string) {
   const d = new Date(`${today}T12:00:00Z`);
-  return { start: new Date(d.getTime() - 7 * 86400000).toISOString().slice(0, 10), end: today };
+  return { start: new Date(d.getTime() - 7 * 86400000).toISOString().slice(0, 10), end: new Date(d.getTime() - 86400000).toISOString().slice(0, 10) };
 }
 
 /** Três Corações só é sinalizada no sábado e domingo. */
