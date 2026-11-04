@@ -37,5 +37,5 @@
 - [x] Margem sem receita: percentual null/— nas telas; 22 serviços de outubro listados; receita mensal preservada, exportação HH inalterada (não há exportação de margem).
 - [x] Apoio configurável em Resultados/MO; Marcelo Nery e Alan na Três Corações; outubro transfere R$91,83 de Batatas para Yokitos, total MO/transporte/margem do cliente idêntico; ausência de base conserva origem e alerta.
 - [x] 200 testes aprovados; telas autenticadas de Resultados, cadastro de apoio e Fechamento conferidas; relatórios nominal e planilha de outubro entregues.
-- [ ] Restringir Escalado sem RDO ao próprio serviço, bloquear RDO de outro cliente e manter 8h em serviço sem RDO.
-- [ ] Comparar outubro com versão anterior; atualizar relatórios v2 e testar as quatro regras preservando margem/apoio.
+- [x] Restringir Escalado sem RDO ao próprio serviço, bloquear RDO de outro cliente e manter 8h em serviço sem RDO; Marcelo 27–30/10 confirmado na tela autenticada.
+- [x] Outubro comparado nos mesmos 93 serviços: 345→111 casos zerados, 2672→864h, MO removida R$113443,26→R$39405,10; relatórios v2 nominal e XLSX conferidos; 40 testes em 9 arquivos, receita/margem/apoio preservados.
