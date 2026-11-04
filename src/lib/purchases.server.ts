@@ -131,7 +131,7 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
       for (const [partIndex, part] of plan.entries()) {
         const resolved = asset ? await assetAllocation(part.month, part.amount) : { allocation: alloc, hours };
         if (!resolved.allocation.parts.length) { pendingReason = resolved.allocation.reason; break; }
-        const portion: CcItem = { ...item, amount: part.amount, date: asset ? null : item.date };
+        const portion: CcItem = { ...item, amount: part.amount, date: asset ? null : item.date ?? null };
         const rows = purchaseItemEntries([portion], part.amount, resolved.allocation, resolved.hours, r.industryWorkIds, monthRange(part.month).to);
         planned.push(...rows.map((row) => ({ ...row, category: asset ? (decision?.category === "transporte" ? "terceiros" : decision?.category === "mo" ? "mao_obra" : decision?.category ?? "materiais") as typeof row.category : row.category, description: plan.length > 1 ? `${row.description} · Parcela ${partIndex + 1}/${plan.length}` : row.description, purchase_item_key: key, competence_month: part.month })));
       }
