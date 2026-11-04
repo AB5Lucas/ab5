@@ -32,4 +32,4 @@
 - [x] Conferir outubro autenticado, comparar totais e entregar relatório dos 93 serviços; 104 testes aprovados. Divergências de alíquota, base de receita e corte de custos aguardam decisão do usuário.
 - [x] Reincluir RH00076 e reprocessar outubro: R$868.430,21 lançados, R$322.507,19 excluídos, Kombi R$55.000 pendente; 9 destinos e redirecionamentos preservados, 43 CC conciliados, zero códigos excluídos em custos; 70 testes e tela autenticada conferidos.
 - [x] Entregar auditoria nominal no chat: 3 mensais sem pedido, 14 custos sem pedido da auditoria anterior, 35 pedidos zero e 13 divergências; indicar que custos são de outubro e Financeiro não foi discriminado nessa comparação.
-- [ ] Reincluir sete benefícios e restaurar decisão autorizada da Kombi em 12 parcelas; reprocessar outubro, conciliar 43 CC e comparar clientes/parcelas; testar.
+- [x] Reincluir sete benefícios e restaurar decisão autorizada da Kombi em 12 parcelas; outubro R$1.080.983,27, exclusões R$114.537,46, futuras parcelas R$50.416,67; 43 CC conciliados, 9 destinos preservados, 70 testes aprovados; comparar clientes/parcelas no chat.
