@@ -1040,7 +1040,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
           <div className="max-h-[70vh] overflow-auto text-sm">
             {detail === "mo" && <ResultSupport clientId={work?.client_id ?? undefined} canWrite={canWrite} />}
             {detail === "mo" && !!calc?.missingRdo.length && <div className="my-3 border-l-2 border-destructive pl-3 text-destructive"><p className="font-semibold">Escalado sem RDO</p>{calc.missingRdo.map((r) => <p key={`${r.id}:${r.workId}:${r.date}`}>{r.name} · {fmtDate(r.date)} · 0h</p>)}</div>}
-            {detail === "mo" && !!calc?.supportNoActivity.length && <p className="my-3 text-destructive">Apoio sem base de horas: mantido no serviço escalado em {calc.supportNoActivity.map((r) => fmtDate(r.date)).join(", ")}.</p>
+            {detail === "mo" && !!calc?.supportNoActivity.length && <p className="my-3 text-destructive">Apoio sem base de horas: mantido no serviço escalado em {calc.supportNoActivity.map((r) => fmtDate(r.date)).join(", ")}.</p>}
             {detail === "mo" && calc && (
               <>
                 <Table>
