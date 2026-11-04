@@ -1,3 +1,5 @@
+import { marginPercent, meanMarginPercent } from "@/lib/result-labor";
+import { MarginPercent } from "@/components/margin-percent";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
@@ -35,7 +37,7 @@ const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR
 
 type Line = {
   work: any; billed: number; tax: number; mo: number; transport: number; materials: number;
-  margin: number; progress: number; monthPct: number; total: { margin: number; pct: number }; full: any; raw: any;
+  margin: number; progress: number; monthPct: number | null; total: { margin: number; pct: number | null }; full: any; raw: any;
 };
 
 function FinanceiroPage() {
@@ -144,9 +146,9 @@ function FinanceiroPage() {
       if (w.monthly_enabled && months.length > 0) {
         const rev = monthlyOrderRevenue(w, "", "", yms);
         const m = rev * (1 - FIN_TAX) - (mo + transport + materials);
-        total = { margin: m, pct: rev ? (m / rev) * 100 : 0 };
+        total = { margin: m, pct: marginPercent(m, rev) };
       }
-      g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: compBilled ? (margin / compBilled) * 100 : 0, total, full, raw });
+      g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: marginPercent(margin, compBilled), total, full, raw });
       by.set(key, g);
     });
     return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
@@ -246,8 +248,8 @@ function FinanceiroPage() {
                     <TableCell className="text-right">{brl(l.materials)}</TableCell>
                     <TableCell className={`text-right font-medium ${l.margin < 0 ? "text-destructive" : ""}`}>{brl(l.margin)}</TableCell>
                     <TableCell className="text-right">{pct(l.progress)}</TableCell>
-                    <TableCell className={`text-right ${l.monthPct < 0 ? "text-destructive" : ""}`}>{pct(l.monthPct)}</TableCell>
-                    <TableCell className={`text-right ${l.total.margin < 0 ? "text-destructive" : ""}`}><span>{pct(l.total.pct)}</span> <span className="text-xs text-muted-foreground">({brl(l.total.margin)})</span></TableCell>
+                    <TableCell className="text-right"><MarginPercent value={l.monthPct} margin={l.margin} /></TableCell>
+                    <TableCell className={`text-right ${l.total.margin < 0 ? "text-destructive" : ""}`}><MarginPercent value={l.total.pct} margin={l.total.margin} /> <span className="text-xs text-muted-foreground">({brl(l.total.margin)})</span></TableCell>
                   </TableRow>
                 ))}
               </Fragment>
@@ -264,14 +266,14 @@ function FinanceiroPage() {
                 <TableCell className="text-right">{brl(sum((l) => l.materials))}</TableCell>
                 <TableCell className="text-right">{brl(tMargin)}</TableCell>
                 <TableCell />
-                <TableCell className="text-right">{pct(tBilled ? (tMargin / tBilled) * 100 : 0)}</TableCell>
+                <TableCell className="text-right">{<MarginPercent value={marginPercent(tMargin, tBilled)} margin={tMargin} />}</TableCell>
                 <TableCell className="text-right">
                   {(() => {
                     const ls = shown.flatMap((g) => g.lines);
                     const n = ls.length || 1;
                     const m = ls.reduce((a, l) => a + l.total.margin, 0) / n;
-                    const p = ls.reduce((a, l) => a + l.total.pct, 0) / n;
-                    void m; return pct(p);
+                    const p = meanMarginPercent(ls.map((l) => l.total.pct), m);
+                    return <MarginPercent value={p} margin={m} />;
                   })()}
                 </TableCell>
               </TableRow>
