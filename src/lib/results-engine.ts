@@ -43,8 +43,27 @@ export async function fetchAll<T>(build: (from: number, to: number) => PromiseLi
 
 const RESPLIT_AT = new Map<string, number>();
 
+/** Query-scoped shared inputs: no singleton cache across users or requests. */
+export async function loadResultShared() {
+  const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
+    fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("schedule_id, collaborator_id").in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
+    supabase.from("transport_voucher_rules").select("*").eq("active", true),
+    supabase.from("driver_bonus_rules").select("*").eq("active", true),
+    supabase.from("travel_bonus_rules").select("*").eq("active", true),
+    supabase.from("city_distances").select("city_a, city_b, km"),
+  ]);
+  for (const result of [vtRules, dbRules, tbRules, cityDist]) if (result.error) throw result.error;
+  return { people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist };
+}
+
+export function sliceResultRaw(raw: any, workId: string) {
+  return { ...raw, allocs: raw.allocs.filter((r: any) => r.work_id === workId), rdoWf: raw.rdoWf.filter((r: any) => r.work_id === workId), progress: raw.progress.filter((r: any) => r.work_id === workId), entries: raw.entries.filter((r: any) => r.work_id === workId), workTravelRows: raw.workTravelRows.filter((r: any) => r.work_id === workId) };
+}
+
 /** Carrega os dados brutos de um serviço (ou de vários, em "Todos os serviços"). */
-export async function loadWorkData(work: any, workIds: string[], canWrite: boolean): Promise<any> {
+export async function loadWorkData(work: any, workIds: string[], canWrite: boolean, shared?: Awaited<ReturnType<typeof loadResultShared>>): Promise<any> {
       const w = work;
       // Rateios vigentes: refaz pelas horas atuais (inclui serviços novos com horas no mês)
       if (canWrite && w.client_id && Date.now() - (RESPLIT_AT.get(w.client_id) ?? 0) > 5 * 60_000) {
@@ -61,7 +80,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
         fetchAll<any>((a, b) => supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", workIds).order("entry_date", { ascending: false }).order("id").range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
+        shared ? Promise.resolve(shared.people) : fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
         w.client_id ? supabase.from("works").select("id, monthly_enabled, night_shift").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
@@ -76,15 +95,15 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         // VT é marcado por cliente na Programação: lê de todos os serviços do cliente
         fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", [...new Set([...workIds, ...(((siblings as any).data ?? []) as any[]).map((x) => x.id)])]).range(a, b)),
         fetchAll<any>((a, b) => supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("work_id", workIds).range(a, b)),
-        fetchAll<any>((a, b) =>
+        shared ? Promise.resolve(shared.noVtRows) : fetchAll<any>((a, b) =>
           supabase.from("daily_status_entries").select("schedule_id, collaborator_id")
             .in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b),
         ),
-        fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
-        supabase.from("transport_voucher_rules").select("*").eq("active", true),
-        supabase.from("driver_bonus_rules").select("*").eq("active", true),
-        supabase.from("travel_bonus_rules").select("*").eq("active", true),
-        supabase.from("city_distances").select("city_a, city_b, km"),
+        shared ? Promise.resolve(shared.leaves) : fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
+        shared ? Promise.resolve(shared.vtRules) : supabase.from("transport_voucher_rules").select("*").eq("active", true),
+        shared ? Promise.resolve(shared.dbRules) : supabase.from("driver_bonus_rules").select("*").eq("active", true),
+        shared ? Promise.resolve(shared.tbRules) : supabase.from("travel_bonus_rules").select("*").eq("active", true),
+        shared ? Promise.resolve(shared.cityDist) : supabase.from("city_distances").select("city_a, city_b, km"),
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
       const clientName = (client as any).data?.name as string | undefined;
@@ -535,9 +554,13 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         progMap.set(ym, val);
       }
     }
+    const groupedWorks = isAll ? opts.allWorks.filter((w) => workIds.includes(w.id)) : [];
+    const monthlyWork = isAll ? groupedWorks.length > 0 && groupedWorks.every((w) => w.monthly_enabled) : !!work.monthly_enabled;
+    const orderMonths = monthlyWork ? ((Array.isArray(work.orders) ? work.orders : []) as any[]).filter((o) => o?.date && (!untilMonth || String(o.date).slice(0, 7) <= untilMonth)).map((o) => String(o.date).slice(0, 7)) : [];
+    if (monthlyWork) for (const ym of [...monthly.keys(), ...orderMonths]) progMap.set(ym, 100);
     const months = [...new Set([...monthly.keys(), ...progMap.keys()])].filter((ym) => isResultMonth(ym, fromMonth, "", opts.selectedMonths)).sort();
     // Valor do pedido: sempre o informado em Dados do Cliente (HH ou não)
-    const order = Number(work.order_value ?? 0);
+    const order = monthlyWork ? monthlyOrderRevenue(work, fromMonth, untilMonth, opts.selectedMonths) : Number(work.order_value ?? 0);
     const biRaw = ((work as any).budget_items ?? {}) as Record<string, number>;
     const bdiOn = !isAll && Number(biRaw["bdi"] ?? 0) === 1;
     const budget = bdiOn ? order * BDI_RATE : Number(work.budget_cost ?? 0);
@@ -554,7 +577,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       accBilling += m.billing;
       const prev = lastPct;
       if (progMap.has(ym)) lastPct = progMap.get(ym)!;
-      const revenue = (order * Math.max(0, lastPct - basePct)) / 100;
+      const revenue = monthlyWork ? monthlyOrderRevenue(work, fromMonth, ym, opts.selectedMonths) : (order * Math.max(0, lastPct - basePct)) / 100;
       const margin = revenue - revenue * TAX_RATE - accCost;
       const marginPct = revenue ? (margin / revenue) * 100 : 0;
       return {
@@ -632,7 +655,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
-    return { rows, last, order, budget: budgetOut, budgetMarginPct: budgetMarginOut, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount };
+    return { rows, last, order, budget: budgetOut, budgetMarginPct: budgetMarginOut, tot, items, monthBars, first, lastDay, days, laborRows, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount, billingMonths: d.entries.filter((e: any) => e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)) as string[] };
 }
 
 export const BDI_RATE = 0.5885;
@@ -681,7 +704,8 @@ export function adjustedItems(work: any, base: NonNullable<ReturnType<typeof bui
 export function totalMargin(work: any, full: NonNullable<ReturnType<typeof buildBase>>) {
   if (!full.last) return { margin: 0, pct: 0 };
   if (work.monthly_enabled) {
-    const list = ((Array.isArray(work.orders) ? work.orders : []) as any[]).filter((o) => o.date);
+    const lastMonth = full.last.ym;
+    const list = ((Array.isArray(work.orders) ? work.orders : []) as any[]).filter((o) => o.date && String(o.date).slice(0, 7) <= lastMonth);
     const months = new Set(list.map((o) => String(o.date).slice(0, 7)));
     const revenue = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
     const cost = full.rows.filter((r) => months.has(r.ym)).reduce((a, r) => a + r.monthCost, 0);
@@ -694,7 +718,12 @@ export function totalMargin(work: any, full: NonNullable<ReturnType<typeof build
 
 /** Andamento (%) até o mês informado, como em Resultados. */
 export function progressUntil(work: any, full: NonNullable<ReturnType<typeof buildBase>>, untilYm: string) {
-  if (work.contract_enabled) return contractFraction(full.billingCount, Number(work.contract_months ?? 12)) * 100;
+  if (work.monthly_enabled) return 100;
+  if (work.contract_enabled) return contractFraction(full.billingMonths.filter((ym) => ym <= untilYm).length, Number(work.contract_months ?? 12)) * 100;
   const r = full.rows.filter((x) => x.ym <= untilYm).pop();
   return r?.progress ?? 0;
+}
+
+export function monthlyOrderRevenue(work: any, from = "", until = "", selected?: readonly string[]): number {
+  return ((Array.isArray(work.orders) ? work.orders : []) as any[]).filter((o) => o?.date && isResultMonth(String(o.date).slice(0, 7), from, until, selected)).reduce((sum, o) => sum + Number(o.value ?? 0), 0);
 }

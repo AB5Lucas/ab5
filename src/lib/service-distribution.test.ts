@@ -35,8 +35,9 @@ describe("indicadores de Serviços", () => {
   });
 });
 describe("indicador recente de Serviços", () => {
-  it("cobre hoje e os 7 dias anteriores", () => {
-    expect(recentRange("2026-10-30")).toEqual({ start: "2026-10-23", end: "2026-10-30" });
+  it("cobre ontem até 7 dias atrás, excluindo hoje", () => {
+    expect(recentRange("2026-10-30")).toEqual({ start: "2026-10-23", end: "2026-10-29" });
+    expect(recentRange("2026-11-04")).toEqual({ start: "2026-10-28", end: "2026-11-03" });
   });
   it("Três Corações só conta no fim de semana", () => {
     expect(isTresCoracoes("TRÊS CORAÇÕES")).toBe(true);
