@@ -33,3 +33,7 @@
 - [x] Reincluir RH00076 e reprocessar outubro: R$868.430,21 lançados, R$322.507,19 excluídos, Kombi R$55.000 pendente; 9 destinos e redirecionamentos preservados, 43 CC conciliados, zero códigos excluídos em custos; 70 testes e tela autenticada conferidos.
 - [x] Entregar auditoria nominal no chat: 3 mensais sem pedido, 14 custos sem pedido da auditoria anterior, 35 pedidos zero e 13 divergências; indicar que custos são de outubro e Financeiro não foi discriminado nessa comparação.
 - [x] Reincluir sete benefícios e restaurar decisão autorizada da Kombi em 12 parcelas; outubro R$1.080.983,27, exclusões R$114.537,46, futuras parcelas R$50.416,67; 43 CC conciliados, 9 destinos preservados, 70 testes aprovados; comparar clientes/parcelas no chat.
+- [ ] Resultados: zerar escalados ausentes em RDO existente do cliente, alertar e auditar outubro.
+- [ ] Margem sem receita: percentual indefinido em telas/exportações, sem mudar receita mensal.
+- [ ] Apoio rateado configurável por colaborador/cliente; ativar dois colaboradores na Três Corações e comparar outubro.
+- [ ] Testar as três regras, conferir telas autenticadas e reportar números.
