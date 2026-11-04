@@ -4722,6 +4722,15 @@ export type Database = {
         Returns: undefined
       }
       prev_business_day: { Args: { _date: string }; Returns: string }
+      purchase_replace_entries: {
+        Args: {
+          _entries: Json
+          _line: string
+          _reason: string
+          _status: string
+        }
+        Returns: number
+      }
       rdo_add_worker: {
         Args: {
           _collaborator_id: string

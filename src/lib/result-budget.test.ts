@@ -16,7 +16,7 @@ describe("monthly budget shown in Resultados", () => {
     const result = displayedBudgetItems(items, 0.3, { mo: 80000, transporte: 37700 });
     expect(result.reduce((sum, item) => sum + item.budget, 0)).toBe(117700);
   });
-  it("keeps progress scaling for non-monthly services", () => {
-    expect(displayedBudgetItems(items, 0.5).map((item) => item.budget)).toEqual([25000, 5000]);
+  it("keeps the full fixed budget for non-monthly services", () => {
+    expect(displayedBudgetItems(items, 0.5).map((item) => item.budget)).toEqual([50000, 10000]);
   });
 });

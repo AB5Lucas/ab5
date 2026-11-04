@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { classifyService, invoiceFolderName, missingStatus, monthsToSync, ordersFileName, parseInvoices, parseOrders, parseWorksBillingRows, stripZeros } from "./industry-sync";
 
 describe("indústria", () => {
-  for (const description of ["SERVICOS COBRANCA OBRAS 3%", "SERVICOS OBRAS EXTERNAS MANUT/REPARO"]) {
+  it("ignora totalmente SERVICOS COBRANCA OBRAS 3% no relatório da Indústria", () => {
+    const r: unknown[] = Array(44).fill("");
+    r[1] = "001702"; r[7] = "2026-10-23"; r[12] = "MOINHO"; r[16] = "8395"; r[25] = "SERVICOS COBRANCA OBRAS 3%"; r[43] = 1602.82;
+    expect(parseInvoices([r])).toEqual([]);
+    expect(parseWorksBillingRows([r])).toEqual([]);
+  });
+  for (const description of ["SERVICOS OBRAS EXTERNAS MANUT/REPARO"]) {
     it(`encaminha ${description} somente para Serviços`, () => {
       const r: unknown[] = Array(44).fill("");
       r[1] = "001702"; r[7] = "2026-10-23"; r[12] = "MOINHO"; r[16] = "8395"; r[25] = description; r[43] = 1602.82;
