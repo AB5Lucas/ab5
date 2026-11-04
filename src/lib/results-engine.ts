@@ -554,7 +554,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         progMap.set(ym, val);
       }
     }
-    const monthlyWork = !isAll && work.monthly_enabled;
+    const groupedWorks = isAll ? opts.allWorks.filter((w) => workIds.includes(w.id)) : [];
+    const monthlyWork = isAll ? groupedWorks.length > 0 && groupedWorks.every((w) => w.monthly_enabled) : !!work.monthly_enabled;
     const orderMonths = monthlyWork ? ((Array.isArray(work.orders) ? work.orders : []) as any[]).filter((o) => o?.date && (!untilMonth || String(o.date).slice(0, 7) <= untilMonth)).map((o) => String(o.date).slice(0, 7)) : [];
     if (monthlyWork) for (const ym of [...monthly.keys(), ...orderMonths]) progMap.set(ym, 100);
     const months = [...new Set([...monthly.keys(), ...progMap.keys()])].filter((ym) => isResultMonth(ym, fromMonth, "", opts.selectedMonths)).sort();

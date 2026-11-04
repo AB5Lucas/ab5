@@ -32,6 +32,11 @@ describe("andamento e receita mensal compartilhados", () => {
     expect(b?.last?.cost).toBe(100);
   });
   it("receita respeita meses não consecutivos", () => expect(monthlyOrderRevenue(w, "", "", ["2026-09", "2026-11"])).toBe(4000));
+  it("resultado geral com todos mensais também é 100% e usa pedidos", () => {
+    const b = buildBase(w, empty, "2026-10", "2026-10", { ...opts, isAll: true });
+    expect(b?.last?.progress).toBe(100);
+    expect(b?.last?.revenue).toBe(2000);
+  });
   it("contrato histórico não conta nota futura", () => {
     const cw = { id: "m", contract_enabled: true, contract_months: 12, order_value: 12000 };
     const b = buildBase(cw, { ...empty, entries: [{ work_id: "m", category: "faturamento", entry_date: "2026-10-10", amount: 1000 }, { work_id: "m", category: "faturamento", entry_date: "2026-11-10", amount: 1000 }] }, "", "", opts);
