@@ -1,3 +1,6 @@
+import { marginPercent, meanMarginPercent } from "@/lib/result-labor";
+import { MarginPercent } from "@/components/margin-percent";
+import { ResultSupport } from "@/components/result-support";
 import { contractFraction } from "@/lib/contract";
 import { resultWorksForRole } from "@/lib/result-work-access";
 import { isResultMonth } from "@/lib/result-period";
@@ -200,11 +203,11 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
           const revenue = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
           const cost = (b?.rows ?? []).filter((r: any) => months.has(String(r.ym).slice(0, 7))).reduce((a: number, r: any) => a + Number(r.monthCost ?? 0), 0);
           const margin = revenue * (1 - TAX_RATE) - cost;
-          return { margin, pct: revenue ? (margin / revenue) * 100 : 0 };
-        }).filter(Boolean) as { margin: number; pct: number }[];
+          return { margin, pct: marginPercent(margin, revenue) };
+        }).filter(Boolean) as { margin: number; pct: number | null }[];
         if (res.length) return {
           margin: res.reduce((a, r) => a + r.margin, 0),
-          pct: res.reduce((a, r) => a + r.pct, 0) / res.length,
+          pct: meanMarginPercent(res.map((r) => r.pct), res.reduce((a, r) => a + r.margin, 0)),
         };
       }
     }
@@ -220,10 +223,10 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
       const revenue = list.filter((o) => o.date).reduce((a, o) => a + Number(o.value ?? 0), 0);
       const cost = b.rows.filter((r: any) => months.has(String(r.ym).slice(0, 7))).reduce((a: number, r: any) => a + Number(r.monthCost ?? 0), 0);
       const margin = revenue * (1 - TAX_RATE) - cost;
-      return { margin, pct: revenue ? (margin / revenue) * 100 : 0 };
+      return { margin, pct: marginPercent(margin, revenue) };
     }
     const margin = b.last.revenue * (1 - TAX_RATE) - b.last.cost;
-    return { margin, pct: b.last.revenue ? (margin / b.last.revenue) * 100 : 0 };
+    return { margin, pct: marginPercent(margin, b.last.revenue) };
   }, [work, data.data, hasPeriod, isAll, holidaysQ.data, works.data, workIds, fromMonth, untilMonth, selectedMonths]);
 
   // ---------- Edição ----------
@@ -382,7 +385,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     const rows = calcRt.rows.map((r) => {
       const revenue = list.filter((o) => o.date && isResultMonth(String(o.date).slice(0, 7), fromMonth, r.ym, selectedMonths)).reduce((a, o) => a + Number(o.value ?? 0), 0);
       const margin = revenue - revenue * TAX_RATE - r.cost;
-      return { ...r, progress: 100, revenue, margin, marginPct: revenue ? (margin / revenue) * 100 : 0, consumed: budget ? (r.cost / budget) * 100 : 0 };
+      return { ...r, progress: 100, revenue, margin, marginPct: marginPercent(margin, revenue), consumed: budget ? (r.cost / budget) * 100 : 0 };
     });
     const last = rows.length ? { ...rows[rows.length - 1]!, progress: calcRt.last?.progress ?? rows[rows.length - 1]!.progress } : calcRt.last;
     return { ...calcRt, items, budget, order, rows, last, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
@@ -706,7 +709,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   })();
   const fixedBudgetPct = allMonthlyOrders != null ? (1 - TAX_RATE - BDI_RATE) * 100 : calc?.budgetMarginPct ?? 0;
   const fixedBudget = { margin: (allMonthlyOrders ?? fullOrder) * (fixedBudgetPct / 100), pct: fixedBudgetPct };
-  const fixedReal = totalReal ?? { margin: realMargin, pct: last?.marginPct ?? 0 };
+  const fixedReal = totalReal ?? { margin: realMargin, pct: last?.marginPct ?? null };
   const totReal = calc?.items.reduce((a, i) => a + i.real, 0) ?? 0;
   const progFrac = (() => {
     const ob = Number(calc?.order ?? 0);
@@ -1012,14 +1015,14 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                 <div className="row-span-2 mx-4 w-px bg-border" />
                 <p className={`pt-6 text-sm ${fixedReal.margin < 0 ? "text-destructive" : ""}`}>{brl(fixedReal.margin)}</p>
                 <p className="pt-4 text-lg">{pct(fixedBudget.pct)}</p>
-                <p className={`pt-4 text-lg ${fixedReal.pct < 0 ? "text-destructive" : ""}`}>{pct(fixedReal.pct)}</p>
+                <p className="pt-4 text-lg"><MarginPercent value={fixedReal.pct} margin={fixedReal.margin} /></p>
               </div>
               {monthlyInfo && hasPeriod && (
                 <div className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-center">
                   <SectionTitle>Margem Mensal</SectionTitle>
                   <div className={`flex items-baseline justify-center gap-4 pt-2 ${realMargin < 0 ? "text-destructive" : ""}`}>
                     <span className="text-sm">{brl(realMargin)}</span>
-                    <span className="text-lg">{pct(last?.marginPct ?? 0)}</span>
+                    <span className="text-lg"><MarginPercent value={last?.marginPct ?? null} margin={realMargin} /></span>
                   </div>
                 </div>
               )}
@@ -1035,11 +1038,11 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
             <DialogTitle>Custo realizado — {catLabel(detail ?? "")}</DialogTitle>
           </DialogHeader>
           <div className="max-h-[70vh] overflow-auto text-sm">
+            {detail === "mo" && <ResultSupport clientId={work?.client_id ?? undefined} canWrite={canWrite} />}
+            {detail === "mo" && !!calc?.missingRdo.length && <div className="my-3 border-l-2 border-destructive pl-3 text-destructive"><p className="font-semibold">Escalado sem RDO</p>{calc.missingRdo.map((r) => <p key={`${r.id}:${r.workId}:${r.date}`}>{r.name} · {fmtDate(r.date)} · 0h</p>)}</div>}
+            {detail === "mo" && !!calc?.supportNoActivity.length && <p className="my-3 text-destructive">Apoio sem base de horas: mantido no serviço escalado em {calc.supportNoActivity.map((r) => fmtDate(r.date)).join(", ")}.</p>}
             {detail === "mo" && calc && (
               <>
-                <p className="mb-2 text-xs text-muted-foreground">
-                  Horas do RDO (ausente = 0h; sem RDO, escalado = {DEFAULT_HOURS}h) × valor hora × adicional (sábado e hora extra acima de 8h × 1,6; domingo e feriado × 2) × {String(ENCARGOS).replace(".", ",")} (encargos; PJ sem encargos).
-                </p>
                 <Table>
                   <TableBody>
                     <TableRow className="font-semibold">
