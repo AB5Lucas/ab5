@@ -126,9 +126,9 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     r.seen.add(date);
     const work = a.works?.clients?.name ? `${a.works.clients.name} - ${a.works.name}` : a.works?.name ?? "—";
     const st = statusByKey.get(`${a.schedule_id}|${a.collaborator_id}`);
-    const reason = holiday.has(date) ? `Feriado (${holiday.get(date)})`
+    const reason = personAbsence(a.collaborator_id, date) ?? (holiday.has(date) ? `Feriado (${holiday.get(date)})`
       : st ? statusLabel(st)
-      : personAbsence(a.collaborator_id, date) ?? rdoAbsent.get(`${a.collaborator_id}|${date}`) ?? null;
+      : rdoAbsent.get(`${a.collaborator_id}|${date}`) ?? null);
     r.days.push({ date, work, status: reason ?? "Trabalhado", counted: !reason, reason: reason ?? undefined });
     if (reason) continue;
     r.meals++;
@@ -152,7 +152,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     const label = statusLabel(e.box_key);
     r.days.push({ date, work: label, status: label, counted: false, reason: label });
     const isBox = e.box_key === "aso" || e.box_key === "treinamento" || e.box_key.startsWith("integracao");
-    if (!isBox) continue;
+    if (!isBox || personAbsence(e.collaborator_id, date)) continue;
     const on = personVt.get(`${e.schedule_id}|${e.box_key}|${e.collaborator_id}`) ?? boxVt.get(`${e.schedule_id}|${e.box_key}`) ?? (e.box_key === "aso" || e.box_key === "treinamento");
     const units = (e.box_key === "aso" ? 1 : 0) + (on ? 1 : 0);
     if (units) r.vtRows.push({ date, work: label, pays: true, value: perDay(false, units) });
@@ -165,6 +165,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
   ]);
   const dDays = new Map<string, { c: any; days: Map<string, number> }>();
   for (const v of (vsch ?? []) as any[]) {
+    if (personAbsence(v.driver_id, v.schedule_date)) continue;
     if (!driverBonusFor(transport, v, v.collaborators?.contract_type === "pj")) continue;
     const e = dDays.get(v.driver_id) ?? { c: v.collaborators, days: new Map<string, number>() };
     e.days.set(v.schedule_date, (e.days.get(v.schedule_date) ?? 0) + (Number(v.km ?? 0) || 0));

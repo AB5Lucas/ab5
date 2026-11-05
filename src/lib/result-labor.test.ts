@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resultHours, marginPercent, supportDailyWeights, supportShare, meanMarginPercent } from "./result-labor";
+import { resultHours, resultAbsenceCheck, marginPercent, supportDailyWeights, supportShare, meanMarginPercent } from "./result-labor";
 import { buildBase, sliceResultRaw } from "./results-engine";
 
 const empty = { allocs: [], sibAllocs: [], sibRdo: [], rdoWf: [], entries: [], progress: [], people: [], vs: [], client: {}, workVt: [], workTravelRows: [], noVtRows: [], leaves: [], vtRules: [], dbRules: [], tbRules: [], cityDist: [], integAppts: [], integBoxes: [], monthlyIds: [], nightIds: [], siblingCount: 2 };
@@ -39,6 +39,49 @@ describe("margem sem receita", () => {
     expect(b?.last?.margin).toBe(-100); expect(b?.last?.marginPct).toBeNull();
   });
   it("margem negativa nunca fica positiva nem vira zero na média", () => { expect(marginPercent(-100, 1000)).toBe(-10); expect(meanMarginPercent([50, -10], -100)).toBeNull(); expect(marginPercent(0, 1000)).toBe(0); });
+});
+describe("ausências cadastradas não são trabalho nem pendência de RDO", () => {
+  const base = () => {
+    const a = alloc("cristiano", "a");
+    return { ...empty, allocs: [a], sibAllocs: [a], people: [{ id: "cristiano", salary: 10 }], vtRules: [{ amount: 5, applies_to_collaborators: true }], tbRules: [{ bonus_amount: 25, minimum_distance: 0, maximum_distance: null }] };
+  };
+  it.each([
+    ["folga de um dia", { daysOff: [{ collaborator_id: "cristiano", date: "2026-10-27", end_date: null }] }],
+    ["férias no último dia", { vacations: [{ collaborator_id: "cristiano", start_date: "2026-10-01", end_date: "2026-10-27" }] }],
+    ["afastamento no primeiro dia", { leaves: [{ collaborator_id: "cristiano", start_date: "2026-10-27", end_date: "2026-10-31" }] }],
+    ["quadro de folga", { noVtRows: [{ collaborator_id: "cristiano", schedule_id: "2026-10-27", daily_schedules: { schedule_date: "2026-10-27" } }] }],
+  ])("%s zera horas, dias, MO, VT e viagem sem alerta", (_name, absence) => {
+    const b = calc({ ...base(), ...absence });
+    expect(b?.laborRows).toHaveLength(0);
+    expect(b?.days).toBe(0);
+    expect(b?.tot.labor).toBe(0);
+    expect(b?.vtTotal).toBe(0);
+    expect(b?.travelTotal).toBe(0);
+    expect(b?.missingRdo).toHaveLength(0);
+  });
+  it("folga suprime alerta mesmo com RDO do próprio serviço e não cobra RDO conflitante", () => {
+    const raw = { ...base(), daysOff: [{ collaborator_id: "cristiano", date: "2026-10-27", end_date: null }], clientRdos: [{ work_id: "a", report_date: "2026-10-27" }] };
+    expect(calc(raw)?.missingRdo).toHaveLength(0);
+    expect(calc({ ...raw, rdoWf: [{ work_id: "a", collaborator_id: "cristiano", report_date: "2026-10-27", present: true, worked_hours: 8 }] })?.tot.labor).toBe(0);
+  });
+  it("fora do intervalo mantém 8h e custo, sem vazar para outro colaborador", () => {
+    const absence = { daysOff: [{ collaborator_id: "cristiano", date: "2026-10-26", end_date: null }] };
+    expect(calc({ ...base(), ...absence })?.tot.labor).toBe(208);
+    const absent = resultAbsenceCheck(absence);
+    expect(absent("outro", "2026-10-26")).toBe(false);
+  });
+  it("pessoa de folga não participa dos pesos nem recebe apoio no seu serviço", () => {
+    const allocations = [alloc("support", "a"), alloc("cristiano", "a"), alloc("p2", "b")];
+    const raw = { ...base(), allocs: allocations, sibAllocs: allocations, supportIds: ["support"], people: [{ id: "support", salary: 10 }, { id: "cristiano", salary: 10 }, { id: "p2", salary: 0 }], daysOff: [{ collaborator_id: "cristiano", date: "2026-10-27", end_date: null }] };
+    expect(calc(raw, "a")?.tot.labor).toBe(0);
+    expect(calc(raw, "b")?.tot.labor).toBe(208);
+  });
+  it("folga também bloqueia custos de integração agendada e prêmio motorista", () => {
+    const raw = { ...base(), daysOff: [{ collaborator_id: "cristiano", date: "2026-10-27", end_date: null }], integAppts: [{ collaborator_id: "cristiano", scheduled_date: "2026-10-27" }], vs: [{ driver_id: "cristiano", driver_bonus: true, work_id: "a", schedule_date: "2026-10-27", km: 0 }], dbRules: [{ amount: 25, minimum_distance: 0, maximum_distance: null }] };
+    expect(calc(raw)?.tot.labor).toBe(0);
+    expect(calc(raw)?.driverTotal).toBe(0);
+    expect(calc(raw)?.travelTotal).toBe(0);
+  });
 });
 describe("apoio diário incluindo mensais", () => {
   it("distribui MO, VT e viagem 75/25 pelas horas dos demais e preserva total", () => {
