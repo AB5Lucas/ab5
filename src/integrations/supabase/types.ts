@@ -2565,6 +2565,8 @@ export type Database = {
           monthly_amount: number | null
           months: number
           purchase_cc_id: string
+          target_client_id: string | null
+          target_work_id: string | null
           updated_at: string
         }
         Insert: {
@@ -2578,6 +2580,8 @@ export type Database = {
           monthly_amount?: number | null
           months?: number
           purchase_cc_id: string
+          target_client_id?: string | null
+          target_work_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -2591,6 +2595,8 @@ export type Database = {
           monthly_amount?: number | null
           months?: number
           purchase_cc_id?: string
+          target_client_id?: string | null
+          target_work_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2599,6 +2605,20 @@ export type Database = {
             columns: ["purchase_cc_id"]
             isOneToOne: false
             referencedRelation: "purchase_cc_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_asset_decisions_target_client_id_fkey"
+            columns: ["target_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_asset_decisions_target_work_id_fkey"
+            columns: ["target_work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
             referencedColumns: ["id"]
           },
         ]
