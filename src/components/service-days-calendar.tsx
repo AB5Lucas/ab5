@@ -1,6 +1,6 @@
 import { laborCost } from "@/lib/labor-cost";
 import { resultAbsenceCheck } from "@/lib/result-labor";
-import { fetchAll, loadResultShared } from "@/lib/results-engine";
+import { loadResultShared } from "@/lib/results-engine";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays } from "lucide-react";

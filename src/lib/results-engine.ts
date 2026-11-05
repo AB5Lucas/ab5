@@ -287,7 +287,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const dayWorks = new Map<string, Map<string, number>>();
     for (const a of d.sibAllocs ?? []) {
       const dt = a.daily_schedules?.schedule_date as string | undefined;
-      if (!dt || hoursOf(`${a.collaborator_id}|${dt}`, a.work_id) <= 0) continue;
+      if (!dt || absent(a.collaborator_id, dt)) continue;
       const m = dayWorks.get(dt) ?? new Map<string, number>();
       m.set(a.work_id, (m.get(a.work_id) ?? 0) + 1);
       dayWorks.set(dt, m);
@@ -353,7 +353,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const dayMine = new Map<string, number>();
     for (const a of d.sibAllocs) {
       const dt = a.daily_schedules?.schedule_date as string | undefined;
-      if (!dt || hoursOf(`${a.collaborator_id}|${dt}`, a.work_id) <= 0) continue;
+      if (!dt || absent(a.collaborator_id, dt)) continue;
       dayTotal.set(dt, (dayTotal.get(dt) ?? 0) + 1);
       if (idSet.has(a.work_id)) dayMine.set(dt, (dayMine.get(dt) ?? 0) + 1);
     }
