@@ -14,7 +14,7 @@ export async function prepareRdoDownload(
     const file = await generate(id);
     onProgress(index + 1, ids.length);
     if (!zip) return file;
-    zip.file(`${String(index + 1).padStart(3, "0")}-${file.filename}`, file.blob);
+    zip.file(`${String(index + 1).padStart(3, "0")}-${file.filename}`, await file.blob.arrayBuffer());
   }
   if (!zip) throw new Error("Nenhum RDO encontrado.");
   return {

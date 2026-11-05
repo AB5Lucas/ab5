@@ -19,8 +19,7 @@ describe("filtered RDO download", () => {
     const progress: number[] = [];
     const file = await prepareRdoDownload(["filtered-a", "filtered-b"], async (id) => {
       calls.push(id);
-      const pdf = await generate(id);
-      return { ...pdf, blob: new Uint8Array(await pdf.blob.arrayBuffer()) as unknown as Blob };
+      return generate(id);
     }, (done) => progress.push(done));
     const zip = await JSZip.loadAsync(await file.blob.arrayBuffer());
     expect(file.filename.endsWith(".zip")).toBe(true);
