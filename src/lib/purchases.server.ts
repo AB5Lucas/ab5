@@ -28,14 +28,18 @@ async function monthHours(ym: string) {
       if (!data || data.length < 1000) return rows;
     }
   }
-  const [works, rows, headers, allocations, supports] = await Promise.all([
+  const [works, rows, headers, allocations, supports, daysOff, vacations, leaves, noVtRows] = await Promise.all([
     all((a, b) => supabaseAdmin.from("works").select("id,client_id").order("id").range(a, b)),
     all((a, b) => supabaseAdmin.from("rdo_workforce").select("work_id,collaborator_id,report_date,present,worked_hours").gte("report_date", from).lte("report_date", to).order("id").range(a, b)),
     all((a, b) => supabaseAdmin.from("rdos").select("work_id,report_date").gte("report_date", from).lte("report_date", to).order("id").range(a, b)),
     all((a, b) => supabaseAdmin.from("daily_allocations").select("work_id,collaborator_id,daily_schedules!inner(schedule_date)").gte("daily_schedules.schedule_date", from).lte("daily_schedules.schedule_date", to).order("id").range(a, b)),
     all((a, b) => supabaseAdmin.from("result_support_allocations").select("client_id,collaborator_id").order("client_id").order("collaborator_id").range(a, b)),
+    all((a, b) => supabaseAdmin.from("days_off").select("collaborator_id,date,end_date").lte("date", to).order("id").range(a, b)),
+    all((a, b) => supabaseAdmin.from("vacations").select("collaborator_id,start_date,end_date").lte("start_date", to).gte("end_date", from).order("id").range(a, b)),
+    all((a, b) => supabaseAdmin.from("medical_leaves").select("collaborator_id,start_date,end_date").lte("start_date", to).gte("end_date", from).order("id").range(a, b)),
+    all((a, b) => supabaseAdmin.from("daily_status_entries").select("collaborator_id,daily_schedules!inner(schedule_date)").in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).gte("daily_schedules.schedule_date", from).lte("daily_schedules.schedule_date", to).order("id").range(a, b)),
   ]);
-  return purchaseMonthHours(works, allocations, rows, headers, supports);
+  return purchaseMonthHours(works, allocations, rows, headers, supports, { daysOff, vacations, leaves, noVtRows });
 }
 
 async function loadRefs() {

@@ -1,5 +1,30 @@
-/** Same-client person rows win; otherwise only the assigned work's header suppresses fallback. */
-export function resultHours(row: any, hasWorkRdo: boolean, hasOtherClientRdo = false): number {
+export type ResultAbsences = {
+  daysOff?: { collaborator_id: string; date: string; end_date: string | null }[];
+  vacations?: { collaborator_id: string; start_date: string; end_date: string | null }[];
+  leaves?: { collaborator_id: string; start_date: string; end_date: string | null }[];
+  noVtRows?: { collaborator_id: string; daily_schedules?: { schedule_date: string } | null }[];
+};
+
+/** Registered absence ranges are inclusive; a single-day folga has no end date. */
+export function resultAbsenceCheck(raw: ResultAbsences) {
+  const ranges = new Map<string, { start: string; end: string }[]>();
+  const add = (id: string, start: string, end: string | null) => {
+    const list = ranges.get(id) ?? [];
+    list.push({ start, end: end ?? start });
+    ranges.set(id, list);
+  };
+  for (const r of raw.daysOff ?? []) add(r.collaborator_id, r.date, r.end_date);
+  for (const r of [...(raw.vacations ?? []), ...(raw.leaves ?? [])]) add(r.collaborator_id, r.start_date, r.end_date);
+  for (const r of raw.noVtRows ?? []) {
+    const date = r.daily_schedules?.schedule_date;
+    if (date) add(r.collaborator_id, date, date);
+  }
+  return (id: string, date: string) => (ranges.get(id) ?? []).some((r) => r.start <= date && date <= r.end);
+}
+
+/** Absences never create worked days; otherwise preserve the four RDO precedence cases. */
+export function resultHours(row: any, hasWorkRdo: boolean, hasOtherClientRdo = false, absent = false): number {
+  if (absent) return 0;
   if (row) return row.present ? Math.max(0, Number(row.worked_hours ?? 8)) : 0;
   return hasOtherClientRdo || hasWorkRdo ? 0 : 8;
 }
@@ -15,7 +40,7 @@ export function meanMarginPercent(values: (number | null)[], margin: number): nu
   return margin < 0 && average >= 0 ? null : average;
 }
 
-export function supportDailyWeights(allocs: any[], rdos: any[], headers: any[], supportIds: Set<string>, otherClientRdos: any[] = []) {
+export function supportDailyWeights(allocs: any[], rdos: any[], headers: any[], supportIds: Set<string>, otherClientRdos: any[] = [], absent: (id: string, date: string) => boolean = () => false) {
   const days = new Set<string>([...headers, ...rdos].map((r) => `${r.work_id}|${String(r.report_date).slice(0, 10)}`));
   const elsewhere = new Set<string>(otherClientRdos.map((r) => `${r.collaborator_id}|${r.report_date}`));
   const byPerson = new Map<string, any>(rdos.map((r) => [`${r.collaborator_id}|${r.report_date}`, r]));
@@ -36,14 +61,14 @@ export function supportDailyWeights(allocs: any[], rdos: any[], headers: any[], 
     if (supportIds.has(a.collaborator_id) || seen.has(key)) continue;
     seen.add(key);
     const rdo = byPerson.get(key);
-    add(rdo?.work_id ?? a.work_id, dt, resultHours(rdo, days.has(`${a.work_id}|${dt}`), elsewhere.has(key)));
+    add(rdo?.work_id ?? a.work_id, dt, resultHours(rdo, days.has(`${a.work_id}|${dt}`), elsewhere.has(key), absent(a.collaborator_id, dt)));
   }
   // Unscheduled people explicitly present in an RDO are valid activity weights, not extra costs.
   for (const r of rdos) {
     const key = `${r.collaborator_id}|${r.report_date}`;
     if (!r.collaborator_id || allocated.has(key) || supportIds.has(r.collaborator_id) || seen.has(key)) continue;
     seen.add(key);
-    add(r.work_id, r.report_date, resultHours(r, true));
+    add(r.work_id, r.report_date, resultHours(r, true, false, absent(r.collaborator_id, r.report_date)));
   }
   return weights;
 }

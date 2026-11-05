@@ -1,4 +1,6 @@
 import { laborCost } from "@/lib/labor-cost";
+import { resultAbsenceCheck } from "@/lib/result-labor";
+import { loadResultShared } from "@/lib/results-engine";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays } from "lucide-react";
@@ -26,11 +28,13 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
     queryKey: ["service-days", workIds.join(",")],
     enabled: open && workIds.length > 0,
     queryFn: async () => {
-      const out: { work_id: string; daily_schedules: { schedule_date: string } | null }[] = [];
+      const shared = await loadResultShared();
+      const absent = resultAbsenceCheck(shared);
+      const out: { work_id: string; collaborator_id: string; daily_schedules: { schedule_date: string } | null }[] = [];
       for (let f = 0; ; f += 1000) {
         const { data, error } = await supabase
           .from("daily_allocations")
-          .select("work_id, daily_schedules(schedule_date)")
+          .select("work_id, collaborator_id, daily_schedules(schedule_date)")
           .in("work_id", workIds)
           .order("id")
           .range(f, f + 999);
@@ -41,9 +45,10 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
       const byDay = new Map<string, Set<string>>();
       for (const r of out) {
         const d = r.daily_schedules?.schedule_date;
-        if (!d) continue;
-        if (!byDay.has(d)) byDay.set(d, new Set());
-        byDay.get(d)!.add(r.work_id);
+        if (!d || absent(r.collaborator_id, d)) continue;
+        const works = byDay.get(d) ?? new Set<string>();
+        works.add(r.work_id);
+        byDay.set(d, works);
       }
       return byDay;
     },
@@ -76,7 +81,9 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
         clientId ? supabase.from("vehicle_schedules").select("km, trips, work_id, vehicles(km_rate)").eq("schedule_date", picked!).eq("client_id", clientId) : Promise.resolve({ data: [] as any[] }),
         clientId ? supabase.from("clients").select("has_toll, toll_amount").eq("id", clientId).maybeSingle() : Promise.resolve({ data: null as any }),
       ]);
-      const all = (allocs.data ?? []) as any[];
+      const shared = await loadResultShared();
+      const absent = resultAbsenceCheck(shared);
+      const all = ((allocs.data ?? []) as any[]).filter((a) => !absent(a.collaborator_id, picked ?? ""));
       const mine = all.filter((a) => ids.has(a.work_id));
       const hrs = new Map<string, number>();
       for (const r of (wf.data ?? []) as any[]) if (r.present) hrs.set(`${r.work_id}|${r.collaborator_id}`, Number(r.worked_hours ?? 0));
@@ -113,7 +120,7 @@ export function ServiceDaysCalendar({ workIds, names, multi }: { workIds: string
         }, 0);
       let vt = 0;
       for (const a of (mineFull.data ?? []) as any[]) {
-        if (skip.has(a.collaborator_id)) continue;
+        if (skip.has(a.collaborator_id) || absent(a.collaborator_id, picked ?? "")) continue;
         const pouso = String(a.collaborators?.city ?? "").toLowerCase().includes("pouso alegre");
         const base = a.collaborators?.vt_enabled === false ? false : clientVt || pouso;
         if (!(a.vt_override ?? base)) continue;
