@@ -83,6 +83,28 @@ function usePresent(workId: string, start: string, end: string) {
   });
 }
 
+const posName = (r: any) => String(r.positions?.name ?? r.collaborators?.positions?.name ?? "");
+/** Função de cada presente no dia, mesma regra da aba Apontamentos. */
+function dayRoles(people: any[], order: string[]): string[] {
+  const isTst = (r: any) => /\btst\b|t[ée]cnico de seguran/i.test(posName(r));
+  const elig = people.filter((r) => !isTst(r));
+  const boss =
+    order.map((id) => elig.find((r) => r.collaborator_id === id)).find(Boolean) ??
+    elig.find((r) => /encarregad/i.test(posName(r))) ??
+    elig.find((r) => /l[ií]der/i.test(posName(r))) ??
+    elig[0];
+  return people.map((r) => (isTst(r) ? "TST" : r === boss ? "ENCARREGADO" : "MONTADOR DE ANDAIME"));
+}
+/** Suzano – Contrato Andaimes: produtividade conta só montadores (base Apontamentos). */
+const MONTADOR_ONLY_WORKS = new Set(["506894fa-df5a-4eae-9a78-9127b78a1143"]);
+
+function useForemanPriority() {
+  return useQuery({
+    queryKey: ["foreman-priority"],
+    queryFn: async () => (await supabase.from("closing_foreman_priority").select("id, collaborator_id, sort_order, collaborators(full_name)").order("sort_order")).data ?? [],
+  });
+}
+
 export function Apontamentos({ workId, start, end, ym }: { workId: string; start: string; end: string; ym: string }) {
   const present = usePresent(workId, start, end);
   const prio = useQuery({
@@ -103,22 +125,15 @@ export function Apontamentos({ workId, start, end, ym }: { workId: string; start
       byDay.set(r.report_date, l);
     }
     const order = (prio.data ?? []).map((p: any) => p.collaborator_id);
-    const pos = (r: any) => String(r.positions?.name ?? r.collaborators?.positions?.name ?? "");
     const out: { date: string; name: string; cpf: string; role: string }[] = [];
     for (const date of [...byDay.keys()].sort()) {
       const people = byDay.get(date)!;
-      const isTst = (r: any) => /\btst\b|t[ée]cnico de seguran/i.test(pos(r));
-      const elig = people.filter((r) => !isTst(r));
-      const boss =
-        order.map((id: string) => elig.find((r) => r.collaborator_id === id)).find(Boolean) ??
-        elig.find((r) => /encarregad/i.test(pos(r))) ??
-        elig.find((r) => /l[ií]der/i.test(pos(r))) ??
-        elig[0];
-      const list = people.map((r) => ({
+      const roles = dayRoles(people, order);
+      const list = people.map((r, i) => ({
         date,
         name: r.collaborators?.full_name ?? "—",
         cpf: r.collaborators?.cpf ?? "",
-        role: isTst(r) ? "TST" : r === boss ? "ENCARREGADO" : "MONTADOR DE ANDAIME",
+        role: roles[i]!,
       }));
       const rank = (x: { role: string }) => (x.role === "ENCARREGADO" ? 0 : x.role === "MONTADOR DE ANDAIME" ? 1 : 2);
       list.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "pt-BR"));
@@ -242,15 +257,25 @@ export function useProdRows(workId: string, start: string, end: string) {
       (await supabase.from("rdo_scaffolds").select("*, rdos!inner(report_date, work_id)")
         .eq("rdos.work_id", workId).gte("rdos.report_date", start).lte("rdos.report_date", end)).data ?? [],
   });
+  const prio = useForemanPriority();
+  const onlyMont = MONTADOR_ONLY_WORKS.has(workId);
   const perDay = useMemo(() => {
-    const m = new Map<string, Set<string>>();
+    const byDay = new Map<string, any[]>();
+    const seen = new Set<string>();
     for (const r of present.data ?? []) {
-      const s = m.get(r.report_date) ?? new Set();
-      s.add(r.collaborator_id);
-      m.set(r.report_date, s);
+      const k = `${r.report_date}|${r.collaborator_id}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      byDay.set(r.report_date, [...(byDay.get(r.report_date) ?? []), r]);
+    }
+    const order = (prio.data ?? []).map((p: any) => p.collaborator_id);
+    const m = new Map<string, Set<string>>();
+    for (const [d, people] of byDay) {
+      const roles = onlyMont ? dayRoles(people, order) : null;
+      m.set(d, new Set(people.filter((_, i) => !roles || roles[i] === "MONTADOR DE ANDAIME").map((r) => r.collaborator_id)));
     }
     return m;
-  }, [present.data]);
+  }, [present.data, prio.data, onlyMont]);
   const rows = (scaf.data ?? [])
     .map((s: any) => {
       const date = s.rdos?.report_date as string;
@@ -268,7 +293,19 @@ export function useProdRows(workId: string, start: string, end: string) {
 
 export function Produtividade({ workId, start, end }: { workId: string; start: string; end: string }) {
   const { rows, loading } = useProdRows(workId, start, end);
+  const exportXlsx = () => {
+    const ws = XLSX.utils.json_to_sheet(rows.map((r) => ({
+      Data: br(r.date), Ordem: r.ord, Atividade: r.op === "desmontagem" ? "Desmontagem" : "Montagem",
+      "Comprimento (m)": r.l, "Largura (m)": r.w, "Altura (m)": r.h, "Volume (m³)": Number(r.vol.toFixed(2)),
+      "Pessoas no dia": r.people, "Produtividade (m³/pessoa)": Number(r.prod.toFixed(2)),
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Produtividade");
+    XLSX.writeFile(wb, `produtividade-${start.slice(0, 7)}.xlsx`);
+  };
   return (
+    <div className="space-y-3">
+    <div className="flex justify-end"><Button onClick={exportXlsx} disabled={!rows.length}><Download className="h-4 w-4" />Exportar Excel</Button></div>
     <div className="panel overflow-x-auto">
       <Table>
         <TableHeader>
@@ -297,6 +334,7 @@ export function Produtividade({ workId, start, end }: { workId: string; start: s
           ))}
         </TableBody>
       </Table>
+    </div>
     </div>
   );
 }
