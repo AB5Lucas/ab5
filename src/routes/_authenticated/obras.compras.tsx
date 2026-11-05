@@ -149,7 +149,7 @@ function ComprasPage() {
   }
   function openAsset(line: Line, item: CcItem, state: PurchaseItemState) {
     const saved = d?.decisions.find((x) => x.purchase_cc_id === line.id && x.item_key === state.key);
-    setAsset({ line, item, state }); setAssetMode(saved?.mode ?? (state.asset ? "installments" : "integral")); setAssetMonths(saved?.months ?? 12); setAssetMonthly(saved?.monthly_amount ?? Math.round(item.amount * 100 / 12) / 100); setAssetCat(saved?.category ?? state.category ?? assetCategory(item));
+    setAsset({ line, item, state }); setAssetMode(saved?.mode === "pending" ? "pending" : saved?.mode === "installments" ? "installments" : "integral"); setAssetMonths(saved?.months ?? 12); setAssetMonthly(saved?.monthly_amount ?? Math.round(item.amount * 100 / 12) / 100); setAssetCat(saved?.category ?? state.category ?? assetCategory(item));
     setAssetIsAsset(saved?.is_asset ?? state.asset); setAssetClient(saved?.target_client_id ?? ALL); setAssetWork(saved?.target_work_id ?? ALL);
   }
   async function decideAsset() {

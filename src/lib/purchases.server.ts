@@ -33,7 +33,7 @@ async function monthHours(ym: string) {
     all((a, b) => supabaseAdmin.from("rdo_workforce").select("work_id,collaborator_id,report_date,present,worked_hours").gte("report_date", from).lte("report_date", to).order("id").range(a, b)),
     all((a, b) => supabaseAdmin.from("rdos").select("work_id,report_date").gte("report_date", from).lte("report_date", to).order("id").range(a, b)),
     all((a, b) => supabaseAdmin.from("daily_allocations").select("work_id,collaborator_id,daily_schedules!inner(schedule_date)").gte("daily_schedules.schedule_date", from).lte("daily_schedules.schedule_date", to).order("id").range(a, b)),
-    all((a, b) => supabaseAdmin.from("result_support_allocations").select("client_id,collaborator_id").order("id").range(a, b)),
+    all((a, b) => supabaseAdmin.from("result_support_allocations").select("client_id,collaborator_id").order("client_id").order("collaborator_id").range(a, b)),
   ]);
   return purchaseMonthHours(works, allocations, rows, headers, supports);
 }
@@ -98,16 +98,16 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
     hoursCache?.set(ym, h);
     return h;
   }
-  async function assetAllocation(ym: string, amount: number) {
+  async function assetAllocation(ym: string, amount: number, dest = direction, destCc = cc) {
     let h = await cachedHours(ym);
-    let a = allocatePurchase(cc, amount, r.clients, r.works, h, direction);
+    let a = allocatePurchase(destCc, amount, r.clients, r.works, h, dest);
     // Search the latest actual movement month for the relevant CC, not global hours.
     const [sy, sm] = ym.split("-").map(Number);
     for (let back = 1; back <= 120 && !a.parts.some((part) => (h.get(part.work_id) ?? 0) > 0); back++) {
       const prevMonth = new Date(Date.UTC(sy ?? 0, (sm ?? 1) - 1 - back, 1)).toISOString().slice(0, 7);
       h = await cachedHours(prevMonth);
-      a = allocatePurchase(cc, amount, r.clients, r.works, h, direction);
-      if (direction.work_id) break;
+      a = allocatePurchase(destCc, amount, r.clients, r.works, h, dest);
+      if (dest.work_id) break;
     }
     return { allocation: a, hours: h };
   }
@@ -119,19 +119,18 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
     const needsDecision = purchaseDecisionRequired(item, decision);
     const controlled = asset || !!decision || needsDecision;
     const reason = controlled ? null : exclusionReason(item.code, r.rules);
-    const state: PurchaseItemState = { key, index, asset, status: "launched", reason: null, category: asset ? decision?.category ?? assetCategory(item) : null, excluded: 0, pending: 0, launched: 0 };
+    const state: PurchaseItemState = { key, index, asset, status: "launched", reason: null, category: decision?.category ?? (asset ? assetCategory(item) : null), excluded: 0, pending: 0, launched: 0 };
     if (reason) { Object.assign(state, { status: "excluded", reason, excluded: item.amount }); }
     else if (needsDecision || decision?.mode === "pending") {
       Object.assign(state, { status: "pending", reason: asset ? "Ativo: decisão necessária" : "Item ≥ R$ 20.000: decisão necessária", pending: item.amount });
     } else {
       const plan = decision?.mode === "installments" ? installmentPlan(item.amount, line.ref_month, decision.months, decision.monthly_amount) : [{ month: line.ref_month, amount: item.amount }];
-      const itemDirection = decision?.target_work_id || decision?.target_client_id ? { client_id: decision.target_client_id, work_id: decision.target_work_id } : direction;
+      const itemDirection = decision?.target_work_id || decision?.target_client_id ? { client_id: decision.target_client_id ?? null, work_id: decision.target_work_id ?? null } : direction;
       const itemCc = effectivePurchaseCc(line.cc_code, r.redirects, !!(itemDirection.client_id || itemDirection.work_id));
       const planned: typeof entries = [];
       let pendingReason: string | null = null;
       for (const [partIndex, part] of plan.entries()) {
-        const resolved = controlled ? await assetAllocation(part.month, part.amount) : { allocation: alloc, hours };
-        if (decision?.target_work_id || decision?.target_client_id) resolved.allocation = allocatePurchase(itemCc, part.amount, r.clients, r.works, resolved.hours, itemDirection);
+        const resolved = controlled ? await assetAllocation(part.month, part.amount, itemDirection, itemCc) : { allocation: alloc, hours };
         if (!resolved.allocation.parts.length) { pendingReason = resolved.allocation.reason; break; }
         const portion: CcItem = { ...item, amount: part.amount, date: controlled ? null : item.date ?? null };
         const rows = purchaseItemEntries([portion], part.amount, resolved.allocation, resolved.hours, r.industryWorkIds, monthRange(part.month).to);
