@@ -54,6 +54,9 @@ function ComprasPage() {
   const [assetMonths, setAssetMonths] = useState(12);
   const [assetMonthly, setAssetMonthly] = useState(0);
   const [assetCat, setAssetCat] = useState("materiais");
+  const [assetIsAsset, setAssetIsAsset] = useState(false);
+  const [assetClient, setAssetClient] = useState(ALL);
+  const [assetWork, setAssetWork] = useState(ALL);
   const [busy, setBusy] = useState(false);
   const [month, setMonth] = useState<string>(ALL);
   const [status, setStatus] = useState<string>(ALL);
@@ -79,10 +82,10 @@ function ComprasPage() {
       if (w.error) throw w.error;
       if (decisions.error) throw decisions.error;
       const ids = l.data.map((x) => x.id);
-      const entries: { purchase_cc_id: string | null; work_id: string; amount: number }[] = [];
+      const entries: { purchase_cc_id: string | null; purchase_item_key: string | null; work_id: string; amount: number }[] = [];
       for (let i = 0; i < ids.length; i += 200) {
         for (let page = 0; ; page++) {
-          const { data: e, error } = await supabase.from("work_entries").select("purchase_cc_id, work_id, amount").in("purchase_cc_id", ids.slice(i, i + 200)).order("id").range(page * 1000, page * 1000 + 999);
+          const { data: e, error } = await supabase.from("work_entries").select("purchase_cc_id, purchase_item_key, work_id, amount").in("purchase_cc_id", ids.slice(i, i + 200)).order("id").range(page * 1000, page * 1000 + 999);
           if (error) throw error;
           entries.push(...(e ?? []));
           if (!e || e.length < 1000) break;
@@ -146,12 +149,13 @@ function ComprasPage() {
   }
   function openAsset(line: Line, item: CcItem, state: PurchaseItemState) {
     const saved = d?.decisions.find((x) => x.purchase_cc_id === line.id && x.item_key === state.key);
-    setAsset({ line, item, state }); setAssetMode(saved?.mode === "integral" ? "integral" : saved?.mode === "installments" ? "installments" : "installments"); setAssetMonths(saved?.months ?? 12); setAssetMonthly(saved?.monthly_amount ?? Math.round(item.amount * 100 / 12) / 100); setAssetCat(saved?.category ?? state.category ?? assetCategory(item));
+    setAsset({ line, item, state }); setAssetMode(saved?.mode ?? (state.asset ? "installments" : "integral")); setAssetMonths(saved?.months ?? 12); setAssetMonthly(saved?.monthly_amount ?? Math.round(item.amount * 100 / 12) / 100); setAssetCat(saved?.category ?? state.category ?? assetCategory(item));
+    setAssetIsAsset(saved?.is_asset ?? state.asset); setAssetClient(saved?.target_client_id ?? ALL); setAssetWork(saved?.target_work_id ?? ALL);
   }
-  async function decideAsset(isAsset = true) {
+  async function decideAsset() {
     if (!asset || busy) return;
     setBusy(true);
-    try { await saveAsset({ data: { line_id: asset.line.id, item_key: asset.state.key, is_asset: isAsset, mode: isAsset ? assetMode : "integral", months: assetMonths, monthly_amount: assetMonthly, category: assetCat } }); await qc.invalidateQueries({ queryKey: ["purchase-lines"] }); setAsset(null); toast.success("Decisão salva e lançamentos atualizados"); }
+    try { await saveAsset({ data: { line_id: asset.line.id, item_key: asset.state.key, is_asset: assetIsAsset, mode: assetMode, months: assetMonths, monthly_amount: assetMonthly, category: assetCat, target_client_id: assetClient === ALL ? null : assetClient, target_work_id: assetWork === ALL ? null : assetWork } }); await qc.invalidateQueries({ queryKey: ["purchase-lines"] }); setAsset(null); toast.success("Decisão salva e lançamentos atualizados"); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Falha ao salvar decisão"); }
     finally { setBusy(false); }
   }
@@ -230,7 +234,7 @@ function ComprasPage() {
             {!data.isLoading && !items.length && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Nenhum item. Clique em Sincronizar.</TableCell></TableRow>}
             {items.map((it, idx) => {
               const l = it.line;
-              const parts = [...new Map((d?.entries ?? []).filter((e) => e.purchase_cc_id === l.id).map((e) => [e.work_id, e])).values()];
+              const parts = [...new Map((d?.entries ?? []).filter((e) => e.purchase_cc_id === l.id && e.purchase_item_key === it.state.key).map((e) => [e.work_id, e])).values()];
               return (
                 <TableRow key={`${l.id}-${idx}`}>
                   <TableCell className="whitespace-nowrap">{it.date ? it.date.split("-").reverse().join("/") : `${l.ref_month.slice(5)}/${l.ref_month.slice(0, 4)}`}</TableCell>
@@ -243,7 +247,7 @@ function ComprasPage() {
                   <TableCell className="text-xs">
                     {it.state.status === "launched" && parts.length ? parts.map((p, i) => <div key={i}>{workName.get(p.work_id) ?? "—"}</div>) : <span className="text-muted-foreground">—</span>}
                   </TableCell>
-                  <TableCell>{canWrite && <div className="flex"><Button size="icon" variant="ghost" title="Direcionar centro de custo" onClick={() => openDirect(l)}><CornerDownRight className="h-4 w-4" /></Button><Button size="icon" variant="ghost" title={it.state.asset ? "Decidir lançamento do ativo" : "Marcar como ativo"} aria-label={it.state.asset ? "Decidir ativo" : "Marcar como ativo"} onClick={() => openAsset(l, { code: it.code, desc: it.desc, qty: it.qty, amount: it.amount, date: it.date }, it.state)}><Landmark className="h-4 w-4" /></Button></div>}</TableCell>
+                  <TableCell>{canWrite && <div className="flex"><Button size="icon" variant="ghost" title="Direcionar centro de custo" onClick={() => openDirect(l)}><CornerDownRight className="h-4 w-4" /></Button><Button size="icon" variant="ghost" title="Decidir lançamento do item" aria-label="Decidir lançamento do item" onClick={() => openAsset(l, { code: it.code, desc: it.desc, qty: it.qty, amount: it.amount, date: it.date }, it.state)}><Landmark className="h-4 w-4" /></Button></div>}</TableCell>
                 </TableRow>
               );
             })}
@@ -251,13 +255,16 @@ function ComprasPage() {
         </Table>
       </div>
 
-      <Dialog open={!!asset} onOpenChange={(o) => !o && setAsset(null)}><DialogContent className="max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>Decisão do ativo · {asset?.item.code}</DialogTitle></DialogHeader>
+      <Dialog open={!!asset} onOpenChange={(o) => !o && setAsset(null)}><DialogContent className="max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>Decisão do item · {asset?.item.code}</DialogTitle></DialogHeader>
         <p className="text-sm">{asset?.item.desc} · {asset ? brl(asset.item.amount) : ""}</p>
+        <label className="flex items-center gap-2 text-sm"><Checkbox checked={assetIsAsset} onCheckedChange={(v) => setAssetIsAsset(v === true)} />Ativo</label>
+        <div className="space-y-1"><Label>Cliente de destino</Label><Select value={assetClient} onValueChange={(v) => { setAssetClient(v); setAssetWork(ALL); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Manter destino do centro de custo</SelectItem>{(d?.clients ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
+        <div className="space-y-1"><Label>Serviço de destino</Label><Select value={assetWork} onValueChange={setAssetWork} disabled={assetClient === ALL}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Ratear por horas entre serviços</SelectItem>{(d?.works ?? []).filter((w) => w.client_id === assetClient).map((w) => <SelectItem key={w.id} value={w.id}>{w.name}{w.active ? "" : " (inativo)"}</SelectItem>)}</SelectContent></Select></div>
         <div className="space-y-1"><Label>Lançamento</Label><Select value={assetMode} onValueChange={(v) => setAssetMode(v as typeof assetMode)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pending">Manter pendente de decisão</SelectItem><SelectItem value="integral">Integral no mês da compra</SelectItem><SelectItem value="installments">Ratear em parcelas mensais</SelectItem></SelectContent></Select></div>
         {assetMode === "installments" && <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><Label>Meses</Label><Input aria-label="Meses do ativo" type="number" min={1} max={120} value={assetMonths} onChange={(e) => { const n = Number(e.target.value); setAssetMonths(n); setAssetMonthly(asset && n > 0 ? Math.round(asset.item.amount * 100 / n) / 100 : 0); }} /></div><div className="space-y-1"><Label>Valor mensal</Label><Input aria-label="Valor mensal do ativo" type="number" step="0.01" value={assetMonthly} onChange={(e) => setAssetMonthly(Number(e.target.value))} /></div></div>}
         <div className="space-y-1"><Label>Categoria</Label><Select value={assetCat} onValueChange={setAssetCat}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PURCHASE_CATEGORIES.map((c) => <SelectItem key={c.key} value={c.key}>{c.key === "andaimes" ? "Insumos / Andaimes" : c.label}</SelectItem>)}</SelectContent></Select></div>
         {previewError ? <p className="text-sm text-destructive">{previewError}</p> : preview.length > 0 && <div className="max-h-40 overflow-auto text-sm">{preview.map((p) => <div key={p.month} className="flex justify-between"><span>{p.month.slice(5)}/{p.month.slice(0, 4)}</span><span>{brl(p.amount)}</span></div>)}</div>}
-        <DialogFooter><Button variant="outline" disabled={busy} onClick={() => decideAsset(false)}>Não é ativo</Button><Button disabled={busy || !!previewError} onClick={() => decideAsset()}>Salvar decisão</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" disabled={busy} onClick={() => setAsset(null)}>Cancelar</Button><Button disabled={busy || !!previewError} onClick={() => decideAsset()}>Salvar decisão</Button></DialogFooter>
       </DialogContent></Dialog>
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
