@@ -41,8 +41,15 @@ export function detectPurchaseAsset(item: CcItem): "vehicle" | "equipment" | nul
   return null;
 }
 
+export function isPurchasePpe(item: CcItem): boolean {
+  const code = normalizePurchaseText(item.code);
+  const description = normalizePurchaseText(item.desc);
+  return /^EP/.test(code) || /\b(?:EPIS?|TYVEK|MACACAO|PROTECAO INDIVIDUAL|CAPACETE|RESPIRADOR|PROTETOR AURICULAR|CINTO DE SEGURANCA|BOTINA|BOTA DE SEGURANCA|OCULOS DE SEGURANCA|LUVA(?:S)? DE (?:SEGURANCA|PROTECAO))\b/.test(description);
+}
+
 export function purchaseDecisionRequired(item: CcItem, decision?: AssetDecision): boolean {
-  const controlled = !!decision?.is_asset || Math.round(item.amount * 100) >= 2000000;
+  // Existing user decisions remain authoritative; automatic retention is PPE-only.
+  const controlled = !!decision || (isPurchasePpe(item) && Math.round(item.amount * 100) >= 2000000);
   return controlled && (!decision || decision.mode === "pending" || Math.round(decision.decided_amount * 100) !== Math.round(item.amount * 100));
 }
 

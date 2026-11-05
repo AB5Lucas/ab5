@@ -122,7 +122,7 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
     const state: PurchaseItemState = { key, index, asset, status: "launched", reason: null, category: decision?.category ?? (asset ? assetCategory(item) : null), excluded: 0, pending: 0, launched: 0 };
     if (reason) { Object.assign(state, { status: "excluded", reason, excluded: item.amount }); }
     else if (needsDecision || decision?.mode === "pending") {
-      Object.assign(state, { status: "pending", reason: asset ? "Ativo: decisão necessária" : "Item ≥ R$ 20.000: decisão necessária", pending: item.amount });
+      Object.assign(state, { status: "pending", reason: decision ? "Decisão do usuário pendente ou valor alterado" : "EPI ≥ R$ 20.000: decisão necessária", pending: item.amount });
     } else {
       const plan = decision?.mode === "installments" ? installmentPlan(item.amount, line.ref_month, decision.months, decision.monthly_amount) : [{ month: line.ref_month, amount: item.amount }];
       const itemDirection = decision?.target_work_id || decision?.target_client_id ? { client_id: decision.target_client_id ?? null, work_id: decision.target_work_id ?? null } : direction;
