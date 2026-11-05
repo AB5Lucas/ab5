@@ -132,7 +132,6 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
   const [f, setF] = useState({ text: "", from: "", to: "", status: "all" });
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [ready, setReady] = useState<RdoPdfFile | null>(null);
-  useEffect(() => { setReady(null); }, [f, listDataKeyPlaceholder]);
   const list = useQuery({
     queryKey: ["rdo-history"],
     queryFn: async () => {
@@ -157,13 +156,35 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
       }),
     [list.data, f],
   );
+  useEffect(() => { setReady(null); }, [rows]);
+
+  async function downloadFiltered() {
+    if (progress || !rows.length) return;
+    if (ready) {
+      try { await deliverRdoFile(ready); }
+      catch { toast.error("Não foi possível baixar os RDOs. Tente novamente."); }
+      return;
+    }
+    const ids = rows.map((r) => r.id);
+    setProgress({ done: 0, total: ids.length });
+    try {
+      const file = await prepareRdoDownload(ids, generateRdoPdfBlob, (done, total) => setProgress({ done, total }));
+      setReady(file);
+      // Touch devices use a second, synchronous click to retain download/share activation.
+      if (!matchMedia("(pointer: coarse)").matches) downloadRdoFile(file);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar os RDOs. Tente novamente.");
+    } finally {
+      setProgress(null);
+    }
+  }
   return (
     <div className="space-y-3">
-      <div className="grid gap-2 sm:grid-cols-4">
+      <fieldset disabled={!!progress} className="grid min-w-0 gap-2 sm:grid-cols-4">
         <Input className="sm:col-span-4" placeholder="Obra, cliente ou responsável" value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} />
         <Input type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} aria-label="De" />
         <Input type="date" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} aria-label="Até" />
-        <Select value={f.status} onValueChange={(status) => setF({ ...f, status })}>
+        <Select disabled={!!progress} value={f.status} onValueChange={(status) => setF({ ...f, status })}>
           <SelectTrigger className="sm:col-span-2"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os status</SelectItem>
@@ -171,7 +192,13 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
             <SelectItem value="finalized">Finalizado</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </fieldset>
+      <Button variant="outline" className="max-w-full whitespace-normal" disabled={list.isFetching || !rows.length || !!progress} onClick={() => void downloadFiltered()}>
+        {progress ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <FileDown className="h-4 w-4 shrink-0" />}
+        <span aria-live="polite">
+          {progress ? `Gerando ${progress.done} de ${progress.total}...` : ready ? `Baixar ${rows.length === 1 ? "PDF" : "ZIP"} (${rows.length})` : `Baixar RDOs filtrados (${rows.length})`}
+        </span>
+      </Button>
       {list.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
       {!list.isLoading && rows.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Nenhum RDO encontrado.</p>}
       <div className="grid gap-2 sm:grid-cols-2">

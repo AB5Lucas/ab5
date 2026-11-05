@@ -48,3 +48,4 @@
 - [x] Compras: retenção automática somente EPIs ≥R$20 mil; demais itens classificados e lançados por CC, preservando exclusões e decisões manuais.
 - [x] Excluir folgas/férias/afastamentos de custos, dias e alerta de RDO; outubro recalculado nos 93 serviços: MO −R$17.441,30, transporte/benefícios −R$476,75; Cristiano Yara 105→97h, R$5.304,50→R$4.920,12, conferido autenticado; 41 testes aprovados, receita mensal preservada e sem reprocessar decisões de Compras.
 - [x] Outubro reprocessado e conferido autenticado: 6 itens/R$274.821,32 liberados; lançados R$1.111.113,94, apenas Tyvek Três Corações R$20.286 pendente, exclusões R$114.537,46; total R$1.245.937,40. Três decisões e nove destinos idênticos antes/depois; 99 testes aprovados, sem erros na tela e build OK.
+- [ ] Histórico RDO: baixar seleção filtrada em PDF único ou ZIP; testar e verificar downloads autenticados.
