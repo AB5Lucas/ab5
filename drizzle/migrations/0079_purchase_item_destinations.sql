@@ -1,0 +1,2 @@
+ALTER TABLE public.purchase_asset_decisions ADD COLUMN target_client_id uuid REFERENCES public.clients(id), ADD COLUMN target_work_id uuid REFERENCES public.works(id);
+COMMENT ON COLUMN public.purchase_asset_decisions.target_work_id IS 'Optional item-specific destination; null uses client hour allocation or existing CC destination.';

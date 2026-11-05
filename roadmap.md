@@ -42,3 +42,6 @@
 - [x] Recorrências gerenciáveis, geração ao abrir e rotina mensal cadastrada (novo endereço exige publicação); Amcor 22 manuais adotados + outubro/novembro = 24 meses/R$108360, sem duplicatas concorrentes.
 - [x] Margem acumulada mensal usa todo histórico até mês final, sem corte pelo andamento; cálculo individual/receita preservados. Amcor outubro R$118822,18/35,20%, novembro R$114307,18/33,86%; 31 mensais auditados, 5 outros alterados; relatórios MD/XLSX e 34 testes aprovados, telas desktop/mobile verificadas.
 - [x] Conciliar andaimes Amcor na tabela e detalhes: R$108.360/24 meses; outubro R$103.845; sem corte pelo andamento, período preservado e receita inalterada; 29 testes e tela autenticada conferidos.
+- [x] Compras: horas de rateio dia a dia conforme Resultados e apoio; 89 testes aprovados, página sem erros.
+- [x] Compras: itens ≥R$20 mil pendentes com destino individual ou rateio por horas; Tyvek R$20.286 pendente, opções autenticadas conferidas sem decidir pelo usuário.
+- [x] Outubro reprocessado: R$1.245.937,40 = lançados R$784.968,62 + pendentes R$346.431,32 + excluídos R$114.537,46; 9 destinos e decisão/12 parcelas Kombi preservados. CC 2117999 restante: Batatas R$6.935,62/Yokitos R$9.883,24; receita mensal intacta.

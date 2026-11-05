@@ -3,7 +3,7 @@ import type { CcItem, PurchaseCategory } from "./purchases";
 export const normalizePurchaseText = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
 export type ExclusionRule = { id?: string; match_type: "code" | "prefix"; value: string; reason: string; active: boolean };
 export type CcRedirect = { id?: string; source_cc: string; target_cc: string; active: boolean };
-export type AssetDecision = { item_key: string; is_asset: boolean; mode: "pending" | "integral" | "installments"; months: number; monthly_amount: number | null; category: string; decided_amount: number };
+export type AssetDecision = { item_key: string; is_asset: boolean; mode: "pending" | "integral" | "installments"; months: number; monthly_amount: number | null; category: string; decided_amount: number; target_client_id?: string | null; target_work_id?: string | null };
 export type PurchaseItemState = { key: string; index: number; status: "excluded" | "pending" | "launched"; reason: string | null; asset: boolean; category: string | null; excluded: number; pending: number; launched: number };
 
 export const DEFAULT_EXCLUSION_RULES: ExclusionRule[] = [
@@ -39,6 +39,11 @@ export function detectPurchaseAsset(item: CcItem): "vehicle" | "equipment" | nul
   if (/\b(VOLKSWAGEN|KOMBI|FIAT|CHEVROLET|RENAULT|TOYOTA|FORD|CAMINHAO|VEICULO|AUTOMOVEL|ONIBUS)\b/.test(d) && /\b(?:19|20)\d{2}\b/.test(d)) return "vehicle";
   if (/\b(MAQUINA|EQUIPAMENTO|COMPRESSOR|GERADOR|EMPILHADEIRA|MOTOR)\b/.test(d) || /(?:MAQUINA|INVERSORA|APARELHO|EQUIPAMENTO).*SOLDA/.test(d)) return "equipment";
   return null;
+}
+
+export function purchaseDecisionRequired(item: CcItem, decision?: AssetDecision): boolean {
+  const controlled = !!decision?.is_asset || Math.round(item.amount * 100) >= 2000000;
+  return controlled && (!decision || decision.mode === "pending" || Math.round(decision.decided_amount * 100) !== Math.round(item.amount * 100));
 }
 
 export function effectivePurchaseCc(cc: string, redirects: CcRedirect[], manual: boolean): string {

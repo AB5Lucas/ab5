@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_EXCLUSION_RULES, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, filterPurchaseEntries, installmentPlan, purchaseItemKeys } from "./purchase-policy";
+import { DEFAULT_EXCLUSION_RULES, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, filterPurchaseEntries, installmentPlan, purchaseItemKeys, purchaseDecisionRequired } from "./purchase-policy";
 
 describe("exclusões em todos os clientes", () => {
   it.each(["VC00001", "VC00214", "SP00064", "SP00010", "RH00062"])("%s já está no km", (code) => expect(exclusionReason(code, DEFAULT_EXCLUSION_RULES)).toBe("Incluso no km rodado"));
@@ -10,6 +10,9 @@ describe("exclusões em todos os clientes", () => {
 });
 describe("aquisições", () => {
   const item = (code: string, desc: string, amount = 20000) => ({ code, desc, amount, qty: 1 });
+  it("Tyvek 20286 aguarda decisão sem virar ativo", () => { const tyvek = item("EP00474", "MACACÃO TYVEK", 20286); expect(purchaseDecisionRequired(tyvek)).toBe(true); expect(detectPurchaseAsset(tyvek)).toBeNull(); });
+  it("limite de decisão é 20000 inclusive", () => { expect(purchaseDecisionRequired(item("EP001", "EPI", 20000))).toBe(true); expect(purchaseDecisionRequired(item("EP001", "EPI", 19999.99))).toBe(false); });
+  it("decisão integral de consumo permanece válida", () => expect(purchaseDecisionRequired(item("EP00474", "MACACÃO TYVEK", 20286), { item_key: "k", is_asset: false, mode: "integral", months: 1, monthly_amount: null, category: "materiais", decided_amount: 20286 })).toBe(false));
   it("Kombi 55000 é ativo antes da exclusão VC", () => expect(detectPurchaseAsset(item("VC00805", "VOLKSWAGEN KOMBI 2011/2012", 55000))).toBe("vehicle"));
   it("limite é inclusivo em 20000", () => { expect(detectPurchaseAsset(item("MF001", "COMPRESSOR", 20000))).toBe("equipment"); expect(detectPurchaseAsset(item("MF001", "COMPRESSOR", 19999.99))).toBeNull(); });
   it.each(["LOCAÇÃO PLATAFORMA ELEVATÓRIA", "SERVIÇOS DE SOLDA", "SERVIÇOS DE FRETES", "GAS GLP GRANEL", "SOMBRITE", "REMOVEDOR MXC-776", "MACACÃO TYVEK", "ENERGIA ELETRICA", "TINTA", "PEÇAS MOTOR"])("%s não é ativo", (desc) => expect(detectPurchaseAsset(item("XX001", desc, 55000))).toBeNull());
