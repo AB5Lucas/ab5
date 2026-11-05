@@ -118,7 +118,7 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
     const asset = decision ? decision.is_asset : !!detectPurchaseAsset(item);
     const needsDecision = purchaseDecisionRequired(item, decision);
     const controlled = asset || !!decision || needsDecision;
-    const reason = controlled ? null : exclusionReason(item.code, r.rules);
+    const reason = asset || decision ? null : exclusionReason(item.code, r.rules);
     const state: PurchaseItemState = { key, index, asset, status: "launched", reason: null, category: decision?.category ?? (asset ? assetCategory(item) : null), excluded: 0, pending: 0, launched: 0 };
     if (reason) { Object.assign(state, { status: "excluded", reason, excluded: item.amount }); }
     else if (needsDecision || decision?.mode === "pending") {
