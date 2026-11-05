@@ -18,6 +18,13 @@ export function exclusionReason(code: string, rules: ExclusionRule[]): string | 
   return rule?.reason ?? null;
 }
 
+/** Client-specific duplicate cost: never apply this exclusion to other clients. */
+export function clientPurchaseExclusionReason(code: string, clientName: string): string | null {
+  return normalizePurchaseText(code) === "SA00038" && /^MARS(?:\s|$)/.test(normalizePurchaseText(clientName))
+    ? "Gestão de contrato já inclusa na MO"
+    : null;
+}
+
 /** Identity ignores price, preserves repeated identical source rows by occurrence. */
 export function purchaseItemKeys(items: CcItem[]): string[] {
   const seen = new Map<string, number>();
