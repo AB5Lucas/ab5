@@ -99,6 +99,7 @@ const STATUS_BOXES = [
   { key: "interjornada", label: "INTERJORNADA" },
   { key: "licenca", label: "LICENÇA" },
   { key: "abono", label: "ABONO" },
+  { key: "personalizada", label: "PERSONALIZADA" },
 ] as const;
 
 const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
@@ -647,6 +648,38 @@ export function SchedulePlannerBoard({
     }
     return boxPaysVt(key);
   };
+  /** Títulos editáveis das caixas (ex.: caixa personalizada). */
+  const boxTitles = useQuery({
+    queryKey: ["box-titles", scheduleId],
+    enabled: !!scheduleId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("schedule_box_titles")
+        .select("box_key, title")
+        .eq("schedule_id", scheduleId!);
+      if (error) throw error;
+      return new Map((data ?? []).map((r) => [r.box_key, r.title]));
+    },
+  });
+  const saveBoxTitle = useMutation({
+    mutationFn: async ({ key, title }: { key: string; title: string }) => {
+      const id = await ensureSchedule();
+      const t = title.trim();
+      if (!t) {
+        const { error } = await supabase.from("schedule_box_titles").delete().eq("schedule_id", id).eq("box_key", key);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("schedule_box_titles")
+          .upsert({ schedule_id: id, box_key: key, title: t }, { onConflict: "schedule_id,box_key" });
+        if (error) throw error;
+      }
+      return id;
+    },
+    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-titles", id] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const [editingBox, setEditingBox] = useState<string | null>(null);
   const toggleBoxVt = useMutation({
     mutationFn: async (key: string) => {
       const id = await ensureSchedule();
@@ -1944,7 +1977,7 @@ export function SchedulePlannerBoard({
               .map((key) => ({ key, label: boxLabelOf(key) })),
             ...STATUS_BOXES.filter((b) => b.key !== "integracao").map((b) => ({
               key: b.key as string,
-              label: b.label as string,
+              label: (boxTitles.data?.get(b.key) ?? b.label) as string,
             })),
           ]
             .filter(
@@ -2000,9 +2033,32 @@ export function SchedulePlannerBoard({
               >
                 <header className="border-b border-border bg-muted/60 px-2 py-1.5">
                   <div className="flex items-start gap-1.5">
-                    <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
-                      {b.label}
-                    </h2>
+                    {b.key === "personalizada" && editingBox === b.key ? (
+                      <Input
+                        autoFocus
+                        defaultValue={b.label}
+                        className="h-6 flex-1 px-1 text-[11px] uppercase"
+                        onBlur={(e) => {
+                          setEditingBox(null);
+                          if (e.target.value.trim() !== b.label) saveBoxTitle.mutate({ key: b.key, title: e.target.value });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                          if (e.key === "Escape") setEditingBox(null);
+                        }}
+                      />
+                    ) : (
+                      <h2
+                        className={cn(
+                          "font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide",
+                          b.key === "personalizada" && editable && "cursor-text hover:underline",
+                        )}
+                        title={b.key === "personalizada" && editable ? "Clique para editar o título" : undefined}
+                        onClick={() => b.key === "personalizada" && editable && setEditingBox(b.key)}
+                      >
+                        {b.label}
+                      </h2>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
