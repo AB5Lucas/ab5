@@ -27,6 +27,8 @@ import {
   classifyKind,
   formatCpf,
   openPdf,
+  periodStart,
+  trainingDays,
   type CertKind,
   type CertSnapshot,
   type ListSnapshot,
@@ -220,6 +222,12 @@ function GenerateTab() {
   const [tstBy, setTstBy] = useState<Record<string, string>>({});
   const [kindBy, setKindBy] = useState<Record<string, "inicial" | "renovacao">>({});
   const [split, setSplit] = useState(false);
+  const [periodBy, setPeriodBy] = useState<Record<string, { start: string; end: string }>>({});
+  const periodOf = (trainingId: string) => {
+    if (periodBy[trainingId]) return periodBy[trainingId]!;
+    const days = trainingDays(certData.data?.get(trainingId)?.workload_hours);
+    return { start: periodStart(date, days), end: date };
+  };
 
   const issued = useQuery({
     queryKey: ["certs-issued", date],
@@ -254,6 +262,8 @@ function GenerateTab() {
     if (!tst) pending.push(`${g.name}: selecione o TST responsável`);
     if (!p.cpf) pending.push(`${p.name}: sem CPF no cadastro`);
     if (!k) pending.push(`${p.name} (${g.name}): defina se é Inicial ou Renovação`);
+    const per = periodOf(g.trainingId);
+    if (!per.start || !per.end || per.start > per.end) pending.push(`${g.name}: período inválido`);
     if (cd && tst && k && p.cpf)
       snaps.push({
         trainingId: g.trainingId,
@@ -271,7 +281,8 @@ function GenerateTab() {
           phrase: buildPhrase(cd.cert_phrase ?? "", k),
           legalBasis: cd.legal_basis ?? "",
           hours: Number((k === "renovacao" ? cd.workload_hours_periodic ?? cd.workload_hours : cd.workload_hours) ?? 0),
-          date,
+          date: per.end,
+          startDate: per.start < per.end ? per.start : null,
           location: cd.default_location ?? "Mogi Guaçu",
           program: cd.program ?? "",
           tstName: tst.full_name.toUpperCase(),
@@ -353,7 +364,7 @@ function GenerateTab() {
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <Label>Data do treinamento</Label>
-          <TrainingDatePicker value={date} onChange={(v) => { setDate(v); setSel({}); setExtras([]); }} />
+          <TrainingDatePicker value={date} onChange={(v) => { setDate(v); setSel({}); setExtras([]); setPeriodBy({}); }} />
         </div>
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={split} onCheckedChange={setSplit} /> Um PDF por colaborador
@@ -406,6 +417,15 @@ function GenerateTab() {
               <span className="text-xs text-muted-foreground">
                 Carga horária: {certData.data?.get(g.trainingId)?.workload_hours ?? "—"} h
               </span>
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground">Período:</span>
+                <Input type="date" className="h-8 w-36" value={periodOf(g.trainingId).start}
+                  onChange={(e) => setPeriodBy((s) => ({ ...s, [g.trainingId]: { ...periodOf(g.trainingId), start: e.target.value } }))} />
+                <span>a</span>
+                <Input type="date" className="h-8 w-36" value={periodOf(g.trainingId).end}
+                  onChange={(e) => setPeriodBy((s) => ({ ...s, [g.trainingId]: { ...periodOf(g.trainingId), end: e.target.value } }))} />
+                <span className="text-muted-foreground">(certificado em {brDate(periodOf(g.trainingId).end || date)})</span>
+              </div>
               <div className="ml-auto w-64">
                 <Select value={tstBy[g.trainingId] ?? ""} onValueChange={(v) => setTstBy((s) => ({ ...s, [g.trainingId]: v }))}>
                   <SelectTrigger><SelectValue placeholder="TST responsável" /></SelectTrigger>
