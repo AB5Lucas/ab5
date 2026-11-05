@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileDown, Pencil, Trash2 } from "lucide-react";
+import { FileDown, Loader2, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { RdoEditor, workLabel } from "@/components/rdo-editor";
@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCurrentUser } from "@/hooks/use-auth";
 import { todayISO, formatDateBR } from "@/lib/scheduling";
 import { RDO_STATUS_LABEL } from "@/lib/rdo";
-import { exportRdoPdf } from "@/lib/rdo-pdf";
+import { exportRdoPdf, generateRdoPdfBlob } from "@/lib/rdo-pdf";
+import { deliverRdoFile, downloadRdoFile, prepareRdoDownload, type RdoPdfFile } from "@/lib/rdo-download";
 
 export const Route = createFileRoute("/_authenticated/externo/relatorio-diario")({
   head: () => ({
@@ -129,6 +130,9 @@ function RdoPage() {
 function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void }) {
   const { isAdmin, canWrite } = useCurrentUser();
   const [f, setF] = useState({ text: "", from: "", to: "", status: "all" });
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [ready, setReady] = useState<RdoPdfFile | null>(null);
+  useEffect(() => { setReady(null); }, [f, listDataKeyPlaceholder]);
   const list = useQuery({
     queryKey: ["rdo-history"],
     queryFn: async () => {

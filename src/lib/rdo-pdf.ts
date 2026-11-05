@@ -3,6 +3,7 @@ import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { RDO_STATUS_LABEL, SCAFFOLD_OPS, reasonLabel, positionLabel } from "@/lib/rdo";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
+import { downloadRdoFile } from "@/lib/rdo-download";
 
 /** Remove o fundo branco do logo e aplica um contorno branco (para fundo escuro). */
 async function logoForDark(): Promise<{ data: string; w: number; h: number } | null> {
@@ -94,9 +95,8 @@ function imgSize(dataUrl: string): Promise<{ w: number; h: number }> {
   });
 }
 
-export async function exportRdoPdf(rdoId: string) {
-  const [{ data: rdo }, { data: team }, { data: scaffolds }, { data: media }, { data: sigs }] =
-    await Promise.all([
+export async function generateRdoPdfBlob(rdoId: string) {
+  const results = await Promise.all([
       supabase.from("rdos").select("*, works(name, clients(name))").eq("id", rdoId).single(),
       supabase
         .from("rdo_workforce")
@@ -106,6 +106,10 @@ export async function exportRdoPdf(rdoId: string) {
       supabase.from("rdo_media").select("*").eq("rdo_id", rdoId).order("created_at"),
       supabase.from("rdo_signatures").select("*").eq("rdo_id", rdoId),
     ]);
+  for (const result of results) {
+    if (result.error) throw new Error(result.error.message);
+  }
+  const [{ data: rdo }, { data: team }, { data: scaffolds }, { data: media }, { data: sigs }] = results;
   if (!rdo) throw new Error("RDO não encontrado");
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -349,5 +353,12 @@ export async function exportRdoPdf(rdoId: string) {
     doc.text(`AB5 · RDO Nº ${rdo.number ?? ""} · ${work?.name ?? ""} · ${formatDateBR(rdo.report_date)}`, M, 292);
     doc.text(`${i}/${pages}`, W - M, 292, { align: "right" });
   }
-  doc.save(`RDO_${rdo.number ?? ""}_${(work?.name ?? "obra").replace(/\W+/g, "_")}_${rdo.report_date}.pdf`);
+  return {
+    blob: doc.output("blob"),
+    filename: `RDO_${rdo.number ?? ""}_${(work?.name ?? "obra").replace(/\W+/g, "_")}_${rdo.report_date}.pdf`,
+  };
+}
+
+export async function exportRdoPdf(rdoId: string) {
+  downloadRdoFile(await generateRdoPdfBlob(rdoId));
 }
