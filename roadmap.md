@@ -45,3 +45,5 @@
 - [x] Compras: horas de rateio dia a dia conforme Resultados e apoio; 89 testes aprovados, página sem erros.
 - [x] Compras: itens ≥R$20 mil pendentes com destino individual ou rateio por horas; Tyvek R$20.286 pendente, opções autenticadas conferidas sem decidir pelo usuário.
 - [x] Outubro reprocessado: R$1.245.937,40 = lançados R$784.968,62 + pendentes R$346.431,32 + excluídos R$114.537,46; 9 destinos e decisão/12 parcelas Kombi preservados. CC 2117999 restante: Batatas R$6.935,62/Yokitos R$9.883,24; receita mensal intacta.
+- [ ] Compras: reter automaticamente apenas EPIs ≥R$20 mil, lançar demais itens por classificação/CC e preservar decisões manuais/exclusões.
+- [ ] Reprocessar compras, conferir Tyvek pendente e decisões preservadas, executar testes e verificar tela autenticada.
