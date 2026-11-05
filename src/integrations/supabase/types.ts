@@ -3198,6 +3198,41 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_box_titles: {
+        Row: {
+          box_key: string
+          created_at: string
+          id: string
+          schedule_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          box_key: string
+          created_at?: string
+          id?: string
+          schedule_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          box_key?: string
+          created_at?: string
+          id?: string
+          schedule_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_box_titles_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "daily_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_box_vt: {
         Row: {
           box_key: string
