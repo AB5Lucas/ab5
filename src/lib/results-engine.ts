@@ -386,7 +386,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const vtByDate = new Map<string, { people: number; cost: number }>();
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date || hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0 || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      if (!date || absent(a.collaborator_id, date) || (!rdoKey.has(`${a.collaborator_id}|${date}`) && hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0) || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
@@ -494,7 +494,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const travelWorkMap = new Map<string, boolean>((raw.clientWorkTravelRows ?? d.workTravelRows ?? []).map((v: any) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date || hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0 || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      if (!date || absent(a.collaborator_id, date) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
       const key = `${a.collaborator_id}|${date}`;
       if (travelSeen.has(key)) continue;
       travelSeen.add(key);
