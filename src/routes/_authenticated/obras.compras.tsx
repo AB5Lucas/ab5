@@ -202,7 +202,7 @@ function ComprasPage() {
         <div className="space-y-1"><Label>Status</Label>
           <Select value={status} onValueChange={setStatus}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value={ALL}>Todos</SelectItem><SelectItem value="launched">Lançados</SelectItem><SelectItem value="pending">Pendentes</SelectItem><SelectItem value="excluded">Excluídos</SelectItem></SelectContent></Select></div>
-        <div className="space-y-1"><Label>Categorias</Label>
+        <div className="flex flex-col gap-1"><Label>Categorias</Label>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline"><Filter className="h-4 w-4" /> {hiddenCats.size > 0 ? `${PURCHASE_CATEGORIES.length - hiddenCats.size} selecionadas` : "Todas"}</Button>
