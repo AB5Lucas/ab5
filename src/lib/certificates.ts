@@ -28,7 +28,8 @@ export type CertSnapshot = {
   phrase: string;
   legalBasis: string;
   hours: number;
-  date: string; // AAAA-MM-DD
+  date: string; // AAAA-MM-DD (último dia do período = data do certificado)
+  startDate?: string | null; // AAAA-MM-DD, quando o treinamento dura mais de um dia
   location: string;
   program: string;
   tstName: string;
@@ -55,6 +56,28 @@ export const brDate = (iso: string) => iso.split("-").reverse().join("/");
 export function longDate(iso: string) {
   const [y, m, d] = iso.split("-").map(Number);
   return `${d} de ${MONTHS[(m ?? 1) - 1]} de ${y}`;
+}
+
+/** Dias necessários para a carga horária (8h por dia). */
+export function trainingDays(hours: number | null | undefined) {
+  return Math.max(1, Math.ceil(Number(hours ?? 0) / 8));
+}
+
+/** Data inicial retroagindo dias úteis (seg–sex) a partir do último dia. */
+export function periodStart(end: string, days: number) {
+  const d = new Date(`${end}T12:00:00Z`);
+  let left = days - 1;
+  while (left > 0) {
+    d.setUTCDate(d.getUTCDate() - 1);
+    const wd = d.getUTCDay();
+    if (wd !== 0 && wd !== 6) left--;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+/** Texto do período: "no dia X" ou "no período de X a Y". */
+export function periodText(start: string | null | undefined, end: string) {
+  return start && start < end ? `no período de ${brDate(start)} a ${brDate(end)}` : `no dia ${brDate(end)}`;
 }
 
 /** Inicial se não há registro anterior do mesmo treinamento; renovação se há; conferir se há duplicidade no mesmo dia. */
@@ -147,7 +170,7 @@ function drawCert(doc: jsPDF, s: CertSnapshot, lg: Awaited<ReturnType<typeof log
   doc.setFont("helvetica", "normal");
   doc.setFontSize(13);
   doc.text(`${s.name} - ${s.cpf}`, W / 2, 93, { align: "center" });
-  const body = `Ministrado pelo Centro de Treinamentos desta empresa, conforme estabelece ${s.legalBasis} com carga horária de ${s.hours} horas realizado no dia ${brDate(s.date)}.`;
+  const body = `Ministrado pelo Centro de Treinamentos desta empresa, conforme estabelece ${s.legalBasis} com carga horária de ${s.hours} horas realizado ${periodText(s.startDate, s.date)}.`;
   // Ajusta a fonte para frase + texto caberem entre o nome (y≈100) e a data (y≈130)
   let fs = 9.5;
   let pl: string[] = [], bl: string[] = [];
