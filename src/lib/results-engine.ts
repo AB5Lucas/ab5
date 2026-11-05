@@ -678,12 +678,12 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       for (const r of rows) { r.consumed = budgetOut ? (r.cost / budgetOut) * 100 : 0; r.budgetMarginPct = budgetMarginOut; }
     }
     const dates = [
-      ...d.allocs.map((a: any) => a.daily_schedules?.schedule_date).filter(Boolean),
-      ...d.rdoWf.map((r: any) => r.report_date),
+      ...d.allocs.filter((a: any) => !absent(a.collaborator_id, a.daily_schedules?.schedule_date ?? "")).map((a: any) => a.daily_schedules?.schedule_date).filter(Boolean),
+      ...d.rdoWf.filter((r: any) => !absent(r.collaborator_id, r.report_date)).map((r: any) => r.report_date),
     ].sort() as string[];
     const first = dates[0];
     const lastDay = dates[dates.length - 1];
-    const days = first ? Math.round((Date.parse(lastDay!) - Date.parse(first)) / 86400000) + 1 : 0;
+    const days = first && lastDay ? Math.round((Date.parse(lastDay) - Date.parse(first)) / 86400000) + 1 : 0;
     const names = new Map<string, string>(d.people.map((p: any) => [p.id, p.full_name]));
     const laborRows = [...laborBy.entries()]
       .map(([id, l]) => ({ id, name: `${names.get(id) ?? "—"}${pj.has(id) ? " (PJ)" : ""}`, rate: rate.get(id) ?? 0, ...l }))
