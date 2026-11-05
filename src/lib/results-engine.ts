@@ -1,4 +1,4 @@
-import { resultHours, marginPercent, supportDailyWeights, supportShare } from "./result-labor";
+import { resultHours, resultAbsenceCheck, marginPercent, supportDailyWeights, supportShare } from "./result-labor";
 import { isResultMonth } from "./result-period";
 import { activeFinancialEntries } from "./billing-sync";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,18 +46,20 @@ const RESPLIT_AT = new Map<string, number>();
 
 /** Query-scoped shared inputs: no singleton cache across users or requests. */
 export async function loadResultShared() {
-  const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce] = await Promise.all([
+  const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations] = await Promise.all([
     fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
-    fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("schedule_id, collaborator_id").in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("schedule_id, collaborator_id, daily_schedules(schedule_date)").in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b)),
     fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
     supabase.from("transport_voucher_rules").select("*").eq("active", true),
     supabase.from("driver_bonus_rules").select("*").eq("active", true),
     supabase.from("travel_bonus_rules").select("*").eq("active", true),
     supabase.from("city_distances").select("city_a, city_b, km"),
     fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date").order("id").range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").order("id").range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("vacations").select("collaborator_id, start_date, end_date").order("id").range(a, b)),
   ]);
   for (const result of [vtRules, dbRules, tbRules, cityDist]) if (result.error) throw result.error;
-  return { people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce };
+  return { people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations };
 }
 
 export function sliceResultRaw(raw: any, workId: string) {
@@ -95,19 +97,21 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           ? supabase.from("clients").select("name, has_toll, toll_amount, city, distance_km, needs_transport_voucher").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
       ]);
-      const [workVt, workTravelRows, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist] = await Promise.all([
+      const [workVt, workTravelRows, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, daysOff, vacations] = await Promise.all([
         // VT é marcado por cliente na Programação: lê de todos os serviços do cliente
         fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", [...new Set([...workIds, ...(((siblings as any).data ?? []) as any[]).map((x) => x.id)])]).range(a, b)),
         fetchAll<any>((a, b) => supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("work_id", [...new Set([...workIds, ...((siblings as any).data ?? []).map((x: any) => x.id)])]).range(a, b)),
         shared ? Promise.resolve(shared.noVtRows) : fetchAll<any>((a, b) =>
-          supabase.from("daily_status_entries").select("schedule_id, collaborator_id")
-            .in("box_key", ["falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b),
+          supabase.from("daily_status_entries").select("schedule_id, collaborator_id, daily_schedules(schedule_date)")
+            .in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b),
         ),
         shared ? Promise.resolve(shared.leaves) : fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
         shared ? Promise.resolve(shared.vtRules) : supabase.from("transport_voucher_rules").select("*").eq("active", true),
         shared ? Promise.resolve(shared.dbRules) : supabase.from("driver_bonus_rules").select("*").eq("active", true),
         shared ? Promise.resolve(shared.tbRules) : supabase.from("travel_bonus_rules").select("*").eq("active", true),
         shared ? Promise.resolve(shared.cityDist) : supabase.from("city_distances").select("city_a, city_b, km"),
+        shared ? Promise.resolve(shared.daysOff) : fetchAll<any>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").order("id").range(a, b)),
+        shared ? Promise.resolve(shared.vacations) : fetchAll<any>((a, b) => supabase.from("vacations").select("collaborator_id, start_date, end_date").order("id").range(a, b)),
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
       const clientName = (client as any).data?.name as string | undefined;
@@ -164,6 +168,8 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         clientWorkTravelRows: workTravelRows,
         noVtRows,
         leaves,
+        daysOff,
+        vacations,
         vtRules: vtRules.data ?? [],
         dbRules: dbRules.data ?? [],
         tbRules: tbRules.data ?? [],
@@ -243,9 +249,13 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     );
     const workRdoDays = new Set<string>([...(raw.clientRdos ?? []), ...(raw.sibRdo ?? []), ...raw.rdoWf].map((r: any) => `${r.work_id}|${String(r.report_date).slice(0, 10)}`));
     const elsewhere = new Set<string>((raw.otherClientRdos ?? []).map((r: any) => `${r.collaborator_id}|${r.report_date}`));
-    const hoursOf = (key: string, workId: string) => resultHours(rdoKey.get(key), workRdoDays.has(`${workId}|${key.split("|")[1] ?? ""}`), elsewhere.has(key));
+    const absent = resultAbsenceCheck(raw);
+    const hoursOf = (key: string, workId: string) => {
+      const [id = "", date = ""] = key.split("|");
+      return resultHours(rdoKey.get(key), workRdoDays.has(`${workId}|${date}`), elsewhere.has(key), absent(id, date));
+    };
     const supportIds = new Set<string>(raw.supportIds ?? []);
-    const weights = supportDailyWeights(raw.sibAllocs ?? [], [...(raw.sibRdo ?? []), ...raw.rdoWf], raw.clientRdos ?? [], supportIds, raw.otherClientRdos ?? []);
+    const weights = supportDailyWeights(raw.sibAllocs ?? [], [...(raw.sibRdo ?? []), ...raw.rdoWf], raw.clientRdos ?? [], supportIds, raw.otherClientRdos ?? [], absent);
     const sourceAllocs = [...d.allocs, ...(raw.sibAllocs ?? []).filter((a: any) => supportIds.has(a.collaborator_id) && !idSet.has(a.work_id) && okDate(a.daily_schedules?.schedule_date))];
     const fraction = (a: any, dt: string) => supportIds.has(a.collaborator_id) ? supportShare(weights, dt, a.work_id, idSet) : 1;
     const missingRdo: { id: string; workId: string; date: string; name: string; hours: number; removedHours: number; removedCost: number }[] = [];
@@ -277,7 +287,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const dayWorks = new Map<string, Map<string, number>>();
     for (const a of d.sibAllocs ?? []) {
       const dt = a.daily_schedules?.schedule_date as string | undefined;
-      if (!dt) continue;
+      if (!dt || hoursOf(`${a.collaborator_id}|${dt}`, a.work_id) <= 0) continue;
       const m = dayWorks.get(dt) ?? new Map<string, number>();
       m.set(a.work_id, (m.get(a.work_id) ?? 0) + 1);
       dayWorks.set(dt, m);
@@ -323,7 +333,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     };
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date || (!supportIds.has(a.collaborator_id) && unsplit(date))) continue;
+      if (!date || absent(a.collaborator_id, date) || (!supportIds.has(a.collaborator_id) && unsplit(date))) continue;
       const key = `${a.collaborator_id}|${date}`;
       if (!rdoKey.has(key) && !elsewhere.has(key) && workRdoDays.has(`${a.work_id}|${date}`) && idSet.has(a.work_id) && !missingSeen.has(key)) {
         missingSeen.add(key);
@@ -343,7 +353,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const dayMine = new Map<string, number>();
     for (const a of d.sibAllocs) {
       const dt = a.daily_schedules?.schedule_date as string | undefined;
-      if (!dt) continue;
+      if (!dt || hoursOf(`${a.collaborator_id}|${dt}`, a.work_id) <= 0) continue;
       dayTotal.set(dt, (dayTotal.get(dt) ?? 0) + 1);
       if (idSet.has(a.work_id)) dayMine.set(dt, (dayMine.get(dt) ?? 0) + 1);
     }
@@ -376,7 +386,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const vtByDate = new Map<string, { people: number; cost: number }>();
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date || (!rdoKey.has(`${a.collaborator_id}|${date}`) && hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0) || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      if (!date || hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0 || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
       const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
@@ -407,7 +417,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       for (const r of raw.sibRdo ?? []) {
         if (!r.report_date || !r.collaborator_id) continue;
         seen.add(`${r.work_id}|${r.collaborator_id}|${r.report_date}`);
-        if (r.present) addH(r.work_id, String(r.report_date), Number(r.worked_hours ?? 0));
+        if (r.present && !absent(r.collaborator_id, r.report_date)) addH(r.work_id, String(r.report_date), Number(r.worked_hours ?? 0));
       }
       for (const a of raw.sibAllocs ?? []) {
         const dt = a.daily_schedules?.schedule_date as string | undefined;
@@ -433,6 +443,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const distF = buildDistanceLookup(d.cityDist ?? []);
       const vtCost = vtDay(false);
       for (const { id, date, paysVt } of days.values()) {
+        if (absent(id, date)) continue;
         const wd = new Date(`${date}T12:00:00`).getDay();
         const hours = wd >= 1 && wd <= 4 ? 9 : 8;
         const shareF = shareOf(date);
@@ -461,7 +472,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const driverRows: { date: string; driver: string; plate: string; km: number; amount: number; share: number }[] = [];
     const bonusSeen = new Set<string>(); // 1 prêmio por motorista por dia, mesmo com várias viagens
     for (const v of d.vs) {
-      if (!v.driver_bonus || !v.driver_id || (v.work_id && !idSet.has(v.work_id))) continue;
+      if (!v.driver_bonus || !v.driver_id || absent(v.driver_id, v.schedule_date) || (v.work_id && !idSet.has(v.work_id))) continue;
       const bk = `${v.driver_id}|${v.schedule_date}`;
       if (bonusSeen.has(bk)) continue;
       bonusSeen.add(bk);
@@ -483,7 +494,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const travelWorkMap = new Map<string, boolean>((raw.clientWorkTravelRows ?? d.workTravelRows ?? []).map((v: any) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
-      if (!date || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
+      if (!date || hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0 || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
       const key = `${a.collaborator_id}|${date}`;
       if (travelSeen.has(key)) continue;
       travelSeen.add(key);
