@@ -3,7 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
 import { allocatePurchase, isIndustryClient, parsePurchaseReport, purchaseFileMonth, purchaseItemEntries, type CcItem, type PClient, type PWork } from "./purchases";
-import { assetCategory, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, installmentPlan, purchaseItemKeys, type AssetDecision, type ExclusionRule, type PurchaseItemState } from "./purchase-policy";
+import { assetCategory, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, installmentPlan, purchaseItemKeys, purchaseDecisionRequired, type AssetDecision, type ExclusionRule, type PurchaseItemState } from "./purchase-policy";
+import { purchaseMonthHours } from "./purchase-hours";
 
 type Credentials = { lovableKey: string; excelKey: string };
 const FOLDER = "Compras/RELATÓRIOS";
@@ -15,30 +16,26 @@ function monthRange(ym: string) {
   return { from: `${ym}-01`, to: `${ym}-${String(last).padStart(2, "0")}` };
 }
 
-/** Horas por serviço no mês: RDO (presentes); serviços só com programação contam 8h por pessoa/dia. */
+/** Resolve each person/day using the same attendance rules as Results. */
 async function monthHours(ym: string) {
   const { from, to } = monthRange(ym);
-  const hours = new Map<string, number>();
-  for (let page = 0; ; page++) {
-    const { data, error } = await supabaseAdmin.from("rdo_workforce").select("work_id, worked_hours, present").gte("report_date", from).lte("report_date", to).range(page * 1000, page * 1000 + 999);
-    if (error) throw error;
-    for (const r of data ?? []) if (r.work_id && r.present !== false) hours.set(r.work_id, (hours.get(r.work_id) ?? 0) + Number(r.worked_hours ?? 0));
-    if (!data || data.length < 1000) break;
-  }
-  const { data: sch, error: se } = await supabaseAdmin.from("daily_schedules").select("id").gte("schedule_date", from).lte("schedule_date", to);
-  if (se) throw se;
-  const ids = (sch ?? []).map((s) => s.id);
-  const alloc = new Map<string, number>();
-  for (let i = 0; i < ids.length; i += 100) {
+  async function all<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
+    const rows: T[] = [];
     for (let page = 0; ; page++) {
-    const { data, error } = await supabaseAdmin.from("daily_allocations").select("id, work_id").in("schedule_id", ids.slice(i, i + 100)).order("id").range(page * 1000, page * 1000 + 999);
-    if (error) throw error;
-    for (const a of data ?? []) if (a.work_id) alloc.set(a.work_id, (alloc.get(a.work_id) ?? 0) + 8);
-    if (!data || data.length < 1000) break;
+      const { data, error } = await query(page * 1000, page * 1000 + 999);
+      if (error) throw error;
+      rows.push(...(data ?? []));
+      if (!data || data.length < 1000) return rows;
     }
   }
-  for (const [w, h] of alloc) if (!(hours.get(w) ?? 0)) hours.set(w, h);
-  return hours;
+  const [works, rows, headers, allocations, supports] = await Promise.all([
+    all((a, b) => supabaseAdmin.from("works").select("id,client_id").order("id").range(a, b)),
+    all((a, b) => supabaseAdmin.from("rdo_workforce").select("work_id,collaborator_id,report_date,present,worked_hours").gte("report_date", from).lte("report_date", to).order("id").range(a, b)),
+    all((a, b) => supabaseAdmin.from("rdos").select("work_id,report_date").gte("report_date", from).lte("report_date", to).order("id").range(a, b)),
+    all((a, b) => supabaseAdmin.from("daily_allocations").select("work_id,collaborator_id,daily_schedules!inner(schedule_date)").gte("daily_schedules.schedule_date", from).lte("daily_schedules.schedule_date", to).order("id").range(a, b)),
+    all((a, b) => supabaseAdmin.from("result_support_allocations").select("client_id,collaborator_id").order("id").range(a, b)),
+  ]);
+  return purchaseMonthHours(works, allocations, rows, headers, supports);
 }
 
 async function loadRefs() {
@@ -119,21 +116,26 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
     const item = { ...original, amount: (itemCents[index] ?? 0) / 100 };
     const decision = (decisions as AssetDecision[]).find((d) => d.item_key === key);
     const asset = decision ? decision.is_asset : !!detectPurchaseAsset(item);
-    const reason = asset ? null : exclusionReason(item.code, r.rules);
+    const needsDecision = purchaseDecisionRequired(item, decision);
+    const controlled = asset || !!decision || needsDecision;
+    const reason = controlled ? null : exclusionReason(item.code, r.rules);
     const state: PurchaseItemState = { key, index, asset, status: "launched", reason: null, category: asset ? decision?.category ?? assetCategory(item) : null, excluded: 0, pending: 0, launched: 0 };
     if (reason) { Object.assign(state, { status: "excluded", reason, excluded: item.amount }); }
-    else if (asset && (!decision || decision.mode === "pending" || Math.round(decision.decided_amount * 100) !== Math.round(item.amount * 100))) {
-      Object.assign(state, { status: "pending", reason: "Ativo: decisão necessária", pending: item.amount });
+    else if (needsDecision || decision?.mode === "pending") {
+      Object.assign(state, { status: "pending", reason: asset ? "Ativo: decisão necessária" : "Item ≥ R$ 20.000: decisão necessária", pending: item.amount });
     } else {
-      const plan = asset && decision?.mode === "installments" ? installmentPlan(item.amount, line.ref_month, decision.months, decision.monthly_amount) : [{ month: line.ref_month, amount: item.amount }];
+      const plan = decision?.mode === "installments" ? installmentPlan(item.amount, line.ref_month, decision.months, decision.monthly_amount) : [{ month: line.ref_month, amount: item.amount }];
+      const itemDirection = decision?.target_work_id || decision?.target_client_id ? { client_id: decision.target_client_id, work_id: decision.target_work_id } : direction;
+      const itemCc = effectivePurchaseCc(line.cc_code, r.redirects, !!(itemDirection.client_id || itemDirection.work_id));
       const planned: typeof entries = [];
       let pendingReason: string | null = null;
       for (const [partIndex, part] of plan.entries()) {
-        const resolved = asset ? await assetAllocation(part.month, part.amount) : { allocation: alloc, hours };
+        const resolved = controlled ? await assetAllocation(part.month, part.amount) : { allocation: alloc, hours };
+        if (decision?.target_work_id || decision?.target_client_id) resolved.allocation = allocatePurchase(itemCc, part.amount, r.clients, r.works, resolved.hours, itemDirection);
         if (!resolved.allocation.parts.length) { pendingReason = resolved.allocation.reason; break; }
-        const portion: CcItem = { ...item, amount: part.amount, date: asset ? null : item.date ?? null };
+        const portion: CcItem = { ...item, amount: part.amount, date: controlled ? null : item.date ?? null };
         const rows = purchaseItemEntries([portion], part.amount, resolved.allocation, resolved.hours, r.industryWorkIds, monthRange(part.month).to);
-        planned.push(...rows.map((row) => ({ ...row, category: asset ? (decision?.category === "transporte" ? "terceiros" : decision?.category === "mo" ? "mao_obra" : decision?.category ?? "materiais") as typeof row.category : row.category, description: plan.length > 1 ? `${row.description} · Parcela ${partIndex + 1}/${plan.length}` : row.description, purchase_item_key: key, competence_month: part.month })));
+        planned.push(...rows.map((row) => ({ ...row, category: decision ? (decision.category === "transporte" ? "terceiros" : decision.category === "mo" ? "mao_obra" : decision.category) as typeof row.category : row.category, description: plan.length > 1 ? `${row.description} · Parcela ${partIndex + 1}/${plan.length}` : row.description, purchase_item_key: key, competence_month: part.month })));
       }
       if (pendingReason || !planned.length) Object.assign(state, { status: "pending", reason: pendingReason ?? "Sem destino", pending: item.amount });
       else { entries.push(...planned); state.launched = item.amount; }
