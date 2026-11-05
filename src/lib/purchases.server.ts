@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
 import { allocatePurchase, isIndustryClient, parsePurchaseReport, purchaseFileMonth, purchaseItemEntries, type CcItem, type PClient, type PWork } from "./purchases";
-import { assetCategory, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, installmentPlan, purchaseItemKeys, purchaseDecisionRequired, type AssetDecision, type ExclusionRule, type PurchaseItemState } from "./purchase-policy";
+import { assetCategory, clientPurchaseExclusionReason, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, installmentPlan, purchaseItemKeys, purchaseDecisionRequired, type AssetDecision, type ExclusionRule, type PurchaseItemState } from "./purchase-policy";
 import { purchaseMonthHours } from "./purchase-hours";
 
 type Credentials = { lovableKey: string; excelKey: string };
@@ -57,7 +57,7 @@ async function loadRefs() {
   const works: PWork[] = (w.data ?? []).flatMap((x) => x.client_id ? [{ id: x.id, client_id: x.client_id, suffix: x.cc_suffix }] : []);
   const industryClients = new Set((c.data ?? []).filter((x) => isIndustryClient(x.name)).map((x) => x.id));
   const industryWorkIds = new Set(works.filter((x) => industryClients.has(x.client_id)).map((x) => x.id));
-  return { clients, works, industryWorkIds, rules: rules.data as ExclusionRule[], redirects: redirects.data };
+  return { clients, works, clientNames: new Map((c.data ?? []).map((x) => [x.id, x.name])), industryWorkIds, rules: rules.data as ExclusionRule[], redirects: redirects.data };
 }
 
 /** Recalcula os lançamentos de uma linha (apaga e recria os gastos dela nos serviços). */
@@ -122,7 +122,9 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
     const asset = decision ? decision.is_asset : !!detectPurchaseAsset(item);
     const needsDecision = purchaseDecisionRequired(item, decision);
     const controlled = asset || !!decision || needsDecision;
-    const reason = asset || decision ? null : exclusionReason(item.code, r.rules);
+    const targetWork = decision?.target_work_id ?? direction.work_id;
+    const targetClient = targetWork ? r.works.find((w) => w.id === targetWork)?.client_id : decision?.target_client_id ?? direction.client_id ?? r.clients.find((c) => c.prefix === cc.slice(0, 4))?.id;
+    const reason = clientPurchaseExclusionReason(item.code, targetClient ? r.clientNames.get(targetClient) ?? "" : "") ?? (asset || decision ? null : exclusionReason(item.code, r.rules));
     const state: PurchaseItemState = { key, index, asset, status: "launched", reason: null, category: decision?.category ?? (asset ? assetCategory(item) : null), excluded: 0, pending: 0, launched: 0 };
     if (reason) { Object.assign(state, { status: "excluded", reason, excluded: item.amount }); }
     else if (needsDecision || decision?.mode === "pending") {

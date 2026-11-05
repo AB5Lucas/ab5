@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_EXCLUSION_RULES, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, filterPurchaseEntries, installmentPlan, purchaseItemKeys, purchaseDecisionRequired } from "./purchase-policy";
+import { DEFAULT_EXCLUSION_RULES, clientPurchaseExclusionReason, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, filterPurchaseEntries, installmentPlan, purchaseItemKeys, purchaseDecisionRequired } from "./purchase-policy";
 
 describe("exclusões em todos os clientes", () => {
+  it("SA00038 sempre é excluído na MARS porque já está na MO", () => expect(clientPurchaseExclusionReason("SA00038", "MARS MM")).toBe("Gestão de contrato já inclusa na MO"));
+  it("SA00038 continua gerando custo fora da MARS", () => expect(clientPurchaseExclusionReason("SA00038", "Suzano")).toBeNull());
+  it("outros itens da MARS não são excluídos por gestão de contrato", () => expect(clientPurchaseExclusionReason("SA00039", "MARS MM")).toBeNull());
   it.each(["VC00001", "VC00214", "SP00064", "SP00010", "RH00062"])("%s já está no km", (code) => expect(exclusionReason(code, DEFAULT_EXCLUSION_RULES)).toBe("Incluso no km rodado"));
   it("RH00043 já está no VT", () => expect(exclusionReason("RH00043", DEFAULT_EXCLUSION_RULES)).toBe("Incluso no VT"));
   it("RH00076 gera custo normalmente, sem exclusão", () => expect(exclusionReason("RH00076", DEFAULT_EXCLUSION_RULES)).toBeNull());
