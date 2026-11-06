@@ -21,6 +21,10 @@ export function recomputePending(r: PunchRow, dow: number): PunchRow {
   return { ...r, lateMin, earlyMin, discountMin: lateMin + earlyMin };
 }
 export type VAPerson = { id: string; reg: string; name: string };
+/** Only explicitly effective employees participate in VA, including manual overrides. */
+export function eligibleVAPeople<T extends VAPerson & { type: string }>(people: T[]): T[] {
+  return people.filter((p) => p.type === "efetivo");
+}
 export type VAEvent = { date: string; kind: "injustificada" | "justificada" | "atraso"; reason: string; detail: string };
 export type VALine = VAPerson & { unjust: number; just: number; late: number; pct: number; value: number; events: VAEvent[] };
 
