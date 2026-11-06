@@ -129,7 +129,7 @@ function RdoPage() {
 
 function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void }) {
   const { isAdmin, canWrite } = useCurrentUser();
-  const [f, setF] = useState({ text: "", from: "", to: "", status: "all" });
+  const [f, setF] = useState({ text: "", from: "", to: "", status: "all", client: "all", work: "all" });
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [ready, setReady] = useState<RdoPdfFile | null>(null);
   const list = useQuery({
@@ -137,12 +137,28 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
     queryFn: async () => {
       const { data } = await supabase
         .from("rdos")
-        .select("id, number, work_id, report_date, status, responsible_name, works(name, clients(name)), rdo_workforce(present), rdo_media(id), rdo_signatures(kind)")
+        .select("id, number, work_id, report_date, status, responsible_name, works(name, client_id, clients(name)), rdo_workforce(present), rdo_media(id), rdo_signatures(kind)")
         .order("report_date", { ascending: false })
         .limit(500);
       return data ?? [];
     },
   });
+  const clients = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const r of list.data ?? []) {
+      if (r.works?.client_id) options.set(r.works.client_id, r.works.clients?.name ?? "Sem nome");
+    }
+    return [...options].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+  }, [list.data]);
+  const services = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const r of list.data ?? []) {
+      if (r.works && (f.client === "all" || r.works.client_id === f.client)) {
+        options.set(r.work_id, r.works.name);
+      }
+    }
+    return [...options].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+  }, [list.data, f.client]);
   const rows = useMemo(
     () =>
       (list.data ?? []).filter((r) => {
@@ -151,6 +167,8 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
           (!f.text || hay.includes(f.text.toLowerCase())) &&
           (!f.from || r.report_date >= f.from) &&
           (!f.to || r.report_date <= f.to) &&
+          (f.client === "all" || r.works?.client_id === f.client) &&
+          (f.work === "all" || r.work_id === f.work) &&
           (f.status === "all" || r.status === f.status)
         );
       }),
@@ -181,6 +199,26 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
   return (
     <div className="space-y-3">
       <fieldset disabled={!!progress} className="grid min-w-0 gap-2 sm:grid-cols-4">
+        <div className="min-w-0 space-y-1 sm:col-span-2">
+          <Label htmlFor="rdo-history-client">Cliente</Label>
+          <Select disabled={!!progress} value={f.client} onValueChange={(client) => setF({ ...f, client, work: "all" })}>
+            <SelectTrigger id="rdo-history-client" className="w-full min-w-0"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os clientes</SelectItem>
+              {clients.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-0 space-y-1 sm:col-span-2">
+          <Label htmlFor="rdo-history-work">Serviço</Label>
+          <Select disabled={!!progress} value={f.work} onValueChange={(work) => setF({ ...f, work })}>
+            <SelectTrigger id="rdo-history-work" className="w-full min-w-0"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os serviços</SelectItem>
+              {services.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <Input className="sm:col-span-4" placeholder="Obra, cliente ou responsável" value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} />
         <Input type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} aria-label="De" />
         <Input type="date" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} aria-label="Até" />
