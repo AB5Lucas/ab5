@@ -12,10 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { computeVA, vaPaths, vaPeriod, type VALine, type VASettings } from "@/lib/vale-alimentacao";
+import { computeVA, eligibleVAPeople, vaPaths, vaPeriod, type VALine, type VASettings } from "@/lib/vale-alimentacao";
 import { loadVASheets } from "@/lib/va.functions";
 
 export const Route = createFileRoute("/_authenticated/relatorios/vale-alimentacao")({
@@ -29,7 +27,6 @@ export const Route = createFileRoute("/_authenticated/relatorios/vale-alimentaca
   component: VAPage,
 });
 
-const TYPE_LABEL: Record<string, string> = { efetivo: "Efetivos", intermitente: "Intermitentes", pj: "PJs" };
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const br = (d: string) => d.split("-").reverse().join("/");
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -57,12 +54,11 @@ function Report() {
   const load = useServerFn(loadVASheets);
   const settings = useSettings();
   const sheets = useQuery({ queryKey: ["va-sheets", ym], queryFn: () => load({ data: { ym } }), retry: false, staleTime: 0, gcTime: 0, refetchOnMount: "always" });
-  const people = useQuery({ queryKey: ["va-people"], queryFn: async () => {
-    const { data, error } = await supabase.from("collaborators").select("id, registration_number, full_name, contract_type").eq("status", "active").order("full_name");
+  const people = useQuery({ queryKey: ["va-people", "efetivo"], queryFn: async () => {
+    const { data, error } = await supabase.from("collaborators").select("id, registration_number, full_name, contract_type").eq("status", "active").eq("contract_type", "efetivo").order("full_name");
     if (error) throw error;
-    return (data ?? []).map((c) => ({ id: c.id, reg: c.registration_number ?? "", name: c.full_name, type: (c.contract_type ?? "efetivo") as string }));
+    return (data ?? []).map((c) => ({ id: c.id, reg: c.registration_number ?? "", name: c.full_name, type: c.contract_type ?? "" }));
   } });
-  const [types, setTypes] = useState<string[]>(["efetivo", "intermitente"]);
   const [editing, setEditing] = useState<{ id: string; v: string } | null>(null);
   const qc = useQueryClient();
   const overrides = useQuery({ queryKey: ["va-overrides", ym], queryFn: async () => {
@@ -78,13 +74,12 @@ function Report() {
     const { error } = await supabase.from("va_overrides").upsert({ ym, collaborator_id: id, value: n, updated_at: new Date().toISOString() });
     if (error) throw error;
   }, onSuccess: () => { setEditing(null); qc.invalidateQueries({ queryKey: ["va-overrides", ym] }); }, onError: (e: Error) => toast.error(e.message) });
-  const typeOf = useMemo(() => new Map((people.data ?? []).map((p) => [p.id, p.type])), [people.data]);
   const lines = useMemo(() => {
     if (!(sheets.data?.found && settings.data && people.data)) return [] as (VALine & { manual: boolean; calc: number })[];
     const ov = overrides.data ?? new Map<string, number>();
-    return computeVA(people.data.filter((p) => types.includes(p.type)), sheets.data.just, sheets.data.punches, settings.data)
+    return computeVA(eligibleVAPeople(people.data), sheets.data.just, sheets.data.punches, settings.data)
       .map((l) => ({ ...l, calc: l.value, manual: ov.has(l.id), value: ov.get(l.id) ?? l.value }));
-  }, [sheets.data, settings.data, people.data, overrides.data, types]);
+  }, [sheets.data, settings.data, people.data, overrides.data]);
   const shown = lines.filter((l) => `${l.reg} ${l.name}`.toLowerCase().includes(q.toLowerCase()));
   const per = vaPeriod(ym); const paths = vaPaths(ym);
   const total = lines.reduce((a, l) => a + l.value, 0);
@@ -105,8 +100,6 @@ function Report() {
       <div className="flex flex-col gap-1.5"><Label htmlFor="va-ym">Competência</Label><Input id="va-ym" type="month" value={ym} onChange={(e) => e.target.value && setYm(e.target.value)} className="w-44" /></div>
       <p className="pb-2 text-sm text-muted-foreground">{MONTHS[per.m - 1]}/{per.y}: {br(per.from)} a {br(per.to)}</p>
       <div className="flex min-w-48 flex-1 flex-col gap-1.5"><Label htmlFor="va-q">Nome ou matrícula</Label><Input id="va-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pesquisar" /></div>
-      <div className="flex flex-col gap-1.5"><Label>Tipo</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-48 justify-start">{types.length === 3 ? "Todos" : types.length ? types.map((t) => TYPE_LABEL[t]).join(", ") : "Nenhum"}</Button></PopoverTrigger>
-        <PopoverContent className="w-48 space-y-2">{Object.entries(TYPE_LABEL).map(([k, lbl]) => <label key={k} className="flex items-center gap-2 text-sm"><Checkbox checked={types.includes(k)} onCheckedChange={(c) => setTypes((t) => c ? [...t, k] : t.filter((x) => x !== k))} />{lbl}</label>)}</PopoverContent></Popover></div>
       <Button variant="outline" onClick={exportXlsx} disabled={!lines.length}><Download className="h-4 w-4" />Exportar planilha</Button>
     </div>
     {sheets.isLoading && <p className="text-sm text-muted-foreground">Lendo as planilhas do mês…</p>}
