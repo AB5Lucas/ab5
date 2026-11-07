@@ -770,7 +770,7 @@ export function SchedulePlannerBoard({
       disabled={!editable || toggleBoxTravel.isPending}
       aria-label={collaboratorId ? "Alternar prêmio viagem / pernoite do colaborador na caixa" : "Alternar prêmio viagem / pernoite da caixa"}
       title={state.overnight ? "Pernoite: R$ 25,00 (clique para desligar)" : state.pays_bonus ? "Prêmio viagem ligado (clique para pernoite)" : "Prêmio viagem desligado (clique para ligar)"}
-      onClick={(e) => { e.stopPropagation(); toggleBoxTravel.mutate({ key, collaboratorId }); }}
+      onClick={(e) => { e.stopPropagation(); toggleBoxTravel.mutate(collaboratorId ? { key, collaboratorId } : { key }); }}
       className={cn("min-w-0 shrink-0 rounded-full p-0", collaboratorId ? "h-2 w-2" : "h-2.5 w-2.5 border border-border", color)}
     />;
   };
