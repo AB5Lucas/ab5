@@ -575,6 +575,13 @@
       "when": 1794057327248,
       "tag": "0081_custom_box_travel_indicators",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1794058182823,
+      "tag": "0082_rdo_general_by_client",
+      "breakpoints": true
     }
   ]
 }
