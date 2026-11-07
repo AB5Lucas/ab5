@@ -4722,6 +4722,7 @@ export type Database = {
           order_value: number
           orders: Json
           quote_number: string | null
+          rdo_general: boolean
           rental_enabled: boolean
           start_date: string | null
           state: string | null
@@ -4765,6 +4766,7 @@ export type Database = {
           order_value?: number
           orders?: Json
           quote_number?: string | null
+          rdo_general?: boolean
           rental_enabled?: boolean
           start_date?: string | null
           state?: string | null
@@ -4808,6 +4810,7 @@ export type Database = {
           order_value?: number
           orders?: Json
           quote_number?: string | null
+          rdo_general?: boolean
           rental_enabled?: boolean
           start_date?: string | null
           state?: string | null
@@ -5025,6 +5028,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      rdo_general_work: { Args: { _client_id: string }; Returns: string }
       rdo_report_absence: {
         Args: { _note: string; _reason: string; _wf_id: string }
         Returns: undefined

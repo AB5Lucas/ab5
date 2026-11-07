@@ -37,6 +37,8 @@ function RdoPage() {
   const [tab, setTab] = useState("fill");
   const [workId, setWorkId] = useState<string>("");
   const [date, setDate] = useState(todayISO());
+  const [mode, setMode] = useState<"service" | "client">("service");
+  const [clientId, setClientId] = useState<string>("");
 
   const works = useQuery({
     queryKey: ["rdo-works", user?.id, role],
@@ -83,7 +85,24 @@ function RdoPage() {
     if (user?.id) void supabase.from("rdo_user_prefs").upsert({ user_id: user.id, last_work_id: id });
   }
 
-  const work = works.data?.find((w) => w.id === workId);
+  const clientOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const w of works.data ?? []) if (w.client_id) m.set(w.client_id, w.clients?.name ?? "Sem nome");
+    return [...m].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+  }, [works.data]);
+
+  const general = useQuery({
+    queryKey: ["rdo-general-work", clientId],
+    enabled: mode === "client" && !!clientId,
+    queryFn: async () => {
+      const { data: id, error } = await (supabase as any).rpc("rdo_general_work", { _client_id: clientId });
+      if (error) throw error;
+      const { data } = await supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, active, rdo_general, clients(name)").eq("id", id).single();
+      return data;
+    },
+  });
+
+  const work = mode === "client" ? (general.data ?? undefined) : works.data?.find((w) => w.id === workId);
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
@@ -94,9 +113,17 @@ function RdoPage() {
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
         <TabsContent value="fill" className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
+          <div className="grid gap-3 sm:grid-cols-[1fr_170px_180px]">
             <div>
-              <Label>Obra</Label>
+              <Label>{mode === "client" ? "Cliente" : "Obra"}</Label>
+              {mode === "client" ? (
+                <Select value={clientId} onValueChange={setClientId}>
+                  <SelectTrigger className="h-12"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
+                  <SelectContent>
+                    {clientOptions.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
               <Select value={workId} onValueChange={chooseWork}>
                 <SelectTrigger className="h-12">
                   <SelectValue placeholder={works.data?.length === 0 ? "Nenhuma obra vinculada a você" : "Selecione a obra"} />
@@ -105,6 +132,17 @@ function RdoPage() {
                   {(works.data ?? []).map((w) => (
                     <SelectItem key={w.id} value={w.id}>{workLabel(w)}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              )}
+            </div>
+            <div>
+              <Label>RDO por</Label>
+              <Select value={mode} onValueChange={(v) => setMode(v as "service" | "client")}>
+                <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="service">Serviço</SelectItem>
+                  <SelectItem value="client">Cliente (RDO Geral)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -119,7 +157,7 @@ function RdoPage() {
         </TabsContent>
         <TabsContent value="history">
           <RdoHistory
-            onOpen={(w, d) => { chooseWork(w); setDate(d); setTab("fill"); }}
+            onOpen={(w, d, generalClient) => { if (generalClient) { setMode("client"); setClientId(generalClient); } else { setMode("service"); chooseWork(w); } setDate(d); setTab("fill"); }}
           />
         </TabsContent>
       </Tabs>
@@ -127,7 +165,7 @@ function RdoPage() {
   );
 }
 
-function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void }) {
+function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string, generalClient?: string | null) => void }) {
   const { isAdmin, canWrite } = useCurrentUser();
   const [f, setF] = useState({ text: "", from: "", to: "", status: "all", client: "all", work: "all" });
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -137,7 +175,7 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
     queryFn: async () => {
       const { data } = await supabase
         .from("rdos")
-        .select("id, number, work_id, report_date, status, responsible_name, works(name, client_id, clients(name)), rdo_workforce(present), rdo_media(id), rdo_signatures(kind)")
+        .select("id, number, work_id, report_date, status, responsible_name, works(name, client_id, rdo_general, clients(name)), rdo_workforce(present), rdo_media(id), rdo_signatures(kind)")
         .order("report_date", { ascending: false })
         .limit(500);
       return data ?? [];
@@ -255,7 +293,7 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string) => void
                 Efetivo {team.filter((t) => t.present).length}/{team.length} · {(r.rdo_media ?? []).length} anexo(s) · {(r.rdo_signatures ?? []).length}/2 assinaturas
               </p>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => onOpen(r.work_id, r.report_date)}>
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => onOpen(r.work_id, r.report_date, r.works?.rdo_general ? r.works.client_id : null)}>
                   <Pencil className="h-4 w-4" /> {r.status === "draft" ? "Abrir / editar" : "Visualizar"}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => toast.promise(exportRdoPdf(r.id), { loading: "Gerando PDF...", success: "PDF gerado", error: (e) => e.message })}>
