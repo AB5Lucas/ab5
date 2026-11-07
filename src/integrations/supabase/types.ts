@@ -3238,6 +3238,8 @@ export type Database = {
           box_key: string
           created_at: string
           id: string
+          overnight: boolean
+          pays_bonus: boolean
           pays_vt: boolean
           schedule_id: string
           updated_at: string
@@ -3246,6 +3248,8 @@ export type Database = {
           box_key: string
           created_at?: string
           id?: string
+          overnight?: boolean
+          pays_bonus?: boolean
           pays_vt: boolean
           schedule_id: string
           updated_at?: string
@@ -3254,6 +3258,8 @@ export type Database = {
           box_key?: string
           created_at?: string
           id?: string
+          overnight?: boolean
+          pays_bonus?: boolean
           pays_vt?: boolean
           schedule_id?: string
           updated_at?: string
@@ -3309,6 +3315,8 @@ export type Database = {
           collaborator_id: string
           created_at: string
           id: string
+          overnight: boolean | null
+          pays_bonus: boolean | null
           pays_vt: boolean
           schedule_id: string
           updated_at: string
@@ -3318,6 +3326,8 @@ export type Database = {
           collaborator_id: string
           created_at?: string
           id?: string
+          overnight?: boolean | null
+          pays_bonus?: boolean | null
           pays_vt: boolean
           schedule_id: string
           updated_at?: string
@@ -3327,6 +3337,8 @@ export type Database = {
           collaborator_id?: string
           created_at?: string
           id?: string
+          overnight?: boolean | null
+          pays_bonus?: boolean | null
           pays_vt?: boolean
           schedule_id?: string
           updated_at?: string
