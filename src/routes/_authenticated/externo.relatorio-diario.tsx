@@ -293,7 +293,7 @@ function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string, general
                 Efetivo {team.filter((t) => t.present).length}/{team.length} · {(r.rdo_media ?? []).length} anexo(s) · {(r.rdo_signatures ?? []).length}/2 assinaturas
               </p>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => onOpen(r.work_id, r.report_date)}>
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => onOpen(r.work_id, r.report_date, r.works?.rdo_general ? r.works.client_id : null)}>
                   <Pencil className="h-4 w-4" /> {r.status === "draft" ? "Abrir / editar" : "Visualizar"}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => toast.promise(exportRdoPdf(r.id), { loading: "Gerando PDF...", success: "PDF gerado", error: (e) => e.message })}>
