@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { copyBoxes, selectedCopyRows } from "@/lib/schedule-copy";
 import { workVtDefault } from "@/lib/transport-rules";
+import { nextBoxTravel, resolveBoxTravel } from "@/lib/schedule-box-benefits";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -214,6 +215,7 @@ function appointmentBoxKey(a: AppointmentRow): string | null {
 function vtBoxDefault(key: string): boolean | null {
   if (key === "aso" || key === "treinamento") return true;
   if (key === "integracao" || key.startsWith(INTEGRATION_PREFIX)) return false;
+  if (key === "personalizada") return false;
   return null;
 }
 
@@ -625,14 +627,16 @@ export function SchedulePlannerBoard({
     enabled: !!scheduleId,
     queryFn: async () => {
       const [b, p] = await Promise.all([
-        supabase.from("schedule_box_vt").select("box_key, pays_vt").eq("schedule_id", scheduleId!),
-        supabase.from("schedule_person_vt").select("box_key, collaborator_id, pays_vt").eq("schedule_id", scheduleId!),
+        supabase.from("schedule_box_vt").select("box_key, pays_vt, pays_bonus, overnight").eq("schedule_id", scheduleId!),
+        supabase.from("schedule_person_vt").select("box_key, collaborator_id, pays_vt, pays_bonus, overnight").eq("schedule_id", scheduleId!),
       ]);
       if (b.error) throw b.error;
       if (p.error) throw p.error;
       return {
         box: new Map((b.data ?? []).map((r) => [r.box_key, r.pays_vt])),
         person: new Map((p.data ?? []).map((r) => [`${r.box_key}|${r.collaborator_id}`, r.pays_vt])),
+        travelBox: new Map((b.data ?? []).map((r) => [r.box_key, r])),
+        travelPerson: new Map((p.data ?? []).map((r) => [`${r.box_key}|${r.collaborator_id}`, r])),
       };
     },
   });
@@ -689,7 +693,8 @@ export function SchedulePlannerBoard({
         .upsert({ schedule_id: id, box_key: key, pays_vt: next }, { onConflict: "schedule_id,box_key" });
       if (error) throw error;
       // o quadro vale para todos: limpa exceções individuais do quadro
-      await supabase.from("schedule_person_vt").delete().eq("schedule_id", id).eq("box_key", key);
+      const { error: personError } = await supabase.from("schedule_person_vt").update({ pays_vt: next }).eq("schedule_id", id).eq("box_key", key);
+      if (personError) throw personError;
       return id;
     },
     onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-vt", id] }),
@@ -717,15 +722,62 @@ export function SchedulePlannerBoard({
     const exception = boxVt.data?.person.has(`${key}|${collaboratorId}`) ?? false;
     const label = key === "aso" ? (on ? "2 VTs (ASO + adicional)" : "1 VT (ASO)") : on ? "Recebe VT" : "Sem VT";
     return (
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon"
         disabled={!editable}
+        aria-label="Alternar VT do colaborador na caixa"
         title={`${label}${exception ? " (exceção)" : ""}`}
         onClick={(e) => { e.stopPropagation(); togglePersonVt.mutate({ key, collaboratorId }); }}
-        className={`h-2 w-2 shrink-0 rounded-full ${on ? "bg-success" : "bg-muted-foreground/40"}`}
+        className={`h-2 w-2 min-w-0 shrink-0 rounded-full p-0 ${on ? "bg-success hover:bg-success" : "bg-muted-foreground/40 hover:bg-muted-foreground/40"}`}
       />
     );
   };
+
+  const boxTravel = (key: string, collaboratorId?: string) => resolveBoxTravel(
+    boxVt.data?.travelBox.get(key) ?? { pays_bonus: false, overnight: false },
+    collaboratorId ? boxVt.data?.travelPerson.get(`${key}|${collaboratorId}`) : undefined,
+  );
+  const toggleBoxTravel = useMutation({
+    mutationFn: async ({ key, collaboratorId }: { key: string; collaboratorId?: string }) => {
+      const id = await ensureSchedule();
+      const next = nextBoxTravel(boxTravel(key, collaboratorId));
+      if (collaboratorId) {
+        const { error } = await supabase.from("schedule_person_vt").upsert({
+          schedule_id: id, box_key: key, collaborator_id: collaboratorId,
+          pays_vt: personPaysVt(key, collaboratorId), ...next,
+        }, { onConflict: "schedule_id,box_key,collaborator_id" });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("schedule_box_vt").upsert({
+          schedule_id: id, box_key: key, pays_vt: boxPaysVt(key), ...next,
+        }, { onConflict: "schedule_id,box_key" });
+        if (error) throw error;
+        const { error: personError } = await supabase.from("schedule_person_vt")
+          .update({ pays_bonus: null, overnight: null }).eq("schedule_id", id).eq("box_key", key);
+        if (personError) throw personError;
+      }
+      return id;
+    },
+    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-vt", id] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const travelDot = (key: string, collaboratorId?: string) => {
+    const state = boxTravel(key, collaboratorId);
+    const color = state.overnight ? "bg-warning hover:bg-warning" : state.pays_bonus ? "bg-info hover:bg-info" : "bg-muted-foreground/40 hover:bg-muted-foreground/40";
+    return <Button
+      variant="ghost" size="icon"
+      disabled={!editable || toggleBoxTravel.isPending}
+      aria-label={collaboratorId ? "Alternar prêmio viagem / pernoite do colaborador na caixa" : "Alternar prêmio viagem / pernoite da caixa"}
+      title={state.overnight ? "Pernoite: R$ 25,00 (clique para desligar)" : state.pays_bonus ? "Prêmio viagem ligado (clique para pernoite)" : "Prêmio viagem desligado (clique para ligar)"}
+      onClick={(e) => { e.stopPropagation(); toggleBoxTravel.mutate({ key, collaboratorId }); }}
+      className={cn("min-w-0 shrink-0 rounded-full p-0", collaboratorId ? "h-2 w-2" : "h-2.5 w-2.5 border border-border", color)}
+    />;
+  };
+  const personBenefits = (key: string, collaboratorId: string) => <span className="flex shrink-0 flex-col items-center gap-0.5">
+    {personDot(key, collaboratorId)}
+    {key === "personalizada" && travelDot(key, collaboratorId)}
+  </span>;
 
   /** Agendamentos (ASO, treinamento, integração) marcados para esta data. */
   const appointments = useQuery({
@@ -2091,9 +2143,12 @@ export function SchedulePlannerBoard({
                       </Badge>
                     </button>
                     {vtBoxDefault(b.key) !== null && (
-                      <button
-                        type="button"
+                      <span className="mt-1 flex shrink-0 flex-col items-center gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         disabled={!editable}
+                        aria-label="Alternar VT da caixa"
                         title={
                           b.key === "aso"
                             ? boxPaysVt(b.key)
@@ -2104,8 +2159,10 @@ export function SchedulePlannerBoard({
                               : "VT: ninguém recebe (clique para ligar)"
                         }
                         onClick={(e) => { e.stopPropagation(); toggleBoxVt.mutate(b.key); }}
-                        className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full border border-border ${boxPaysVt(b.key) ? "bg-success" : "bg-muted-foreground/40"}`}
+                        className={`h-2.5 w-2.5 min-w-0 shrink-0 rounded-full border border-border p-0 ${boxPaysVt(b.key) ? "bg-success hover:bg-success" : "bg-muted-foreground/40 hover:bg-muted-foreground/40"}`}
                       />
+                      {b.key === "personalizada" && travelDot(b.key)}
+                      </span>
                     )}
                   </div>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">Caixa de situação do dia</p>
@@ -2145,7 +2202,7 @@ export function SchedulePlannerBoard({
                         >
                           {a.note}
                         </Badge>
-                        {vtBoxDefault(b.key) !== null && personDot(b.key, a.id)}
+                        {vtBoxDefault(b.key) !== null && personBenefits(b.key, a.id)}
                       </li>
                     );
                   })}
@@ -2181,7 +2238,7 @@ export function SchedulePlannerBoard({
                             </p>
                           )}
                         </div>
-                        {vtBoxDefault(b.key) !== null && personDot(b.key, entry.collaborator_id)}
+                        {vtBoxDefault(b.key) !== null && personBenefits(b.key, entry.collaborator_id)}
                         {editable && (
                           <Button
                             variant="ghost"
