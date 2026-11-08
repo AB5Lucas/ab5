@@ -8,6 +8,7 @@ import { TransportBuilderDialog } from "@/components/transport-builder-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
+  DropdownMenuItem,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -557,6 +558,13 @@ function ServicesPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>Serviços que aparecem</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={visible.length === 0}
+              onSelect={(e) => { e.preventDefault(); savePrefs({ hidden_work_ids: [...new Set([...hidden, ...shown.map((w) => w.id)])] }); }}
+            >
+              Desmarcar todos
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             {shown.map((w) => (
               <DropdownMenuCheckboxItem
