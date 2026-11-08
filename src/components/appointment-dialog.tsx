@@ -1,4 +1,5 @@
 import { LeaveNotice } from "@/components/leave-notice";
+import { findDateConflicts } from "@/lib/date-conflicts";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -205,6 +206,8 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
       if (!form.scheduled_time) throw new Error("Informe o horário do agendamento");
       if (type === "treinamento" && !form.training_id) throw new Error("Selecione o treinamento (NR)");
       if (type === "integracao" && !form.client_id) throw new Error("Selecione o cliente");
+      const conflicts = await findDateConflicts(form.collaborator_id, form.scheduled_date, form.scheduled_date, editing ? { table: "appointments", id: editing.id } : undefined, form.scheduled_time);
+      if (conflicts.length) throw new Error(`Não é possível agendar: ${conflicts.join("; ")}`);
       const payload = {
         type,
         collaborator_id: form.collaborator_id,

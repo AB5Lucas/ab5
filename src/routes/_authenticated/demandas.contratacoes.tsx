@@ -268,6 +268,7 @@ function NewRequest({ onClose }: { onClose: () => void }) {
       toast.success(n.length > 1 ? `Solicitações ${n.map(num).join(", ")} abertas.` : `Solicitação ${num(n[0]!)} aberta.`);
       qc.invalidateQueries({ queryKey: ["hiring-requests"] });
       qc.invalidateQueries({ queryKey: ["hiring-last-number"] });
+      qc.invalidateQueries({ queryKey: ["workflow-badges"] });
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -373,6 +374,7 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
       qc.invalidateQueries({ queryKey: ["hiring-requests"] });
       qc.invalidateQueries({ queryKey: ["hiring-events", req.id] });
       qc.invalidateQueries({ queryKey: ["hiring-mails", req.id] });
+      qc.invalidateQueries({ queryKey: ["workflow-badges"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

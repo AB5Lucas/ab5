@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { addDays, todayISO } from "@/lib/scheduling";
 import { useServiceDistribution } from "@/hooks/use-service-distribution";
+import { hiringBadge } from "@/lib/hiring-badge";
 
 export type MenuBadge = { count: number; tone: "red" | "orange" };
 
@@ -88,7 +89,7 @@ export function useMenuBadges() {
   if (distribution?.pendingClients) out["/programacao/servicos"] = { count: distribution.pendingClients, tone: "red" };
   if (w?.ponto) out["/relatorios/ajuste-ponto"] = { count: w.ponto, tone: "red" };
   if (w?.andaimes) out["/andaimes/solicitacoes"] = { count: w.andaimes, tone: "red" };
-  if (w?.hiring) out["/demandas/contratacoes"] = { count: w.hiring, tone: "red" };
+  if (w?.hiring) out["/demandas/contratacoes"] = { count: w.hiring, tone: w.hiringTone ?? "red" };
   if (d) {
     const docs = toBadge(d); if (docs) out["/agendamentos"] = docs;
     const c = conferenceBadge(d.conference); if (c) out["/conferencia"] = c;
@@ -156,17 +157,25 @@ export function useWorkflowBadges() {
       for (const f of flowRoles as any[]) ids[f.key] = f.user_id;
       const andaimes = reqs.filter((r) => flowPendingFor(r.flow_stage, { ...ids, solicitante: r.user_id }) === uid).length;
       let hiring = 0;
-      if (rh) hiring = hires.filter((h) => !["atendida", "cancelada"].includes(h.status)).length;
+      let hiringTone: "red" | "orange" = "orange";
+      if (rh) {
+        const badge = hiringBadge(hires);
+        hiring = badge?.count ?? 0;
+        hiringTone = badge?.tone ?? "orange";
+      }
       else {
         const mine = hires.filter((h) => h.requester_id === uid).map((h) => h.id);
         if (mine.length) {
           const seen = readHiringSeen(uid);
           if (!seen["__base"]) { seen["__base"] = new Date().toISOString(); localStorage.setItem(SEEN_KEY(uid), JSON.stringify(seen)); }
           const { data: ev } = await supabase.from("hiring_request_events").select("request_id, user_id, created_at").in("request_id", mine).neq("user_id", uid);
-          hiring = (ev ?? []).filter((e: any) => e.created_at > (seen[e.request_id] ?? seen["__base"]!)).length;
+          const unread = (ev ?? []).filter((e: any) => e.created_at > (seen[e.request_id] ?? seen["__base"] ?? ""));
+          hiring = unread.length;
+          const unreadIds = new Set(unread.map((e) => e.request_id));
+          hiringTone = hiringBadge(hires.filter((h) => unreadIds.has(h.id)))?.tone ?? "orange";
         }
       }
-      return { ponto, andaimes, hiring };
+      return { ponto, andaimes, hiring, hiringTone };
     },
   });
 }
