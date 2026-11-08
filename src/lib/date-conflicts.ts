@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateBR } from "@/lib/scheduling";
+import { appointmentTimesConflict } from "@/lib/appointment-conflicts";
 
 const TYPE_LABEL: Record<string, string> = {
   aso: "ASO",
@@ -13,12 +14,13 @@ export async function findDateConflicts(
   from: string,
   to: string,
   exclude?: { table: string; id: string },
+  scheduledTime?: string,
 ): Promise<string[]> {
   const skip = (table: string, id: string) => exclude?.table === table && exclude.id === id;
   const [ap, vac, off, med] = await Promise.all([
     supabase
       .from("appointments")
-      .select("id,type,scheduled_date,status")
+      .select("id,type,scheduled_date,scheduled_time,status")
       .eq("collaborator_id", collaboratorId)
       .gte("scheduled_date", from)
       .lte("scheduled_date", to),
@@ -36,10 +38,12 @@ export async function findDateConflicts(
       .lte("start_date", to)
       .gte("end_date", from),
   ]);
+  for (const result of [ap, vac, off, med]) if (result.error) throw result.error;
   const out: string[] = [];
   for (const a of ap.data ?? []) {
     if (skip("appointments", a.id) || /cancel/i.test(a.status ?? "")) continue;
-    out.push(`${TYPE_LABEL[a.type] ?? a.type} agendado em ${formatDateBR(a.scheduled_date)}`);
+    if (!appointmentTimesConflict(a.scheduled_time, scheduledTime)) continue;
+    out.push(`${TYPE_LABEL[a.type] ?? a.type} agendado em ${formatDateBR(a.scheduled_date)}${a.scheduled_time ? ` às ${a.scheduled_time.slice(0, 5)}` : " (sem horário)"}`);
   }
   for (const v of vac.data ?? []) {
     if (skip("vacations", v.id) || /cancel/i.test(v.status ?? "")) continue;

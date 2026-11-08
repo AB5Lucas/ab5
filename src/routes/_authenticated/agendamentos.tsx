@@ -361,7 +361,7 @@ function AppointmentsPage() {
       if (!form.scheduled_time) throw new Error("Informe o horário");
       if (form.type === "treinamento" && !form.training_id) throw new Error("Selecione a NR");
       if (form.type === "integracao" && !form.client_id) throw new Error("Selecione o cliente");
-      const conflicts = await findDateConflicts(form.collaborator_id, form.scheduled_date, form.scheduled_date);
+      const conflicts = await findDateConflicts(form.collaborator_id, form.scheduled_date, form.scheduled_date, undefined, form.scheduled_time);
       if (conflicts.length) throw new Error(`Não é possível agendar: ${conflicts.join("; ")}`);
       const { error } = await supabase.from("appointments").insert({
         type: form.type,
@@ -468,7 +468,9 @@ function AppointmentsPage() {
   const reschedule = useMutation({
     mutationFn: async ({ row, date, time }: { row: Row; date: string; time: string }) => {
       if (!date) throw new Error("Informe a nova data");
-      const conflicts = await findDateConflicts(row.collaborator_id, date, date, { table: "appointments", id: row.id });
+      const nextTime = time || row.scheduled_time;
+      if (!nextTime) throw new Error("Informe o horário");
+      const conflicts = await findDateConflicts(row.collaborator_id, date, date, { table: "appointments", id: row.id }, nextTime);
       if (conflicts.length) throw new Error(`Não é possível remarcar: ${conflicts.join("; ")}`);
       const history = (Array.isArray(row.reschedules) ? row.reschedules : []) as Record<string, string | null>[];
       const nextHistory: Record<string, string | null>[] = [
