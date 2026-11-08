@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -117,6 +118,7 @@ function ClientsPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [addressSource, setAddressSource] = useState("");
   const [deleting, setDeleting] = useState<Client | null>(null);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -206,7 +208,23 @@ function ClientsPage() {
   function openNew() {
     setEditing(null);
     setForm(emptyForm);
+    setAddressSource("");
     setOpen(true);
+  }
+
+  function copyAddress(clientId: string) {
+    const source = clients.data?.find((c) => c.id === clientId);
+    if (!source) return;
+    setAddressSource(clientId);
+    setForm((current) => ({
+      ...current,
+      address: source.address ?? "",
+      number: source.number ?? "",
+      neighborhood: source.neighborhood ?? "",
+      city: source.city ?? "",
+      state: source.state ?? "",
+      zip_code: source.zip_code ?? "",
+    }));
   }
 
   function openEdit(c: Client) {
@@ -394,6 +412,21 @@ function ClientsPage() {
               <Input inputMode="numeric" maxLength={4} placeholder="Ex.: 2004" value={form.cc_prefix} onChange={(e) => set("cc_prefix", e.target.value.replace(/\D/g, ""))} />
             </div>
             <div className="space-y-1 sm:col-span-2">
+              {!editing && (
+                <div className="mb-3 space-y-1">
+                  <Label htmlFor="copy-client-address">Copiar endereço de outro cliente</Label>
+                  <Select value={addressSource} onValueChange={copyAddress} disabled={!clients.data?.length}>
+                    <SelectTrigger id="copy-client-address">
+                      <SelectValue placeholder="Selecionar cliente cadastrado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(clients.data ?? []).map((client) => (
+                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <Label>Endereço</Label>
               <Input value={form.address} onChange={(e) => set("address", e.target.value)} />
             </div>
