@@ -10,7 +10,7 @@ import { FakeSupabase, type FakeDb } from "@/test/fake-supabase";
 const fake = new FakeSupabase({});
 vi.mock("@/integrations/supabase/client", () => ({ supabase: fake }));
 
-const { loadResultShared, loadWorkData, sliceResultRaw, monthEnd } = await import("./results-engine");
+const { loadResultShared, loadWorkData, sliceResultRaw, monthEnd, buildBase, clientContextCache } = await import("./results-engine");
 const { loadFinanceActive, financeList, financeBatches, loadFinanceRaws, buildFinanceGroups } = await import("./finance-data");
 
 const sortDeep = (v: any): any => {
@@ -53,6 +53,13 @@ async function compare(db: FakeDb, yms: string[]) {
   const a = nums(legacy), b = nums(bulk);
   expect(b.map((x) => x.id)).toEqual(a.map((x) => x.id));
   for (let i = 0; i < a.length; i++) for (const k of KEYS) expect(b[i]![k], `${a[i]!.id} ${k}`).toBeCloseTo(a[i]![k], 6);
+  // Reaproveitamento por cliente no motor: resultado idêntico ao cálculo sem reaproveitar
+  const plain = (v: any) => JSON.stringify(v, (_k, x) => (x instanceof Map ? [...x.entries()] : x instanceof Set ? [...x] : x));
+  const runAll = () => list.flatMap((w: any) => ["", yms[yms.length - 1]!].map((until) =>
+    plain(buildBase(w, bulk.get(w.id), "", until, { isAll: false, workIds: [w.id], holidays, allWorks: works, accumulated: true }))));
+  const cached = runAll();
+  clientContextCache.enabled = false;
+  try { expect(cached).toEqual(runAll()); } finally { clientContextCache.enabled = true; }
   return { services: list.length, clients: batches.length, lines: a, legacyReq, bulkReq };
 }
 

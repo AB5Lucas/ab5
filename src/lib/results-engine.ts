@@ -32,7 +32,7 @@ export const monthEnd = (ym: string) => {
 };
 
 const PAGE = 1000;
-const PARALLEL_PAGES = 4;
+const PARALLEL_PAGES = 8;
 /** Lê todas as páginas. Depois da primeira página cheia, busca as seguintes em grupos paralelos
  * e junta na ordem das páginas — mesmo resultado da leitura sequencial, com menos esperas. */
 export async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
@@ -204,6 +204,68 @@ export function contractCutoffs(work: any, entries: any[], isAll: boolean, allWo
 }
 
 /** Cálculo base (custos realizados, andamento, receita e margem por mês). */
+/**
+ * Contexto do cliente reaproveitado entre os serviços do mesmo cliente (Fechamento calcula
+ * vários serviços com os mesmos dados do cliente, 2× cada). Só é usado quando os RDOs do
+ * serviço já estão, um a um e sem ambiguidade, entre os RDOs do cliente — aí as horas por
+ * pessoa/dia, o rateio de apoio e a base da integração são exatamente os mesmos. Senão o
+ * cálculo segue o caminho original.
+ */
+type ClientCtx = {
+  deps: unknown[];
+  rdoKey: Map<string, any>;
+  workRdoDays: Set<string>;
+  elsewhere: Set<string>;
+  absent: (id: string, date: string) => boolean;
+  tripleCount: Map<string, number>;
+  pairCount: Map<string, number>;
+  weights?: Map<string, Map<string, number>>;
+  integHours?: [string, string, number][];
+};
+const CLIENT_CTX = new WeakMap<object, ClientCtx>();
+/** Só para testes: desliga o reaproveitamento para comparar com o caminho original. */
+export const clientContextCache = { enabled: true };
+const ABSENCE_FN = new WeakMap<object, { deps: unknown[]; fn: (id: string, date: string) => boolean }>();
+const sameDeps = (a: unknown[], b: unknown[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+function absenceFor(raw: any) {
+  const deps = [raw.daysOff, raw.vacations, raw.leaves, raw.noVtRows];
+  const key = raw.noVtRows ?? raw;
+  const hit = ABSENCE_FN.get(key);
+  if (hit && sameDeps(hit.deps, deps)) return hit.fn;
+  const fn = resultAbsenceCheck(raw);
+  ABSENCE_FN.set(key, { deps, fn });
+  return fn;
+}
+function clientContext(raw: any): ClientCtx | null {
+  const sibRdo: any[] = raw.sibRdo ?? [];
+  if (!clientContextCache.enabled || !raw.sibAllocs || !sibRdo.length) return null;
+  const deps = [sibRdo, raw.clientRdos, raw.otherClientRdos, raw.supportIds, raw.daysOff, raw.vacations, raw.leaves, raw.noVtRows];
+  let ctx = CLIENT_CTX.get(raw.sibAllocs);
+  if (!ctx || !sameDeps(ctx.deps, deps)) {
+    const tripleCount = new Map<string, number>();
+    const pairCount = new Map<string, number>();
+    for (const r of sibRdo) {
+      const t = `${r.work_id}|${r.collaborator_id}|${r.report_date}`;
+      tripleCount.set(t, (tripleCount.get(t) ?? 0) + 1);
+      if (r.collaborator_id) { const k = `${r.collaborator_id}|${r.report_date}`; pairCount.set(k, (pairCount.get(k) ?? 0) + 1); }
+    }
+    ctx = {
+      deps, tripleCount, pairCount,
+      rdoKey: new Map<string, any>(sibRdo.filter((r: any) => r.collaborator_id).map((r: any) => [`${r.collaborator_id}|${r.report_date}`, r])),
+      workRdoDays: new Set<string>([...(raw.clientRdos ?? []), ...sibRdo].map((r: any) => `${r.work_id}|${String(r.report_date).slice(0, 10)}`)),
+      elsewhere: new Set<string>((raw.otherClientRdos ?? []).map((r: any) => `${r.collaborator_id}|${r.report_date}`)),
+      absent: absenceFor(raw),
+    };
+    CLIENT_CTX.set(raw.sibAllocs, ctx);
+  }
+  // Cada RDO do serviço precisa ser exatamente um RDO do cliente (mesmo serviço, pessoa e dia, sem duplicata)
+  for (const r of raw.rdoWf ?? []) {
+    if (ctx.tripleCount.get(`${r.work_id}|${r.collaborator_id}|${r.report_date}`) !== 1) return null;
+    if (r.collaborator_id && ctx.pairCount.get(`${r.collaborator_id}|${r.report_date}`) !== 1) return null;
+  }
+  return ctx;
+}
+
 export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: string, opts: BaseOpts) {
   if (!work || !raw) return null;
   const { isAll, workIds } = opts;
@@ -254,18 +316,21 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const noPrem = new Set<string>(d.people.filter((p: any) => p.no_overtime_premium).map((p: any) => p.id));
     const enc = (id: string) => (pj.has(id) ? 1 : ENCARGOS);
     // Horas vêm do RDO de qualquer serviço do cliente (um RDO pode cobrir a equipe toda)
-    const rdoKey = new Map<string, any>(
+    const ctx = clientContext(raw);
+    const rdoKey = ctx?.rdoKey ?? new Map<string, any>(
       [...(raw.sibRdo ?? []), ...raw.rdoWf].filter((r: any) => r.collaborator_id).map((r: any) => [`${r.collaborator_id}|${r.report_date}`, r]),
     );
-    const workRdoDays = new Set<string>([...(raw.clientRdos ?? []), ...(raw.sibRdo ?? []), ...raw.rdoWf].map((r: any) => `${r.work_id}|${String(r.report_date).slice(0, 10)}`));
-    const elsewhere = new Set<string>((raw.otherClientRdos ?? []).map((r: any) => `${r.collaborator_id}|${r.report_date}`));
-    const absent = resultAbsenceCheck(raw);
+    const workRdoDays = ctx?.workRdoDays ?? new Set<string>([...(raw.clientRdos ?? []), ...(raw.sibRdo ?? []), ...raw.rdoWf].map((r: any) => `${r.work_id}|${String(r.report_date).slice(0, 10)}`));
+    const elsewhere = ctx?.elsewhere ?? new Set<string>((raw.otherClientRdos ?? []).map((r: any) => `${r.collaborator_id}|${r.report_date}`));
+    const absent = ctx?.absent ?? resultAbsenceCheck(raw);
     const hoursOf = (key: string, workId: string) => {
       const [id = "", date = ""] = key.split("|");
       return resultHours(rdoKey.get(key), workRdoDays.has(`${workId}|${date}`), elsewhere.has(key), absent(id, date));
     };
     const supportIds = new Set<string>(raw.supportIds ?? []);
-    const weights = supportDailyWeights(raw.sibAllocs ?? [], [...(raw.sibRdo ?? []), ...raw.rdoWf], raw.clientRdos ?? [], supportIds, raw.otherClientRdos ?? [], absent);
+    const weights = ctx
+      ? (ctx.weights ??= supportDailyWeights(raw.sibAllocs ?? [], raw.sibRdo ?? [], raw.clientRdos ?? [], supportIds, raw.otherClientRdos ?? [], absent))
+      : supportDailyWeights(raw.sibAllocs ?? [], [...(raw.sibRdo ?? []), ...raw.rdoWf], raw.clientRdos ?? [], supportIds, raw.otherClientRdos ?? [], absent);
     const sourceAllocs = [...d.allocs, ...(raw.sibAllocs ?? []).filter((a: any) => supportIds.has(a.collaborator_id) && !idSet.has(a.work_id) && okDate(a.daily_schedules?.schedule_date))];
     const fraction = (a: any, dt: string) => supportIds.has(a.collaborator_id) ? supportShare(weights, dt, a.work_id, idSet) : 1;
     const missingRdo: { id: string; workId: string; date: string; name: string; hours: number; removedHours: number; removedCost: number }[] = [];
@@ -418,21 +483,26 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const allByM = new Map<string, number>();
       const myByM = new Map<string, number>();
       // Base: todos os serviços do cliente com pessoas escaladas (RDO; sem RDO = 8h por escalação)
-      const seen = new Set<string>();
-      const addH = (wid: string, date: string, h: number) => {
-        const m = date.slice(0, 7);
+      // Horas por mês e serviço (mesma ordem de soma do cálculo original), reaproveitadas por cliente
+      const computeHours = () => {
+        const order: [string, string, number][] = [];
+        const seen = new Set<string>();
+        for (const r of raw.sibRdo ?? []) {
+          if (!r.report_date || !r.collaborator_id) continue;
+          seen.add(`${r.work_id}|${r.collaborator_id}|${r.report_date}`);
+          if (r.present && !absent(r.collaborator_id, r.report_date)) order.push([r.work_id, String(r.report_date).slice(0, 7), Number(r.worked_hours ?? 0)]);
+        }
+        for (const a of raw.sibAllocs ?? []) {
+          const dt = a.daily_schedules?.schedule_date as string | undefined;
+          if (!dt || !a.work_id || seen.has(`${a.work_id}|${a.collaborator_id}|${dt}`)) continue;
+          order.push([a.work_id, dt.slice(0, 7), hoursOf(`${a.collaborator_id}|${dt}`, a.work_id)]);
+        }
+        return order;
+      };
+      const hoursData = ctx ? (ctx.integHours ??= computeHours()) : computeHours();
+      for (const [wid, m, h] of hoursData) {
         allByM.set(m, (allByM.get(m) ?? 0) + h);
         if (idSet.has(wid)) myByM.set(m, (myByM.get(m) ?? 0) + h);
-      };
-      for (const r of raw.sibRdo ?? []) {
-        if (!r.report_date || !r.collaborator_id) continue;
-        seen.add(`${r.work_id}|${r.collaborator_id}|${r.report_date}`);
-        if (r.present && !absent(r.collaborator_id, r.report_date)) addH(r.work_id, String(r.report_date), Number(r.worked_hours ?? 0));
-      }
-      for (const a of raw.sibAllocs ?? []) {
-        const dt = a.daily_schedules?.schedule_date as string | undefined;
-        if (!dt || !a.work_id || seen.has(`${a.work_id}|${a.collaborator_id}|${dt}`)) continue;
-        addH(a.work_id, dt, hoursOf(`${a.collaborator_id}|${dt}`, a.work_id));
       }
       const shareOf = (date: string) => {
         const m = date.slice(0, 7);
