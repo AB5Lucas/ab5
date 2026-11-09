@@ -1,6 +1,6 @@
 import { marginPercent, meanMarginPercent } from "@/lib/result-labor";
 import { MarginPercent } from "@/components/margin-percent";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { contractFraction } from "@/lib/contract";
-import { ResultadoPage } from "./obras.resultado";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { loadResultShared, monthEnd } from "@/lib/results-engine";
@@ -32,6 +31,8 @@ export const Route = createFileRoute("/_authenticated/fechamentos/financeiro")({
 });
 
 const EMPTY_RAWS = new Map<string, any>();
+// Detalhe (tela Resultados) só é baixado quando o usuário abre um serviço
+const ResultadoPage = lazy(() => import("./obras.resultado").then((m) => ({ default: m.ResultadoPage })));
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
@@ -220,7 +221,7 @@ function DetailDialog({ line, months, onClose }: { line: Line | null; months: st
     <Dialog open={!!line} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-[98vw] w-[98vw] h-[96vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{line?.work.clients?.name ?? line?.work.client} — {line?.work.name}</DialogTitle></DialogHeader>
-        {line && <ResultadoPage key={`${line.work.id}:${months.join(",")}`} initialWorkId={line.work.id} initialMonths={months} />}
+        {line && <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Carregando...</div>}><ResultadoPage key={`${line.work.id}:${months.join(",")}`} initialWorkId={line.work.id} initialMonths={months} /></Suspense>}
       </DialogContent>
     </Dialog>
   );
