@@ -2,7 +2,7 @@ import { marginPercent, meanMarginPercent } from "@/lib/result-labor";
 import { MarginPercent } from "@/components/margin-percent";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,8 @@ import { contractFraction } from "@/lib/contract";
 import { ResultadoPage } from "./obras.resultado";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { buildBase, fetchAll, loadWorkData, loadResultShared, sliceResultRaw, monthEnd, monthlyOrderRevenue, progressUntil, totalMargin } from "@/lib/results-engine";
+import { loadResultShared, monthEnd } from "@/lib/results-engine";
+import { FIN_TAX, buildFinanceGroups, financeBatches, financeList, loadFinanceActive, loadFinanceRaws, type FinanceLine } from "@/lib/finance-data";
 
 export const Route = createFileRoute("/_authenticated/fechamentos/financeiro")({
   head: () => ({
@@ -30,15 +31,12 @@ export const Route = createFileRoute("/_authenticated/fechamentos/financeiro")({
   component: FinanceiroPage,
 });
 
-const FIN_TAX = 0.185; // imposto do relatório Financeiro
+const EMPTY_RAWS = new Map<string, any>();
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
 
-type Line = {
-  work: any; billed: number; tax: number; mo: number; transport: number; materials: number;
-  margin: number; progress: number; monthPct: number | null; total: { margin: number; pct: number | null }; full: any; raw: any;
-};
+type Line = FinanceLine;
 
 function FinanceiroPage() {
   const now = new Date();
@@ -66,88 +64,24 @@ function FinanceiroPage() {
   // Serviços com movimento no período (lançamentos, RDOs ou escala)
   const active = useQuery({
     queryKey: ["fin-active", start, end],
-    queryFn: async () => {
-      const out = new Set<string>();
-      const [ent, rdo, sch] = await Promise.all([
-        fetchAll<any>((a, b) =>
-          supabase.from("work_entries").select("work_id").eq("sync_cancelled", false)
-            .or(`and(entry_date.gte.${start},entry_date.lte.${end}),and(competence_month.gte.${start.slice(0, 7)},competence_month.lte.${end.slice(0, 7)})`)
-            .order("id").range(a, b),
-        ),
-        fetchAll<any>((a, b) => supabase.from("rdos").select("work_id").gte("report_date", start).lte("report_date", end).order("id").range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("daily_schedules").select("id").gte("schedule_date", start).lte("schedule_date", end).order("id").range(a, b)),
-      ]);
-      ent.forEach((r) => out.add(r.work_id));
-      rdo.forEach((r) => out.add(r.work_id));
-      const ids = sch.map((s) => s.id);
-      for (let i = 0; i < ids.length; i += 200) {
-        const rows = await fetchAll<any>((a, b) => supabase.from("daily_allocations").select("work_id").in("schedule_id", ids.slice(i, i + 200)).order("id").range(a, b));
-        rows.forEach((r) => out.add(r.work_id));
-      }
-      return out;
-    },
+    queryFn: () => loadFinanceActive(start, end),
   });
   // Qualquer serviço (inclusive concluído/inativo) com movimento ou pedido datado no período
-  const list = useMemo(() => (works.data ?? []).filter((w: any) =>
-    active.data?.has(w.id) ||
-    (Array.isArray(w.orders) && w.orders.some((o: any) => o?.date && String(o.date).slice(0, 10) >= start && String(o.date).slice(0, 10) <= end)),
-  ), [works.data, active.data, start, end]);
+  const list = useMemo(() => financeList(works.data ?? [], active.data, start, end), [works.data, active.data, start, end]);
   const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 60_000, queryFn: loadResultShared });
-  const clientBatches = useMemo(() => [...new Set(list.map((w: any) => w.client_id ?? w.id))].map((key) => {
-    const selected = list.filter((w: any) => (w.client_id ?? w.id) === key);
-    return { key, work: selected[0], ids: selected.map((w: any) => w.id) };
-  }), [list]);
-  const clientRaws = useQueries({
-    queries: clientBatches.map((batch) => ({
-      queryKey: ["fin-client-raw", batch.key, batch.ids.join(",")],
-      staleTime: 60_000,
-      enabled: !!shared.data,
-      queryFn: () => loadWorkData(batch.work, batch.ids, false, shared.data),
-    })),
+  const clientBatches = useMemo(() => financeBatches(list), [list]);
+  // Um carregamento em lote para todos os clientes do período (antes: ~17 consultas por cliente)
+  const batchKey = useMemo(() => clientBatches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [clientBatches]);
+  const raws = useQuery({
+    queryKey: ["fin-client-raw", batchKey],
+    staleTime: 60_000,
+    enabled: !!shared.data && !!active.data,
+    queryFn: () => loadFinanceRaws(clientBatches, shared.data!),
   });
-  const rawByWork = useMemo(() => {
-    const out = new Map<string, any>();
-    clientBatches.forEach((batch, index) => { const raw = clientRaws[index]?.data; if (raw) for (const id of batch.ids) out.set(id, sliceResultRaw(raw, id)); });
-    return out;
-  }, [clientBatches, clientRaws]);
-  const loading = works.isLoading || active.isLoading || shared.isLoading || clientRaws.some((r) => r.isPending);
+  const rawByWork = raws.data ?? EMPTY_RAWS;
+  const loading = works.isLoading || active.isLoading || shared.isLoading || (list.length > 0 && raws.isPending);
 
-  const groups = useMemo(() => {
-    const sel = new Set(yms);
-    const by = new Map<string, { key: string; name: string; lines: Line[] }>();
-    list.forEach((w: any, i: number) => {
-      const raw = rawByWork.get(w.id);
-      if (!raw) return;
-      const full = buildBase(w, raw, "", "", { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [] });
-      if (!full) return;
-      let mo = 0, transport = 0, materials = 0, compBilled = 0, billed = 0;
-      for (const r of full.rows) if (sel.has(r.ym)) { mo += r.labor; transport += r.transport; }
-      for (const e of raw.entries as any[]) {
-        const v = Number(e.amount);
-        // Valor faturado exibido pelo mês do lançamento; margem pela competência
-        if (e.category === "faturamento" && sel.has(String(e.doc_date ?? e.entry_date).slice(0, 7))) billed += v;
-        if (!sel.has(e.entry_date.slice(0, 7))) continue;
-        if (e.category === "faturamento") compBilled += v;
-        else if (e.category === "mao_obra") mo += v;
-        else if (e.category === "terceiros") transport += v;
-        else if (["materiais", "ferramentas", "andaimes"].includes(e.category)) materials += v;
-      }
-      const tax = billed * FIN_TAX;
-      const margin = compBilled * (1 - FIN_TAX) - mo - transport - materials;
-      const hasOrder = (Array.isArray(w.orders) ? w.orders : []).some((o: any) => o?.date && sel.has(String(o.date).slice(0, 7)));
-      if (!billed && !compBilled && !mo && !transport && !materials && !hasOrder) return;
-      const lastYm = yms[yms.length - 1] ?? `${year}-12`;
-      const progress = progressUntil(w, full, lastYm);
-      const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
-      const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as Line[] };
-      const upto = buildBase(w, raw, "", lastYm, { isAll: false, workIds: [w.id], holidays: holidays.data ?? [], allWorks: works.data ?? [], accumulated: true }) ?? full;
-      // Margem total usa todo o histórico até o último mês; margem do período permanece inalterada.
-      const total = totalMargin(w, upto);
-      g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: marginPercent(margin, compBilled), total, full, raw });
-      by.set(key, g);
-    });
-    return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [list, rawByWork, yms, year, months.length, holidays.data, works.data]);
+  const groups = useMemo(() => buildFinanceGroups(list, rawByWork, yms, year, holidays.data ?? [], works.data ?? []), [list, rawByWork, yms, year, holidays.data, works.data]);
 
   const allGroups = groups;
   const shown = useMemo(() => allGroups.filter((g) => !hidden.includes(g.key)), [allGroups, hidden]);
