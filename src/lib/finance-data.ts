@@ -71,14 +71,14 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
   const out = new Map<string, any>();
   if (!batches.length) return out;
   const allIds = [...new Set(batches.flatMap((b) => b.ids))];
-  const generated = await supabase.rpc("generate_recurring_entries", { _work_ids: allIds });
-  if (generated.error) throw generated.error;
-
   const clientIds = [...new Set(batches.map((b) => b.work.client_id).filter(Boolean))] as string[];
-  const [siblingRows, clientRows] = await Promise.all([
+  // Recorrências precisam existir antes de ler os lançamentos; rodam junto com serviços/clientes.
+  const [generated, siblingRows, clientRows] = await Promise.all([
+    supabase.rpc("generate_recurring_entries", { _work_ids: allIds }),
     clientIds.length ? supabase.from("works").select("id, client_id, monthly_enabled, night_shift").in("client_id", clientIds) : Promise.resolve({ data: [], error: null }),
     clientIds.length ? supabase.from("clients").select("id, name, has_toll, toll_amount, city, distance_km, needs_transport_voucher").in("id", clientIds) : Promise.resolve({ data: [], error: null }),
   ]);
+  if (generated.error) throw generated.error;
   const siblingsByClient = groupBy((must(siblingRows as any) ?? []) as any[], (r) => r.client_id);
   const clientById = new Map(((must(clientRows as any) ?? []) as any[]).map((c) => [c.id, c]));
   const sibIdsOf = (b: FinanceBatch) => (b.work.client_id ? (siblingsByClient.get(b.work.client_id) ?? []).map((x: any) => x.id as string) : []);

@@ -31,15 +31,25 @@ export const monthEnd = (ym: string) => {
   return `${ym}-${String(new Date(y!, m!, 0).getDate()).padStart(2, "0")}`;
 };
 
+const PAGE = 1000;
+const PARALLEL_PAGES = 4;
+/** Lê todas as páginas. Depois da primeira página cheia, busca as seguintes em grupos paralelos
+ * e junta na ordem das páginas — mesmo resultado da leitura sequencial, com menos esperas. */
 export async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
-  const out: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await build(from, from + 999);
+  const page = async (n: number) => {
+    const { data, error } = await build(n * PAGE, n * PAGE + PAGE - 1);
     if (error) throw error;
-    out.push(...(data ?? []));
-    if (!data || data.length < 1000) break;
+    return data ?? [];
+  };
+  const out: T[] = [...(await page(0))];
+  if (out.length < PAGE) return out;
+  for (let next = 1; ; next += PARALLEL_PAGES) {
+    const pages = await Promise.all(Array.from({ length: PARALLEL_PAGES }, (_, i) => page(next + i)));
+    for (const rows of pages) {
+      out.push(...rows);
+      if (rows.length < PAGE) return out;
+    }
   }
-  return out;
 }
 
 const RESPLIT_AT = new Map<string, number>();
