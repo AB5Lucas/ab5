@@ -733,6 +733,7 @@ export type Database = {
       appointments: {
         Row: {
           client_id: string | null
+          client_booked: boolean
           collaborator_id: string
           completed_at: string | null
           completed_date: string | null
@@ -754,6 +755,7 @@ export type Database = {
         }
         Insert: {
           client_id?: string | null
+          client_booked?: boolean
           collaborator_id: string
           completed_at?: string | null
           completed_date?: string | null
@@ -775,6 +777,7 @@ export type Database = {
         }
         Update: {
           client_id?: string | null
+          client_booked?: boolean
           collaborator_id?: string
           completed_at?: string | null
           completed_date?: string | null

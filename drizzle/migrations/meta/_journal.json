@@ -582,6 +582,13 @@
       "when": 1794058182823,
       "tag": "0082_rdo_general_by_client",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1794337200000,
+      "tag": "0083_appointment_client_booked",
+      "breakpoints": true
     }
   ]
 }

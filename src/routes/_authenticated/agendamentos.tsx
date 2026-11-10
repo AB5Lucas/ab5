@@ -121,10 +121,12 @@ type Row = {
   original_date: string | null;
   original_time: string | null;
   reschedules: unknown;
+  /** Já agendado na plataforma do cliente; o banco volta para false quando a data ou o horário mudam. */
+  client_booked: boolean;
 };
 
 const SELECT_COLS =
-  "id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, client_id, status, notes, completed_date, completed_time, original_date, original_time, reschedules";
+  "id, type, collaborator_id, scheduled_date, scheduled_time, training_id, work_id, client_id, status, notes, completed_date, completed_time, original_date, original_time, reschedules, client_booked";
 
 const hourLabel = (t: string | null) => {
   if (!t) return "—";
@@ -495,6 +497,15 @@ function AppointmentsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const toggleBooked = useMutation({
+    mutationFn: async (row: Row) => {
+      const { error } = await supabase.from("appointments").update({ client_booked: !row.client_booked }).eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["appointments"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const remove = useMutation({
     mutationFn: async (row: Row) => {
       const { error } = await supabase.from("appointments").delete().eq("id", row.id);
@@ -670,6 +681,15 @@ function AppointmentsPage() {
                 <TableRow key={r.id} className={late ? "bg-destructive/5" : undefined}>
                   <TableCell className="whitespace-nowrap text-xs">
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={!canWrite || showHistory || toggleBooked.isPending}
+                        title={r.client_booked ? "Agendado na plataforma do cliente (clique para desmarcar)" : "Ainda não agendado na plataforma do cliente (clique quando agendar)"}
+                        aria-label="Alternar agendado na plataforma do cliente"
+                        aria-pressed={r.client_booked}
+                        onClick={() => toggleBooked.mutate(r)}
+                        className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${r.client_booked ? "bg-success" : "bg-muted-foreground/40"}`}
+                      />
                       {formatDateBR(r.scheduled_date)}
                       {late && <Badge variant="destructive">Atrasado</Badge>}
                     </div>
