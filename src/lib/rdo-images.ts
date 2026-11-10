@@ -27,7 +27,7 @@ export async function normalizePhoto(file: File): Promise<Blob> {
     try {
       const { default: heic2any } = await import("heic2any");
       const out = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
-      src = Array.isArray(out) ? out[0] : out;
+      src = Array.isArray(out) ? (out[0] ?? file) : out;
     } catch {
       // Navegador pode decodificar HEIC nativamente (Safari); segue abaixo.
     }
