@@ -52,7 +52,7 @@ function AuthenticatedLayout() {
       navigate({ to: "/externo/relatorio-diario", replace: true });
       return;
     }
-    if (pathname === "/dashboard") {
+    if (pathname === "/dashboard" || pathname === "/programacao/diaria") {
       const first = MENU_GROUPS.flatMap((g) => g.items).find((i) => canAccess(i.url));
       if (first) navigate({ to: first.url, replace: true });
     }
@@ -75,7 +75,7 @@ function AuthenticatedLayout() {
             {isForeman ? (
               <span className="font-display text-sm uppercase tracking-widest">Relatório Diário</span>
             ) : (
-              <Link to="/dashboard" className="font-display text-sm uppercase tracking-widest">
+              <Link to="/programacao/diaria" className="font-display text-sm uppercase tracking-widest">
                 Programação Operacional
               </Link>
             )}

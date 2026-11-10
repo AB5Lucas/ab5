@@ -508,7 +508,7 @@ export function TrainingsPage() {
                     const st = statusOf(r.expires_at);
                     return (
                       <TableRow key={r.id}>
-                        <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}{scheduled.has(`${r.collaborator_id}|${r.training_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Agendado</Badge>}{inConf.has(`${r.collaborator_id}|${r.training_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Conferência</Badge>}</TableCell>
+                        <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}{scheduled.has(`${r.collaborator_id}|${r.training_id}`) && <Badge title={scheduled.get(`${r.collaborator_id}|${r.training_id}`)} variant="destructive" className="ml-2 px-1.5 py-0 text-[10px] cursor-help">Agendado</Badge>}{inConf.has(`${r.collaborator_id}|${r.training_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Conferência</Badge>}</TableCell>
                         <TableCell>{nameById.get(r.training_id) ?? "—"}</TableCell>
                         <TableCell className="hidden md:table-cell">{formatDateBR(r.completed_at)}</TableCell>
                         <TableCell className="hidden md:table-cell">

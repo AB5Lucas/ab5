@@ -51,7 +51,7 @@ function ResetPasswordPage() {
     }
     setLoading(false);
     toast.success("Senha atualizada com sucesso.");
-    navigate({ to: "/dashboard" });
+    navigate({ to: "/programacao/diaria" });
   }
 
   return (
