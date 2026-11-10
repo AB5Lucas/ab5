@@ -55,9 +55,9 @@ function Report() {
   const settings = useSettings();
   const sheets = useQuery({ queryKey: ["va-sheets", ym], queryFn: () => load({ data: { ym } }), retry: false, staleTime: 0, gcTime: 0, refetchOnMount: "always" });
   const people = useQuery({ queryKey: ["va-people", "efetivo"], queryFn: async () => {
-    const { data, error } = await supabase.from("collaborators").select("id, registration_number, full_name, contract_type").eq("status", "active").eq("contract_type", "efetivo").order("full_name");
+    const { data, error } = await supabase.from("collaborators").select("id, registration_number, full_name, contract_type").eq("status", "active").or("contract_type.is.null,contract_type.eq.efetivo").order("full_name");
     if (error) throw error;
-    return (data ?? []).map((c) => ({ id: c.id, reg: c.registration_number ?? "", name: c.full_name, type: c.contract_type ?? "" }));
+    return (data ?? []).map((c) => ({ id: c.id, reg: c.registration_number ?? "", name: c.full_name, type: c.contract_type ?? "efetivo" }));
   } });
   const [editing, setEditing] = useState<{ id: string; v: string } | null>(null);
   const qc = useQueryClient();
