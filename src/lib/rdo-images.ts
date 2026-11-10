@@ -17,13 +17,29 @@ function toJpeg(src: CanvasImageSource, w: number, h: number, rotate = 0): Promi
 }
 
 /** Aplica a orientação gravada pela câmera nos pixels, para a foto ficar em pé em qualquer lugar (inclusive no PDF). */
+function isHeic(file: File) {
+  return /image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+}
+
 export async function normalizePhoto(file: File): Promise<Blob> {
+  let src: Blob = file;
+  if (isHeic(file)) {
+    try {
+      const { default: heic2any } = await import("heic2any");
+      const out = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+      src = Array.isArray(out) ? out[0] : out;
+    } catch {
+      // Navegador pode decodificar HEIC nativamente (Safari); segue abaixo.
+    }
+  }
   try {
-    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const bmp = await createImageBitmap(src, { imageOrientation: "from-image" });
     const out = await toJpeg(bmp, bmp.width, bmp.height);
     bmp.close();
     return out;
   } catch {
+    if (src !== file) return src;
+    if (isHeic(file)) throw new Error("Não foi possível converter a foto HEIC. Envie em JPG.");
     return file;
   }
 }
