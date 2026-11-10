@@ -224,6 +224,14 @@ function ClientsPage() {
       city: source.city ?? "",
       state: source.state ?? "",
       zip_code: source.zip_code ?? "",
+      // Mesmo endereço: mesma distância, transporte e pedágio.
+      distance_km: source.distance_km != null ? String(source.distance_km) : "",
+      requires_integration: source.requires_integration ?? true,
+      needs_company_transport: source.needs_company_transport ?? false,
+      needs_transport_voucher: source.needs_transport_voucher ?? false,
+      has_toll: source.has_toll ?? false,
+      toll_amount: source.toll_amount != null ? String(source.toll_amount) : "",
+      trips_per_day: String(source.trips_per_day ?? 1),
     }));
   }
 
@@ -415,6 +423,7 @@ function ClientsPage() {
               {!editing && (
                 <div className="mb-3 space-y-1">
                   <Label htmlFor="copy-client-address">Copiar endereço de outro cliente</Label>
+                  <p className="text-xs text-muted-foreground">Copia também distância, integração, transporte e pedágio.</p>
                   <Select value={addressSource} onValueChange={copyAddress} disabled={!clients.data?.length}>
                     <SelectTrigger id="copy-client-address">
                       <SelectValue placeholder="Selecionar cliente cadastrado" />
