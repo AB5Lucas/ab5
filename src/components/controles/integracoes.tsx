@@ -535,7 +535,7 @@ export function IntegrationsPage() {
               
               return (
                 <TableRow key={r.id}>
-                  <TableCell className="font-medium">{p?.full_name ?? "—"}{(scheduled.has(`${r.collaborator_id}|${r.client_id}`)) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Agendado</Badge>}{inConf.has(`${r.collaborator_id}|${r.client_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Conferência</Badge>}</TableCell>
+                  <TableCell className="font-medium">{p?.full_name ?? "—"}{(scheduled.has(`${r.collaborator_id}|${r.client_id}`)) && <Badge title={scheduled.get(`${r.collaborator_id}|${r.client_id}`)} variant="destructive" className="ml-2 px-1.5 py-0 text-[10px] cursor-help">Agendado</Badge>}{inConf.has(`${r.collaborator_id}|${r.client_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Conferência</Badge>}</TableCell>
                   <TableCell className="hidden lg:table-cell">
                     {p?.position_id ? positionById.get(p.position_id) ?? "—" : "—"}
                   </TableCell>
