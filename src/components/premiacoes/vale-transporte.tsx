@@ -247,10 +247,12 @@ export function VoucherPage() {
         map.set(key, entry);
         return entry;
       };
+      // Vários itens no mesmo dia (obra, ASO, treinamento, integração) não somam VT:
+      // o dia vale o maior VT entre eles, como se só aquele item estivesse escalado.
       const add = (collab: string, c: C, dayKey: string, n: number) => {
         if (n <= 0) return;
         const e = entryFor(collab, c);
-        e.units.set(dayKey, (e.units.get(dayKey) ?? 0) + n);
+        e.units.set(dayKey, Math.max(e.units.get(dayKey) ?? 0, n));
       };
       for (const a of allocations) {
         const c = (a as unknown as { collaborators: C }).collaborators;
@@ -262,9 +264,8 @@ export function VoucherPage() {
         const pays = a.vt_override ?? base;
         if (!pays) continue;
         const date = dateById.get(a.schedule_id) ?? a.schedule_id;
-        const e = entryFor(a.collaborator_id, c);
-        if (!e.units.has(date)) e.units.set(date, 1); // uma obra por dia
-        if (a.driver) e.driver = true;
+        add(a.collaborator_id, c, date, 1); // uma obra por dia
+        if (a.driver) entryFor(a.collaborator_id, c).driver = true;
       }
       // Membros dos quadros (sem duplicar pessoa no mesmo quadro/dia)
       const seen = new Set<string>();

@@ -143,19 +143,29 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     if (prize > 0) r.prizeRows.push({ date, vehicle: a.vehicles?.plate ?? "—", work, distance: dist, value: prize });
     if (a.overnight) r.prizeRows.push({ date, vehicle: "—", work: `Pernoite - ${work}`, distance: 0, value: OVERNIGHT_PRIZE });
   }
-  // Dias em quadros (sem obra): aparecem no detalhamento; ASO/Treinamento/Integração podem gerar VT
+  // Dias em quadros (sem obra): aparecem no detalhamento; ASO/Treinamento/Integração podem gerar VT.
+  // Vários quadros no mesmo dia não somam VT: vale o maior entre eles. Um status de ausência no dia zera o VT.
+  const boxDays = new Map<string, { e: any; date: string; labels: string[]; units: number; absent: boolean }>();
   for (const e of entries) {
     const date = dateById.get(e.schedule_id)!;
-    const r = get(e.collaborator_id, e.collaborators);
-    if (r.seen.has(date)) continue;
-    r.seen.add(date);
+    if (rows.get(e.collaborator_id)?.seen.has(date)) continue; // dia com obra
+    const key = `${e.collaborator_id}|${date}`;
+    const d = boxDays.get(key) ?? { e, date, labels: [], units: 0, absent: false };
+    boxDays.set(key, d);
     const label = statusLabel(e.box_key);
-    r.days.push({ date, work: label, status: label, counted: false, reason: label });
+    if (!d.labels.includes(label)) d.labels.push(label);
     const isBox = e.box_key === "aso" || e.box_key === "treinamento" || e.box_key.startsWith("integracao");
-    if (!isBox || personAbsence(e.collaborator_id, date)) continue;
+    if (!isBox) { d.absent = true; continue; }
+    if (personAbsence(e.collaborator_id, date)) continue;
     const on = personVt.get(`${e.schedule_id}|${e.box_key}|${e.collaborator_id}`) ?? boxVt.get(`${e.schedule_id}|${e.box_key}`) ?? (e.box_key === "aso" || e.box_key === "treinamento");
-    const units = (e.box_key === "aso" ? 1 : 0) + (on ? 1 : 0);
-    if (units) r.vtRows.push({ date, work: label, pays: true, value: perDay(false, units) });
+    d.units = Math.max(d.units, (e.box_key === "aso" ? 1 : 0) + (on ? 1 : 0));
+  }
+  for (const d of boxDays.values()) {
+    const r = get(d.e.collaborator_id, d.e.collaborators);
+    r.seen.add(d.date);
+    const label = d.labels.join(" + ");
+    r.days.push({ date: d.date, work: label, status: label, counted: false, reason: label });
+    if (d.units && !d.absent) r.vtRows.push({ date: d.date, work: label, pays: true, value: perDay(false, d.units) });
   }
   // Prêmio Motorista: 1 por dia dirigido (faixa pela km do dia), somado ao VT
   const [{ data: vsch }, { data: dbr }] = await Promise.all([
