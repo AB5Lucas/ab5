@@ -5,7 +5,7 @@ import { addDays, todayISO } from "@/lib/scheduling";
 import { useServiceDistribution } from "@/hooks/use-service-distribution";
 import { hiringBadge } from "@/lib/hiring-badge";
 
-export type MenuBadge = { count: number; tone: "red" | "orange" };
+export type MenuBadge = { count: number; tone: "red" | "orange"; title?: string };
 
 const WARN_DAYS = 30;
 
@@ -94,8 +94,9 @@ export function useMenuBadges() {
     const docs = toBadge(d); if (docs) out["/agendamentos"] = docs;
     const c = conferenceBadge(d.conference); if (c) out["/conferencia"] = c;
     if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red" };
-    if (d.orders) out["/fechamentos/suzano"] = { count: d.orders, tone: "red" };
-    if (d.billing) out["/relatorios/sincronizacao"] = { count: d.billing, tone: "red" };
+    // Vermelho = Serviços, laranja = Indústria; basta 1 da Serviços para ficar vermelho.
+    if (d.orders) out["/fechamentos/suzano"] = { count: d.orders, tone: "orange", title: "Pendentes da Indústria" };
+    if (d.billing) out["/relatorios/sincronizacao"] = { count: d.billing, tone: d.billingSrv ? "red" : "orange", title: d.billingSrv ? `Pendentes: ${d.billingSrv} da Serviços, ${d.billingInd} da Indústria` : "Pendentes da Indústria" };
   }
   return out;
 }
@@ -105,7 +106,7 @@ const red = (n?: number): MenuBadge | undefined => (n ? { count: n, tone: "red" 
 /** Contadores das subabas de Faturamento. */
 export function useBillingBadges() {
   const d = useBadgeData().data;
-  return { servicos: red(d?.billingSrv), industria: red(d?.billingInd) } as Record<string, MenuBadge | undefined>;
+  return { servicos: red(d?.billingSrv), industria: d?.billingInd ? { count: d.billingInd, tone: "orange" } : undefined } as Record<string, MenuBadge | undefined>;
 }
 
 export function BadgeDot({ b }: { b?: MenuBadge | undefined }) {

@@ -90,7 +90,7 @@ export function AppSidebar() {
                           <span className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ${b.tone === "red" ? "bg-destructive" : "bg-warning"}`} />
                         ) : (
                           <span
-                            title={b.tone === "red" ? "Vencidos/pendentes" : "A vencer"}
+                            title={b.title ?? (b.tone === "red" ? "Vencidos/pendentes" : "A vencer")}
                             className={`ml-auto min-w-4 rounded-full px-1 text-center text-[10px] font-semibold leading-4 tabular-nums ${b.tone === "red" ? "bg-destructive/85 text-destructive-foreground" : "bg-warning/85 text-warning-foreground"}`}
                           >
                             {b.count > 99 ? "99+" : b.count}
