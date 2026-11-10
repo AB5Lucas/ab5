@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { dropServicesInvoices, invoiceFolderName, missingStatus, monthsToSync, ordersFileName, parseInvoices, parseOrders, parseWorksBillingRows } from "./industry-sync";
+import { dropServicesInvoices, invoiceFolderName, missingStatus, monthsToSync, ordersFileName, parseInvoices, parseOrders, parseWorksBillingRows, pickOrders, previousMonths, stripZeros, type IndustryOrder } from "./industry-sync";
 
 type Credentials = { lovableKey: string; excelKey: string };
 export const DRIVE = "/drives/b!5V4Lk-rJCUCH4KwrKzBCgQtORfWyeVZNr7N5qacwdyb7xsyD9fxASIPz40EKW7xL";
@@ -30,7 +30,56 @@ function sources(ym: string) {
   };
 }
 
-async function runOne(source: "pedidos" | "faturamento", ym: string, today: string, kind: string, c: Credentials) {
+type OrdersCache = Map<string, IndustryOrder[]>;
+
+/** Parsed orders of one month's PCP sheet; a missing sheet counts as no orders. Cached per execution. */
+async function monthOrders(ym: string, c: Credentials, cache: OrdersCache): Promise<IndustryOrder[]> {
+  const hit = cache.get(ym);
+  if (hit) return hit;
+  let orders: IndustryOrder[] = [];
+  try {
+    const buf = await graph(`${DRIVE}/root:/${enc(sources(ym).pedidos)}:/content`, c, true);
+    const sheet = XLSX.read(new Uint8Array(buf), { cellDates: false }).Sheets["Dados"];
+    if (sheet) orders = parseOrders(XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "" })).orders;
+  } catch (err) {
+    if (!(err instanceof MissingFile)) console.error(`Busca retroativa: falha ao ler pedidos de ${ym}`, err);
+  }
+  cache.set(ym, orders);
+  return orders;
+}
+
+/**
+ * Invoices of `ym` whose order is not in the database: search the previous
+ * ORDER_LOOKBACK_MONTHS order sheets and import only the matching orders.
+ * Invoices stay pending only when no sheet has their order.
+ */
+async function findOrdersInPastMonths(ym: string, invoiceRun: string, kind: string, c: Credentials, cache: OrdersCache) {
+  const { data: missing, error } = await supabaseAdmin.from("industry_invoices").select("order_number")
+    .eq("ref_month", ym).is("order_id", null).is("reversed_at", null).not("order_number", "is", null);
+  if (error) throw error;
+  const wanted = new Set((missing ?? []).map(i => stripZeros(i.order_number)).filter(Boolean));
+  if (!wanted.size) return;
+  for (const past of previousMonths(ym)) {
+    if (!wanted.size) break;
+    const found = pickOrders(await monthOrders(past, c, cache), wanted);
+    if (!found.length) continue;
+    const file = sources(past).pedidos;
+    const { data: run, error: re } = await supabaseAdmin.from("billing_sync_runs").insert({ category: "industria", source: "pedidos", ref_month: past, file_path: file, trigger_kind: kind, status: "running" }).select("id").single();
+    if (re) throw re;
+    const { error: ae } = await supabaseAdmin.rpc("industry_sync_apply", { p_run: run.id, p_source: "pedidos", p_month: past, p_file: file, p_rows: JSON.parse(JSON.stringify(found)) });
+    if (ae) {
+      await supabaseAdmin.from("billing_sync_runs").update({ status: "error", finished_at: new Date().toISOString(), errors: 1, error_message: ae.message }).eq("id", run.id);
+      throw ae;
+    }
+    for (const o of found) { wanted.delete(o.order); o.aliases.forEach(a => wanted.delete(a)); }
+  }
+  // The invoice run counted its pending before the search: refresh it.
+  const { count, error: ce } = await supabaseAdmin.from("industry_invoices").select("id", { count: "exact", head: true }).eq("ref_month", ym).eq("status", "pending");
+  if (ce) throw ce;
+  await supabaseAdmin.from("billing_sync_runs").update({ pending: count ?? 0, status: count ? "completed_pending" : "completed" }).eq("id", invoiceRun);
+}
+
+async function runOne(source: "pedidos" | "faturamento", ym: string, today: string, kind: string, c: Credentials, cache: OrdersCache) {
   const file = sources(ym)[source];
   const { data: run, error } = await supabaseAdmin.from("billing_sync_runs").insert({ category: "industria", source, ref_month: ym, file_path: file, trigger_kind: kind, status: "running" }).select("id").single();
   if (error) throw error;
@@ -52,6 +101,8 @@ async function runOne(source: "pedidos" | "faturamento", ym: string, today: stri
     }
     const { data, error: e2 } = await supabaseAdmin.rpc("industry_sync_apply", { p_run: run.id, p_source: source, p_month: ym, p_file: file, p_rows: JSON.parse(JSON.stringify(payload)) });
     if (e2) throw e2;
+    // The invoices are already saved; a failed search leaves them pending instead of failing the run.
+    if (source === "faturamento") await findOrdersInPastMonths(ym, run.id, kind, c, cache).catch(err => console.error(`Busca retroativa de pedidos falhou (${ym})`, err));
     if (source === "faturamento") {
       const notes = parseWorksBillingRows(rows);
       if (notes.length) {
@@ -79,7 +130,7 @@ async function runOne(source: "pedidos" | "faturamento", ym: string, today: stri
 export async function executeIndustrySync(c: Credentials, kind: string, months?: string[]) {
   const today = new Date().toISOString().slice(0, 10);
   const list = months ?? monthsToSync(today);
-  const results = [];
-  for (const ym of list) for (const s of ["pedidos", "faturamento"] as const) results.push(await runOne(s, ym, today, kind, c));
+  const results = []; const cache: OrdersCache = new Map();
+  for (const ym of list) for (const s of ["pedidos", "faturamento"] as const) results.push(await runOne(s, ym, today, kind, c, cache));
   return results;
 }

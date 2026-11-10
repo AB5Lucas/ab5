@@ -35,6 +35,20 @@ export function monthsToSync(today: string, tolerance = TOLERANCE_DAYS): string[
   const py = m === 1 ? y - 1 : y; const pm = m === 1 ? 12 : m - 1;
   return [`${py}-${String(pm).padStart(2, "0")}`, cur];
 }
+/** How many past order sheets an unmatched invoice searches before staying pending. */
+export const ORDER_LOOKBACK_MONTHS = 12;
+/** The `count` months before ym, newest first: previousMonths("2026-02", 3) → ["2026-01","2025-12","2025-11"]. */
+export function previousMonths(ym: string, count = ORDER_LOOKBACK_MONTHS): string[] {
+  const [y, m] = ym.split("-").map(Number) as [number, number];
+  return Array.from({ length: count }, (_, i) => {
+    const t = y * 12 + (m - 1) - (i + 1);
+    return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+  });
+}
+/** Only the orders an invoice is waiting for: an old sheet never brings its other orders along. */
+export function pickOrders(orders: IndustryOrder[], wanted: Set<string>): IndustryOrder[] {
+  return orders.filter(o => wanted.has(o.order) || o.aliases.some(a => wanted.has(a)));
+}
 /** Missing file for ym is "waiting" while within tolerance days of the month start. */
 export function missingStatus(ym: string, today: string, tolerance = TOLERANCE_DAYS): "waiting" | "access_error" {
   const start = new Date(`${ym}-01T00:00:00Z`).getTime();

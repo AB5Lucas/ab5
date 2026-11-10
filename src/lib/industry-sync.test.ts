@@ -114,3 +114,19 @@ describe("prioridade da Serviços", () => {
     expect(_drop(list, [{ invoice: "1700", date: "2026-10-07" }])).toEqual([]);
   });
 });
+
+import { pickOrders, previousMonths } from "./industry-sync";
+describe("busca do pedido nos 12 meses anteriores", () => {
+  it("lista os 12 meses anteriores, do mais recente ao mais antigo, virando o ano", () => {
+    const m = previousMonths("2026-02");
+    expect(m).toHaveLength(12);
+    expect(m.slice(0, 3)).toEqual(["2026-01", "2025-12", "2025-11"]);
+    expect(m[11]).toBe("2025-02");
+  });
+  it("traz só os pedidos que o faturamento procura, nunca a planilha inteira", () => {
+    const base = { client: "X", code: "PPO", service: "PPO", amount: 1, mp: null, date: "2026-07-10" };
+    const orders = [{ ...base, order: "26583", aliases: [] }, { ...base, order: "26584", aliases: [] }, { ...base, order: "26590", aliases: ["26999"] }];
+    expect(pickOrders(orders, new Set(["26583", "26999"])).map(o => o.order)).toEqual(["26583", "26590"]);
+    expect(pickOrders(orders, new Set())).toEqual([]);
+  });
+});

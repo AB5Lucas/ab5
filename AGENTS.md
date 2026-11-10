@@ -28,6 +28,7 @@
 - Billing (Serviços): Excel feeds atomic billing_sync_process; readers exclude sync_cancelled; billing_client_key resolves equivalences; daily cron run; an order shared by services splits by order value (extra parts in sync_split_note_id). Why: shared mapping, history, no ambiguity.
 - Works-description invoices read from the industry report are routed through billing_sync_import_external and the Serviços engine, with cross-source invoice identity checks. Why: one posting owner and no duplicate financial entries across spreadsheets.
 - Industry: PCP rows remain separate; MP is informational, never a cost; sector splits affect invoices only. Why: purchases own MP costs; reversed invoices stay skipped.
+- Industry invoices without a known order search the previous 12 PCP sheets (industry-sync.server.ts) and import only the matching orders; pending only if none has it. Why: old sheets must never bring unbilled orders into Resultados.
 - VT: absent work settings inherit client defaults; Serviços initializes them without overwriting choices; built transport wins. Why: weekend VT stays consistent.
 - Schedule copy filters allocations/benefits by client boxes. Why: chosen date and boxes control copying.
 - Vale Alimentação reads the month's ponto sheets live (va.functions.ts, paths in vaPaths); rules in src/lib/vale-alimentacao.ts; only parameters in va_settings. Why: no report without the month's sheets.
