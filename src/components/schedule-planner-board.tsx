@@ -57,6 +57,7 @@ import { formatCpf } from "@/lib/copy-names";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
 import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
+import { WeeklyDaysOffDialog } from "@/components/weekly-days-off-dialog";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -1360,6 +1361,7 @@ export function SchedulePlannerBoard({
 
 
   const [confirmCopyPrev, setConfirmCopyPrev] = useState(false);
+  const [openFolgas, setOpenFolgas] = useState(false);
   const [copyFrom, setCopyFrom] = useState(addDays(date, -1));
   const [selectedCopyBoxes, setSelectedCopyBoxes] = useState<Set<string>>(new Set());
   const copySource = useQuery({
@@ -1705,6 +1707,10 @@ export function SchedulePlannerBoard({
               <Copy className="h-4 w-4" /> Copiar dia anterior
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={() => setOpenFolgas(true)}>
+            <CalendarDays className="h-4 w-4" /> Folgas
+          </Button>
+          <WeeklyDaysOffDialog date={date} open={openFolgas} onOpenChange={setOpenFolgas} editable={editable} />
         </div>
       </div>
 
