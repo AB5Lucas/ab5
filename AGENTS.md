@@ -31,7 +31,7 @@
 - Industry invoices without a known order search the previous 12 PCP sheets (industry-sync.server.ts) and import only the matching orders; pending only if none has it. Why: old sheets must never bring unbilled orders into Resultados.
 - VT: absent work settings inherit client defaults; Serviços initializes them without overwriting choices; built transport wins. Why: weekend VT stays consistent.
 - Schedule copy filters allocations/benefits by client boxes. Why: chosen date and boxes control copying.
-- Folga semanal (botão Folgas na Programação): direito = alocado no sábado e no domingo antes da semana (seg–dom); a folga agendada grava days_off e, se a programação do dia existe, move a pessoa para a caixa FOLGAS (lib/weekly-days-off.ts). Por quê: uma única fonte de folgas.
+- Folga semanal (botão Folgas na Programação): direito = alocado no sábado e no domingo antes da semana (seg–dom); a folga vale nessa semana ou na seguinte; a folga agendada grava days_off e, se a programação do dia existe, move a pessoa para a caixa FOLGAS (lib/weekly-days-off.ts). Por quê: uma única fonte de folgas.
 - Vale Alimentação reads the month's ponto sheets live (va.functions.ts, paths in vaPaths); rules in src/lib/vale-alimentacao.ts; only parameters in va_settings. Why: no report without the month's sheets.
 - Collaborator copy uses filtered rows via collaborator-list.ts to match the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.

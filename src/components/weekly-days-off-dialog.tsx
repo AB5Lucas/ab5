@@ -22,6 +22,7 @@ export function WeeklyDaysOffDialog({ date, open, onOpenChange, editable }: { da
   const week = useMemo(() => folgaWeekOf(date), [date]);
   const monday = week.days[0]!;
   const sunday = week.days[6]!;
+  const lastDay = week.window[week.window.length - 1]!;
   const today = todayISO();
   const [pick, setPick] = useState<Record<string, string>>({});
 
@@ -29,16 +30,16 @@ export function WeeklyDaysOffDialog({ date, open, onOpenChange, editable }: { da
     queryKey: ["weekly-folgas", monday],
     enabled: open,
     queryFn: async (): Promise<Person[]> => {
-      const { data: schedules, error } = await supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", week.saturday).lte("schedule_date", sunday);
+      const { data: schedules, error } = await supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", week.saturday).lte("schedule_date", lastDay);
       if (error) throw error;
       const dateOf = new Map((schedules ?? []).map((s) => [s.id, s.schedule_date as string]));
       const idsOn = (d: string) => (schedules ?? []).filter((s) => s.schedule_date === d).map((s) => s.id);
       const weekendIds = [...idsOn(week.saturday), ...idsOn(week.sunday)];
-      const weekIds = week.days.flatMap(idsOn);
+      const weekIds = week.window.flatMap(idsOn);
       const [alloc, box, off] = await Promise.all([
         weekendIds.length ? supabase.from("daily_allocations").select("schedule_id, collaborator_id").in("schedule_id", weekendIds).range(0, 9999) : Promise.resolve(NONE),
         weekIds.length ? supabase.from("daily_status_entries").select("schedule_id, collaborator_id").in("schedule_id", weekIds).eq("box_key", "folga").range(0, 9999) : Promise.resolve(NONE),
-        supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", sunday).or(`end_date.gte.${monday},and(end_date.is.null,date.gte.${monday})`).range(0, 9999),
+        supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", lastDay).or(`end_date.gte.${monday},and(end_date.is.null,date.gte.${monday})`).range(0, 9999),
       ]);
       for (const r of [alloc, box, off]) if (r.error) throw r.error;
       const on = (d: string) => (alloc.data ?? []).filter((a) => dateOf.get(a.schedule_id) === d).map((a) => a.collaborator_id);
@@ -87,7 +88,7 @@ export function WeeklyDaysOffDialog({ date, open, onOpenChange, editable }: { da
 
   const rows = list.data ?? [];
   const missing = rows.filter((r) => !r.days.length).length;
-  const defaultDay = week.days.find((d) => d >= today && d !== week.days[6]) ?? week.days[0]!;
+  const defaultDay = week.window.find((d) => d >= today && d !== sunday) ?? monday;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -95,7 +96,7 @@ export function WeeklyDaysOffDialog({ date, open, onOpenChange, editable }: { da
         <DialogHeader>
           <DialogTitle>Folgas da semana</DialogTitle>
           <DialogDescription>
-            Trabalharam no sábado {formatDateBR(week.saturday)} e no domingo {formatDateBR(week.sunday)}: folga entre {formatDateBR(monday)} e {formatDateBR(sunday)}.
+            Trabalharam no sábado {formatDateBR(week.saturday)} e no domingo {formatDateBR(week.sunday)}: folga nesta semana ({formatDateBR(monday)} a {formatDateBR(sunday)}) ou na seguinte (até {formatDateBR(lastDay)}).
           </DialogDescription>
         </DialogHeader>
         {list.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
@@ -135,7 +136,7 @@ export function WeeklyDaysOffDialog({ date, open, onOpenChange, editable }: { da
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {week.days.map((d) => (
+                        {week.window.map((d) => (
                           <SelectItem key={d} value={d} disabled={p.days.includes(d)}>{dayLabel(d)}</SelectItem>
                         ))}
                       </SelectContent>
