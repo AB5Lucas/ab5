@@ -48,7 +48,7 @@ const TABS = [
   { v: "transporte", l: "Transporte" },
   { v: "frota", l: "Frota" },
   { v: "motoristas", l: "Motoristas" },
-  { v: "manutencao", l: "Manutenção" },
+  { v: "custos", l: "Custos" },
 ] as const;
 type Tab = (typeof TABS)[number]["v"];
 
@@ -80,7 +80,7 @@ function TransportTabs() {
       <TabsContent value="transporte" className="mt-4"><TransportPage /></TabsContent>
       <TabsContent value="frota" className="mt-4"><VehiclesPage /></TabsContent>
       <TabsContent value="motoristas" className="mt-4"><DriversPage /></TabsContent>
-      <TabsContent value="manutencao" className="mt-4"><FleetMaintenancePage /></TabsContent>
+      <TabsContent value="custos" className="mt-4"><FleetMaintenancePage /></TabsContent>
     </Tabs>
   );
 }

@@ -37,7 +37,7 @@ const lastDay = (ym: string) => {
 type Vehicle = { id: string; plate: string; model: string | null; type: string | null; ownership: string; monthly_rent: number };
 type Row = VehicleMonth & { id: string; plate: string; label: string; ownership: string };
 
-/** Transporte › Manutenção: orçado (km × R$ 1,35 + pedágio) contra o gasto real de cada veículo. */
+/** Transporte › Custos: orçado (km × R$ 1,35 + pedágio) contra o gasto real de cada veículo. */
 export function FleetMaintenancePage() {
   const { canWrite } = useCurrentUser();
   const qc = useQueryClient();
@@ -200,7 +200,7 @@ export function FleetMaintenancePage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Manutenção"
+        title="Custos"
         description={`Orçado: soma do transporte orçado dos serviços no mês (mensais: o mês inteiro; demais: pelo andamento do mês; Indústria, ADM, Comercial e Pátio ou sem orçado lançado: o custo real dos veículos, km e pedágio, sem VT), dividida entre os veículos pelo km. Clique no Orçado para ver o detalhe. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação. Km × ${brl(BUDGET_KM_RATE)} fica só como referência.`}
         actions={
           <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
