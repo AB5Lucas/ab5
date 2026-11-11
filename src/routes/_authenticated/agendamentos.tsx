@@ -43,6 +43,7 @@ import { Tabs as SubTabs, TabsContent as SubTabsContent, TabsList as SubTabsList
 import { IntegrationsPage } from "@/components/controles/integracoes";
 import { TrainingsPage } from "@/components/controles/treinamentos";
 import { AsosPage } from "@/components/controles/asos";
+import { EpiSheetsPage } from "@/components/controles/fichas-epi";
 import { useControlBadges } from "@/hooks/use-nav-badges";
 
 export const Route = createFileRoute("/_authenticated/agendamentos")({
@@ -73,6 +74,7 @@ const CTRL_TABS = [
   { v: "asos", l: "ASOs" },
   { v: "integracoes", l: "Integrações" },
   { v: "treinamentos", l: "Treinamentos" },
+  { v: "epi", l: "Fichas de EPI" },
 ] as const;
 type CtrlTab = (typeof CTRL_TABS)[number]["v"];
 
@@ -101,6 +103,7 @@ function ControlsPage() {
       <SubTabsContent value="asos" className="mt-4"><AsosPage /></SubTabsContent>
       <SubTabsContent value="integracoes" className="mt-4"><IntegrationsPage /></SubTabsContent>
       <SubTabsContent value="treinamentos" className="mt-4"><TrainingsPage /></SubTabsContent>
+      <SubTabsContent value="epi" className="mt-4"><EpiSheetsPage /></SubTabsContent>
     </SubTabs>
   );
 }

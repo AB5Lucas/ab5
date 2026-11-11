@@ -19,7 +19,7 @@ function useBadgeData() {
       const today = todayISO();
       const warn = addDays(today, WARN_DAYS);
       const safe = async <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
-      const [colabs, asos, trns, ints, appts, conf, purchases, orders, invoices, notes] = await Promise.all([
+      const [colabs, asos, trns, ints, appts, conf, purchases, orders, invoices, notes, epis] = await Promise.all([
         safe(fetchAll<any>((a, b) => supabase.from("collaborators").select("id").eq("status", "active").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("asos").select("collaborator_id, expires_at").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at").range(a, b))),
@@ -30,6 +30,7 @@ function useBadgeData() {
         safe(fetchAll<any>((a, b) => supabase.from("industry_orders").select("id").eq("status", "pending").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("industry_invoices").select("id").eq("status", "pending").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("billing_sync_notes").select("id").not("status", "in", '("posted","cancelled")').range(a, b))),
+        safe(fetchAll<any>((a, b) => supabase.from("epi_sheets").select("collaborator_id, expires_at, archived").range(a, b))),
       ]);
       const confIds = new Set(conf.map((c) => c.id));
       const checks = await safe(fetchAll<any>((a, b) => supabase.from("conference_checks").select("item_id, next_check_date").eq("approved", false).range(a, b)));
@@ -54,12 +55,19 @@ function useBadgeData() {
       ints.forEach((r) => active.has(r.collaborator_id) && !r.documentation && put(`int|${r.collaborator_id}|${r.client_id}`, r.expires_at));
       const byKind: Record<string, { expired: number; expiring: number }> = {
         agendamentos: { expired: appts.filter((a) => a.scheduled_date < today).length, expiring: 0 },
-        aso: { expired: 0, expiring: 0 }, int: { expired: 0, expiring: 0 }, trn: { expired: 0, expiring: 0 },
+        aso: { expired: 0, expiring: 0 }, int: { expired: 0, expiring: 0 }, trn: { expired: 0, expiring: 0 }, epi: { expired: 0, expiring: 0 },
       };
       for (const [key, exp] of latest) {
         const [k, cid] = key.split("|");
         if (covered.has(key) || covered.has(`${k}|${cid}`)) continue;
         if (exp < today) byKind[k!]!.expired++; else if (exp <= warn) byKind[k!]!.expiring++;
+      }
+      // Fichas de EPI: todo ativo deve ter; sem ficha conta como vencida; arquivada não sinaliza.
+      const epiBy = new Map(epis.map((e) => [e.collaborator_id, e]));
+      for (const id of active) {
+        const e = epiBy.get(id);
+        if (e?.archived) continue;
+        if (!e?.expires_at || e.expires_at < today) byKind.epi!.expired++; else if (e.expires_at <= warn) byKind.epi!.expiring++;
       }
       const vals = Object.values(byKind);
       const expired = vals.reduce((a, v) => a + v.expired, 0);
@@ -78,7 +86,7 @@ const conferenceBadge = (v?: { expired: number; expiring: number }): MenuBadge |
 /** Contadores das subabas de Documentação. */
 export function useControlBadges() {
   const k = useBadgeData().data?.byKind;
-  return { agendamentos: toBadge(k?.["agendamentos"]), asos: toBadge(k?.["aso"]), integracoes: toBadge(k?.["int"]), treinamentos: toBadge(k?.["trn"]) } as Record<string, MenuBadge | undefined>;
+  return { agendamentos: toBadge(k?.["agendamentos"]), asos: toBadge(k?.["aso"]), integracoes: toBadge(k?.["int"]), treinamentos: toBadge(k?.["trn"]), epi: toBadge(k?.["epi"]) } as Record<string, MenuBadge | undefined>;
 }
 
 export function useMenuBadges() {

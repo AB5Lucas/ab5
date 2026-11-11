@@ -866,6 +866,45 @@ export type Database = {
           },
         ]
       }
+      epi_sheets: {
+        Row: {
+          archived: boolean
+          collaborator_id: string
+          created_at: string
+          delivered_at: string | null
+          expires_at: string | null
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived?: boolean
+          collaborator_id: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived?: boolean
+          collaborator_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epi_sheets_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: true
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_lists: {
         Row: {
           id: string
