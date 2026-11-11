@@ -65,6 +65,24 @@ function AuthenticatedLayout() {
     navigate({ to: "/auth", replace: true });
   }
 
+  // Usuário sem acesso liberado (novo ou desativado): só a mensagem, sem menu nem páginas.
+  if (profile && profile.active === false) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-card p-6 text-center">
+          <h1 className="font-display text-lg">Acesso ainda não liberado</h1>
+          <p className="text-sm text-muted-foreground">
+            Olá{profile.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}! Seu cadastro foi recebido, mas você ainda não tem acesso ao sistema.
+            Fale com o administrador do sistema para que os seus acessos sejam liberados.
+          </p>
+          <Button variant="outline" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4" /> Sair
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
