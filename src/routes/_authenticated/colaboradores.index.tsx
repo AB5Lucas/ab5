@@ -42,6 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { ExportCollaboratorsDialog } from "@/components/colaboradores/export-excel-dialog";
 import { createNameMatcher, emptyToNull, insertSequentially, normText, parseBool, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 const CONTRACT_LABELS: Record<string, string> = {
@@ -426,6 +427,12 @@ function CollaboratorsPage() {
               <Copy className="h-4 w-4" />
               Copiar nomes
             </Button>
+            <ExportCollaboratorsDialog
+              rows={filtered}
+              ctx={{ names: nameById, contractLabels: CONTRACT_LABELS }}
+              isAdmin={isAdmin}
+              disabled={collaborators.isLoading || !filtered.length}
+            />
             {canWrite && (
               <ImportDialog
                 entity="colaboradores"
