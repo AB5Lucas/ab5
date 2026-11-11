@@ -732,8 +732,8 @@ export type Database = {
       }
       appointments: {
         Row: {
-          client_id: string | null
           client_booked: boolean
+          client_id: string | null
           collaborator_id: string
           completed_at: string | null
           completed_date: string | null
@@ -754,8 +754,8 @@ export type Database = {
           work_id: string | null
         }
         Insert: {
-          client_id?: string | null
           client_booked?: boolean
+          client_id?: string | null
           collaborator_id: string
           completed_at?: string | null
           completed_date?: string | null
@@ -776,8 +776,8 @@ export type Database = {
           work_id?: string | null
         }
         Update: {
-          client_id?: string | null
           client_booked?: boolean
+          client_id?: string | null
           collaborator_id?: string
           completed_at?: string | null
           completed_date?: string | null
@@ -866,102 +866,6 @@ export type Database = {
           },
         ]
       }
-      fleet_expenses: {
-        Row: {
-          amount: number
-          created_at: string
-          description: string | null
-          document: string | null
-          expense_date: string
-          file_path: string
-          id: string
-          plate: string
-          source: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          description?: string | null
-          document?: string | null
-          expense_date: string
-          file_path: string
-          id?: string
-          plate: string
-          source: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          description?: string | null
-          document?: string | null
-          expense_date?: string
-          file_path?: string
-          id?: string
-          plate?: string
-          source?: string
-        }
-        Relationships: []
-      }
-      fleet_expense_files: {
-        Row: {
-          file_path: string
-          rows: number
-          source: string
-          synced_at: string
-        }
-        Insert: {
-          file_path: string
-          rows?: number
-          source: string
-          synced_at?: string
-        }
-        Update: {
-          file_path?: string
-          rows?: number
-          source?: string
-          synced_at?: string
-        }
-        Relationships: []
-      }
-      epi_sheets: {
-        Row: {
-          archived: boolean
-          collaborator_id: string
-          created_at: string
-          delivered_at: string | null
-          expires_at: string | null
-          id: string
-          notes: string | null
-          updated_at: string
-        }
-        Insert: {
-          archived?: boolean
-          collaborator_id: string
-          created_at?: string
-          delivered_at?: string | null
-          id?: string
-          notes?: string | null
-          updated_at?: string
-        }
-        Update: {
-          archived?: boolean
-          collaborator_id?: string
-          created_at?: string
-          delivered_at?: string | null
-          id?: string
-          notes?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "epi_sheets_collaborator_id_fkey"
-            columns: ["collaborator_id"]
-            isOneToOne: true
-            referencedRelation: "collaborators"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       attendance_lists: {
         Row: {
           id: string
@@ -1040,6 +944,84 @@ export type Database = {
           new_data?: Json | null
           old_data?: Json | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_industry_orders_20261110: {
+        Row: {
+          aliases: string[] | null
+          amount: number | null
+          client_name: string | null
+          created_at: string | null
+          id: string | null
+          issue: string | null
+          lines: Json | null
+          manual_work_id: string | null
+          order_date: string | null
+          order_number: string | null
+          raw_material: number | null
+          ref_month: string | null
+          service_code: string | null
+          source_file: string | null
+          splits: Json | null
+          status: string | null
+          updated_at: string | null
+          work_id: string | null
+        }
+        Insert: {
+          aliases?: string[] | null
+          amount?: number | null
+          client_name?: string | null
+          created_at?: string | null
+          id?: string | null
+          issue?: string | null
+          lines?: Json | null
+          manual_work_id?: string | null
+          order_date?: string | null
+          order_number?: string | null
+          raw_material?: number | null
+          ref_month?: string | null
+          service_code?: string | null
+          source_file?: string | null
+          splits?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          aliases?: string[] | null
+          amount?: number | null
+          client_name?: string | null
+          created_at?: string | null
+          id?: string | null
+          issue?: string | null
+          lines?: Json | null
+          manual_work_id?: string | null
+          order_date?: string | null
+          order_number?: string | null
+          raw_material?: number | null
+          ref_month?: string | null
+          service_code?: string | null
+          source_file?: string | null
+          splits?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_works_orders_20261110: {
+        Row: {
+          id: string | null
+          orders: Json | null
+        }
+        Insert: {
+          id?: string | null
+          orders?: Json | null
+        }
+        Update: {
+          id?: string | null
+          orders?: Json | null
         }
         Relationships: []
       }
@@ -2096,6 +2078,104 @@ export type Database = {
           minimum_distance?: number
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      epi_sheets: {
+        Row: {
+          archived: boolean
+          collaborator_id: string
+          created_at: string
+          delivered_at: string | null
+          expires_at: string | null
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived?: boolean
+          collaborator_id: string
+          created_at?: string
+          delivered_at?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived?: boolean
+          collaborator_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epi_sheets_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: true
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_expense_files: {
+        Row: {
+          file_path: string
+          rows: number
+          source: string
+          synced_at: string
+        }
+        Insert: {
+          file_path: string
+          rows?: number
+          source: string
+          synced_at?: string
+        }
+        Update: {
+          file_path?: string
+          rows?: number
+          source?: string
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      fleet_expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          document: string | null
+          expense_date: string
+          file_path: string
+          id: string
+          plate: string
+          source: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          document?: string | null
+          expense_date: string
+          file_path: string
+          id?: string
+          plate: string
+          source: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          document?: string | null
+          expense_date?: string
+          file_path?: string
+          id?: string
+          plate?: string
+          source?: string
         }
         Relationships: []
       }
@@ -4393,11 +4473,11 @@ export type Database = {
           id: string
           km_rate: number | null
           model: string | null
+          monthly_rent: number
           notes: string | null
+          ownership: string
           passenger_capacity: number
           plate: string
-          ownership: string
-          monthly_rent: number
           status: Database["public"]["Enums"]["vehicle_status"]
           type: string | null
           updated_at: string
@@ -4412,11 +4492,11 @@ export type Database = {
           id?: string
           km_rate?: number | null
           model?: string | null
+          monthly_rent?: number
           notes?: string | null
+          ownership?: string
           passenger_capacity?: number
           plate: string
-          ownership?: string
-          monthly_rent?: number
           status?: Database["public"]["Enums"]["vehicle_status"]
           type?: string | null
           updated_at?: string
@@ -4431,11 +4511,11 @@ export type Database = {
           id?: string
           km_rate?: number | null
           model?: string | null
+          monthly_rent?: number
           notes?: string | null
+          ownership?: string
           passenger_capacity?: number
           plate?: string
-          ownership?: string
-          monthly_rent?: number
           status?: Database["public"]["Enums"]["vehicle_status"]
           type?: string | null
           updated_at?: string
@@ -4953,10 +5033,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      fleet_expenses_replace: {
-        Args: { p_file: string; p_rows: Json; p_source: string }
-        Returns: number
-      }
       _andam_move: {
         Args: {
           _fc: string
@@ -5058,6 +5134,10 @@ export type Database = {
         Returns: string
       }
       driver_bonus_default: { Args: { _driver_id: string }; Returns: boolean }
+      fleet_expenses_replace: {
+        Args: { p_file: string; p_rows: Json; p_source: string }
+        Returns: number
+      }
       generate_recurring_entries: {
         Args: { _work_ids?: string[] }
         Returns: number
@@ -5161,6 +5241,7 @@ export type Database = {
         Args: { _driver_id: string; _vs_id: string }
         Returns: undefined
       }
+      title_case_name: { Args: { _name: string }; Returns: string }
       unassign_allocation_service: {
         Args: { _alloc_id: string }
         Returns: undefined

@@ -67,7 +67,7 @@ function useBadgeData() {
       for (const id of active) {
         const e = epiBy.get(id);
         if (e?.archived) continue;
-        if (!e?.expires_at || e.expires_at < today) byKind.epi!.expired++; else if (e.expires_at <= warn) byKind.epi!.expiring++;
+        if (!e?.expires_at || e.expires_at < today) byKind["epi"]!.expired++; else if (e.expires_at <= warn) byKind["epi"]!.expiring++;
       }
       const vals = Object.values(byKind);
       const expired = vals.reduce((a, v) => a + v.expired, 0);
