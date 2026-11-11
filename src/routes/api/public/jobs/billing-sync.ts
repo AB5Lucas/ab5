@@ -22,8 +22,10 @@ export const Route = createFileRoute("/api/public/jobs/billing-sync")({
     const { executeIndustrySync } = await import("@/lib/industry-sync.server");
     const services = executeBillingSync({ lovableKey, excelKey }, "daily");
     const industry = executeIndustrySync({ lovableKey, excelKey }, "daily").catch(error => console.error("Industry sync failed", error));
-    const work = services.finally(() => industry);
-    const background = Promise.allSettled([services, industry]).then(r => { if (r[0].status === "rejected") console.error("Billing sync failed", r[0].reason); });
+    const { executeFleetSync } = await import("@/lib/fleet-costs.server");
+    const fleet = executeFleetSync({ lovableKey, excelKey }).catch(error => console.error("Fleet costs sync failed", error));
+    const work = services.finally(() => Promise.all([industry, fleet]));
+    const background = Promise.allSettled([services, industry, fleet]).then(r => { if (r[0].status === "rejected") console.error("Billing sync failed", r[0].reason); });
     // Nitro's Cloudflare adapter attaches the execution context to the request.
     if ("waitUntil" in request && typeof request.waitUntil === "function") {
       request.waitUntil(background);

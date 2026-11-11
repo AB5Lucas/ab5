@@ -866,6 +866,63 @@ export type Database = {
           },
         ]
       }
+      fleet_expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          document: string | null
+          expense_date: string
+          file_path: string
+          id: string
+          plate: string
+          source: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          document?: string | null
+          expense_date: string
+          file_path: string
+          id?: string
+          plate: string
+          source: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          document?: string | null
+          expense_date?: string
+          file_path?: string
+          id?: string
+          plate?: string
+          source?: string
+        }
+        Relationships: []
+      }
+      fleet_expense_files: {
+        Row: {
+          file_path: string
+          rows: number
+          source: string
+          synced_at: string
+        }
+        Insert: {
+          file_path: string
+          rows?: number
+          source: string
+          synced_at?: string
+        }
+        Update: {
+          file_path?: string
+          rows?: number
+          source?: string
+          synced_at?: string
+        }
+        Relationships: []
+      }
       epi_sheets: {
         Row: {
           archived: boolean
@@ -4339,6 +4396,8 @@ export type Database = {
           notes: string | null
           passenger_capacity: number
           plate: string
+          ownership: string
+          monthly_rent: number
           status: Database["public"]["Enums"]["vehicle_status"]
           type: string | null
           updated_at: string
@@ -4356,6 +4415,8 @@ export type Database = {
           notes?: string | null
           passenger_capacity?: number
           plate: string
+          ownership?: string
+          monthly_rent?: number
           status?: Database["public"]["Enums"]["vehicle_status"]
           type?: string | null
           updated_at?: string
@@ -4373,6 +4434,8 @@ export type Database = {
           notes?: string | null
           passenger_capacity?: number
           plate?: string
+          ownership?: string
+          monthly_rent?: number
           status?: Database["public"]["Enums"]["vehicle_status"]
           type?: string | null
           updated_at?: string
@@ -4890,6 +4953,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fleet_expenses_replace: {
+        Args: { p_file: string; p_rows: Json; p_source: string }
+        Returns: number
+      }
       _andam_move: {
         Args: {
           _fc: string

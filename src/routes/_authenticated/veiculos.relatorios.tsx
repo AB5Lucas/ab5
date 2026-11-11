@@ -1,8 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-// Página realocada como sub aba de Transporte; mantém links antigos funcionando.
+// Relatórios virou a sub aba Manutenção de Transporte; mantém links antigos funcionando.
 export const Route = createFileRoute("/_authenticated/veiculos/relatorios")({
   beforeLoad: () => {
-    throw redirect({ to: "/veiculos/transporte", search: { tab: "relatorios" } });
+    throw redirect({ to: "/veiculos/transporte", search: { tab: "manutencao" } });
   },
 });
