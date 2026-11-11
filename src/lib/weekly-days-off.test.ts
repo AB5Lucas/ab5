@@ -29,3 +29,19 @@ describe("folga semanal", () => {
     expect(m.get("d")).toEqual(["2026-11-13"]);
   });
 });
+
+import { folgaListText } from "./weekly-days-off";
+describe("lista de folgas para copiar", () => {
+  it("separa quem tem folga agendada de quem não tem", () => {
+    const text = folgaListText(folgaWeekOf("2026-11-11"), [
+      { name: "Ana", days: ["2026-11-10"] },
+      { name: "Bruno", days: [] },
+      { name: "Matheus", days: ["2026-11-16"] },
+    ], "2026-11-11");
+    expect(text).toBe([
+      "*FOLGAS · fim de semana 07/11 e 08/11*", "3 com direito",
+      "", "*Com folga agendada (2)*", "Ana – Ter 10/11 (folgou)", "Matheus – Seg 16/11",
+      "", "*Sem folga agendada (1)*", "Bruno",
+    ].join("\n"));
+  });
+});

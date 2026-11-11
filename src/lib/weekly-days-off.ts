@@ -45,3 +45,22 @@ export function folgaDaysBy(week: FolgaWeek, daysOff: DayOffRow[], folgaBox: { c
   for (const r of folgaBox) put(r.collaborator_id, r.date);
   return new Map([...out].map(([id, s]) => [id, [...s].sort()]));
 }
+
+const WEEKDAY = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const br = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+/** "Seg 16/11" */
+export const folgaDayLabel = (iso: string) => `${WEEKDAY[new Date(`${iso}T12:00:00Z`).getUTCDay()]} ${br(iso)}`;
+
+/** Texto para copiar (WhatsApp): quem tem direito, com e sem folga agendada. */
+export function folgaListText(week: FolgaWeek, people: { name: string; days: string[] }[], today: string): string {
+  const withDay = people.filter((p) => p.days.length);
+  const without = people.filter((p) => !p.days.length);
+  const lines = [`*FOLGAS · fim de semana ${br(week.saturday)} e ${br(week.sunday)}*`, `${people.length} com direito`];
+  lines.push("", `*Com folga agendada (${withDay.length})*`);
+  if (withDay.length) for (const p of withDay) lines.push(`${p.name} – ${p.days.map((d) => `${folgaDayLabel(d)}${d < today ? " (folgou)" : ""}`).join(", ")}`);
+  else lines.push("Ninguém");
+  lines.push("", `*Sem folga agendada (${without.length})*`);
+  if (without.length) for (const p of without) lines.push(p.name);
+  else lines.push("Ninguém");
+  return lines.join("\n");
+}

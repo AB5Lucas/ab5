@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { findDateConflicts } from "@/lib/date-conflicts";
 import { formatDateBR, todayISO } from "@/lib/scheduling";
-import { entitledToFolga, folgaDaysBy, folgaWeekOf } from "@/lib/weekly-days-off";
+import { entitledToFolga, folgaDaysBy, folgaListText, folgaWeekOf } from "@/lib/weekly-days-off";
+import { Copy } from "lucide-react";
 
 const WEEKDAY = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const dayLabel = (iso: string) => `${WEEKDAY[new Date(`${iso}T12:00:00Z`).getUTCDay()]} ${formatDateBR(iso).slice(0, 5)}`;
@@ -105,9 +106,23 @@ export function WeeklyDaysOffDialog({ date, open, onOpenChange, editable }: { da
           <p className="text-sm text-muted-foreground">Ninguém trabalhou nos dois dias desse fim de semana.</p>
         )}
         {rows.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {rows.length} com direito · {missing ? `${missing} sem folga marcada` : "todos com folga marcada"}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              {rows.length} com direito · {missing ? `${missing} sem folga marcada` : "todos com folga marcada"}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                navigator.clipboard.writeText(folgaListText(week, rows, today)).then(
+                  () => toast.success(`Lista copiada (${rows.length} pessoas)`),
+                  () => toast.error("Não foi possível copiar."),
+                )
+              }
+            >
+              <Copy className="h-4 w-4" /> Copiar lista
+            </Button>
+          </div>
         )}
         <ul className="divide-y divide-border rounded-md border border-border">
           {rows.map((p) => {
