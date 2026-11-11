@@ -6,9 +6,24 @@ import { fuelFile, MAINTENANCE_FILE, parseFuel, parseMaintenance, type FleetExpe
 type Credentials = { lovableKey: string; excelKey: string };
 const enc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
 
+/** Baixa pelo caminho; se não estiver lá, procura o arquivo pelo nome na unidade inteira. */
+async function download(file: string, c: Credentials): Promise<ArrayBuffer> {
+  try {
+    return await graph(`${DRIVE}/root:/${enc(file)}:/content`, c, true);
+  } catch (err) {
+    if (!/não encontrad/i.test(err instanceof Error ? err.message : "")) throw err;
+    const name = file.split("/").pop()!;
+    const found = await graph(`${DRIVE}/root/search(q='${encodeURIComponent(name.replace(/'/g, "''"))}')?$select=id,name&$top=50`, c);
+    const hit = ((found?.value ?? []) as { id: string; name: string }[]).find((i) => i.name.trim().toLowerCase() === name.toLowerCase());
+    if (!hit) throw new Error(`Arquivo ou pasta não encontrado: ${name}`);
+    return graph(`${DRIVE}/items/${hit.id}/content`, c, true);
+  }
+}
+
 async function sheetRows(file: string, sheet: string, c: Credentials): Promise<unknown[][]> {
-  const buf = await graph(`${DRIVE}/root:/${enc(file)}:/content`, c, true);
-  const wb = XLSX.read(new Uint8Array(buf), { cellDates: false });
+  const buf = await download(file, c);
+  // Só a aba usada: a planilha do posto é grande e tem várias abas com fórmulas.
+  const wb = XLSX.read(new Uint8Array(buf), { cellDates: false, sheets: sheet, cellFormula: false, cellHTML: false, cellText: false });
   const ws = wb.Sheets[sheet];
   if (!ws) throw new Error(`Aba "${sheet}" não encontrada em ${file}`);
   return XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, defval: "" });

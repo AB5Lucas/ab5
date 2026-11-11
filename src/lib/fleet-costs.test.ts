@@ -34,6 +34,6 @@ describe("manutenção da frota", () => {
     expect(dayKm(s)).toBe(410);
     expect(dayToll(s)).toBe(20);
     expect(dayToll({ ...s, is_suzano_local: true })).toBe(0);
-    expect(vehicleMonth(1000, 20, 800, 300, 0)).toEqual({ km: 1000, budget: 1370, toll: 20, fuel: 800, maintenance: 300, rent: 0, real: 1120, diff: 250 });
+    expect(vehicleMonth(1000, 1500, 20, 800, 300, 100)).toEqual({ km: 1000, kmCost: 1350, budget: 1500, toll: 20, fuel: 800, maintenance: 300, rent: 100, real: 1220, diff: 280 });
   });
 });

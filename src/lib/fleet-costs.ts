@@ -1,6 +1,6 @@
 import { excelDate, moneyCents } from "./billing-sync";
 
-/** Custo orçado por km rodado (aba Transporte › Manutenção). */
+/** Referência de custo por km rodado (aba Transporte › Manutenção); não é o orçado. */
 export const BUDGET_KM_RATE = 1.35;
 
 /** Planilhas de Compras no SharePoint (mesma unidade usada por Compras/RELATÓRIOS). */
@@ -65,10 +65,14 @@ export const dayKm = (s: ScheduleKm) => Number(s.km ?? 0) * 2 * Math.max(1, Numb
 /** Pedágio do dia, como já calculado no sistema (ida e volta por viagem; Suzano Local não paga). */
 export const dayToll = (s: ScheduleKm) => (s.client?.has_toll && !s.is_suzano_local ? Number(s.client.toll_amount ?? 0) * 2 * Math.max(1, Number(s.trips ?? 1)) : 0);
 
-export type VehicleMonth = { km: number; budget: number; toll: number; fuel: number; maintenance: number; rent: number; real: number; diff: number };
-/** Orçado = km × 1,35 + pedágio; real = combustível + manutenção + pedágio + locação. */
-export function vehicleMonth(km: number, toll: number, fuel: number, maintenance: number, rent: number): VehicleMonth {
-  const budget = Math.round((km * BUDGET_KM_RATE + toll) * 100) / 100;
-  const real = Math.round((fuel + maintenance + toll + rent) * 100) / 100;
-  return { km, budget, toll, fuel, maintenance, rent, real, diff: Math.round((budget - real) * 100) / 100 };
+export type VehicleMonth = { km: number; kmCost: number; budget: number; toll: number; fuel: number; maintenance: number; rent: number; real: number; diff: number };
+const r2 = (v: number) => Math.round(v * 100) / 100;
+/**
+ * Mês de um veículo. Orçado = parte do transporte orçado dos serviços (ver serviceTransportBudget),
+ * rateada pelo km; km × 1,35 fica só como referência. Real = combustível + manutenção + pedágio + locação.
+ */
+export function vehicleMonth(km: number, budget: number, toll: number, fuel: number, maintenance: number, rent: number): VehicleMonth {
+  const real = r2(fuel + maintenance + toll + rent);
+  return { km, kmCost: r2(km * BUDGET_KM_RATE), budget: r2(budget), toll, fuel, maintenance, rent, real, diff: r2(budget - real) };
 }
+

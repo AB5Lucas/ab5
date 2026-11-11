@@ -13,8 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll, loadResultShared } from "@/lib/results-engine";
 import { BUDGET_KM_RATE, dayKm, dayToll, normalizePlate, vehicleMonth, type VehicleMonth } from "@/lib/fleet-costs";
+import { serviceTransportBudget } from "@/lib/fleet-budget";
+import { financeBatches, financeList, loadFinanceActive, loadFinanceRaws } from "@/lib/finance-data";
 import { syncFleetCostsNow } from "@/lib/fleet-costs.functions";
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -61,6 +63,26 @@ export function FleetMaintenancePage() {
     queryKey: ["fleet-expenses", from, to],
     queryFn: () => fetchAll<any>((a, b) => supabase.from("fleet_expenses").select("source, plate, expense_date, amount")
       .gte("expense_date", from).lte("expense_date", to).order("id").range(a, b)),
+  });
+  /** Transporte orçado dos serviços: mesmo carregamento em lote do Financeiro (dados dos Resultados). */
+  const allWorks = useQuery({
+    queryKey: ["fin-works"],
+    queryFn: async () => (await supabase.from("works").select("*, clients(name)").order("name")).data ?? [],
+  });
+  const holidays = useQuery({
+    queryKey: ["holidays-dates"],
+    queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string),
+  });
+  const active = useQuery({ queryKey: ["fin-active", from, to], queryFn: () => loadFinanceActive(from, to) });
+  const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 60_000, queryFn: loadResultShared });
+  const serviceList = useMemo(() => financeList(allWorks.data ?? [], active.data, from, to), [allWorks.data, active.data, from, to]);
+  const batches = useMemo(() => financeBatches(serviceList), [serviceList]);
+  const batchKey = useMemo(() => batches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [batches]);
+  const raws = useQuery({
+    queryKey: ["fin-client-raw", batchKey],
+    staleTime: 60_000,
+    enabled: !!shared.data && !!active.data,
+    queryFn: () => loadFinanceRaws(batches, shared.data!),
   });
   const files = useQuery({
     queryKey: ["fleet-expense-files"],
@@ -121,32 +143,58 @@ export function FleetMaintenancePage() {
       }
       get(v.id, ym)[x.source === "combustivel" ? "fuel" : "maintenance"] += Number(x.amount);
     }
-    return { acc, unmatched };
+    const kmByMonth = new Map<string, number>();
+    for (const [k, e] of acc) kmByMonth.set(k.split("|")[1]!, (kmByMonth.get(k.split("|")[1]!) ?? 0) + e.km);
+    return { acc, unmatched, kmByMonth };
   }, [schedules.data, expenses.data, byPlate, month]);
 
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => addMonths(first, i)), [first]);
+  /** Orçado de transporte da frota por mês: soma dos serviços (mensal inteiro; demais pelo andamento do mês). */
+  const fleetBudget = useMemo(() => {
+    const out = new Map<string, number>();
+    if (!raws.data) return out;
+    const opts = { holidays: holidays.data ?? [], allWorks: allWorks.data ?? [] };
+    for (const ym of months) {
+      let sum = 0;
+      for (const w of serviceList) {
+        const raw = raws.data.get(w.id);
+        if (raw) sum += serviceTransportBudget(w, raw, ym, opts);
+      }
+      out.set(ym, Math.round(sum * 100) / 100);
+    }
+    return out;
+  }, [raws.data, serviceList, months, holidays.data, allWorks.data]);
+
+  /** O orçado da frota no mês é dividido entre os veículos pelo km rodado de cada um. */
   const rowFor = (v: Vehicle, ym: string): Row => {
     const e = table.acc.get(`${v.id}|${ym}`) ?? { km: 0, toll: 0, fuel: 0, maintenance: 0 };
     const rent = v.ownership === "alugado" ? Number(v.monthly_rent ?? 0) : 0;
-    return { ...vehicleMonth(Math.round(e.km * 10) / 10, e.toll, e.fuel, e.maintenance, rent), id: v.id, plate: v.plate, label: `${v.plate}${v.model ? ` · ${v.model}` : ""}`, ownership: v.ownership };
+    const kmAll = table.kmByMonth.get(ym) ?? 0;
+    const budget = kmAll ? ((fleetBudget.get(ym) ?? 0) * e.km) / kmAll : 0;
+    return { ...vehicleMonth(Math.round(e.km * 10) / 10, budget, e.toll, e.fuel, e.maintenance, rent), id: v.id, plate: v.plate, label: `${v.plate}${v.model ? ` · ${v.model}` : ""}`, ownership: v.ownership };
   };
 
   const shownVehicles = (vehicles.data ?? []).filter((v) => vehicleFilter === "all" || v.id === vehicleFilter);
   const rows = shownVehicles.map((v) => rowFor(v, month)).filter((r) => r.km || r.real).sort((a, b) => b.real - a.real || a.plate.localeCompare(b.plate));
-  const total = rows.reduce((t, r) => ({ km: t.km + r.km, budget: t.budget + r.budget, real: t.real + r.real, fuel: t.fuel + r.fuel, maintenance: t.maintenance + r.maintenance, toll: t.toll + r.toll, rent: t.rent + r.rent }), { km: 0, budget: 0, real: 0, fuel: 0, maintenance: 0, toll: 0, rent: 0 });
+  const sumRows = (rs: Row[]) => rs.reduce((t, r) => ({ km: t.km + r.km, kmCost: t.kmCost + r.kmCost, budget: t.budget + r.budget, real: t.real + r.real, fuel: t.fuel + r.fuel, maintenance: t.maintenance + r.maintenance, toll: t.toll + r.toll, rent: t.rent + r.rent }), { km: 0, kmCost: 0, budget: 0, real: 0, fuel: 0, maintenance: 0, toll: 0, rent: 0 });
+  const total = sumRows(rows);
+  // Frota inteira: o orçado é o total dos serviços, mesmo que nenhum veículo tenha rodado.
+  if (vehicleFilter === "all") total.budget = fleetBudget.get(month) ?? 0;
   const diff = total.budget - total.real;
-  const trend = Array.from({ length: 12 }, (_, i) => addMonths(first, i)).map((ym) => {
-    const rs = shownVehicles.map((v) => rowFor(v, ym));
-    return { label: monthLabel(ym), Orçado: Math.round(rs.reduce((s, r) => s + r.budget, 0)), Real: Math.round(rs.reduce((s, r) => s + r.real, 0)) };
+  const trend = months.map((ym) => {
+    const t = sumRows(shownVehicles.map((v) => rowFor(v, ym)));
+    return { label: monthLabel(ym), Orçado: Math.round(vehicleFilter === "all" ? fleetBudget.get(ym) ?? 0 : t.budget), Real: Math.round(t.real), "Km × 1,35": Math.round(t.kmCost) };
   });
   const unmatched = [...table.unmatched].map(([plate, u]) => ({ plate, ...u })).sort((a, b) => b.fuel + b.maintenance - (a.fuel + a.maintenance));
   const unmatchedTotal = unmatched.reduce((s, u) => s + u.fuel + u.maintenance, 0);
   const loading = vehicles.isLoading || schedules.isLoading || expenses.isLoading;
+  const budgetLoading = allWorks.isLoading || active.isLoading || shared.isLoading || (serviceList.length > 0 && raws.isPending);
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Manutenção"
-        description={`Orçado: km rodado × ${brl(BUDGET_KM_RATE)} + pedágio do sistema. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação.`}
+        description={`Orçado: soma do transporte orçado dos serviços no mês (mensais: o mês inteiro; demais: pelo andamento do mês), dividida entre os veículos pelo km. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação. Km × ${brl(BUDGET_KM_RATE)} fica só como referência.`}
         actions={
           <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
             <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Lendo planilhas..." : "Atualizar planilhas"}
@@ -179,32 +227,34 @@ export function FleetMaintenancePage() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Kpi label="Km rodados" value={total.km.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} />
-        <Kpi label="Orçado" value={brl(total.budget)} />
+        <Kpi label="Orçado" value={budgetLoading ? "Calculando..." : brl(total.budget)} hint="transporte orçado dos serviços" />
         <Kpi label="Real" value={brl(total.real)} />
         <Kpi label="Diferença" value={`${diff < 0 ? "−" : "+"} ${brl(Math.abs(diff))}`} tone={diff < 0 ? "bad" : "good"} hint={total.budget ? `${diff < 0 ? "acima" : "abaixo"} do orçado em ${Math.abs((diff / total.budget) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : undefined} />
-        <Kpi label="Custo real por km" value={total.km ? brl(total.real / total.km) : "—"} hint={`orçado ${brl(BUDGET_KM_RATE)} + pedágio`} />
+        <Kpi label="Custo real por km" value={total.km ? brl(total.real / total.km) : "—"} hint={`referência ${brl(BUDGET_KM_RATE)} por km`} />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Kpi small label="Combustível" value={brl(total.fuel)} />
         <Kpi small label="Manutenção" value={brl(total.maintenance)} />
         <Kpi small label="Pedágio" value={brl(total.toll)} />
         <Kpi small label="Locação" value={brl(total.rent)} />
+        <Kpi small label={`Km × ${brl(BUDGET_KM_RATE)} (referência)`} value={brl(total.kmCost)} hint="informativo, não entra no orçado" />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="panel p-4">
           <h3 className="mb-2 text-sm font-medium">Orçado × real por veículo · {monthLabel(month)}</h3>
           {rows.length ? (
-            <ResponsiveContainer width="100%" height={Math.max(220, rows.length * 34 + 60)}>
-              <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 16 }} barGap={2} barCategoryGap="22%">
-                <CartesianGrid horizontal={false} className="stroke-border" />
-                <XAxis type="number" fontSize={11} tickFormatter={(v: number) => brlShort(v)} />
-                <YAxis type="category" dataKey="plate" width={72} fontSize={11} axisLine={false} tickLine={false} />
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={rows} margin={{ left: 8, right: 16, bottom: 8 }} barGap={2} barCategoryGap="20%">
+                <CartesianGrid vertical={false} className="stroke-border" />
+                <XAxis dataKey="plate" fontSize={10} interval={0} angle={-40} textAnchor="end" height={52} tickLine={false} />
+                <YAxis fontSize={11} tickFormatter={(v: number) => brlShort(v)} width={80} />
                 <Tooltip formatter={(v: number) => brl(v)} labelFormatter={(_, p) => p?.[0]?.payload?.label ?? ""} />
                 <Legend wrapperStyle={{ fontSize: 12 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
-                <Bar dataKey="budget" name="Orçado" fill="var(--chart-2)" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="real" name="Real" fill="var(--chart-blue)" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="budget" name="Orçado" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="real" name="Real" fill="var(--chart-blue)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="kmCost" name={`Km × ${brl(BUDGET_KM_RATE)}`} fill="var(--muted-foreground)" fillOpacity={0.45} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : <p className="py-10 text-center text-sm text-muted-foreground">Sem km nem gastos neste mês.</p>}
@@ -220,9 +270,10 @@ export function FleetMaintenancePage() {
               <Legend wrapperStyle={{ fontSize: 12 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
               <Line type="monotone" dataKey="Orçado" stroke="var(--chart-2)" strokeWidth={2} dot={{ r: 4 }} />
               <Line type="monotone" dataKey="Real" stroke="var(--chart-blue)" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="Km × 1,35" stroke="var(--muted-foreground)" strokeWidth={2} strokeDasharray="5 4" dot={false} />
             </LineChart>
           </ResponsiveContainer>
-          <p className="mt-1 text-xs text-muted-foreground">O orçado só existe a partir do mês em que a programação de veículos passou a ser lançada no sistema.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Km × 1,35 (tracejado) é referência; só existe a partir do mês em que a programação de veículos passou a ser lançada no sistema.</p>
         </section>
       </div>
 
@@ -241,6 +292,7 @@ export function FleetMaintenancePage() {
             <TableRow>
               <TableHead>Veículo</TableHead>
               <TableHead className="text-right">Km</TableHead>
+              <TableHead className="text-right">Km × 1,35</TableHead>
               <TableHead className="text-right">Orçado</TableHead>
               <TableHead className="text-right">Combustível</TableHead>
               <TableHead className="text-right">Manutenção</TableHead>
@@ -256,6 +308,7 @@ export function FleetMaintenancePage() {
               <TableRow key={r.id}>
                 <TableCell className="whitespace-nowrap font-medium">{r.label}{r.ownership === "alugado" && <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-[10px]">Alugado</Badge>}</TableCell>
                 <TableCell className="text-right tabular-nums">{r.km ? r.km.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "—"}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">{r.kmCost ? brl(r.kmCost) : "—"}</TableCell>
                 <TableCell className="text-right tabular-nums">{r.budget ? brl(r.budget) : "—"}</TableCell>
                 <TableCell className="text-right tabular-nums">{r.fuel ? brl(r.fuel) : "—"}</TableCell>
                 <TableCell className="text-right tabular-nums">{r.maintenance ? brl(r.maintenance) : "—"}</TableCell>
@@ -267,7 +320,7 @@ export function FleetMaintenancePage() {
               </TableRow>
             ))}
             {!loading && rows.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="text-center text-sm text-muted-foreground">Nenhum veículo rodou ou teve gasto neste mês.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-sm text-muted-foreground">Nenhum veículo rodou ou teve gasto neste mês.</TableCell></TableRow>
             )}
           </TableBody>
           {rows.length > 0 && (
@@ -275,6 +328,7 @@ export function FleetMaintenancePage() {
               <TableRow>
                 <TableCell>Total</TableCell>
                 <TableCell className="text-right tabular-nums">{total.km.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">{brl(total.kmCost)}</TableCell>
                 <TableCell className="text-right tabular-nums">{brl(total.budget)}</TableCell>
                 <TableCell className="text-right tabular-nums">{brl(total.fuel)}</TableCell>
                 <TableCell className="text-right tabular-nums">{brl(total.maintenance)}</TableCell>
