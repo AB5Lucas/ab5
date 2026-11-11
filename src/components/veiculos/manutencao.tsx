@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAll, loadResultShared } from "@/lib/results-engine";
 import { BUDGET_KM_RATE, dayKm, dayToll, normalizePlate, vehicleMonth, type VehicleMonth } from "@/lib/fleet-costs";
-import { serviceTransportBudget, type BudgetPart } from "@/lib/fleet-budget";
+import { budgetByClient, serviceTransportBudget, type BudgetPart } from "@/lib/fleet-budget";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { financeBatches, financeList, loadFinanceActive, loadFinanceRaws } from "@/lib/finance-data";
 import { syncFleetCostsNow } from "@/lib/fleet-costs.functions";
@@ -201,7 +201,7 @@ export function FleetMaintenancePage() {
     <div className="space-y-4">
       <PageHeader
         title="Manutenção"
-        description={`Orçado: soma do transporte orçado dos serviços no mês (Indústria: VT real; mensais: o mês inteiro; sem orçado de transporte: o real; demais: pelo andamento do mês), dividida entre os veículos pelo km. Clique no Orçado para ver o detalhe. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação. Km × ${brl(BUDGET_KM_RATE)} fica só como referência.`}
+        description={`Orçado: soma do transporte orçado dos serviços no mês (Indústria, ADM, Comercial e Pátio: VT real; mensais: o mês inteiro; sem orçado lançado: o gasto real; demais: pelo andamento do mês), dividida entre os veículos pelo km. Clique no Orçado para ver o detalhe. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação. Km × ${brl(BUDGET_KM_RATE)} fica só como referência.`}
         actions={
           <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
             <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Lendo planilhas..." : "Atualizar planilhas"}
@@ -355,30 +355,40 @@ export function FleetMaintenancePage() {
           <DialogHeader>
             <DialogTitle>Orçado de transporte · {monthLabel(month)}</DialogTitle>
             <DialogDescription>
-              Soma do transporte orçado dos serviços no mês: {brl(fleetBudget.get(month) ?? 0)}.
+              Todos os clientes com atividade no mês: {brl(fleetBudget.get(month) ?? 0)}. Por serviço: orçado lançado (mensal pelo BDI dos pedidos do mês; demais pelo andamento); Indústria, ADM, Comercial e Pátio pelo VT real; sem orçado lançado, pelo gasto real.
               {vehicleFilter !== "all" ? ` O veículo filtrado recebe ${brl(total.budget)}, a parte proporcional ao km dele.` : " Entre os veículos, o valor é dividido pelo km rodado."}
             </DialogDescription>
           </DialogHeader>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Cliente · Serviço</TableHead>
-                <TableHead>Regra</TableHead>
+                <TableHead>Cliente / serviço</TableHead>
+                <TableHead>Como foi calculado</TableHead>
                 <TableHead>Base</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(budgetParts.get(month) ?? []).map((p) => (
-                <TableRow key={p.workId}>
-                  <TableCell className="text-sm"><span className="text-muted-foreground">{p.client} · </span>{p.service}</TableCell>
-                  <TableCell className="text-xs">{p.rule}</TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{p.base}</TableCell>
-                  <TableCell className="text-right tabular-nums">{brl(p.value)}</TableCell>
-                </TableRow>
+              {budgetByClient(budgetParts.get(month) ?? []).map((c) => (
+                <Fragment key={c.key}>
+                  <TableRow className="bg-muted/40">
+                    <TableCell className="font-medium">{c.client}</TableCell>
+                    <TableCell className="text-xs">{c.rules.join(" + ")}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{c.parts.length} serviço(s)</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{brl(c.value)}</TableCell>
+                  </TableRow>
+                  {c.parts.map((p) => (
+                    <TableRow key={p.workId}>
+                      <TableCell className="pl-6 text-sm text-muted-foreground">{p.service}</TableCell>
+                      <TableCell className="text-xs">{p.rule}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{p.base}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">{brl(p.value)}</TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
               ))}
               {!(budgetParts.get(month) ?? []).length && (
-                <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground">Nenhum serviço com transporte orçado neste mês.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground">Nenhum cliente com atividade neste mês.</TableCell></TableRow>
               )}
             </TableBody>
             {(budgetParts.get(month) ?? []).length > 0 && (
