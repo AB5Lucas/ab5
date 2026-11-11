@@ -184,6 +184,7 @@ function AppointmentsPage() {
   const [fPeriod, setFPeriod] = useState("all");
   const [fType, setFType] = useState("all");
   const [fWork, setFWork] = useState("all");
+  const [fTraining, setFTraining] = useState("all");
   const [search, setSearch] = useState("");
   const [showHistory, setShowHistory] = useState(false);
 
@@ -301,6 +302,24 @@ function AppointmentsPage() {
     [clients.data],
   );
 
+  /** Agendamentos da lista atual (pendentes ou histórico): base das opções dos filtros. */
+  const listed = useMemo(
+    () => (appointments.data ?? []).filter((r) => (showHistory ? r.status !== "agendado" : r.status === "agendado")),
+    [appointments.data, showHistory],
+  );
+  /** Filtro Cliente: só clientes com integração na lista. */
+  const clientFilterOptions = useMemo(() => {
+    const ids = new Set(listed.filter((r) => r.type === "integracao" && r.client_id).map((r) => r.client_id as string));
+    return clientOptions.filter((c) => ids.has(c.id));
+  }, [listed, clientOptions]);
+  /** Filtro Treinamento: só treinamentos com agendamento na lista. */
+  const trainingFilterOptions = useMemo(() => {
+    const ids = new Set(listed.filter((r) => r.type === "treinamento" && r.training_id).map((r) => r.training_id as string));
+    return [...ids]
+      .map((id) => ({ id, name: trainingById.get(id)?.label ?? "Treinamento" }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [listed, trainingById]);
+
   const currentValidity = (collaboratorId: string, trainingId: string | null) => {
     if (!trainingId) return null;
     const recs = (collabTrainings.data ?? []).filter(
@@ -327,6 +346,7 @@ function AppointmentsPage() {
       if (showHistory ? pending : !pending) return false;
       if (fType !== "all" && r.type !== fType) return false;
       if (fWork !== "all" && r.client_id !== fWork) return false;
+      if (fTraining !== "all" && r.training_id !== fTraining) return false;
       if (!showHistory) {
         if (fPeriod === "today" && r.scheduled_date !== today) return false;
         if (fPeriod === "tomorrow" && r.scheduled_date !== addDays(today, 1)) return false;
@@ -341,7 +361,7 @@ function AppointmentsPage() {
       }
       return true;
     });
-  }, [appointments.data, fPeriod, fType, fWork, personById, search, showHistory, today]);
+  }, [appointments.data, fPeriod, fType, fWork, fTraining, personById, search, showHistory, today]);
 
   const pendingCount = (appointments.data ?? []).filter((r) => r.status === "agendado").length;
   const lateCount = (appointments.data ?? []).filter(
@@ -605,7 +625,7 @@ function AppointmentsPage() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Tipo</Label>
-            <Select value={fType} onValueChange={setFType}>
+            <Select value={fType} onValueChange={(v) => { setFType(v); setFWork("all"); setFTraining("all"); }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -617,22 +637,41 @@ function AppointmentsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Cliente</Label>
-            <Select value={fWork} onValueChange={setFWork}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {clientOptions.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {fType === "treinamento" ? (
+            <div className="space-y-1">
+              <Label className="text-xs">Treinamento</Label>
+              <Select value={fTraining} onValueChange={setFTraining}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {trainingFilterOptions.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label className="text-xs">Cliente</Label>
+              <Select value={fWork} onValueChange={setFWork}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {clientFilterOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1">
             <Label className="text-xs">Colaborador</Label>
             <Input
@@ -646,7 +685,7 @@ function AppointmentsPage() {
               variant={showHistory ? "default" : "outline"}
               size="sm"
               className="w-full"
-              onClick={() => setShowHistory((v) => !v)}
+              onClick={() => { setShowHistory((v) => !v); setFWork("all"); setFTraining("all"); }}
             >
               <CalendarClock className="h-4 w-4" />
               {showHistory ? "Ver pendentes" : "Histórico"}
