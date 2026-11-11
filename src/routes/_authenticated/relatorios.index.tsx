@@ -293,7 +293,7 @@ function Page() {
             id="person"
             value={person}
             onChange={(e) => setPerson(e.target.value)}
-            className="h-9 w-64 rounded-md border border-input bg-background px-2 text-sm"
+            className="block h-9 w-64 rounded-md border border-input bg-background px-2 text-sm"
           >
             <option value="">Todos</option>
             {(people.data ?? []).map((p) => (
@@ -669,7 +669,7 @@ function LaborShareTab() {
       <div className="flex flex-wrap items-end gap-3 p-3">
         <div className="space-y-1">
           <Label htmlFor="rateio-by">Ver por</Label>
-          <select id="rateio-by" value={by} onChange={(e) => setBy(e.target.value as LaborShareBy)} className="h-9 w-40 rounded-md border border-input bg-background px-2 text-sm">
+          <select id="rateio-by" value={by} onChange={(e) => setBy(e.target.value as LaborShareBy)} className="block h-9 w-40 rounded-md border border-input bg-background px-2 text-sm">
             <option value="cliente">Cliente</option>
             <option value="servico">Serviço</option>
           </select>

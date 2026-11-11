@@ -36,5 +36,6 @@
 - Collaborator copy uses filtered rows via collaborator-list.ts to match the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
 - Never cancel vite:preloadError in recovery. Why: it breaks lazy routes.
+- Filtros e campos: o título (Label) fica sempre em cima do campo, nunca ao lado: envolva em <div className="space-y-1"> e use campos de bloco (Input/Select do ui; um <select> nativo precisa da classe "block"). Por quê: padrão visual pedido pelo usuário para todas as abas.
 - Purchases: persist exclusions, CC redirects and item asset decisions; replace summaries/costs atomically; preserve manual targets and exclude generic resplit. Why: reconcile totals and installment competencies.
 - Allocation reports use allocation-hours.ts/RDO headers for hours; daily PDF shares the table's filtered rows. Why: preserve absences and match exported selections.
