@@ -50,10 +50,11 @@ export function DateRangePicker({ value, onChange, label = "Período", id }: { v
 
   return (
     <div className="space-y-1">
-      <Label htmlFor={id}>{label}</Label>
+      {/* block: o botão do calendário é inline e, sem isso, o título fica ao lado em vez de em cima. */}
+      <Label htmlFor={id} className="block">{label}</Label>
       <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setDraft({ from: toDate(value.from), to: toDate(value.to) }); }}>
         <PopoverTrigger asChild>
-          <Button id={id} variant="outline" className="w-60 justify-start font-normal">
+          <Button id={id} variant="outline" className="flex w-60 justify-start font-normal">
             <CalendarDays className="h-4 w-4" />
             {value.from === value.to ? br(value.from) : `${br(value.from)} a ${br(value.to)}`}
           </Button>

@@ -26,15 +26,6 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Frota",
-    icon: Truck,
-    items: [
-      { title: "Abastecimento", url: "/frota/notas" },
-      { title: "Manutenção", url: "/frota/manutencao" },
-      { title: "Visão Geral", url: "/frota/custos" },
-    ],
-  },
-  {
     label: "Controles",
     icon: CalendarClock,
     items: [
@@ -50,6 +41,15 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Colaboradores", url: "/colaboradores" },
       { title: "Ausências", url: "/ausencias" },
       { title: "Contratações", url: "/demandas/contratacoes" },
+    ],
+  },
+  {
+    label: "Frota",
+    icon: Truck,
+    items: [
+      { title: "Abastecimento", url: "/frota/notas" },
+      { title: "Manutenção", url: "/frota/manutencao" },
+      { title: "Visão Geral", url: "/frota/custos" },
     ],
   },
   {
