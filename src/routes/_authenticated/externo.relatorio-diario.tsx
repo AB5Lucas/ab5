@@ -165,19 +165,45 @@ function RdoPage() {
   );
 }
 
+/**
+ * O que cada perfil vê no Histórico: encarregado e coordenador, os RDOs dos clientes vinculados a ele
+ * (todos os serviços do cliente, inclusive RDO Geral); cliente, só os serviços marcados; demais, tudo.
+ */
+function useRdoScope() {
+  const { user, role } = useCurrentUser();
+  return useQuery({
+    queryKey: ["rdo-history-scope", user?.id, role],
+    enabled: !!user?.id,
+    queryFn: async (): Promise<{ clients: Set<string> | null; works: Set<string> | null }> => {
+      if (role !== "encarregado" && role !== "coordenador" && role !== "cliente") return { clients: null, works: null };
+      const { data, error } = await supabase.from("foreman_works").select("work_id, works(client_id)").eq("user_id", user!.id);
+      if (error) throw error;
+      if (role === "cliente") return { clients: null, works: new Set((data ?? []).map((l) => l.work_id)) };
+      return { clients: new Set((data ?? []).map((l: any) => l.works?.client_id).filter(Boolean)), works: null };
+    },
+  });
+}
+
 function RdoHistory({ onOpen }: { onOpen: (workId: string, date: string, generalClient?: string | null) => void }) {
   const { isAdmin, canWrite } = useCurrentUser();
+  const scope = useRdoScope();
   const [f, setF] = useState({ text: "", from: "", to: "", status: "all", client: "all", work: "all" });
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [ready, setReady] = useState<RdoPdfFile | null>(null);
   const list = useQuery({
-    queryKey: ["rdo-history"],
+    queryKey: ["rdo-history", scope.data?.clients ? [...scope.data.clients].sort().join() : "", scope.data?.works ? [...scope.data.works].sort().join() : ""],
+    enabled: !!scope.data,
     queryFn: async () => {
-      const { data } = await supabase
+      const allowedClients = scope.data?.clients ? [...scope.data.clients] : null;
+      const allowedWorks = scope.data?.works ? [...scope.data.works] : null;
+      if ((allowedClients && !allowedClients.length) || (allowedWorks && !allowedWorks.length)) return [];
+      // Filtra no banco (os 500 mais recentes já são os do usuário), pelo cliente do serviço ou pelo serviço.
+      let q = supabase
         .from("rdos")
-        .select("id, number, work_id, report_date, status, responsible_name, works(name, client_id, rdo_general, clients(name)), rdo_workforce(present), rdo_media(id), rdo_signatures(kind)")
-        .order("report_date", { ascending: false })
-        .limit(500);
+        .select("id, number, work_id, report_date, status, responsible_name, works!inner(name, client_id, rdo_general, clients(name)), rdo_workforce(present), rdo_media(id), rdo_signatures(kind)");
+      if (allowedClients) q = q.in("works.client_id", allowedClients);
+      if (allowedWorks) q = q.in("work_id", allowedWorks);
+      const { data } = await q.order("report_date", { ascending: false }).limit(500);
       return data ?? [];
     },
   });
