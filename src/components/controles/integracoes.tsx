@@ -42,6 +42,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { AppointmentDialog } from "@/components/appointment-dialog";
 import { useInConference, useScheduled } from "@/hooks/use-scheduled";
+import { FollowUpFilter, followUpApplies, matchesFollowUp, type FollowUp } from "@/components/controles/follow-up-filter";
 import { createNameMatcher, emptyToNull, normText, parseDate } from "@/lib/import-helpers";
 import { addDays, expiryFrom, formatDateBR, todayISO, INTEGRATION_WARN_DAYS } from "@/lib/scheduling";
 
@@ -116,6 +117,7 @@ export function IntegrationsPage() {
   const [clientFilter, setClientFilter] = useState("all");
   
   const [statusFilter, setStatusFilter] = useState("all");
+  const [followUp, setFollowUp] = useState<FollowUp>("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -199,6 +201,7 @@ export function IntegrationsPage() {
       const clientName = clientById.get(r.client_id) ?? "";
       if (clientFilter !== "all" && r.client_id !== clientFilter) return false;
       if (statusFilter !== "all" && statusOf(r.expires_at, today, r.documentation) !== statusFilter) return false;
+      if (followUpApplies(statusFilter) && !matchesFollowUp(followUp, `${r.collaborator_id}|${r.client_id}`, scheduled, inConf)) return false;
       if (q) {
         const hit =
           (p?.full_name ?? "").toLowerCase().includes(q) ||
@@ -209,7 +212,7 @@ export function IntegrationsPage() {
       }
       return true;
     });
-  }, [integrations.data, search, clientFilter, statusFilter, personById, clientById, positionById, today]);
+  }, [integrations.data, search, clientFilter, statusFilter, followUp, scheduled, inConf, personById, clientById, positionById, today]);
 
   // "Não possuem": colaboradores ativos sem integração no cliente filtrado (ou sem nenhuma).
   const missing = useMemo(() => {
@@ -444,42 +447,53 @@ export function IntegrationsPage() {
         <Badge variant="destructive">Documentação: {summary.documentation}</Badge>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Buscar por nome, CPF, cliente ou função"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1">
+          <Label htmlFor="int-search">Busca</Label>
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="int-search"
+              className="pl-8"
+              placeholder="Buscar por nome, CPF, cliente ou função"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
-        <Select value={clientFilter} onValueChange={setClientFilter}>
-          <SelectTrigger>
-            <SelectValue placeholder="Cliente" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os clientes</SelectItem>
-            {(clients.data ?? []).map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger>
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os status</SelectItem>
-            <SelectItem value="valid">Válida</SelectItem>
-            <SelectItem value="expiring">Próxima do vencimento</SelectItem>
-            <SelectItem value="expired">Vencida</SelectItem>
-            <SelectItem value="documentation">Documentação</SelectItem>
-            <SelectItem value="missing">Não possuem</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="space-y-1">
+          <Label>Cliente</Label>
+          <Select value={clientFilter} onValueChange={setClientFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os clientes</SelectItem>
+              {(clients.data ?? []).map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label>Status</Label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os status</SelectItem>
+              <SelectItem value="valid">Válida</SelectItem>
+              <SelectItem value="expiring">Próxima do vencimento</SelectItem>
+              <SelectItem value="expired">Vencida</SelectItem>
+              <SelectItem value="documentation">Documentação</SelectItem>
+              <SelectItem value="missing">Não possuem</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {followUpApplies(statusFilter) && <FollowUpFilter value={followUp} onChange={setFollowUp} />}
       </div>
 
       <div className="rounded-lg border border-border">

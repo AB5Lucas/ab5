@@ -42,6 +42,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { AppointmentDialog } from "@/components/appointment-dialog";
 import { useInConference, useScheduled } from "@/hooks/use-scheduled";
+import { FollowUpFilter, followUpApplies, matchesFollowUp, type FollowUp } from "@/components/controles/follow-up-filter";
 import { emptyToNull, normText, parseDate } from "@/lib/import-helpers";
 import { asoStatusOf, expiryFrom, formatDateBR, todayISO, ASO_LABEL, type AsoStatus } from "@/lib/scheduling";
 
@@ -90,6 +91,7 @@ export function AsosPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [followUp, setFollowUp] = useState<FollowUp>("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -154,6 +156,7 @@ export function AsosPage() {
       if (!p) return false;
       const status = asoStatusOf(r.expires_at, today);
       if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (followUpApplies(statusFilter) && !matchesFollowUp(followUp, r.collaborator_id, scheduled, inConf)) return false;
       if (q) {
         const hit =
           normText(p?.full_name ?? "").includes(q) || normText(p?.registration_number ?? "").includes(q);
@@ -161,7 +164,7 @@ export function AsosPage() {
       }
       return true;
     });
-  }, [asos.data, search, statusFilter, personById, today]);
+  }, [asos.data, search, statusFilter, followUp, scheduled, inConf, personById, today]);
 
   const summary = useMemo(() => {
     const s = { total: filtered.length, valid: 0, expiring: 0, expired: 0 };
@@ -338,26 +341,34 @@ export function AsosPage() {
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="relative lg:col-span-2">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Buscar por nome ou matrícula"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="space-y-1 lg:col-span-2">
+          <Label htmlFor="aso-search">Colaborador</Label>
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="aso-search"
+              className="pl-8"
+              placeholder="Buscar por nome ou matrícula"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger>
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="valid">Válidos</SelectItem>
-            <SelectItem value="expiring">Próximos a vencer</SelectItem>
-            <SelectItem value="expired">Vencidos</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="space-y-1">
+          <Label>Status</Label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="valid">Válidos</SelectItem>
+              <SelectItem value="expiring">Próximos a vencer</SelectItem>
+              <SelectItem value="expired">Vencidos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {followUpApplies(statusFilter) && <FollowUpFilter value={followUp} onChange={setFollowUp} />}
       </div>
 
       <div className="rounded-lg border border-border">

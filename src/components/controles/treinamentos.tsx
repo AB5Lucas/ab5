@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { AppointmentDialog } from "@/components/appointment-dialog";
 import { useInConference, useScheduled } from "@/hooks/use-scheduled";
+import { FollowUpFilter, followUpApplies, matchesFollowUp, type FollowUp } from "@/components/controles/follow-up-filter";
 import { upcomingAlongside } from "@/lib/training-batch";
 import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate } from "@/lib/import-helpers";
 
@@ -192,6 +193,7 @@ export function TrainingsPage() {
   const [rDoc, setRDoc] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "valid" | "expiring" | "expired" | "missing">("all");
+  const [followUp, setFollowUp] = useState<FollowUp>("all");
   const [personSearch, setPersonSearch] = useState("");
   const [trainingIds, setTrainingIds] = useState<string[]>([]);
 
@@ -275,6 +277,7 @@ export function TrainingsPage() {
   const filtered = (records.data ?? []).filter((r) => {
     if (!nameById.has(r.collaborator_id)) return false;
     if (filter !== "all" && statusOf(r.expires_at) !== filter) return false;
+    if (followUpApplies(filter) && !matchesFollowUp(followUp, `${r.collaborator_id}|${r.training_id}`, scheduled, inConf)) return false;
     const p = normText(personSearch);
     if (p && !normText(nameById.get(r.collaborator_id) ?? "").includes(p)) return false;
     if (peopleWithAll) {
@@ -411,7 +414,7 @@ export function TrainingsPage() {
         </TabsList>
 
         <TabsContent value="records" className="space-y-4 pt-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1">
               <Label>Colaborador</Label>
               <Input value={personSearch} onChange={(e) => setPersonSearch(e.target.value)} placeholder="Buscar colaborador" />
@@ -463,6 +466,7 @@ export function TrainingsPage() {
                 </SelectContent>
               </Select>
             </div>
+            {followUpApplies(filter) && <FollowUpFilter value={followUp} onChange={setFollowUp} />}
           </div>
 
           <div className="panel overflow-x-auto">
