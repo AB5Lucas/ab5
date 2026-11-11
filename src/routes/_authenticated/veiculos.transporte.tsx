@@ -24,7 +24,6 @@ import { VehicleHandover } from "@/components/vehicle-handover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VehiclesPage } from "@/components/veiculos/frota";
-import { FleetMaintenancePage } from "@/components/veiculos/manutencao";
 import { DriversPage } from "@/components/veiculos/motoristas";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -48,7 +47,6 @@ const TABS = [
   { v: "transporte", l: "Transporte" },
   { v: "frota", l: "Frota" },
   { v: "motoristas", l: "Motoristas" },
-  { v: "custos", l: "Custos" },
 ] as const;
 type Tab = (typeof TABS)[number]["v"];
 
@@ -80,7 +78,6 @@ function TransportTabs() {
       <TabsContent value="transporte" className="mt-4"><TransportPage /></TabsContent>
       <TabsContent value="frota" className="mt-4"><VehiclesPage /></TabsContent>
       <TabsContent value="motoristas" className="mt-4"><DriversPage /></TabsContent>
-      <TabsContent value="custos" className="mt-4"><FleetMaintenancePage /></TabsContent>
     </Tabs>
   );
 }

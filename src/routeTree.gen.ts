@@ -60,6 +60,9 @@ import { Route as AuthenticatedRelatoriosSincronizacaoRouteImport } from './rout
 import { Route as AuthenticatedRelatoriosValeAlimentacaoRouteImport } from './routes/_authenticated/relatorios.vale-alimentacao'
 import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authenticated/veiculos.index'
 import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_authenticated/veiculos.motoristas'
+import { Route as AuthenticatedFrotaCustosRouteImport } from './routes/_authenticated/frota.custos'
+import { Route as AuthenticatedFrotaManutencaoRouteImport } from './routes/_authenticated/frota.manutencao'
+import { Route as AuthenticatedFrotaNotasRouteImport } from './routes/_authenticated/frota.notas'
 import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
 import { Route as AuthenticatedVeiculosTransporteRouteImport } from './routes/_authenticated/veiculos.transporte'
 import { Route as ApiPublicJobsBillingSyncRouteImport } from './routes/api/public/jobs/billing-sync'
@@ -361,6 +364,21 @@ const AuthenticatedVeiculosMotoristasRoute =
     path: '/veiculos/motoristas',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFrotaCustosRoute = AuthenticatedFrotaCustosRouteImport.update({
+  id: '/frota/custos',
+  path: '/frota/custos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedFrotaManutencaoRoute = AuthenticatedFrotaManutencaoRouteImport.update({
+  id: '/frota/manutencao',
+  path: '/frota/manutencao',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedFrotaNotasRoute = AuthenticatedFrotaNotasRouteImport.update({
+  id: '/frota/notas',
+  path: '/frota/notas',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedVeiculosRelatoriosRoute =
   AuthenticatedVeiculosRelatoriosRouteImport.update({
     id: '/veiculos/relatorios',
@@ -432,6 +450,9 @@ export interface FileRoutesByFullPath {
   '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
+  '/frota/custos': typeof AuthenticatedFrotaCustosRoute
+  '/frota/manutencao': typeof AuthenticatedFrotaManutencaoRoute
+  '/frota/notas': typeof AuthenticatedFrotaNotasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/ausencias/': typeof AuthenticatedAusenciasIndexRoute
@@ -488,6 +509,9 @@ export interface FileRoutesByTo {
   '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
+  '/frota/custos': typeof AuthenticatedFrotaCustosRoute
+  '/frota/manutencao': typeof AuthenticatedFrotaManutencaoRoute
+  '/frota/notas': typeof AuthenticatedFrotaNotasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/ausencias': typeof AuthenticatedAusenciasIndexRoute
@@ -546,6 +570,9 @@ export interface FileRoutesById {
   '/_authenticated/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/_authenticated/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/_authenticated/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
+  '/_authenticated/frota/custos': typeof AuthenticatedFrotaCustosRoute
+  '/_authenticated/frota/manutencao': typeof AuthenticatedFrotaManutencaoRoute
+  '/_authenticated/frota/notas': typeof AuthenticatedFrotaNotasRoute
   '/_authenticated/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/_authenticated/ausencias/': typeof AuthenticatedAusenciasIndexRoute
@@ -604,6 +631,9 @@ export interface FileRouteTypes {
     | '/relatorios/sincronizacao'
     | '/relatorios/vale-alimentacao'
     | '/veiculos/motoristas'
+    | '/frota/custos'
+    | '/frota/manutencao'
+    | '/frota/notas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
     | '/ausencias/'
@@ -660,6 +690,9 @@ export interface FileRouteTypes {
     | '/relatorios/sincronizacao'
     | '/relatorios/vale-alimentacao'
     | '/veiculos/motoristas'
+    | '/frota/custos'
+    | '/frota/manutencao'
+    | '/frota/notas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
     | '/ausencias'
@@ -717,6 +750,9 @@ export interface FileRouteTypes {
     | '/_authenticated/relatorios/sincronizacao'
     | '/_authenticated/relatorios/vale-alimentacao'
     | '/_authenticated/veiculos/motoristas'
+    | '/_authenticated/frota/custos'
+    | '/_authenticated/frota/manutencao'
+    | '/_authenticated/frota/notas'
     | '/_authenticated/veiculos/relatorios'
     | '/_authenticated/veiculos/transporte'
     | '/_authenticated/ausencias/'
@@ -1096,6 +1132,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVeiculosMotoristasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/frota/custos': {
+      id: '/_authenticated/frota/custos'
+      path: '/frota/custos'
+      fullPath: '/frota/custos'
+      preLoaderRoute: typeof AuthenticatedFrotaCustosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/frota/manutencao': {
+      id: '/_authenticated/frota/manutencao'
+      path: '/frota/manutencao'
+      fullPath: '/frota/manutencao'
+      preLoaderRoute: typeof AuthenticatedFrotaManutencaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/frota/notas': {
+      id: '/_authenticated/frota/notas'
+      path: '/frota/notas'
+      fullPath: '/frota/notas'
+      preLoaderRoute: typeof AuthenticatedFrotaNotasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/veiculos/relatorios': {
       id: '/_authenticated/veiculos/relatorios'
       path: '/veiculos/relatorios'
@@ -1170,6 +1227,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRelatoriosSincronizacaoRoute: typeof AuthenticatedRelatoriosSincronizacaoRoute
   AuthenticatedRelatoriosValeAlimentacaoRoute: typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   AuthenticatedVeiculosMotoristasRoute: typeof AuthenticatedVeiculosMotoristasRoute
+  AuthenticatedFrotaCustosRoute: typeof AuthenticatedFrotaCustosRoute
+  AuthenticatedFrotaManutencaoRoute: typeof AuthenticatedFrotaManutencaoRoute
+  AuthenticatedFrotaNotasRoute: typeof AuthenticatedFrotaNotasRoute
   AuthenticatedVeiculosRelatoriosRoute: typeof AuthenticatedVeiculosRelatoriosRoute
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
   AuthenticatedAusenciasIndexRoute: typeof AuthenticatedAusenciasIndexRoute
@@ -1236,6 +1296,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRelatoriosValeAlimentacaoRoute:
     AuthenticatedRelatoriosValeAlimentacaoRoute,
   AuthenticatedVeiculosMotoristasRoute: AuthenticatedVeiculosMotoristasRoute,
+  AuthenticatedFrotaCustosRoute: AuthenticatedFrotaCustosRoute,
+  AuthenticatedFrotaManutencaoRoute: AuthenticatedFrotaManutencaoRoute,
+  AuthenticatedFrotaNotasRoute: AuthenticatedFrotaNotasRoute,
   AuthenticatedVeiculosRelatoriosRoute: AuthenticatedVeiculosRelatoriosRoute,
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
   AuthenticatedAusenciasIndexRoute: AuthenticatedAusenciasIndexRoute,

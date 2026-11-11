@@ -624,6 +624,13 @@
       "when": 1794450000001,
       "tag": "0088_restrict_box_titles_read",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1794460000000,
+      "tag": "0089_fleet_notes_maintenance",
+      "breakpoints": true
     }
   ]
 }

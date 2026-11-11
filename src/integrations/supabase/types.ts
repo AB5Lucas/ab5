@@ -2081,6 +2081,219 @@ export type Database = {
         }
         Relationships: []
       }
+      fleet_fuel_notes: {
+        Row: {
+          access_key: string
+          allocation: Json | null
+          approval_notes: string | null
+          approved_at: string | null
+          approved_by: string | null
+          driver: string | null
+          driver_fix: string | null
+          fuel: string | null
+          id: string
+          info: string | null
+          issued_at: string | null
+          issuer: string | null
+          km: number | null
+          km_fix: number | null
+          nf_number: string | null
+          note_file: string | null
+          note_match: string | null
+          notes: string | null
+          plate: string | null
+          plate_fix: string | null
+          quantity: number | null
+          ref_month: string
+          synced_at: string
+          total: number | null
+          unit_price: number | null
+          xml_file: string
+        }
+        Insert: {
+          access_key: string
+          allocation?: Json | null
+          approval_notes?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          driver?: string | null
+          driver_fix?: string | null
+          fuel?: string | null
+          id?: string
+          info?: string | null
+          issued_at?: string | null
+          issuer?: string | null
+          km?: number | null
+          km_fix?: number | null
+          nf_number?: string | null
+          note_file?: string | null
+          note_match?: string | null
+          notes?: string | null
+          plate?: string | null
+          plate_fix?: string | null
+          quantity?: number | null
+          ref_month: string
+          synced_at?: string
+          total?: number | null
+          unit_price?: number | null
+          xml_file: string
+        }
+        Update: {
+          access_key?: string
+          allocation?: Json | null
+          approval_notes?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          driver?: string | null
+          driver_fix?: string | null
+          fuel?: string | null
+          id?: string
+          info?: string | null
+          issued_at?: string | null
+          issuer?: string | null
+          km?: number | null
+          km_fix?: number | null
+          nf_number?: string | null
+          note_file?: string | null
+          note_match?: string | null
+          notes?: string | null
+          plate?: string | null
+          plate_fix?: string | null
+          quantity?: number | null
+          ref_month?: string
+          synced_at?: string
+          total?: number | null
+          unit_price?: number | null
+          xml_file?: string
+        }
+        Relationships: []
+      }
+      fleet_item_accounts: {
+        Row: {
+          cc_code: string
+          description: string | null
+          id: string
+          item_account: string
+          updated_at: string
+        }
+        Insert: {
+          cc_code: string
+          description?: string | null
+          id?: string
+          item_account: string
+          updated_at?: string
+        }
+        Update: {
+          cc_code?: string
+          description?: string | null
+          id?: string
+          item_account?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fleet_note_docs: {
+        Row: {
+          file_name: string
+          item_id: string | null
+          ref_month: string
+        }
+        Insert: {
+          file_name: string
+          item_id?: string | null
+          ref_month: string
+        }
+        Update: {
+          file_name?: string
+          item_id?: string | null
+          ref_month?: string
+        }
+        Relationships: []
+      }
+      fleet_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: []
+      }
+      vehicle_maintenance_plans: {
+        Row: {
+          base_date: string | null
+          base_km: number | null
+          interval_km: number | null
+          interval_months: number | null
+          notes: string | null
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          base_date?: string | null
+          base_km?: number | null
+          interval_km?: number | null
+          interval_months?: number | null
+          notes?: string | null
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          base_date?: string | null
+          base_km?: number | null
+          interval_km?: number | null
+          interval_months?: number | null
+          notes?: string | null
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
+      vehicle_maintenance_records: {
+        Row: {
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          kind: string
+          km: number | null
+          service_date: string
+          vehicle_id: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          kind?: string
+          km?: number | null
+          service_date: string
+          vehicle_id: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          kind?: string
+          km?: number | null
+          service_date?: string
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
       epi_sheets: {
         Row: {
           archived: boolean
@@ -5134,6 +5347,10 @@ export type Database = {
         Returns: string
       }
       driver_bonus_default: { Args: { _driver_id: string }; Returns: boolean }
+      fleet_fuel_notes_sync: {
+        Args: { p_docs: Json; p_month: string; p_notes: Json }
+        Returns: number
+      }
       fleet_expenses_replace: {
         Args: { p_file: string; p_rows: Json; p_source: string }
         Returns: number

@@ -37,7 +37,7 @@ const lastDay = (ym: string) => {
 type Vehicle = { id: string; plate: string; model: string | null; type: string | null; ownership: string; monthly_rent: number };
 type Row = VehicleMonth & { id: string; plate: string; label: string; ownership: string };
 
-/** Transporte › Custos: orçado (km × R$ 1,35 + pedágio) contra o gasto real de cada veículo. */
+/** Frota › Custos: orçado (km × R$ 1,35 + pedágio) contra o gasto real de cada veículo. */
 export function FleetMaintenancePage() {
   const { canWrite } = useCurrentUser();
   const qc = useQueryClient();

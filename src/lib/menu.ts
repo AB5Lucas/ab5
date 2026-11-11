@@ -26,6 +26,15 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
+    label: "Frota",
+    icon: Truck,
+    items: [
+      { title: "Custos", url: "/frota/custos" },
+      { title: "Manutenção", url: "/frota/manutencao" },
+      { title: "Notas", url: "/frota/notas" },
+    ],
+  },
+  {
     label: "Controles",
     icon: CalendarClock,
     items: [
@@ -92,7 +101,7 @@ export const MENU_GROUPS: MenuGroup[] = RAW_GROUPS.map((g) => ({
   // Andaimes segue a ordem do processo, não alfabética
   // Andaimes segue a ordem do processo; em Controles, Documentação vem primeiro
   items:
-    g.label === "Andaimes"
+    g.label === "Andaimes" || g.label === "Frota"
       ? g.items
       : [...g.items].sort((a, b) =>
           g.label === "Controles" && (a.url === "/agendamentos" || b.url === "/agendamentos")

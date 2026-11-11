@@ -1,6 +1,6 @@
 import { excelDate, moneyCents } from "./billing-sync";
 
-/** Referência de custo por km rodado (aba Transporte › Custos); não é o orçado. */
+/** Referência de custo por km rodado (aba Frota › Custos); não é o orçado. */
 export const BUDGET_KM_RATE = 1.35;
 
 /** Planilhas de Compras no SharePoint (mesma unidade usada por Compras/RELATÓRIOS). */
