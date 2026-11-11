@@ -617,6 +617,13 @@
       "when": 1794450000000,
       "tag": "0087_fleet_costs",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1794450000001,
+      "tag": "0088_restrict_box_titles_read",
+      "breakpoints": true
     }
   ]
 }
