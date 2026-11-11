@@ -160,7 +160,7 @@ export function parseFuelXml(xml: string, fileName: string): FuelNoteRow | null 
 export type RateioSchedule = { vehicle_id: string; schedule_date: string; client_id: string | null; extra_client_ids?: string[] | null; is_maintenance?: boolean | null };
 export type RateioClient = { id: string; name: string; cc_prefix: string | null };
 export type RateioWork = { id: string; client_id: string | null; cc_suffix: string | null; active: boolean };
-export type ItemAccount = { cc_code: string; item_account: string };
+export type ItemAccount = { cc_code: string; item_account: string; description?: string | null };
 export type RateioPart = { client_id: string; client: string; days: number; pct: number; value: number; cc: string | null; cc_rule: string; item_account: string | null };
 export type Rateio = { from: string; to: string; fallback: boolean; parts: RateioPart[] };
 
@@ -171,21 +171,42 @@ export const isoDay = (ts: string | null) => {
   return Number.isNaN(d.getTime()) ? ts.slice(0, 10) : new Date(d.getTime() - 3 * 3600_000).toISOString().slice(0, 10);
 };
 
-/** CC do cliente: com um único serviço ativo, o CC dele; com mais de um, o almoxarifado (final 999). */
-export function clientCc(client: RateioClient | undefined, works: RateioWork[]): { cc: string | null; rule: string } {
+/**
+ * CC do cliente: com um único serviço ativo, o CC dele; com mais de um (ou o único sem sufixo), o almoxarifado
+ * (final 999). Cliente sem prefixo cadastrado (ex.: Pátio) usa o CC da tabela Item Conta com o mesmo nome no rateio.
+ */
+export function clientCc(client: RateioClient | undefined, works: RateioWork[], accounts: ItemAccount[] = []): { cc: string | null; rule: string } {
   const prefix = (client?.cc_prefix ?? "").trim();
-  if (!prefix) return { cc: null, rule: "cliente sem prefixo de CC" };
+  if (!prefix) {
+    const byName = accounts.filter((a) => sameName(a.description, client?.name));
+    return byName.length === 1 ? { cc: byName[0]!.cc_code.trim(), rule: "CC da tabela Item Conta (cliente sem prefixo)" } : { cc: null, rule: "cliente sem prefixo de CC" };
+  }
   const own = works.filter((w) => w.client_id === client!.id && w.active);
   if (own.length === 1) {
     const suffix = (own[0]!.cc_suffix ?? "").trim();
-    return suffix ? { cc: `${prefix}${suffix}`, rule: "único serviço" } : { cc: null, rule: "serviço sem sufixo de CC" };
+    return suffix ? { cc: `${prefix}${suffix}`, rule: "único serviço" } : { cc: `${prefix}999`, rule: "único serviço sem sufixo de CC: almoxarifado" };
   }
   return { cc: `${prefix}999`, rule: own.length ? `${own.length} serviços: almoxarifado` : "sem serviço ativo: almoxarifado" };
 }
-/** Item conta pela equivalência: o CC exato; senão o prefixo do cliente (4 primeiros dígitos). */
-export function itemAccountFor(cc: string | null, accounts: ItemAccount[]): string | null {
-  if (!cc) return null;
-  return accounts.find((a) => a.cc_code.trim() === cc)?.item_account ?? accounts.find((a) => a.cc_code.trim() === cc.slice(0, 4))?.item_account ?? null;
+const sameName = (a: string | null | undefined, b: string | null | undefined) =>
+  !!a && !!b && plain(a).replace(/[^A-Z0-9]/g, "") === plain(b).replace(/[^A-Z0-9]/g, "");
+
+/**
+ * Item conta pela tabela Item Conta (rateio = nome do cliente, centro de custo, item conta):
+ * CC exato; se o mesmo CC tiver mais de uma linha (ex.: 1001999 Indústria e Pátio), vale a do rateio com o
+ * nome do cliente. Sem CC na tabela, tenta o prefixo do cliente (4 dígitos) e, por fim, só o nome do rateio.
+ */
+export function itemAccountFor(cc: string | null, accounts: ItemAccount[], clientName?: string | null): string | null {
+  const pick = (list: ItemAccount[]) =>
+    list.length === 1 ? list[0]!.item_account : list.find((a) => sameName(a.description, clientName))?.item_account ?? null;
+  if (cc) {
+    const exact = accounts.filter((a) => a.cc_code.trim() === cc);
+    if (exact.length) return pick(exact);
+    const prefix = accounts.filter((a) => a.cc_code.trim() === cc.slice(0, 4));
+    if (prefix.length) return pick(prefix);
+  }
+  const byName = accounts.filter((a) => sameName(a.description, clientName));
+  return byName.length === 1 ? byName[0]!.item_account : null;
 }
 
 /**
@@ -220,8 +241,8 @@ export function fuelRateio(opts: {
     const cents = i === all.length - 1 ? totalCents - given : Math.round((totalCents * w) / sum);
     given += cents;
     const client = opts.clients.get(id);
-    const { cc, rule } = clientCc(client, opts.works);
-    return { client_id: id, client: client?.name ?? "Cliente", days: Math.round(w * 100) / 100, pct: Math.round((w / sum) * 10000) / 100, value: cents / 100, cc, cc_rule: rule, item_account: itemAccountFor(cc, opts.accounts) };
+    const { cc, rule } = clientCc(client, opts.works, opts.accounts);
+    return { client_id: id, client: client?.name ?? "Cliente", days: Math.round(w * 100) / 100, pct: Math.round((w / sum) * 10000) / 100, value: cents / 100, cc, cc_rule: rule, item_account: itemAccountFor(cc, opts.accounts, client?.name) };
   });
   return { from, to: opts.day, fallback, parts };
 }

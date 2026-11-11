@@ -29,9 +29,9 @@ const RAW_GROUPS: MenuGroup[] = [
     label: "Frota",
     icon: Truck,
     items: [
-      { title: "Custos", url: "/frota/custos" },
+      { title: "Abastecimento", url: "/frota/notas" },
       { title: "Manutenção", url: "/frota/manutencao" },
-      { title: "Notas", url: "/frota/notas" },
+      { title: "Visão Geral", url: "/frota/custos" },
     ],
   },
   {

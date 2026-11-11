@@ -31,18 +31,18 @@ const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`)
 const lastDay = (ym: string) => { const [y, m] = ym.split("-").map(Number) as [number, number]; return `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
 const MATCH_LABEL: Record<string, string> = { chave: "ok", nf: "pelo nº da NF", manual: "atribuída", hora: "pela hora: confira", leitura: "lido na foto" };
 
-/** Frota › Notas: abastecimentos (XML do posto) e equivalências de item conta. */
+/** Frota › Abastecimento: abastecimentos (XML do posto) e equivalências de item conta. */
 export function FleetNotesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Notas"
+        title="Abastecimento"
         description="Cada XML do posto na pasta do mês vira um abastecimento. A nota é procurada na pasta de notas do mês pelo código de acesso (nome do arquivo); se não achar, atribua à mão. O rateio usa os dias em que o veículo esteve em cada cliente na Transporte, desde o abastecimento anterior."
       />
       <Tabs defaultValue="abastecimentos">
         <TabsList>
           <TabsTrigger value="abastecimentos">Abastecimentos</TabsTrigger>
-          <TabsTrigger value="equivalencias">Equivalências item conta</TabsTrigger>
+          <TabsTrigger value="equivalencias">Item Conta</TabsTrigger>
         </TabsList>
         <TabsContent value="abastecimentos" className="mt-4"><FuelNotes /></TabsContent>
         <TabsContent value="equivalencias" className="mt-4"><ItemAccounts /></TabsContent>
@@ -503,16 +503,21 @@ function FoldersDialog({ open, onClose, values }: { open: boolean; onClose: () =
 function ItemAccounts() {
   const qc = useQueryClient();
   const [form, setForm] = useState({ id: "", cc: "", item: "", description: "" });
-  const list = useQuery({ queryKey: ["fleet-item-accounts"], queryFn: async () => ((await supabase.from("fleet_item_accounts").select("*").order("cc_code")).data ?? []) as Tables<"fleet_item_accounts">[] });
+  const list = useQuery({ queryKey: ["fleet-item-accounts"], queryFn: async () => ((await supabase.from("fleet_item_accounts").select("*").order("cc_code").order("description")).data ?? []) as Tables<"fleet_item_accounts">[] });
   const clients = useQuery({ queryKey: ["fleet-rateio-clients"], queryFn: async () => ((await supabase.from("clients").select("id, name, cc_prefix")).data ?? []) as RateioClient[] });
-  const prefixName = (cc: string) => (clients.data ?? []).find((c) => c.cc_prefix && cc.startsWith(c.cc_prefix))?.name ?? null;
+  // NFD separa os acentos; o filtro tira acentos, espaços e pontuação.
+  const plainName = (s: string) => s.toUpperCase().normalize("NFD").replace(/[^A-Z0-9]/g, "");
+  const systemClient = (a: { cc_code: string; description: string | null }) =>
+    (clients.data ?? []).find((c) => a.description && plainName(c.name) === plainName(a.description))?.name
+    ?? (clients.data ?? []).find((c) => c.cc_prefix && a.cc_code.startsWith(c.cc_prefix))?.name ?? null;
   const done = () => { qc.invalidateQueries({ queryKey: ["fleet-item-accounts"] }); setForm({ id: "", cc: "", item: "", description: "" }); };
   const save = useMutation({
     mutationFn: async () => {
       const row = { cc_code: form.cc.replace(/\s/g, ""), item_account: form.item.trim(), description: form.description.trim() || null, updated_at: new Date().toISOString() };
       if (!row.cc_code || !row.item_account) throw new Error("Preencha o centro de custo e o item conta.");
+      if (!row.description) throw new Error("Preencha o rateio (nome do cliente).");
       const { error } = form.id ? await supabase.from("fleet_item_accounts").update(row).eq("id", form.id) : await supabase.from("fleet_item_accounts").insert(row);
-      if (error) throw error.code === "23505" ? new Error("Este centro de custo já tem equivalência.") : error;
+      if (error) throw error.code === "23505" ? new Error("Este rateio já está cadastrado com este centro de custo.") : error;
     },
     onSuccess: () => { toast.success("Equivalência salva."); done(); },
     onError: (e: Error) => toast.error(e.message),
@@ -524,26 +529,26 @@ function ItemAccounts() {
   });
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">O item conta de cada parte do rateio vem do centro de custo dela. Use o CC completo (ex.: 0102999) ou só o prefixo do cliente (4 dígitos) para valer para todos os CC do cliente.</p>
+      <p className="text-sm text-muted-foreground">O item conta de cada parte do rateio vem do centro de custo dela. Quando o mesmo centro de custo aparece em mais de uma linha (ex.: 1001999 Indústria e Pátio), vale a linha cujo rateio tem o nome do cliente. Um CC de 4 dígitos vale para todos os CC do cliente.</p>
       <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1"><Label htmlFor="eq-desc">Rateio</Label><Input id="eq-desc" className="w-64" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
         <div className="space-y-1"><Label htmlFor="eq-cc">Centro de custo</Label><Input id="eq-cc" className="w-40" value={form.cc} onChange={(e) => setForm({ ...form, cc: e.target.value })} /></div>
-        <div className="space-y-1"><Label htmlFor="eq-item">Item conta</Label><Input id="eq-item" className="w-40" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} /></div>
-        <div className="space-y-1"><Label htmlFor="eq-desc">Descrição</Label><Input id="eq-desc" className="w-72" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+        <div className="space-y-1"><Label htmlFor="eq-item">Item conta</Label><Input id="eq-item" className="w-32" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} /></div>
         <Button onClick={() => save.mutate()} disabled={save.isPending}>{form.id ? "Salvar" : "Adicionar"}</Button>
         {form.id && <Button variant="ghost" onClick={() => setForm({ id: "", cc: "", item: "", description: "" })}>Cancelar</Button>}
       </div>
       <div className="panel overflow-x-auto">
         <Table>
-          <TableHeader><TableRow><TableHead>Centro de custo</TableHead><TableHead>Cliente</TableHead><TableHead>Item conta</TableHead><TableHead>Descrição</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Rateio</TableHead><TableHead>Centro de custo</TableHead><TableHead>Item conta</TableHead><TableHead>Cliente no sistema</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
           <TableBody>
             {!(list.data ?? []).length ? (
               <TableRow><TableCell colSpan={5} className="text-muted-foreground">{list.isLoading ? "Carregando..." : "Nenhuma equivalência cadastrada."}</TableCell></TableRow>
             ) : (list.data ?? []).map((a) => (
               <TableRow key={a.id}>
-                <TableCell className="font-medium">{a.cc_code}</TableCell>
-                <TableCell>{prefixName(a.cc_code) ?? "—"}</TableCell>
+                <TableCell className="font-medium">{a.description ?? "—"}</TableCell>
+                <TableCell>{a.cc_code}</TableCell>
                 <TableCell>{a.item_account}</TableCell>
-                <TableCell>{a.description ?? "—"}</TableCell>
+                <TableCell>{systemClient(a) ?? <span className="text-muted-foreground">—</span>}</TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="sm" onClick={() => setForm({ id: a.id, cc: a.cc_code, item: a.item_account, description: a.description ?? "" })}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="sm" onClick={() => remove.mutate(a.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>

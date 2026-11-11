@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseFolderPath, clientCc, folderMonthScore, fuelRateio, infoFields, maintenanceState, matchPhotosByTime, otherPlates, parseFuelXml, photoTime, pickMonthFolder, sharepointPath } from "./fleet-notes";
+import { baseFolderPath, clientCc, folderMonthScore, fuelRateio, infoFields, itemAccountFor, maintenanceState, matchPhotosByTime, otherPlates, parseFuelXml, photoTime, pickMonthFolder, sharepointPath } from "./fleet-notes";
 
 const KEY = "35261112345678000199550010000482111000482115";
 const XML = `<?xml version="1.0"?><nfeProc><NFe><infNFe Id="NFe${KEY}" versao="4.00">
@@ -85,6 +85,19 @@ describe("rateio e centro de custo", () => {
   it("um serviço ativo usa o CC dele; mais de um vai para o almoxarifado", () => {
     expect(clientCc(clients.get("c2"), works).cc).toBe("0001001");
     expect(clientCc(clients.get("c1"), works).cc).toBe("0102999");
+  });
+  it("mesmo CC com dois rateios: vale o nome do cliente; sem prefixo, o CC vem da tabela", () => {
+    const table = [
+      { cc_code: "1001999", item_account: "003", description: "INDÚSTRIA" },
+      { cc_code: "1001999", item_account: "008", description: "PATIO" },
+      { cc_code: "2030999", item_account: "008", description: "SUZANO" },
+    ];
+    expect(itemAccountFor("1001999", table, "INDUSTRIA")).toBe("003");
+    expect(itemAccountFor("1001999", table, "Pátio")).toBe("008");
+    expect(itemAccountFor("1001999", table, "Outro")).toBeNull();
+    expect(itemAccountFor("2030999", table, "Suzano Papel")).toBe("008");
+    expect(clientCc({ id: "p", name: "PATIO", cc_prefix: null }, [], table)).toEqual({ cc: "1001999", rule: "CC da tabela Item Conta (cliente sem prefixo)" });
+    expect(clientCc({ id: "c", name: "COCA", cc_prefix: "2025" }, [{ id: "w", client_id: "c", cc_suffix: null, active: true }]).cc).toBe("2025999");
   });
   it("divide pelos dias desde o abastecimento anterior", () => {
     const schedules = [

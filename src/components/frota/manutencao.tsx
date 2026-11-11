@@ -77,7 +77,7 @@ export function FleetServicePage() {
     <div className="space-y-4">
       <PageHeader
         title="Manutenção"
-        description="Cada veículo tem a sua regra de revisão preventiva: a cada X km e/ou a cada Y meses (nos alugados, o km pedido pela locadora). O km atual vem da última nota do posto (Frota › Notas). Fica 'Perto' quando faltam 10% do km ou 30 dias."
+        description="Cada veículo tem a sua regra de revisão preventiva: a cada X km e/ou a cada Y meses (nos alugados, o km pedido pela locadora). O km atual vem da última nota do posto (Frota › Abastecimento). Fica 'Perto' quando faltam 10% do km ou 30 dias."
       />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">

@@ -8,7 +8,7 @@ function credentials() {
   return { lovableKey, excelKey };
 }
 
-/** Lê agora as pastas de XML e de notas do mês (botão "Ler pastas" em Frota › Notas). */
+/** Lê agora as pastas de XML e de notas do mês (botão "Ler pastas" em Frota › Abastecimento). */
 export const syncFleetNotesNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { month: string }) => {
@@ -17,7 +17,7 @@ export const syncFleetNotesNow = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { data: allowed, error } = await context.supabase.rpc("can_access_page", { _path: "/frota/notas" });
-    if (error || !allowed) throw new Error("Você não tem acesso a Frota › Notas");
+    if (error || !allowed) throw new Error("Você não tem acesso a Frota › Abastecimento");
     const { executeFleetNotesSync } = await import("./fleet-notes.server");
     return executeFleetNotesSync(data.month, credentials());
   });
@@ -31,7 +31,7 @@ export const fleetNoteThumbnails = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { data: allowed, error } = await context.supabase.rpc("can_access_page", { _path: "/frota/notas" });
-    if (error || !allowed) throw new Error("Você não tem acesso a Frota › Notas");
+    if (error || !allowed) throw new Error("Você não tem acesso a Frota › Abastecimento");
     const { noteThumbnails } = await import("./fleet-notes.server");
     return noteThumbnails(data.month, credentials());
   });
@@ -45,7 +45,7 @@ export const fleetNoteLink = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { data: allowed, error } = await context.supabase.rpc("can_access_page", { _path: "/frota/notas" });
-    if (error || !allowed) throw new Error("Você não tem acesso a Frota › Notas");
+    if (error || !allowed) throw new Error("Você não tem acesso a Frota › Abastecimento");
     const { noteFileUrl } = await import("./fleet-notes.server");
     return noteFileUrl(data.itemId, credentials());
   });
