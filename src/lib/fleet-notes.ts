@@ -259,6 +259,74 @@ export type NoteStatus = "sem-nota" | "pendente" | "aprovada";
 export const noteStatus = (n: { note_file: string | null; approved_at: string | null }): NoteStatus =>
   n.approved_at ? "aprovada" : !n.note_file ? "sem-nota" : "pendente";
 
+// ---------- Ranking de entrega de notas ----------
+export type RankingNote = { id: string; nf_number: string | null; issued_at: string | null; plate: string | null; plate_fix: string | null; driver: string | null; driver_fix: string | null; total: number | null; note_file: string | null };
+export type RankingSchedule = { vehicle_id: string; schedule_date: string; driver_id: string | null; extra_driver_ids?: string[] | null };
+export type RankingEntry = {
+  key: string; name: string; source: "transporte" | "nota"; total: number; delivered: number; pending: number; waiting: number;
+  score: number; pendingNotes: { id: string; nf: string | null; day: string | null; plate: string | null; total: number | null }[];
+};
+/** Prazo para mandar a foto da nota: abastecimentos mais novos que isso ainda não contam como pendentes. */
+export const NOTE_GRACE_DAYS = 2;
+
+/**
+ * Ranking de quem entrega a foto da nota. O motorista de cada abastecimento vem da Transporte: o motorista do
+ * veículo naquele dia (ou no dia anterior, para abastecimento de madrugada antes da programação); sem
+ * programação, vale o nome escrito na nota. Pontuação = % de notas entregues (0 a 100), só com os abastecimentos
+ * fora do prazo de entrega; mais abastecimentos desempatam.
+ */
+export function driverRanking(notes: RankingNote[], schedules: RankingSchedule[], vehicleIdByPlate: Map<string, string>, names: Map<string, string>, today: string): RankingEntry[] {
+  const byVehicleDay = new Map<string, RankingSchedule[]>();
+  for (const s of schedules) {
+    const k = `${s.vehicle_id}|${s.schedule_date}`;
+    byVehicleDay.set(k, [...(byVehicleDay.get(k) ?? []), s]);
+  }
+  const limit = addDays(today, -NOTE_GRACE_DAYS);
+  const out = new Map<string, RankingEntry>();
+  // Nome escrito na nota → colaborador: todas as palavras do nome escrito estão no cadastro, e só um colaborador combina.
+  const tokens = (s: string) => plain(s).replace(/[^A-Z ]/g, " ").split(/\s+/).filter((t) => t.length > 2);
+  const people = [...names.entries()].map(([id, nm]) => ({ id, words: new Set(tokens(nm)) }));
+  const nameCache = new Map<string, string | null>();
+  const byWrittenName = (written: string) => {
+    if (nameCache.has(written)) return nameCache.get(written)!;
+    const ws = tokens(written);
+    const hits = ws.length >= 2 ? people.filter((p) => ws.every((w) => p.words.has(w))) : [];
+    const id = hits.length === 1 ? hits[0]!.id : null;
+    nameCache.set(written, id);
+    return id;
+  };
+  for (const n of notes) {
+    const day = isoDay(n.issued_at);
+    const plate = normalizePlate(n.plate_fix ?? n.plate ?? "") || null;
+    const vehicleId = plate ? vehicleIdByPlate.get(plate) : undefined;
+    let driverId: string | null = null;
+    if (vehicleId && day) {
+      for (const d of [day, addDays(day, -1)]) {
+        const s = (byVehicleDay.get(`${vehicleId}|${d}`) ?? []).find((x) => x.driver_id) ?? null;
+        if (s?.driver_id) { driverId = s.driver_id; break; }
+      }
+    }
+    const written = (n.driver_fix ?? n.driver ?? "").trim();
+    const fromTransport = !!driverId;
+    if (!driverId && written) driverId = byWrittenName(written);
+    const key = driverId ? `id:${driverId}` : written ? `nome:${plain(written).replace(/\s+/g, " ")}` : "sem-motorista";
+    const name = driverId ? names.get(driverId) ?? "Motorista" : written || "Sem motorista identificado";
+    const e = out.get(key) ?? { key, name, source: fromTransport ? "transporte" : "nota", total: 0, delivered: 0, pending: 0, waiting: 0, score: 0, pendingNotes: [] };
+    if (fromTransport) e.source = "transporte";
+    e.total++;
+    if (n.note_file) e.delivered++;
+    else if (day && day > limit) e.waiting++;
+    else { e.pending++; e.pendingNotes.push({ id: n.id, nf: n.nf_number, day, plate, total: n.total }); }
+    out.set(key, e);
+  }
+  for (const e of out.values()) {
+    const counted = e.delivered + e.pending;
+    e.score = counted ? Math.round((e.delivered / counted) * 100) : 100;
+    e.pendingNotes.sort((a, b) => String(a.day).localeCompare(String(b.day)));
+  }
+  return [...out.values()].sort((a, b) => b.score - a.score || (b.delivered + b.pending) - (a.delivered + a.pending) || a.name.localeCompare(b.name, "pt-BR"));
+}
+
 // ---------- Manutenção ----------
 export type MaintenancePlan = { interval_km: number | null; interval_months: number | null; base_km: number | null; base_date: string | null };
 export type MaintenanceState = { lastKm: number | null; lastDate: string | null; nextKm: number | null; nextDate: string | null; kmLeft: number | null; daysLeft: number | null; status: "sem-regra" | "em-dia" | "perto" | "vencida" };

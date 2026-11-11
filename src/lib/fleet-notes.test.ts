@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseFolderPath, clientCc, folderMonthScore, fuelRateio, infoFields, itemAccountFor, maintenanceState, matchPhotosByTime, otherPlates, parseFuelXml, photoTime, pickMonthFolder, sharepointPath } from "./fleet-notes";
+import { baseFolderPath, clientCc, driverRanking, folderMonthScore, fuelRateio, infoFields, itemAccountFor, maintenanceState, matchPhotosByTime, otherPlates, parseFuelXml, photoTime, pickMonthFolder, sharepointPath } from "./fleet-notes";
 
 const KEY = "35261112345678000199550010000482111000482115";
 const XML = `<?xml version="1.0"?><nfeProc><NFe><infNFe Id="NFe${KEY}" versao="4.00">
@@ -134,5 +134,24 @@ describe("ADM como Diretoria", () => {
     ];
     const r = fuelRateio({ vehicleId: "v", day: "2026-11-05", prevDay: "2026-11-01", total: 100, schedules: [{ vehicle_id: "v", schedule_date: "2026-11-03", client_id: "a" }], clients, works, accounts });
     expect([r.parts[0]!.cc, r.parts[0]!.item_account]).toEqual(["2000", "010"]);
+  });
+});
+
+describe("ranking de entrega de notas", () => {
+  it("motorista pela Transporte, pelo nome da nota quando não há programação, e prazo de 2 dias", () => {
+    const names = new Map([["m1", "Maycon Roberto Ribeiro dos Santos"], ["m2", "André Jesus de Souza"]]);
+    const vehicles = new Map([["URY3B26", "v1"], ["TDE4F86", "v2"]]);
+    const schedules = [{ vehicle_id: "v1", schedule_date: "2026-11-02", driver_id: "m1" }, { vehicle_id: "v1", schedule_date: "2026-11-03", driver_id: "m1" }];
+    const base = { plate_fix: null, driver_fix: null, total: 100 };
+    const notes = [
+      { ...base, id: "a", nf_number: "1", issued_at: "2026-11-02T15:00:00-03:00", plate: "URY3B26", driver: "MAYCON", note_file: "f.jpg" },
+      { ...base, id: "b", nf_number: "2", issued_at: "2026-11-04T05:00:00-03:00", plate: "URY3B26", driver: "MAYCON", note_file: null },
+      { ...base, id: "c", nf_number: "3", issued_at: "2026-11-10T19:00:00-03:00", plate: "TDE4F86", driver: "Andre Jesus", note_file: null },
+    ];
+    const r = driverRanking(notes, schedules, vehicles, names, "2026-11-11");
+    const maycon = r.find((x) => x.key === "id:m1")!;
+    expect([maycon.total, maycon.delivered, maycon.pending, maycon.score]).toEqual([2, 1, 1, 50]);
+    const andre = r.find((x) => x.key === "id:m2")!;
+    expect([andre.source, andre.waiting, andre.pending]).toEqual(["nota", 1, 0]);
   });
 });

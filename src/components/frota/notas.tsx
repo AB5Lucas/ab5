@@ -18,6 +18,7 @@ import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
 import { baseFolderPath, fuelRateio, isoDay, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
+import { DriverRanking } from "./ranking";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Note = Tables<"fleet_fuel_notes">;
@@ -42,9 +43,11 @@ export function FleetNotesPage() {
       <Tabs defaultValue="abastecimentos">
         <TabsList>
           <TabsTrigger value="abastecimentos">Abastecimentos</TabsTrigger>
+          <TabsTrigger value="ranking">Ranking</TabsTrigger>
           <TabsTrigger value="equivalencias">Item Conta</TabsTrigger>
         </TabsList>
         <TabsContent value="abastecimentos" className="mt-4"><FuelNotes /></TabsContent>
+        <TabsContent value="ranking" className="mt-4"><DriverRanking /></TabsContent>
         <TabsContent value="equivalencias" className="mt-4"><ItemAccounts /></TabsContent>
       </Tabs>
     </div>
