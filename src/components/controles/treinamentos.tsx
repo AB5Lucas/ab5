@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { AppointmentDialog } from "@/components/appointment-dialog";
 import { useInConference, useScheduled } from "@/hooks/use-scheduled";
+import { upcomingAlongside } from "@/lib/training-batch";
 import { createNameMatcher, emptyToNull, insertSequentially, normText, parseDate } from "@/lib/import-helpers";
 
 const RECORD_COLUMNS: ImportColumn[] = [
@@ -263,6 +264,13 @@ export function TrainingsPage() {
     });
     return ok;
   }, [records.data, trainingIds]);
+
+  /** Registro a vencer → outros treinamentos da pessoa que vencem em até 2 meses depois dele. */
+  const alongside = useMemo(
+    () => upcomingAlongside(records.data ?? [], today(), (o) => scheduled.has(`${o.collaborator_id}|${o.training_id}`) || inConf.has(`${o.collaborator_id}|${o.training_id}`)),
+    [records.data, scheduled, inConf],
+  );
+  const [batchFor, setBatchFor] = useState<{ personId: string; anchor: string; items: { training_id: string; expires_at: string | null }[] } | null>(null);
 
   const filtered = (records.data ?? []).filter((r) => {
     if (!nameById.has(r.collaborator_id)) return false;
@@ -508,7 +516,17 @@ export function TrainingsPage() {
                     const st = statusOf(r.expires_at);
                     return (
                       <TableRow key={r.id}>
-                        <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}{scheduled.has(`${r.collaborator_id}|${r.training_id}`) && <Badge title={scheduled.get(`${r.collaborator_id}|${r.training_id}`)} variant="destructive" className="ml-2 px-1.5 py-0 text-[10px] cursor-help">Agendado</Badge>}{inConf.has(`${r.collaborator_id}|${r.training_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Conferência</Badge>}</TableCell>
+                        <TableCell className="font-medium">{alongside.has(r.id) && (
+                          <button
+                            type="button"
+                            title="Outros treinamentos vencem logo depois deste"
+                            aria-label="Ver treinamentos que vencem logo depois"
+                            onClick={() => setBatchFor({ personId: r.collaborator_id, anchor: r.training_id, items: alongside.get(r.id)! })}
+                            className="mr-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[11px] font-bold leading-none text-destructive-foreground align-middle"
+                          >
+                            !
+                          </button>
+                        )}{nameById.get(r.collaborator_id) ?? "—"}{scheduled.has(`${r.collaborator_id}|${r.training_id}`) && <Badge title={scheduled.get(`${r.collaborator_id}|${r.training_id}`)} variant="destructive" className="ml-2 px-1.5 py-0 text-[10px] cursor-help">Agendado</Badge>}{inConf.has(`${r.collaborator_id}|${r.training_id}`) && <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-[10px]">Conferência</Badge>}</TableCell>
                         <TableCell>{nameById.get(r.training_id) ?? "—"}</TableCell>
                         <TableCell className="hidden md:table-cell">{formatDateBR(r.completed_at)}</TableCell>
                         <TableCell className="hidden md:table-cell">
@@ -557,6 +575,32 @@ export function TrainingsPage() {
               </TableBody>
             </Table>
           </div>
+
+          <Dialog open={!!batchFor} onOpenChange={(v) => !v && setBatchFor(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Vencem logo depois</DialogTitle>
+              </DialogHeader>
+              {batchFor && (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {nameById.get(batchFor.personId) ?? "Colaborador"} tem {nameById.get(batchFor.anchor) ?? "um treinamento"} a vencer. Estes outros vencem em até 2 meses depois dele e podem ser agendados juntos:
+                  </p>
+                  <ul className="divide-y divide-border rounded-md border border-border">
+                    {batchFor.items.map((t) => (
+                      <li key={t.training_id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-medium">{nameById.get(t.training_id) ?? "—"}</p>
+                          <p className="text-xs text-muted-foreground">Vence em {t.expires_at ? formatDateBR(t.expires_at) : "—"}</p>
+                        </div>
+                        <AppointmentDialog type="treinamento" iconOnly initialValues={{ collaborator_id: batchFor.personId, training_id: t.training_id }} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="catalog" className="space-y-4 pt-4">
