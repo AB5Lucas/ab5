@@ -201,7 +201,7 @@ export function FleetMaintenancePage() {
     <div className="space-y-4">
       <PageHeader
         title="Manutenção"
-        description={`Orçado: soma do transporte orçado dos serviços no mês (Indústria, ADM, Comercial e Pátio: VT real; mensais: o mês inteiro; sem orçado lançado: o gasto real; demais: pelo andamento do mês), dividida entre os veículos pelo km. Clique no Orçado para ver o detalhe. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação. Km × ${brl(BUDGET_KM_RATE)} fica só como referência.`}
+        description={`Orçado: soma do transporte orçado dos serviços no mês (mensais: o mês inteiro; demais: pelo andamento do mês; Indústria, ADM, Comercial e Pátio ou sem orçado lançado: o custo real dos veículos, km e pedágio, sem VT), dividida entre os veículos pelo km. Clique no Orçado para ver o detalhe. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação. Km × ${brl(BUDGET_KM_RATE)} fica só como referência.`}
         actions={
           <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
             <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Lendo planilhas..." : "Atualizar planilhas"}
@@ -355,7 +355,7 @@ export function FleetMaintenancePage() {
           <DialogHeader>
             <DialogTitle>Orçado de transporte · {monthLabel(month)}</DialogTitle>
             <DialogDescription>
-              Todos os clientes com atividade no mês: {brl(fleetBudget.get(month) ?? 0)}. Por serviço: orçado lançado (mensal pelo BDI dos pedidos do mês; demais pelo andamento); Indústria, ADM, Comercial e Pátio pelo VT real; sem orçado lançado, pelo gasto real.
+              Todos os clientes com atividade no mês: {brl(fleetBudget.get(month) ?? 0)}. Por serviço: orçado lançado (mensal pelo BDI dos pedidos do mês; demais pelo andamento); Indústria, ADM, Comercial e Pátio ou sem orçado lançado: custo real dos veículos (km e pedágio), sem VT.
               {vehicleFilter !== "all" ? ` O veículo filtrado recebe ${brl(total.budget)}, a parte proporcional ao km dele.` : " Entre os veículos, o valor é dividido pelo km rodado."}
             </DialogDescription>
           </DialogHeader>

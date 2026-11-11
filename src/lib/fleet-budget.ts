@@ -5,28 +5,30 @@ import { contractFraction } from "./contract";
 export type BudgetPart = { workId: string; clientKey: string; client: string; service: string; rule: string; base: string; value: number };
 export type BudgetClient = { key: string; client: string; value: number; rules: string[]; parts: BudgetPart[] };
 
-/** Clientes internos: o orçado de transporte é o VT real do mês. */
-const VT_CLIENTS = /^(ind[uú]stria|adm|comercial|p[aá]tio)$/i;
+/** Clientes internos (sem orçado próprio): entram pelo custo real dos veículos no mês. */
+const INTERNAL_CLIENTS = /^(ind[uú]stria|adm|comercial|p[aá]tio)$/i;
 const clientName = (work: any) => String(work.clients?.name ?? work.client ?? "Sem cliente").trim();
-export const isVtClient = (name: string) => VT_CLIENTS.test(name.trim());
+export const isInternalClient = (name: string) => INTERNAL_CLIENTS.test(name.trim());
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
 /**
  * Transporte orçado de um serviço num mês, com os dados dos Resultados. Devolve null só quando o serviço
  * não teve nenhuma atividade no mês (sem custo real, sem pedido e sem andamento):
- * - Indústria, ADM, Comercial e Pátio: o VT real do mês;
+ * - Indústria, ADM, Comercial e Pátio: o custo real dos veículos no mês (km e pedágio);
  * - mensal: o transporte do mês no BDI dos pedidos do mês;
- * - nada lançado como orçado de transporte: o transporte real do mês;
+ * - nada lançado como orçado de transporte: o custo real dos veículos no mês (km e pedágio).
  * - contrato: o transporte × a fração do contrato faturada no mês;
  * - demais: o transporte orçado × o andamento ganho no mês (% do mês − % anterior).
+ * VT não entra no que vem do real: a despesa real da frota é só combustível, pedágio, locação e manutenção.
  */
 export function serviceTransportBudget(work: any, raw: any, ym: string, opts: { holidays: string[]; allWorks: any[] }): BudgetPart | null {
   const base = buildBase(work, raw, ym, ym, { isAll: false, workIds: [work.id], holidays: opts.holidays, allWorks: opts.allWorks });
   if (!base) return null;
   const realItems = Object.fromEntries(base.items.map((i) => [i.key, i.real]));
   const realTotal = base.items.reduce((s, i) => s + Number(i.real ?? 0), 0);
-  const realTransport = Number(realItems["transporte"] ?? 0);
+  // Só a parte dos veículos (km rodado e pedágio) do transporte real; VT e prêmios ficam de fora.
+  const vehicleReal = ((base.transportRows ?? []) as { date: string; share: number }[]).filter((t) => t.date.slice(0, 7) === ym).reduce((s, t) => s + Number(t.share ?? 0), 0);
   const row = base.rows.find((r) => r.ym === ym);
   const advance = row ? Math.max(0, row.advance) : 0;
   const orders = work.monthly_enabled ? monthlyOrderRevenue(work, ym, ym) : 0;
@@ -36,16 +38,13 @@ export function serviceTransportBudget(work: any, raw: any, ym: string, opts: { 
     workId: work.id, clientKey: work.client_id ?? client, client, service: work.name ?? "—", rule, base: baseText, value: Math.round(Math.max(0, value) * 100) / 100,
   });
 
-  if (isVtClient(client)) {
-    const days = (base.vtRows ?? []).filter((r: any) => String(r.date).slice(0, 7) === ym);
-    return part("VT real do mês", `${days.length} dia(s) com VT`, days.reduce((s: number, r: any) => s + Number(r.cost ?? 0), 0));
-  }
+  if (isInternalClient(client)) return part("Cliente interno: custo real dos veículos", "km e pedágio dos veículos no mês", vehicleReal);
   if (work.monthly_enabled && orders) {
     return part("Orçado lançado (mensal)", `pedidos do mês ${brl(orders)}`, Number(bdiBudget(orders, realItems, { weights: work.budget_items?.weights })["transporte"] ?? 0));
   }
   const bi = (work.budget_items ?? {}) as Record<string, unknown>;
   const filled = Number(bi["bdi"] ?? 0) === 1 || Number(bi["transporte"] ?? 0) > 0;
-  if (!filled || work.monthly_enabled) return part("Sem orçado lançado: gasto real", "transporte real nos Resultados", realTransport);
+  if (!filled || work.monthly_enabled) return part("Sem orçado lançado: custo real dos veículos", "km e pedágio dos veículos no mês", vehicleReal);
   const item = Number(base.items.find((i) => i.key === "transporte")?.budget ?? 0);
   if (work.contract_enabled) {
     const billed = [...new Set(((raw.entries ?? []) as any[]).filter((e) => e.work_id === work.id && e.category === "faturamento").map((e) => String(e.entry_date).slice(0, 7)))];
