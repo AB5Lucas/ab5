@@ -16,12 +16,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { fuelRateio, isoDay, monthLabel, noteStatus, sharepointPath, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
-import { fleetNoteLink, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
+import { baseFolderPath, fuelRateio, isoDay, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
+import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Note = Tables<"fleet_fuel_notes">;
-type Row = Note & { day: string | null; plateShown: string | null; kmShown: number | null; driverShown: string | null; vehicleLabel: string | null; rateio: Rateio | null; status: ReturnType<typeof noteStatus> };
+type Row = Note & { day: string | null; plateShown: string | null; kmShown: number | null; driverShown: string | null; vehicleLabel: string | null; rateio: Rateio | null; status: ReturnType<typeof noteStatus>; warnings: string[] };
 type Filter = "pendentes" | "sem-nota" | "aguardando" | "aprovadas" | "todas";
 
 const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
@@ -29,7 +29,7 @@ const num = (v: number | null | undefined, d = 2) => (v == null ? "—" : Number
 const brDate = (d: string | null) => (d ? d.split("-").reverse().join("/") : "—");
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 const lastDay = (ym: string) => { const [y, m] = ym.split("-").map(Number) as [number, number]; return `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
-const MATCH_LABEL: Record<string, string> = { chave: "ok", nf: "pelo nº da NF", manual: "atribuída" };
+const MATCH_LABEL: Record<string, string> = { chave: "ok", nf: "pelo nº da NF", manual: "atribuída", hora: "pela hora: confira" };
 
 /** Frota › Notas: abastecimentos (XML do posto) e equivalências de item conta. */
 export function FleetNotesPage() {
@@ -108,7 +108,13 @@ function FuelNotes() {
       const rateio = n.approved_at && n.allocation ? (n.allocation as unknown as Rateio)
         : day && schedules.data ? fuelRateio({ vehicleId: v?.id ?? null, day, prevDay: isoDay(prev?.issued_at ?? null), total: Number(n.total ?? 0), schedules: schedules.data, clients: clientMap, works: works.data ?? [], accounts: (accounts.data ?? []) as ItemAccount[] })
         : null;
-      return { ...n, day, plateShown: p, kmShown: n.km_fix ?? n.km, driverShown: n.driver_fix ?? n.driver, vehicleLabel: v ? (v.model ?? v.plate) : null, rateio, status: noteStatus(n) };
+      const kmShown = n.km_fix ?? n.km;
+      const prevKm = prev ? prev.km_fix ?? prev.km : null;
+      const warnings = [
+        ...(n.plate_fix ? [] : otherPlates(n.info, p).map((o) => `outra placa no texto da nota: ${o}`)),
+        ...(kmShown != null && prevKm != null && Number(kmShown) < Number(prevKm) ? [`km menor que o abastecimento anterior (${Number(prevKm).toLocaleString("pt-BR")})`] : []),
+      ];
+      return { ...n, day, plateShown: p, kmShown, driverShown: n.driver_fix ?? n.driver, vehicleLabel: v ? (v.model ?? v.plate) : null, rateio, status: noteStatus(n), warnings };
     });
   }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, month]);
 
@@ -209,7 +215,10 @@ function FuelNotes() {
                 <TableRow key={r.id} className="align-top">
                   <TableCell className="whitespace-nowrap">{brDate(r.day)}</TableCell>
                   <TableCell>{r.nf_number ?? "—"}</TableCell>
-                  <TableCell className="whitespace-nowrap">{r.plateShown ?? <span className="text-destructive">sem placa</span>}{r.plate_fix ? " *" : ""}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {r.plateShown ?? <span className="text-destructive">sem placa</span>}{r.plate_fix ? " *" : ""}
+                    {r.warnings.map((w) => <div key={w} className="max-w-48 whitespace-normal text-amber-600 dark:text-amber-400">⚠ {w}</div>)}
+                  </TableCell>
                   <TableCell>{r.driverShown ?? "—"}</TableCell>
                   <TableCell>{r.vehicleLabel ?? (r.plateShown ? <span className="text-destructive">não cadastrado</span> : "—")}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.kmShown == null ? "—" : num(r.kmShown, 0)}</TableCell>
@@ -227,7 +236,7 @@ function FuelNotes() {
                   <TableCell className="whitespace-nowrap">
                     {r.note_file ? (
                       <div className="flex items-center gap-1">
-                        <Badge variant="outline" className="border-emerald-500/50 text-emerald-700 dark:text-emerald-400">{MATCH_LABEL[r.note_match ?? "manual"]}</Badge>
+                        <Badge variant="outline" className={r.note_match === "hora" ? "cursor-pointer border-amber-500/60 text-amber-700 dark:text-amber-400" : "border-emerald-500/50 text-emerald-700 dark:text-emerald-400"} onClick={() => !r.approved_at && setAttach(r)}>{MATCH_LABEL[r.note_match ?? "manual"]}</Badge>
                         <Button variant="ghost" size="icon" className="h-6 w-6" title={`Abrir ${r.note_file}`} onClick={() => openDoc(r.note_file!)}><ExternalLink className="h-3.5 w-3.5" /></Button>
                         {!r.approved_at && <Button variant="ghost" size="icon" className="h-6 w-6" title="Trocar nota" onClick={() => setAttach(r)}><Link2 className="h-3.5 w-3.5" /></Button>}
                       </div>
@@ -276,7 +285,7 @@ function FuelNotes() {
 
       <ApproveDialog row={approve} onClose={() => setApprove(null)} />
       <EditDialog row={edit} onClose={() => setEdit(null)} />
-      <AttachDialog row={attach} docs={attach?.note_file ? [{ file_name: attach.note_file, item_id: null }, ...freeDocs] : freeDocs} onClose={() => setAttach(null)} />
+      <AttachDialog row={attach} month={month} docs={attach?.note_file ? [{ file_name: attach.note_file, item_id: null }, ...freeDocs] : freeDocs} onClose={() => setAttach(null)} />
       <FoldersDialog open={folders} onClose={() => setFolders(false)} values={settings.data ?? {}} />
     </div>
   );
@@ -322,6 +331,8 @@ function ApproveDialog({ row, onClose }: { row: Row | null; onClose: () => void 
           <DialogDescription>NF {row.nf_number ?? "—"} · {row.plateShown ?? "sem placa"} · {brDate(row.day)} · {brl(row.total)}</DialogDescription>
         </DialogHeader>
         {!row.note_file && <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">Este abastecimento está sem nota.</p>}
+        {row.note_match === "hora" && <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm text-amber-700 dark:text-amber-400">A nota foi ligada pela hora da foto e ainda não foi conferida.</p>}
+        {row.warnings.map((w) => <p key={w} className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm text-amber-700 dark:text-amber-400">{w}</p>)}
         <div className="rounded-md border border-border text-sm">
           {parts.length ? parts.map((p) => (
             <div key={p.client_id} className="flex justify-between gap-2 border-b border-border px-3 py-1.5 last:border-0">
@@ -379,33 +390,63 @@ function EditDialog({ row, onClose }: { row: Row | null; onClose: () => void }) 
   );
 }
 
-function AttachDialog({ row, docs, onClose }: { row: Row | null; docs: { file_name: string; item_id: string | null }[]; onClose: () => void }) {
+const timeLabel = (t: number | null) => (t == null ? null : new Date(t).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }));
+
+function AttachDialog({ row, month, docs, onClose }: { row: Row | null; month: string; docs: { file_name: string; item_id: string | null }[]; onClose: () => void }) {
   const [file, setFile] = useState("");
   const [q, setQ] = useState("");
   useEffect(() => { setFile(row?.note_file ?? ""); setQ(""); }, [row?.id]);
   const m = useNoteUpdate(() => { toast.success("Nota atualizada."); onClose(); });
+  const thumbFn = useServerFn(fleetNoteThumbnails);
+  const thumbs = useQuery({
+    queryKey: ["fleet-note-thumbs", month], enabled: !!row, staleTime: 20 * 60_000,
+    queryFn: async () => new Map((await thumbFn({ data: { month } })).map((t) => [t.name, t])),
+  });
   if (!row) return null;
-  const list = docs.filter((d) => d.file_name.toLowerCase().includes(q.toLowerCase()));
+  const emitted = row.issued_at ? Date.parse(row.issued_at) : null;
+  // Mais perto da hora do abastecimento primeiro.
+  const list = docs.filter((d) => d.file_name.toLowerCase().includes(q.toLowerCase()))
+    .map((d) => ({ ...d, time: photoTime(d.file_name) }))
+    .sort((a, b) => (a.file_name === row.note_file ? -1 : b.file_name === row.note_file ? 1 : 0)
+      || (emitted == null ? 0 : Math.abs((a.time ?? 0) - emitted) - Math.abs((b.time ?? 0) - emitted)) || a.file_name.localeCompare(b.file_name));
+  const preview = file ? thumbs.data?.get(file)?.large : null;
+  const confirming = !!file && file === row.note_file && row.note_match === "hora";
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Atribuir nota</DialogTitle>
-          <DialogDescription>NF {row.nf_number ?? "—"} · chave {row.access_key}. Escolha o arquivo da pasta de notas do mês (só os que ainda não estão em outra linha).</DialogDescription>
+          <DialogTitle>Nota do abastecimento</DialogTitle>
+          <DialogDescription>
+            NF {row.nf_number ?? "—"} · {row.plateShown ?? "sem placa"} · {brl(row.total)} · abastecido em {timeLabel(emitted) ?? "—"}. Escolha a foto da nota (as mais próximas da hora do abastecimento vêm primeiro; só aparecem as que não estão em outra linha).
+          </DialogDescription>
         </DialogHeader>
+        {preview && <img src={preview} alt={`Nota ${file}`} className="mx-auto max-h-[45vh] rounded-md border border-border object-contain" />}
         <div className="space-y-1">
           <Label htmlFor="attach-search">Procurar</Label>
-          <Input id="attach-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={row.nf_number ?? ""} />
+          <Input id="attach-search" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <div className="max-h-64 overflow-y-auto rounded-md border border-border">
-          {list.length ? list.map((d) => (
-            <button key={d.file_name} type="button" onClick={() => setFile(d.file_name)} className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-accent ${file === d.file_name ? "bg-accent font-medium" : ""}`}>{d.file_name}</button>
-          )) : <p className="p-3 text-sm text-muted-foreground">Nenhum arquivo livre na pasta de notas deste mês.</p>}
-        </div>
+        {list.length ? (
+          <div className="grid max-h-[40vh] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-4">
+            {list.map((d) => {
+              const t = thumbs.data?.get(d.file_name);
+              return (
+                <button key={d.file_name} type="button" onClick={() => setFile(d.file_name)}
+                  className={`rounded-md border p-1 text-left text-xs hover:bg-accent ${file === d.file_name ? "border-primary ring-2 ring-primary" : "border-border"}`}>
+                  {t?.small ? <img src={t.small} alt="" className="mb-1 h-24 w-full rounded object-cover" loading="lazy" />
+                    : <div className="mb-1 flex h-24 items-center justify-center rounded bg-muted text-muted-foreground">{thumbs.isLoading ? "carregando..." : "sem prévia"}</div>}
+                  <div className="truncate font-medium">{timeLabel(d.time) ?? d.file_name}</div>
+                  {d.file_name === row.note_file && <div className="text-muted-foreground">atual</div>}
+                </button>
+              );
+            })}
+          </div>
+        ) : <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">Nenhuma foto livre na pasta de notas deste mês.</p>}
         <DialogFooter>
           {row.note_file && <Button variant="ghost" className="mr-auto text-destructive" disabled={m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_file: null } })}><Trash2 className="h-4 w-4" /> Tirar nota</Button>}
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button disabled={!file || file === row.note_file || m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_file: file } })}>Atribuir</Button>
+          {confirming
+            ? <Button disabled={m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_match: "manual" } })}><Check className="h-4 w-4" /> Confirmar esta nota</Button>
+            : <Button disabled={!file || file === row.note_file || m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_file: file } })}>Atribuir</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -419,7 +460,7 @@ function FoldersDialog({ open, onClose, values }: { open: boolean; onClose: () =
   useEffect(() => { if (open) { setXml(values["xml_folder"] ?? ""); setNf(values["notes_folder"] ?? ""); } }, [open]);
   const save = useMutation({
     mutationFn: async () => {
-      const rows = [{ key: "xml_folder", value: xml.trim() ? sharepointPath(xml) : null }, { key: "notes_folder", value: nf.trim() ? sharepointPath(nf) : null }]
+      const rows = [{ key: "xml_folder", value: xml.trim() ? baseFolderPath(xml) : null }, { key: "notes_folder", value: nf.trim() ? baseFolderPath(nf) : null }]
         .map((r) => ({ ...r, updated_at: new Date().toISOString() }));
       const { error } = await supabase.from("fleet_settings").upsert(rows);
       if (error) throw error;
@@ -437,12 +478,12 @@ function FoldersDialog({ open, onClose, values }: { open: boolean; onClose: () =
         <div className="space-y-1">
           <Label htmlFor="xml-folder">Pasta dos XML</Label>
           <Input id="xml-folder" value={xml} onChange={(e) => setXml(e.target.value)} placeholder="Compras/06 FISCAL/..." />
-          {xml.trim() && <p className="text-xs text-muted-foreground">SharePoint: {sharepointPath(xml)}</p>}
+          {xml.trim() && <p className="text-xs text-muted-foreground">SharePoint: {baseFolderPath(xml)}</p>}
         </div>
         <div className="space-y-1">
           <Label htmlFor="notes-folder">Pasta das notas</Label>
           <Input id="notes-folder" value={nf} onChange={(e) => setNf(e.target.value)} placeholder="Compras/06 FISCAL/..." />
-          {nf.trim() && <p className="text-xs text-muted-foreground">SharePoint: {sharepointPath(nf)}</p>}
+          {nf.trim() && <p className="text-xs text-muted-foreground">SharePoint: {baseFolderPath(nf)}</p>}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>

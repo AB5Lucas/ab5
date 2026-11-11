@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
-import { parseFuelXml, pickMonthFolder, sharepointPath, type FuelNoteRow } from "./fleet-notes";
+import { baseFolderPath, matchPhotosByTime, parseFuelXml, pickMonthFolder, type FuelNoteRow } from "./fleet-notes";
 
 type Credentials = { lovableKey: string; excelKey: string };
 type Item = { id: string; name: string; folder?: unknown; file?: unknown; lastModifiedDateTime?: string };
@@ -52,13 +52,13 @@ export async function executeFleetNotesSync(ym: string, c: Credentials) {
   const xmlBase = await setting("xml_folder");
   const notesBase = await setting("notes_folder");
   if (!xmlBase) throw new Error("Informe a pasta dos XML do posto (botão Pastas).");
-  const xmlDir = await monthFolder(sharepointPath(xmlBase), ym, c);
-  if (!xmlDir) throw new Error(`Não achei a pasta de ${ym} dentro de ${sharepointPath(xmlBase)}.`);
+  const xmlDir = await monthFolder(baseFolderPath(xmlBase), ym, c);
+  if (!xmlDir) throw new Error(`Não achei a pasta de ${ym} dentro de ${baseFolderPath(xmlBase)}.`);
   const files = (await children(xmlDir, c)).filter((i) => i.file && /\.xml$/i.test(i.name));
 
   const { data: known } = await supabaseAdmin.from("fleet_fuel_notes")
-    .select("access_key, xml_file, issued_at, nf_number, issuer, plate, km, driver, fuel, quantity, unit_price, total, info, synced_at").eq("ref_month", ym);
-  const byFile = new Map((known ?? []).map((k) => [k.xml_file, k]));
+    .select("access_key, xml_file, issued_at, nf_number, issuer, plate, km, driver, fuel, quantity, unit_price, total, info, synced_at, note_file, note_match").eq("ref_month", ym);
+  const byFile = new Map((known ?? []).map(({ note_file: _f, note_match: _m, ...k }) => [k.xml_file, k]));
   const errors: string[] = [];
   const rows = (await pool(files, 6, async (f): Promise<FuelNoteRow | null> => {
     const old = byFile.get(f.name);
@@ -81,14 +81,41 @@ export async function executeFleetNotesSync(ym: string, c: Credentials) {
   let docs: { id: string; name: string }[] = [];
   let notesDir: string | null = null;
   if (notesBase) {
-    notesDir = await monthFolder(sharepointPath(notesBase), ym, c);
+    notesDir = await monthFolder(baseFolderPath(notesBase), ym, c);
     if (notesDir) docs = (await children(notesDir, c)).filter((i) => i.file).map((i) => ({ id: i.id, name: i.name }));
-    else errors.push(`Não achei a pasta de notas de ${ym} dentro de ${sharepointPath(notesBase)}.`);
+    else errors.push(`Não achei a pasta de notas de ${ym} dentro de ${baseFolderPath(notesBase)}.`);
   } else errors.push("Pasta das notas ainda não informada: todas as linhas ficam sem nota.");
 
-  const { data: n, error } = await supabaseAdmin.rpc("fleet_fuel_notes_sync", { p_month: ym, p_notes: JSON.parse(JSON.stringify(unique)), p_docs: JSON.parse(JSON.stringify(docs)) });
+  // Fotos das notas (nome com data e hora): sugere a foto de cada abastecimento pela hora, sem mexer nas atribuídas à mão.
+  const manual = new Map((known ?? []).filter((k) => k.note_match === "manual" && k.note_file).map((k) => [k.access_key, k.note_file!]));
+  const taken = new Set(manual.values());
+  const byTime = matchPhotosByTime(unique.filter((u) => !manual.has(u.access_key)).map((u) => ({ key: u.access_key, issued_at: u.issued_at })), docs.map((d) => d.name).filter((d) => !taken.has(d)));
+  const payload = unique.map((u) => ({ ...u, doc_guess: byTime.get(u.access_key) ?? null }));
+
+  const { data: n, error } = await supabaseAdmin.rpc("fleet_fuel_notes_sync", { p_month: ym, p_notes: JSON.parse(JSON.stringify(payload)), p_docs: JSON.parse(JSON.stringify(docs)) });
   if (error) throw error;
   return { xmlDir, notesDir, xml: files.length, saved: n as number, docs: docs.length, errors: errors.slice(0, 20) };
+}
+
+/** Miniaturas das notas (fotos) da pasta do mês, para conferir e atribuir na tela; os links valem por pouco tempo. */
+export async function noteThumbnails(ym: string, c: Credentials): Promise<{ name: string; small: string | null; large: string | null }[]> {
+  const notesBase = await setting("notes_folder");
+  if (!notesBase) return [];
+  const dir = await monthFolder(baseFolderPath(notesBase), ym, c);
+  if (!dir) return [];
+  const out: { name: string; small: string | null; large: string | null }[] = [];
+  let next: string | null = `${DRIVE}/root:/${enc(dir)}:/children?$expand=thumbnails&$top=999`;
+  while (next) {
+    const page: any = await graph(next, c);
+    for (const i of (page?.value ?? []) as any[]) {
+      if (!i.file) continue;
+      const t = i.thumbnails?.[0];
+      out.push({ name: i.name, small: t?.medium?.url ?? t?.small?.url ?? null, large: t?.large?.url ?? t?.medium?.url ?? null });
+    }
+    const link = page?.["@odata.nextLink"] as string | undefined;
+    next = link ? link.replace(GRAPH, "") : null;
+  }
+  return out;
 }
 
 /** Link para abrir um arquivo da pasta de notas no SharePoint. */

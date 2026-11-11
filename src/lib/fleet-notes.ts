@@ -31,6 +31,13 @@ export function sharepointPath(input: string): string {
 export function folderMonthScore(name: string, ym: string): number {
   const [y, m] = ym.split("-").map(Number) as [number, number];
   const n = plain(name);
+  // Só números, juntos ou separados: "112026", "11.2026", "202611".
+  const digits = n.replace(/\D/g, "");
+  const mm = String(m).padStart(2, "0");
+  if (/^[\d\s._/-]+$/.test(n)) {
+    if ([`${mm}${y}`, `${y}${mm}`, `${m}${y}`].includes(digits)) return 5;
+    return digits.length <= 2 && Number(digits) === m ? 1 : 0;
+  }
   const years = n.match(/(?:^|\D)(20\d{2})(?!\d)/g)?.map((s) => Number(s.replace(/\D/g, ""))) ?? [];
   if (years.length && !years.includes(y)) return 0;
   const rest = n.replace(/20\d{2}/g, " ");
@@ -39,6 +46,53 @@ export function folderMonthScore(name: string, ym: string): number {
   if (!byName && !byNumber) return 0;
   return (years.length ? 2 : 1) + (byName ? 1 : 0) + (byNumber ? 1 : 0);
 }
+/** Nome de pasta que já é de um mês ("112026", "11.2026", "2026-11"): a pasta configurada é a de cima. */
+export const isMonthFolderName = (name: string) => /^(\d{6}|\d{1,2}[._ -]\d{4}|\d{4}[._ -]\d{1,2})$/.test(name.trim());
+/** Pasta-mãe onde ficam as pastas de cada mês (se colarem o caminho de um mês, sobe um nível). */
+export function baseFolderPath(input: string): string {
+  const p = sharepointPath(input);
+  const parts = p.split("/");
+  return parts.length > 1 && isMonthFolderName(parts[parts.length - 1]!) ? parts.slice(0, -1).join("/") : p;
+}
+
+/** Data e hora da foto pelo nome ("WhatsApp Image 2026-11-04 at 15.16.43", "IMG_20261104_151643"), no horário de Brasília. */
+export function photoTime(name: string): number | null {
+  const m = name.match(/(\d{4})-(\d{2})-(\d{2}) at (\d{2})\.(\d{2})\.(\d{2})/) ?? name.match(/(20\d{2})(\d{2})(\d{2})[_-](\d{2})(\d{2})(\d{2})/);
+  if (!m) return null;
+  const t = Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}-03:00`);
+  return Number.isNaN(t) ? null : t;
+}
+
+/**
+ * Liga cada abastecimento à foto da nota pela hora: a foto mais próxima, tirada de 30 min antes até 24 h
+ * depois da emissão; cada foto vale para um abastecimento só (os pares mais próximos primeiro).
+ */
+export function matchPhotosByTime(notes: { key: string; issued_at: string | null }[], docs: string[]): Map<string, string> {
+  const pairs: { key: string; doc: string; gap: number }[] = [];
+  for (const n of notes) {
+    const t = n.issued_at ? Date.parse(n.issued_at) : NaN;
+    if (Number.isNaN(t)) continue;
+    for (const d of docs) {
+      const p = photoTime(d);
+      if (p == null) continue;
+      const gap = p - t;
+      if (gap >= -30 * 60_000 && gap <= 24 * 3600_000) pairs.push({ key: n.key, doc: d, gap: gap < 0 ? -gap * 2 : gap });
+    }
+  }
+  pairs.sort((a, b) => a.gap - b.gap);
+  const out = new Map<string, string>(), used = new Set<string>();
+  for (const p of pairs) if (!out.has(p.key) && !used.has(p.doc)) { out.set(p.key, p.doc); used.add(p.doc); }
+  return out;
+}
+
+/** Outras placas escritas no texto da nota (ex.: placa certa digitada no campo do motorista). */
+export function otherPlates(info: string | null, plate: string | null): string[] {
+  if (!info) return [];
+  const t = plain(info);
+  const found = [...t.matchAll(new RegExp(PLATE.source, "g"))].map((m) => normalizePlate(`${m[1]}${m[2]}`));
+  return [...new Set(found)].filter((p) => p !== plate);
+}
+
 export function pickMonthFolder<T extends { name: string }>(folders: T[], ym: string): T | null {
   return folders.map((f) => ({ f, s: folderMonthScore(f.name, ym) })).filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s || a.f.name.localeCompare(b.f.name))[0]?.f ?? null;
@@ -68,7 +122,7 @@ export function infoFields(text: string): { plate: string | null; km: number | n
   const t = plain(text).replace(/\s+/g, " ");
   const plateTxt = t.match(/PLACA\W{0,3}([A-Z]{3}[\s-]?\d[A-Z0-9]\d{2})/)?.[1] ?? t.match(PLACA_FALLBACK)?.[0] ?? null;
   const kmTxt = t.match(/(?:\bKM|HODOMETRO|ODOMETRO|QUILOMETRAGEM|KILOMETRAGEM)\b\W{0,3}(\d[\d.,]*)/)?.[1] ?? null;
-  const drv = t.match(/(?:MOTORISTA|CONDUTOR|FRENTISTA_CLIENTE|RESPONSAVEL)\W{0,3}([A-Z][A-Z .']{2,60}?)(?=\s*(?:[-|;,/:]|\bPLACA\b|\bKM\b|\bHOD|\bVEIC|\bCPF\b|\bRG\b|\d|$))/)?.[1]?.trim() ?? null;
+  const drv = t.match(/(?:MOTORISTA|CONDUTOR|FRENTISTA_CLIENTE|RESPONSAVEL)\W{0,3}([A-Z][A-Z .']{2,60}?)(?=\s*(?:[-|;,/:.]|\bPLACA\b|\bKM\b|\bHOD|\bVEIC|\bCPF\b|\bRG\b|\d|$))/)?.[1]?.trim() ?? null;
   return { plate: plateTxt ? normalizePlate(plateTxt) : null, km: kmTxt ? kmNumber(kmTxt) : null, driver: drv && drv.length > 2 ? titleCase(drv) : null };
 }
 const PLACA_FALLBACK = new RegExp(PLATE.source);

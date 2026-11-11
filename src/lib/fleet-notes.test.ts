@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientCc, folderMonthScore, fuelRateio, infoFields, maintenanceState, parseFuelXml, pickMonthFolder, sharepointPath } from "./fleet-notes";
+import { baseFolderPath, clientCc, folderMonthScore, fuelRateio, infoFields, maintenanceState, matchPhotosByTime, otherPlates, parseFuelXml, photoTime, pickMonthFolder, sharepointPath } from "./fleet-notes";
 
 const KEY = "35261112345678000199550010000482111000482115";
 const XML = `<?xml version="1.0"?><nfeProc><NFe><infNFe Id="NFe${KEY}" versao="4.00">
@@ -34,7 +34,31 @@ describe("XML do posto", () => {
   });
 });
 
+describe("notas reais do posto", () => {
+  const INFO = "CX:CAIXA 4 -  OP:CARLINDO V:432.  CLIENTE: AB5 INDUSTRIA E COMERCIO LTDA.  IE: 455143410113 .  PLACA: LQA-2I52 VOLKSWAGEN KOMBI     KM: 112643.  MOTORISTA: ANDRE JESUS. AV. MINISTRO ROBERTO CARDOSO ALVES 1215, PARQ INDUSTRIAL, MOGI GUACU/SP, CEP 13849-212.  MEDIA ATUAL 9,3 KM/L.";
+  it("lê placa, km e motorista do texto do posto", () => {
+    expect(infoFields(INFO)).toEqual({ plate: "LQA2I52", km: 112643, driver: "Andre Jesus" });
+    expect(otherPlates(INFO, "LQA2I52")).toEqual([]);
+    expect(otherPlates("PLACA: TDJ-9B39 ONIX KM: 53533.  MOTORISTA: ANDRE JESUS - TDE4F86 FROTA", "TDJ9B39")).toEqual(["TDE4F86"]);
+  });
+  it("liga a foto do WhatsApp pela hora", () => {
+    expect(photoTime("WhatsApp Image 2026-11-04 at 15.16.43.jpeg")).toBe(Date.parse("2026-11-04T15:16:43-03:00"));
+    const m = matchPhotosByTime(
+      [{ key: "a", issued_at: "2026-11-04T15:14:00-03:00" }, { key: "b", issued_at: "2026-11-04T17:45:00-03:00" }, { key: "c", issued_at: "2026-11-01T08:00:00-03:00" }],
+      ["WhatsApp Image 2026-11-04 at 15.16.43.jpeg", "WhatsApp Image 2026-11-04 at 17.51.28.jpeg"],
+    );
+    expect(m.get("a")).toBe("WhatsApp Image 2026-11-04 at 15.16.43.jpeg");
+    expect(m.get("b")).toBe("WhatsApp Image 2026-11-04 at 17.51.28.jpeg");
+    expect(m.has("c")).toBe(false);
+  });
+});
+
 describe("pastas", () => {
+  it("reconhece a pasta 112026 e sobe um nível quando colam a pasta do mês", () => {
+    expect(pickMonthFolder([{ name: "102026" }, { name: "112026" }], "2026-11")?.name).toBe("112026");
+    expect(folderMonthScore("112025", "2026-11")).toBe(0);
+    expect(baseFolderPath("C:\\Users\\x\\AB5\\servidor dados - Compras\\04 COMPRAS\\04 CONSUMO VEICULAR\\02 XML\\112026")).toBe("Compras/04 COMPRAS/04 CONSUMO VEICULAR/02 XML");
+  });
   it("acha a pasta do mês pelo nome", () => {
     expect(folderMonthScore("11 - NOVEMBRO", "2026-11")).toBeGreaterThan(0);
     expect(folderMonthScore("2026-11", "2026-11")).toBeGreaterThan(0);

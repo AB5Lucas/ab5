@@ -22,6 +22,20 @@ export const syncFleetNotesNow = createServerFn({ method: "POST" })
     return executeFleetNotesSync(data.month, credentials());
   });
 
+/** Miniaturas das fotos das notas do mês (tela de atribuição). */
+export const fleetNoteThumbnails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { month: string }) => {
+    if (!/^\d{4}-\d{2}$/.test(d?.month ?? "")) throw new Error("Mês inválido");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const { data: allowed, error } = await context.supabase.rpc("can_access_page", { _path: "/frota/notas" });
+    if (error || !allowed) throw new Error("Você não tem acesso a Frota › Notas");
+    const { noteThumbnails } = await import("./fleet-notes.server");
+    return noteThumbnails(data.month, credentials());
+  });
+
 /** Abre a nota (arquivo da pasta de notas) no SharePoint. */
 export const fleetNoteLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
