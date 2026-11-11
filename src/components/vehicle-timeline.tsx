@@ -114,6 +114,8 @@ type CellForm = {
 
 const NONE = "__none__";
 const WORK_PREFIX = "w:";
+const ALL_WORKS = "__all_works__";
+const SPECIAL_KEYS = new Set([EXTERNAL_KEY, MAINTENANCE_KEY, SUZANO_LOCAL_KEY]);
 
 export function VehicleTimeline() {
   const { canWrite } = useCurrentUser();
@@ -690,6 +692,9 @@ export function VehicleTimeline() {
     return rows.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [clients.data, needs.data, capacityOf]);
 
+  // Caminhão (atribuído por serviço): cliente escolhido, vindo do serviço quando há um.
+  const byWork = !!cell && byWorkVehicle(cell.vehicleId);
+  const truckClient = form.client_id.startsWith(WORK_PREFIX) ? workById.get(form.client_id.slice(WORK_PREFIX.length))?.client_id ?? NONE : form.client_id;
   const filteredDrivers = useMemo(() => {
     const q = driverSearch.trim().toLowerCase();
     return (drivers.data ?? []).filter((d) => !q || d.full_name.toLowerCase().includes(q));
@@ -942,19 +947,36 @@ export function VehicleTimeline() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Obra / Cliente</Label>
-              <Select value={form.client_id} onValueChange={(v) => setForm((f) => ({ ...f, client_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
+              <Label>{byWork ? "Cliente" : "Obra / Cliente"}</Label>
+              {/* Caminhão: primeiro o cliente, depois (opcional) o serviço. Só o cliente = rateio pelas horas dos serviços dele. */}
+              <Select value={byWork ? truckClient : form.client_id} onValueChange={(v) => setForm((f) => ({ ...f, client_id: v }))}>
+                <SelectTrigger><SelectValue placeholder={byWork ? "Selecione o cliente" : "Selecione a obra"} /></SelectTrigger>
                 <SelectContent>
-                  {cell && byWorkVehicle(cell.vehicleId)
-                    ? (worksQ.data ?? []).map((w) => (
-                        <SelectItem key={w.id} value={WORK_PREFIX + w.id}>{workLabel(w.id)}</SelectItem>
-                      ))
-                    : clientOptions()}
+                  {clientOptions()}
                   <SelectItem value={EXTERNAL_KEY}>EXTERNO</SelectItem>
                   <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
                 </SelectContent>
               </Select>
+              {byWork && truckClient !== NONE && !SPECIAL_KEYS.has(truckClient) && (
+                <div className="space-y-1">
+                  <Label>Serviço</Label>
+                  <Select
+                    value={form.client_id.startsWith(WORK_PREFIX) ? form.client_id : ALL_WORKS}
+                    onValueChange={(v) => setForm((f) => ({ ...f, client_id: v === ALL_WORKS ? truckClient : v }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_WORKS}>Todos os serviços do cliente (rateio por horas)</SelectItem>
+                      {(worksQ.data ?? []).filter((w) => w.client_id === truckClient).map((w) => (
+                        <SelectItem key={w.id} value={WORK_PREFIX + w.id}>{w.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!form.client_id.startsWith(WORK_PREFIX) && (
+                    <p className="text-xs text-muted-foreground">O custo do caminhão no dia é dividido entre os serviços do cliente pelas horas trabalhadas em cada um.</p>
+                  )}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 {form.client_id === MAINTENANCE_KEY
                   ? "Manutenção: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem."

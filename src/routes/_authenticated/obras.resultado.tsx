@@ -1082,7 +1082,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                         <TableCell className="text-right">{brl(t.kmCost)}</TableCell>
                         <TableCell className="text-right">{brl(t.toll)}</TableCell>
                         <TableCell className="text-right">{brl(t.kmCost + t.toll)}</TableCell>
-                        <TableCell className="text-right">{t.direct ? "Direto" : t.total > 0 ? `${t.mine}/${t.total}` : "—"}</TableCell>
+                        <TableCell className="text-right">{t.direct ? "Direto" : t.total > 0 ? (t.byHours ? `${Math.round(t.mine * 10) / 10} h/${Math.round(t.total * 10) / 10} h` : `${t.mine}/${t.total}`) : "—"}</TableCell>
                         <TableCell className="text-right">{brl(t.share)}</TableCell>
                       </TableRow>
                     ))}

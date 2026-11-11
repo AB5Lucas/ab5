@@ -100,7 +100,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         w.client_id ? supabase.from("works").select("id, monthly_enabled, night_shift").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
-              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, vehicles(km_rate, plate), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).range(a, b),
+              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, vehicles(km_rate, plate, assign_by_work), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
@@ -423,14 +423,20 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     // Pessoa presente no RDO sem escalação em nenhum serviço do cliente: não gera MO em serviço algum
     void allocAny;
     const toll = d.client?.has_toll ? Number(d.client.toll_amount ?? 0) : 0;
-    const transportRows: { date: string; km: number; trips: number; kmCost: number; toll: number; share: number; mine: number; total: number; direct: boolean }[] = [];
+    const transportRows: { date: string; km: number; trips: number; kmCost: number; toll: number; share: number; mine: number; total: number; direct: boolean; byHours?: boolean }[] = [];
     const dayTotal = new Map<string, number>();
     const dayMine = new Map<string, number>();
+    // Caminhão só com cliente: rateio pelas horas trabalhadas nos serviços do cliente no dia.
+    const dayHoursTotal = new Map<string, number>();
+    const dayHoursMine = new Map<string, number>();
     for (const a of d.sibAllocs) {
       const dt = a.daily_schedules?.schedule_date as string | undefined;
       if (!dt || absent(a.collaborator_id, dt)) continue;
       dayTotal.set(dt, (dayTotal.get(dt) ?? 0) + 1);
       if (idSet.has(a.work_id)) dayMine.set(dt, (dayMine.get(dt) ?? 0) + 1);
+      const h = hoursOf(`${a.collaborator_id}|${dt}`, a.work_id);
+      dayHoursTotal.set(dt, (dayHoursTotal.get(dt) ?? 0) + h);
+      if (idSet.has(a.work_id)) dayHoursMine.set(dt, (dayHoursMine.get(dt) ?? 0) + h);
     }
     for (const v of d.vs) {
       if (v.work_id && !idSet.has(v.work_id)) continue;
@@ -438,11 +444,12 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const trips = Number(v.trips ?? 1);
       const kmCost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? KM_RATE);
       const t = v.is_suzano_local ? 0 : toll * 2 * trips;
-      const total = dayTotal.get(v.schedule_date) ?? 0;
-      const mine = dayMine.get(v.schedule_date) ?? 0;
+      const byHours = !v.work_id && !!v.vehicles?.assign_by_work && (dayHoursTotal.get(v.schedule_date) ?? 0) > 0;
+      const total = byHours ? dayHoursTotal.get(v.schedule_date)! : dayTotal.get(v.schedule_date) ?? 0;
+      const mine = byHours ? dayHoursMine.get(v.schedule_date) ?? 0 : dayMine.get(v.schedule_date) ?? 0;
       const share = v.work_id ? kmCost + t : total > 0 ? ((kmCost + t) * mine) / total : 0;
       if (!share) continue;
-      transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share, mine, total, direct: !!v.work_id });
+      transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share, mine, total, direct: !!v.work_id, byHours });
       bump(v.schedule_date.slice(0, 7), "transport", share);
     }
     // VT dos colaboradores escalados neste serviço entra no transporte da obra

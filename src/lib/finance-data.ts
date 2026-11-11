@@ -92,7 +92,7 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
     supabase.from("work_progress").select("*").in("work_id", allIds).order("month"),
     byWorks<any>(allIds, (ids, a, b) => supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", ids).order("entry_date", { ascending: false }).order("id").range(a, b)),
     clientIds.length
-      ? fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("id, schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, vehicles(km_rate, plate), collaborators(full_name)").or(`client_id.in.(${clientIds.join(",")}),is_suzano_local.eq.true`).order("id").range(a, b))
+      ? fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("id, schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, vehicles(km_rate, plate, assign_by_work), collaborators(full_name)").or(`client_id.in.(${clientIds.join(",")}),is_suzano_local.eq.true`).order("id").range(a, b))
       : Promise.resolve([] as any[]),
     byWorks<any>(scope, (ids, a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", ids).order("schedule_id").order("work_id").range(a, b)),
     byWorks<any>(scope, (ids, a, b) => supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("work_id", ids).order("schedule_id").order("work_id").range(a, b)),
