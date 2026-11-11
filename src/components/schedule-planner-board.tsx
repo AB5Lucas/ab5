@@ -303,7 +303,10 @@ export function SchedulePlannerBoard({
     });
   }
 
-  /** Clientes visíveis no dia — salvo no banco; dias sem configuração herdam o dia anterior. */
+  /**
+   * Escolhas manuais de quadros do dia (salvas no banco, só deste dia). Não herda mais o dia anterior:
+   * por padrão aparecem só os clientes com MO escalada (ver visibleClients).
+   */
   const visibility = useQuery({
     queryKey: ["client-visibility", date],
     queryFn: async () => {
@@ -312,30 +315,9 @@ export function SchedulePlannerBoard({
         .select("client_id, visible")
         .eq("schedule_date", date);
       if (own.error) throw own.error;
-      if ((own.data ?? []).length > 0) return own.data ?? [];
-      if (isWeekendDate(date)) return [];
-      const prev = await supabase
-        .from("schedule_client_visibility")
-        .select("schedule_date")
-        .lt("schedule_date", date)
-        .order("schedule_date", { ascending: false })
-        .limit(1);
-      if (prev.error) throw prev.error;
-      const prevDate = prev.data?.[0]?.schedule_date;
-      if (!prevDate) return [];
-      const inherited = await supabase
-        .from("schedule_client_visibility")
-        .select("client_id, visible")
-        .eq("schedule_date", prevDate);
-      if (inherited.error) throw inherited.error;
-      return inherited.data ?? [];
+      return own.data ?? [];
     },
   });
-
-  const visibleClients = useMemo(
-    () => new Set((visibility.data ?? []).filter((v) => v.visible).map((v) => v.client_id)),
-    [visibility.data],
-  );
 
   const ctx = useQuery({ queryKey: ["schedule-ctx", date], queryFn: () => fetchScheduleContext(date) });
 
@@ -902,7 +884,23 @@ export function SchedulePlannerBoard({
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [works]);
 
-  /** Quadros exibidos no dia: só os serviços de clientes marcados. */
+  /**
+   * Clientes exibidos no dia: os que têm MO escalada, mais os que foram exibidos à mão neste dia.
+   * Um cliente escondido à mão neste dia fica escondido mesmo com MO.
+   */
+  const visibleClients = useMemo(() => {
+    const manual = new Map((visibility.data ?? []).map((v) => [v.client_id, v.visible]));
+    const clientOfWork = new Map(works.map((w) => [w.id, w.client_id]));
+    const out = new Set<string>();
+    rows.forEach((r: { work_id: string }) => {
+      const cid = clientOfWork.get(r.work_id);
+      if (cid && manual.get(cid) !== false) out.add(cid);
+    });
+    manual.forEach((visible, cid) => visible && out.add(cid));
+    return out;
+  }, [visibility.data, works, rows]);
+
+  /** Quadros exibidos no dia: só os serviços de clientes exibidos. */
   const shownWorks = works.filter((w) => !w.client_id || visibleClients.has(w.client_id));
   /** Uma caixa por cliente: agrupa os serviços do cliente (o serviço de cada pessoa é definido na aba Serviços). */
   const groups = useMemo(() => {
@@ -939,17 +937,12 @@ export function SchedulePlannerBoard({
 
   const toggleClientVisible = useMutation({
     mutationFn: async (clientId: string) => {
-      let next = new Set(visibleClients);
+      // Grava só o que foi mudado à mão: os demais seguem a regra "aparece quem tem MO".
+      let payload: { schedule_date: string; client_id: string; visible: boolean }[];
       if (clientId === "__all__") {
         const all = clientOptions.every((cl) => visibleClients.has(cl.id));
-        next = all ? new Set() : new Set(clientOptions.map((cl) => cl.id));
-      } else if (next.has(clientId)) next.delete(clientId);
-      else next.add(clientId);
-      const payload = clientOptions.map((cl) => ({
-        schedule_date: date,
-        client_id: cl.id,
-        visible: next.has(cl.id),
-      }));
+        payload = clientOptions.map((cl) => ({ schedule_date: date, client_id: cl.id, visible: !all }));
+      } else payload = [{ schedule_date: date, client_id: clientId, visible: !visibleClients.has(clientId) }];
       const { error } = await supabase
         .from("schedule_client_visibility")
         .upsert(payload, { onConflict: "schedule_date,client_id" });

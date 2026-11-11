@@ -261,7 +261,32 @@ function ServicesPage() {
       .filter((w) => w.active || allocs.some((a) => a.work_id === w.id && a.service_assigned))
       .sort((a, b) => rank(a.id) - rank(b.id) || a.name.localeCompare(b.name, "pt-BR"));
   }, [works, allocs, order]);
-  const visible = useMemo(() => shown.filter((w) => !hidden.has(w.id)), [shown, hidden]);
+  /** Serviços com MO escalada no dia. */
+  const withMO = useMemo(() => new Set(allocs.filter((a) => a.service_assigned).map((a) => a.work_id as string)), [allocs]);
+  /** Quadros vazios exibidos à mão neste dia (guardado neste navegador, por cliente e dia). */
+  const manualKey = `servicos-exibidos:${clientId}:${date}`;
+  const [manualShown, setManualShown] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try { setManualShown(new Set(JSON.parse(localStorage.getItem(manualKey) ?? "[]") as string[])); } catch { setManualShown(new Set()); }
+  }, [manualKey]);
+  const saveManual = (s: Set<string>) => {
+    setManualShown(s);
+    try { localStorage.setItem(manualKey, JSON.stringify([...s])); } catch { /* ignora */ }
+  };
+  /** Aparecem só os serviços com MO escalada, mais os vazios exibidos à mão; escondido à mão fica escondido. */
+  const visible = useMemo(() => shown.filter((w) => !hidden.has(w.id) && (withMO.has(w.id) || manualShown.has(w.id))), [shown, hidden, withMO, manualShown]);
+  const toggleVisible = (id: string) => {
+    const isOn = visible.some((w) => w.id === id);
+    const manual = new Set(manualShown);
+    if (isOn) {
+      manual.delete(id);
+      saveManual(manual);
+      if (withMO.has(id)) toggleHidden(id);
+    } else {
+      if (!withMO.has(id)) { manual.add(id); saveManual(manual); }
+      if (hidden.has(id)) toggleHidden(id);
+    }
+  };
   const [orderDrag, setOrderDrag] = useState<string | null>(null);
   function reorder(targetId: string) {
     const from = orderDrag;
@@ -553,7 +578,7 @@ function ServicesPage() {
           <DropdownMenuTrigger asChild>
             <Button variant="outline" disabled={!clientId}>
               <ListFilter className="h-4 w-4" /> Serviços
-              {hidden.size > 0 && <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">{visible.length}/{shown.length}</Badge>}
+              {visible.length < shown.length && <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">{visible.length}/{shown.length}</Badge>}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -561,7 +586,7 @@ function ServicesPage() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               disabled={visible.length === 0}
-              onSelect={(e) => { e.preventDefault(); savePrefs({ hidden_work_ids: [...new Set([...hidden, ...shown.map((w) => w.id)])] }); }}
+              onSelect={(e) => { e.preventDefault(); saveManual(new Set()); savePrefs({ hidden_work_ids: [...new Set([...hidden, ...shown.map((w) => w.id)])] }); }}
             >
               Desmarcar todos
             </DropdownMenuItem>
@@ -569,8 +594,8 @@ function ServicesPage() {
             {shown.map((w) => (
               <DropdownMenuCheckboxItem
                 key={w.id}
-                checked={!hidden.has(w.id)}
-                onCheckedChange={() => toggleHidden(w.id)}
+                checked={visible.some((v) => v.id === w.id)}
+                onCheckedChange={() => toggleVisible(w.id)}
                 onSelect={(e) => e.preventDefault()}
               >
                 {w.name}
