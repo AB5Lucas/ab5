@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
-import { baseFolderPath, matchPhotosByTime, parseFuelXml, pickMonthFolder, type FuelNoteRow } from "./fleet-notes";
+import { baseFolderPath, parseFuelXml, pickMonthFolder, type FuelNoteRow } from "./fleet-notes";
 
 type Credentials = { lovableKey: string; excelKey: string };
 type Item = { id: string; name: string; folder?: unknown; file?: unknown; lastModifiedDateTime?: string };
@@ -57,8 +57,8 @@ export async function executeFleetNotesSync(ym: string, c: Credentials) {
   const files = (await children(xmlDir, c)).filter((i) => i.file && /\.xml$/i.test(i.name));
 
   const { data: known } = await supabaseAdmin.from("fleet_fuel_notes")
-    .select("access_key, xml_file, issued_at, nf_number, issuer, plate, km, driver, fuel, quantity, unit_price, total, info, synced_at, note_file, note_match").eq("ref_month", ym);
-  const byFile = new Map((known ?? []).map(({ note_file: _f, note_match: _m, ...k }) => [k.xml_file, k]));
+    .select("access_key, xml_file, issued_at, nf_number, issuer, plate, km, driver, fuel, quantity, unit_price, total, info, synced_at").eq("ref_month", ym);
+  const byFile = new Map((known ?? []).map((k) => [k.xml_file, k]));
   const errors: string[] = [];
   const rows = (await pool(files, 6, async (f): Promise<FuelNoteRow | null> => {
     const old = byFile.get(f.name);
@@ -86,11 +86,9 @@ export async function executeFleetNotesSync(ym: string, c: Credentials) {
     else errors.push(`Não achei a pasta de notas de ${ym} dentro de ${baseFolderPath(notesBase)}.`);
   } else errors.push("Pasta das notas ainda não informada: todas as linhas ficam sem nota.");
 
-  // Fotos das notas (nome com data e hora): sugere a foto de cada abastecimento pela hora, sem mexer nas atribuídas à mão.
-  const manual = new Map((known ?? []).filter((k) => k.note_match === "manual" && k.note_file).map((k) => [k.access_key, k.note_file!]));
-  const taken = new Set(manual.values());
-  const byTime = matchPhotosByTime(unique.filter((u) => !manual.has(u.access_key)).map((u) => ({ key: u.access_key, issued_at: u.issued_at })), docs.map((d) => d.name).filter((d) => !taken.has(d)));
-  const payload = unique.map((u) => ({ ...u, doc_guess: byTime.get(u.access_key) ?? null }));
+  // Sem ligação automática pela hora da foto: os motoristas mandam as fotos em lote e a hora erra (nov/2026: 17 de 30).
+  // A tela de atribuição só ordena as fotos pela hora; quem liga é a pessoa.
+  const payload = unique.map((u) => ({ ...u, doc_guess: null }));
 
   const { data: n, error } = await supabaseAdmin.rpc("fleet_fuel_notes_sync", { p_month: ym, p_notes: JSON.parse(JSON.stringify(payload)), p_docs: JSON.parse(JSON.stringify(docs)) });
   if (error) throw error;
