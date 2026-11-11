@@ -2088,11 +2088,14 @@ export type Database = {
           approval_notes: string | null
           approved_at: string | null
           approved_by: string | null
+          cc_fix: string | null
+          cc_label_fix: string | null
           driver: string | null
           driver_fix: string | null
           fuel: string | null
           id: string
           info: string | null
+          item_account_fix: string | null
           issued_at: string | null
           issuer: string | null
           km: number | null
@@ -2116,11 +2119,14 @@ export type Database = {
           approval_notes?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          cc_fix?: string | null
+          cc_label_fix?: string | null
           driver?: string | null
           driver_fix?: string | null
           fuel?: string | null
           id?: string
           info?: string | null
+          item_account_fix?: string | null
           issued_at?: string | null
           issuer?: string | null
           km?: number | null
@@ -2144,11 +2150,14 @@ export type Database = {
           approval_notes?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          cc_fix?: string | null
+          cc_label_fix?: string | null
           driver?: string | null
           driver_fix?: string | null
           fuel?: string | null
           id?: string
           info?: string | null
+          item_account_fix?: string | null
           issued_at?: string | null
           issuer?: string | null
           km?: number | null

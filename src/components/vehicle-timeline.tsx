@@ -205,11 +205,12 @@ export function VehicleTimeline() {
   }, [days.length]);
 
   const vehicles = useQuery({
-    queryKey: ["vehicles"],
+    // Veículos inativos (ex.: placa fictícia ABC1234 do diesel avulso) não entram na programação.
+    queryKey: ["vehicles", "timeline"],
     queryFn: async () => {
       const { data, error } = await supabase.from("vehicles").select("*").order("plate");
       if (error) throw error;
-      return data;
+      return (data ?? []).filter((v) => v.status !== "inactive");
     },
   });
 

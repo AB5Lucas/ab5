@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { baseFolderPath, fuelRateio, isoDay, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
+import { baseFolderPath, fuelRateio, isoDay, itemAccountFor, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
 import { DriverRanking } from "./ranking";
 import type { Tables } from "@/integrations/supabase/types";
@@ -109,6 +109,11 @@ function FuelNotes() {
       const idx = ordered.indexOf(n);
       const prev = p ? [...ordered.slice(0, idx)].reverse().find((o) => plateOf(o) === p) : undefined;
       const rateio = n.approved_at && n.allocation ? (n.allocation as unknown as Rateio)
+        // CC informado à mão no Editar: 100% nesse CC, sem rateio pela Transporte.
+        : n.cc_fix ? { from: day ?? "", to: day ?? "", fallback: false, parts: [{
+            client_id: "manual", client: n.cc_label_fix ?? "CC manual", days: 0, pct: 100, value: Number(n.total ?? 0), cc: n.cc_fix, cc_rule: "CC informado à mão",
+            item_account: n.item_account_fix ?? itemAccountFor(n.cc_fix, (accounts.data ?? []) as ItemAccount[], n.cc_label_fix),
+          }] }
         : day && schedules.data ? fuelRateio({ vehicleId: v?.id ?? null, day, prevDay: isoDay(prev?.issued_at ?? null), total: Number(n.total ?? 0), schedules: schedules.data, clients: clientMap, works: works.data ?? [], accounts: (accounts.data ?? []) as ItemAccount[] })
         : null;
       const kmShown = n.km_fix ?? n.km;
@@ -233,6 +238,7 @@ function FuelNotes() {
                     {parts.length ? parts.map((p) => <div key={p.client_id} className="whitespace-nowrap">{p.client} {p.pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</div>)
                       : <span className="text-destructive">sem programação</span>}
                     {r.rateio?.fallback && <div className="text-muted-foreground">último dia programado</div>}
+                    {r.cc_fix && !r.approved_at && <div className="text-muted-foreground">CC informado à mão</div>}
                   </TableCell>
                   <TableCell>{parts.map((p) => <div key={p.client_id} className="whitespace-nowrap" title={p.cc_rule}>{p.cc ?? <span className="text-destructive">{p.cc_rule}</span>}</div>)}</TableCell>
                   <TableCell>{parts.map((p) => <div key={p.client_id} className="whitespace-nowrap">{p.item_account ?? <span className="text-muted-foreground">sem equivalência</span>}</div>)}</TableCell>
@@ -287,7 +293,7 @@ function FuelNotes() {
       </div>
 
       <ApproveDialog row={approve} onClose={() => setApprove(null)} />
-      <EditDialog row={edit} onClose={() => setEdit(null)} />
+      <EditDialog row={edit} accounts={accounts.data ?? []} onClose={() => setEdit(null)} />
       <AttachDialog row={attach} month={month} docs={attach?.note_file ? [...(docs.data ?? []).filter((d) => d.file_name === attach.note_file), ...freeDocs] : freeDocs} onClose={() => setAttach(null)} />
       <FoldersDialog open={folders} onClose={() => setFolders(false)} values={settings.data ?? {}} />
     </div>
@@ -360,11 +366,16 @@ function ApproveDialog({ row, onClose }: { row: Row | null; onClose: () => void 
   );
 }
 
-function EditDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
-  const [form, setForm] = useState({ plate: "", km: "", driver: "", notes: "" });
+const AUTO_CC = "__auto__";
+
+function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tables<"fleet_item_accounts">[]; onClose: () => void }) {
+  const [form, setForm] = useState({ plate: "", km: "", driver: "", notes: "", cc: AUTO_CC });
   useEffect(() => {
-    if (row) setForm({ plate: row.plate_fix ?? "", km: row.km_fix == null ? "" : String(row.km_fix), driver: row.driver_fix ?? "", notes: row.notes ?? "" });
+    if (!row) return;
+    const current = row.cc_fix ? accounts.find((a) => a.cc_code === row.cc_fix && (a.description ?? null) === (row.cc_label_fix ?? null)) ?? accounts.find((a) => a.cc_code === row.cc_fix) : null;
+    setForm({ plate: row.plate_fix ?? "", km: row.km_fix == null ? "" : String(row.km_fix), driver: row.driver_fix ?? "", notes: row.notes ?? "", cc: current?.id ?? AUTO_CC });
   }, [row?.id]);
+  const ccRow = form.cc === AUTO_CC ? null : accounts.find((a) => a.id === form.cc) ?? null;
   const m = useNoteUpdate(() => { toast.success("Abastecimento atualizado."); onClose(); });
   if (!row) return null;
   const km = form.km.trim() ? Number(form.km.replace(/\./g, "").replace(",", ".")) : null;
@@ -381,11 +392,25 @@ function EditDialog({ row, onClose }: { row: Row | null; onClose: () => void }) 
           <div className="space-y-1"><Label htmlFor="fix-km">Km</Label><Input id="fix-km" inputMode="decimal" placeholder={row.km == null ? "" : String(row.km)} value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} /></div>
           <div className="space-y-1"><Label htmlFor="fix-driver">Motorista</Label><Input id="fix-driver" placeholder={row.driver ?? ""} value={form.driver} onChange={(e) => setForm({ ...form, driver: e.target.value })} /></div>
         </div>
+        <div className="space-y-1">
+          <Label>Centro de custo</Label>
+          <Select value={form.cc} onValueChange={(v) => setForm({ ...form, cc: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent className="max-h-72">
+              <SelectItem value={AUTO_CC}>Automático (rateio pela Transporte)</SelectItem>
+              {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.description ?? "—"} · CC {a.cc_code} · item {a.item_account}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {ccRow ? `100% do abastecimento vai para o CC ${ccRow.cc_code} (item conta ${ccRow.item_account}), sem rateio.` : "Os CC vêm da aba Item Conta; para um CC que não está lá, cadastre-o primeiro."}
+          </p>
+        </div>
         <div className="space-y-1"><Label htmlFor="fix-notes">Observações</Label><Textarea id="fix-notes" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button disabled={m.isPending || (km != null && !Number.isFinite(km))} onClick={() => m.mutate({ id: row.id, patch: {
             plate_fix: form.plate.trim() ? normalizePlate(form.plate) : null, km_fix: km, driver_fix: form.driver.trim() || null, notes: form.notes.trim() || null,
+            cc_fix: ccRow?.cc_code ?? null, item_account_fix: ccRow?.item_account ?? null, cc_label_fix: ccRow?.description ?? null,
           } })}>Salvar</Button>
         </DialogFooter>
       </DialogContent>
