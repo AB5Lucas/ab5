@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { workedHours } from "@/lib/rdo";
 import { allocationHours } from "@/lib/allocation-hours";
+import { laborShare, monthRange, type LaborShareBy } from "@/lib/labor-share";
 import { filteredDailyAllocations } from "@/lib/allocation-daily-pdf";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -74,6 +75,62 @@ type AllocRow = {
   collaborators: { full_name: string } | null;
 };
 
+async function fetchAllocations(from: string, to: string): Promise<AllocRow[]> {
+  const out: AllocRow[] = [];
+  for (let off = 0; ; off += 1000) {
+    const { data, error } = await supabase
+      .from("daily_allocations")
+      .select(
+        "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(id, name, order_number, client, client_id, entry_time, exit_time, exit_time_weekend, night_shift, clients(name)), collaborators(full_name)",
+      )
+      .gte("daily_schedules.schedule_date", from)
+      .lte("daily_schedules.schedule_date", to)
+      .order("id")
+      .range(off, off + 999);
+    if (error) throw error;
+    out.push(...((data ?? []) as unknown as AllocRow[]));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
+async function fetchHours(from: string, to: string): Promise<{ records: HourRow[]; reports: { work_id: string; report_date: string }[] }> {
+  const out: HourRow[] = [];
+  for (let off = 0; ; off += 1000) {
+    const { data, error } = await supabase
+      .from("rdo_workforce")
+      .select("id, work_id, collaborator_id, report_date, entry_time, exit_time, break_minutes, worked_hours, present, collaborators(full_name)")
+      .gte("report_date", from)
+      .lte("report_date", to)
+      .order("id")
+      .range(off, off + 999);
+    if (error) throw error;
+    for (const r of (data ?? []) as any[]) {
+      const h = !r.present ? 0 : r.worked_hours != null ? Number(r.worked_hours) : workedHours(r.entry_time, r.exit_time, r.break_minutes ?? 60);
+      out.push({ work_id: r.work_id, collaborator_id: r.collaborator_id, name: r.collaborators?.full_name ?? "—", date: r.report_date, hours: h });
+    }
+    if (!data || data.length < 1000) break;
+  }
+  const reports: { work_id: string; report_date: string }[] = [];
+  for (let off = 0; ; off += 1000) {
+    const { data, error } = await supabase.from("rdos").select("id, work_id, report_date").gte("report_date", from).lte("report_date", to).order("id").range(off, off + 999);
+    if (error) throw error;
+    reports.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  return { records: out, reports };
+}
+
+/** Informações de cliente e nome de cada serviço que aparece nas alocações. */
+function workInfoOf(data: AllocRow[]) {
+  const m = new Map<string, { client: string; clientKey: string; name: string }>();
+  for (const a of data) if (a.works) {
+    const client = a.works.clients?.name ?? a.works.client ?? "Sem cliente";
+    m.set(a.works.id, { client, clientKey: a.works.client_id ?? client, name: a.works.name });
+  }
+  return m;
+}
+
 function Page() {
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(iso(new Date()));
@@ -89,24 +146,7 @@ function Page() {
 
   const allocations = useQuery({
     queryKey: ["report-allocations", from, to],
-    queryFn: async () => {
-const out: AllocRow[] = [];
-      for (let off = 0; ; off += 1000) {
-        const { data, error } = await supabase
-          .from("daily_allocations")
-          .select(
-          "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(id, name, order_number, client, client_id, entry_time, exit_time, exit_time_weekend, night_shift, clients(name)), collaborators(full_name)",
-        )
-          .gte("daily_schedules.schedule_date", from)
-          .lte("daily_schedules.schedule_date", to)
-          .order("id")
-          .range(off, off + 999);
-        if (error) throw error;
-        out.push(...((data ?? []) as unknown as AllocRow[]));
-        if (!data || data.length < 1000) break;
-      }
-      return out;
-    },
+    queryFn: () => fetchAllocations(from, to),
   });
 
   const absences = useQuery({
@@ -160,46 +200,14 @@ const out: AllocRow[] = [];
 
   const hours = useQuery({
     queryKey: ["report-hours-with-defaults", from, to],
-    queryFn: async () => {
-      const out: HourRow[] = [];
-      for (let off = 0; ; off += 1000) {
-        const { data, error } = await supabase
-          .from("rdo_workforce")
-          .select("id, work_id, collaborator_id, report_date, entry_time, exit_time, break_minutes, worked_hours, present, collaborators(full_name)")
-          .gte("report_date", from)
-          .lte("report_date", to)
-          .order("id")
-          .range(off, off + 999);
-        if (error) throw error;
-        for (const r of (data ?? []) as any[]) {
-          const h = !r.present ? 0 : r.worked_hours != null ? Number(r.worked_hours) : workedHours(r.entry_time, r.exit_time, r.break_minutes ?? 60);
-          out.push({ work_id: r.work_id, collaborator_id: r.collaborator_id, name: r.collaborators?.full_name ?? "—", date: r.report_date, hours: h });
-        }
-        if (!data || data.length < 1000) break;
-      }
-      const reports: { work_id: string; report_date: string }[] = [];
-      for (let off = 0; ; off += 1000) {
-        const { data, error } = await supabase.from("rdos").select("id, work_id, report_date").gte("report_date", from).lte("report_date", to).order("id").range(off, off + 999);
-        if (error) throw error;
-        reports.push(...(data ?? []));
-        if (!data || data.length < 1000) break;
-      }
-      return { records: out, reports };
-    },
+    queryFn: () => fetchHours(from, to),
   });
 
   const data = allocations.data ?? [];
   const hourRows = useMemo(() => allocationHours(data, hours.data?.records ?? [], hours.data?.reports ?? []), [data, hours.data]);
   const [detail, setDetail] = useState<Detail | null>(null);
 
-  const workInfo = useMemo(() => {
-    const m = new Map<string, { client: string; clientKey: string; name: string }>();
-    for (const a of data) if (a.works) {
-      const client = a.works.clients?.name ?? a.works.client ?? "Sem cliente";
-      m.set(a.works.id, { client, clientKey: a.works.client_id ?? client, name: a.works.name });
-    }
-    return m;
-  }, [data]);
+  const workInfo = useMemo(() => workInfoOf(data), [data]);
 
   const byWork = useMemo(() => {
     const map = new Map<string, { key: string; label: string; client: string; clientKey: string; workId: string | null; hours: number; total: number; overnight: number; days: Set<string> }>();
@@ -344,6 +352,7 @@ const out: AllocRow[] = [];
           <TabsTrigger value="obras">Por obra</TabsTrigger>
           <TabsTrigger value="colaboradores">Por colaborador</TabsTrigger>
           <TabsTrigger value="ausencias">Ausências</TabsTrigger>
+          <TabsTrigger value="rateio">Rateio</TabsTrigger>
         </TabsList>
 
         <TabsContent value="obras" className="panel mt-3 overflow-x-auto p-0">
@@ -475,6 +484,9 @@ const out: AllocRow[] = [];
               {!loading && (absences.data ?? []).length === 0 && <EmptyRow cols={4} />}
             </TableBody>
           </Table>
+        </TabsContent>
+        <TabsContent value="rateio" className="panel mt-3 overflow-x-auto p-0">
+          <LaborShareTab />
         </TabsContent>
       </Tabs>
 
@@ -632,5 +644,100 @@ function EmptyRow({ cols }: { cols: number }) {
         Nenhum registro no período selecionado.
       </TableCell>
     </TableRow>
+  );
+}
+
+/** Rateio: % das horas de MO do mês em cada cliente ou serviço. */
+function LaborShareTab() {
+  const [by, setBy] = useState<LaborShareBy>("cliente");
+  const [month, setMonth] = useState(firstDayOfMonth().slice(0, 7));
+  const { from, to } = monthRange(month);
+  const allocations = useQuery({ queryKey: ["report-allocations", from, to], queryFn: () => fetchAllocations(from, to), enabled: !!month });
+  const hours = useQuery({ queryKey: ["report-hours-with-defaults", from, to], queryFn: () => fetchHours(from, to), enabled: !!month });
+  const rows = useMemo(() => {
+    const data = allocations.data ?? [];
+    return laborShare(allocationHours(data, hours.data?.records ?? [], hours.data?.reports ?? []), workInfoOf(data), by);
+  }, [allocations.data, hours.data, by]);
+  const total = rows.reduce((s, r) => s + r.hours, 0);
+  const loading = allocations.isLoading || hours.isLoading;
+  const error = (allocations.error ?? hours.error) as Error | null;
+  const pct = (v: number) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  const label = by === "cliente" ? "Cliente" : "Serviço";
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end gap-3 p-3">
+        <div className="space-y-1">
+          <Label htmlFor="rateio-by">Ver por</Label>
+          <select id="rateio-by" value={by} onChange={(e) => setBy(e.target.value as LaborShareBy)} className="h-9 w-40 rounded-md border border-input bg-background px-2 text-sm">
+            <option value="cliente">Cliente</option>
+            <option value="servico">Serviço</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="rateio-month">Mês</Label>
+          <Input id="rateio-month" type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="w-44" />
+        </div>
+        {loading && <span className="pb-2 text-sm text-muted-foreground">Carregando...</span>}
+        <div className="ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!rows.length}
+            onClick={() =>
+              downloadCsv(`rateio-mo-${by}-${month}.csv`, [
+                by === "cliente" ? ["Cliente", "Pessoas", "Horas", "% da MO"] : ["Cliente", "Serviço", "Pessoas", "Horas", "% da MO"],
+                ...rows.map((r) => (by === "cliente" ? [r.label, r.people, fmtH(r.hours), pct(r.pct)] : [r.client, r.label, r.people, fmtH(r.hours), pct(r.pct)])),
+              ])
+            }
+          >
+            <Download className="h-4 w-4" /> Exportar CSV
+          </Button>
+        </div>
+      </div>
+      <p className="px-3 pb-2 text-xs text-muted-foreground">
+        Percentual das horas de mão de obra do mês (RDO quando existe; senão o horário do serviço) em cada {label.toLowerCase()}.
+      </p>
+      {error && <p className="px-3 pb-3 text-sm text-destructive">{error.message}</p>}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {by === "servico" && <TableHead>Cliente</TableHead>}
+            <TableHead>{label}</TableHead>
+            <TableHead className="text-right">Pessoas</TableHead>
+            <TableHead className="text-right">Horas</TableHead>
+            <TableHead className="w-[40%]">% da MO</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r) => (
+            <TableRow key={r.key}>
+              {by === "servico" && <TableCell className="text-muted-foreground">{r.client}</TableCell>}
+              <TableCell className="font-medium">{r.label}</TableCell>
+              <TableCell className="text-right">{r.people}</TableCell>
+              <TableCell className="text-right">{fmtH(r.hours)}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 flex-1 rounded-full bg-muted">
+                    <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.min(100, r.pct)}%` }} />
+                  </div>
+                  <span className="w-14 text-right tabular-nums">{pct(r.pct)}</span>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+          {rows.length > 0 && (
+            <TableRow className="font-medium">
+              {by === "servico" && <TableCell />}
+              <TableCell>Total</TableCell>
+              <TableCell />
+              <TableCell className="text-right">{fmtH(total)}</TableCell>
+              <TableCell className="text-right tabular-nums">100%</TableCell>
+            </TableRow>
+          )}
+          {!loading && !error && rows.length === 0 && <EmptyRow cols={by === "servico" ? 5 : 4} />}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
