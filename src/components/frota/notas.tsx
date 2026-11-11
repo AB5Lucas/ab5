@@ -19,6 +19,7 @@ import { normalizePlate } from "@/lib/fleet-costs";
 import { baseFolderPath, fuelRateio, isoDay, itemAccountFor, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
 import { DriverRanking } from "./ranking";
+import { currentMonthRange, DateRangePicker, monthsInRange, type DayRange } from "@/components/date-range-picker";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Note = Tables<"fleet_fuel_notes">;
@@ -29,7 +30,6 @@ const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toL
 const num = (v: number | null | undefined, d = 2) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { maximumFractionDigits: d, minimumFractionDigits: d }));
 const brDate = (d: string | null) => (d ? d.split("-").reverse().join("/") : "—");
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
-const lastDay = (ym: string) => { const [y, m] = ym.split("-").map(Number) as [number, number]; return `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
 const MATCH_LABEL: Record<string, string> = { chave: "ok", nf: "pelo nº da NF", manual: "atribuída", hora: "pela hora: confira", leitura: "lido na foto" };
 
 /** Frota › Abastecimento: abastecimentos (XML do posto) e equivalências de item conta. */
@@ -56,22 +56,23 @@ export function FleetNotesPage() {
 
 function FuelNotes() {
   const qc = useQueryClient();
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [range, setRange] = useState<DayRange>(() => currentMonthRange());
+  const months = monthsInRange(range);
   const [filter, setFilter] = useState<Filter>("pendentes");
   const [plate, setPlate] = useState("all");
   const [approve, setApprove] = useState<Row | null>(null);
   const [edit, setEdit] = useState<Row | null>(null);
   const [attach, setAttach] = useState<Row | null>(null);
   const [folders, setFolders] = useState(false);
-  const start = `${month}-01`, end = lastDay(month), lookback = addDays(start, -90);
+  const start = range.from, end = range.to, lookback = addDays(start, -90);
 
   const settings = useQuery({ queryKey: ["fleet-settings"], queryFn: async () => Object.fromEntries(((await supabase.from("fleet_settings").select("key, value")).data ?? []).map((s) => [s.key, s.value])) as Record<string, string | null> });
   const notes = useQuery({
-    queryKey: ["fleet-fuel-notes", month],
+    queryKey: ["fleet-fuel-notes", start, end],
     queryFn: () => fetchAll<Note>((a, b) => supabase.from("fleet_fuel_notes").select("*")
-      .or(`ref_month.eq.${month},and(issued_at.gte.${lookback},issued_at.lte.${end}T23:59:59)`).order("issued_at").range(a, b)),
+      .or(`ref_month.in.(${months.join(",")}),and(issued_at.gte.${lookback},issued_at.lte.${end}T23:59:59)`).order("issued_at").range(a, b)),
   });
-  const docs = useQuery({ queryKey: ["fleet-note-docs", month], queryFn: async () => (await supabase.from("fleet_note_docs").select("file_name, item_id, read_nf, read_plate, read_total, read_error").eq("ref_month", month).order("file_name")).data ?? [] });
+  const docs = useQuery({ queryKey: ["fleet-note-docs", months.join(",")], queryFn: async () => (await supabase.from("fleet_note_docs").select("ref_month, file_name, item_id, read_nf, read_plate, read_total, read_error").in("ref_month", months).order("file_name")).data ?? [] });
   const vehicles = useQuery({ queryKey: ["fleet-vehicles-basic"], queryFn: async () => (await supabase.from("vehicles").select("id, plate, model").order("plate")).data ?? [] });
   const schedules = useQuery({
     queryKey: ["fleet-rateio-schedules", lookback, end],
@@ -85,10 +86,23 @@ function FuelNotes() {
 
   const syncFn = useServerFn(syncFleetNotesNow);
   const sync = useMutation({
-    mutationFn: () => syncFn({ data: { month } }),
+    // Uma pasta por mês: lê todos os meses que o período cobre, um de cada vez.
+    mutationFn: async () => {
+      const out = { saved: 0, xml: 0, docs: 0, photosRead: 0, errors: [] as string[] };
+      for (const m of months) {
+        try {
+          const r = await syncFn({ data: { month: m } });
+          out.saved += r.saved; out.xml += r.xml; out.docs += r.docs; out.photosRead += r.photosRead ?? 0;
+          out.errors.push(...r.errors.map((e) => (months.length > 1 ? `${monthLabel(m)}: ${e}` : e)));
+        } catch (e) {
+          out.errors.push(`${monthLabel(m)}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      return out;
+    },
     onSuccess: (r) => {
       toast.success(`${r.saved} abastecimento(s) de ${r.xml} XML · ${r.docs} nota(s) na pasta${r.photosRead ? ` · ${r.photosRead} foto(s) lida(s)` : ""}.`);
-      r.errors.slice(0, 3).forEach((e) => toast.warning(e));
+      r.errors.slice(0, 4).forEach((e) => toast.warning(e));
       qc.invalidateQueries({ queryKey: ["fleet-fuel-notes"] });
       qc.invalidateQueries({ queryKey: ["fleet-note-docs"] });
       qc.invalidateQueries({ queryKey: ["fleet-settings"] });
@@ -102,7 +116,7 @@ function FuelNotes() {
     const vehicleByPlate = new Map((vehicles.data ?? []).map((v) => [normalizePlate(v.plate), v]));
     const clientMap = new Map((clients.data ?? []).map((c) => [c.id, c]));
     const ordered = [...all].sort((a, b) => String(a.issued_at).localeCompare(String(b.issued_at)) || a.access_key.localeCompare(b.access_key));
-    return ordered.filter((n) => n.ref_month === month).map((n) => {
+    return ordered.filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= start && d <= end; }).map((n) => {
       const p = plateOf(n);
       const v = p ? vehicleByPlate.get(p) : undefined;
       const day = isoDay(n.issued_at);
@@ -124,16 +138,17 @@ function FuelNotes() {
       ];
       return { ...n, day, plateShown: p, kmShown, driverShown: n.driver_fix ?? n.driver, vehicleLabel: v ? (v.model ?? v.plate) : null, rateio, status: noteStatus(n), warnings };
     });
-  }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, month]);
+  }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, start, end]);
 
   const plates = [...new Set(rows.map((r) => r.plateShown).filter((p): p is string => !!p))].sort();
   const shown = rows.filter((r) => (plate === "all" || r.plateShown === plate) && (
     filter === "todas" ? true : filter === "pendentes" ? r.status !== "aprovada" : filter === "sem-nota" ? r.status === "sem-nota" : filter === "aguardando" ? r.status === "pendente" : r.status === "aprovada"));
   const count = (s: Row["status"]) => rows.filter((r) => r.status === s).length;
   const usedDocs = new Set(rows.map((r) => r.note_file).filter(Boolean));
-  const freeDocs = (docs.data ?? []).filter((d) => !usedDocs.has(d.file_name));
+  const freeDocs = (docs.data ?? []).filter((d) => !usedDocs.has(d.file_name) && d.ref_month === attach?.ref_month);
   const loading = notes.isLoading || schedules.isLoading || vehicles.isLoading;
-  const synced = settings.data?.[`synced:${month}`];
+  const notRead = months.filter((m) => !settings.data?.[`synced:${m}`]);
+  const lastRead = months.map((m) => settings.data?.[`synced:${m}`]).filter((v): v is string => !!v).sort().at(-1);
 
   const linkFn = useServerFn(fleetNoteLink);
   async function openDoc(file: string) {
@@ -146,10 +161,7 @@ function FuelNotes() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="notes-month">Mês</Label>
-          <Input id="notes-month" type="month" className="w-44" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
-        </div>
+        <DateRangePicker id="notes-range" value={range} onChange={setRange} />
         <div className="space-y-1">
           <Label>Situação</Label>
           <Select value={filter} onValueChange={(v) => setFilter(v as Filter)}>
@@ -178,16 +190,18 @@ function FuelNotes() {
           <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Lendo pastas..." : "Ler pastas"}
         </Button>
         <p className="pb-2 text-xs text-muted-foreground">
-          {!settings.data?.["xml_folder"] ? "Informe as pastas dos XML e das notas em Pastas." : synced ? `${monthLabel(month)} lido em ${new Date(synced).toLocaleString("pt-BR")}.` : `${monthLabel(month)} ainda não foi lido: clique em Ler pastas.`}
+          {!settings.data?.["xml_folder"] ? "Informe as pastas dos XML e das notas em Pastas."
+            : notRead.length ? `${notRead.map(monthLabel).join(", ")} ainda não ${notRead.length > 1 ? "foram lidos" : "foi lido"}: clique em Ler pastas.`
+            : lastRead ? `Pastas lidas em ${new Date(lastRead).toLocaleString("pt-BR")}${months.length > 1 ? ` (${months.length} meses)` : ""}.` : ""}
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="XML no mês" value={String(rows.length)} />
+        <Kpi label="XML no período" value={String(rows.length)} />
         <Kpi label="Sem nota" value={String(count("sem-nota"))} tone={count("sem-nota") ? "bad" : undefined} />
         <Kpi label="Aguardando aprovação" value={String(count("pendente"))} />
         <Kpi label="Aprovadas" value={String(count("aprovada"))} />
-        <Kpi label="Total do mês" value={brl(rows.reduce((s, r) => s + Number(r.total ?? 0), 0))} />
+        <Kpi label="Total do período" value={brl(rows.reduce((s, r) => s + Number(r.total ?? 0), 0))} />
       </div>
 
       <div className="panel overflow-x-auto">
@@ -294,7 +308,7 @@ function FuelNotes() {
 
       <ApproveDialog row={approve} onClose={() => setApprove(null)} />
       <EditDialog row={edit} accounts={accounts.data ?? []} onClose={() => setEdit(null)} />
-      <AttachDialog row={attach} month={month} docs={attach?.note_file ? [...(docs.data ?? []).filter((d) => d.file_name === attach.note_file), ...freeDocs] : freeDocs} onClose={() => setAttach(null)} />
+      <AttachDialog row={attach} month={attach?.ref_month ?? months[0]!} docs={attach?.note_file ? [...(docs.data ?? []).filter((d) => d.file_name === attach.note_file && d.ref_month === attach.ref_month), ...freeDocs] : freeDocs} onClose={() => setAttach(null)} />
       <FoldersDialog open={folders} onClose={() => setFolders(false)} values={settings.data ?? {}} />
     </div>
   );

@@ -1,23 +1,15 @@
 import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
 import { driverRanking, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
+import { currentMonthRange, DateRangePicker, type DayRange } from "@/components/date-range-picker";
 
 const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 const brDate = (d: string | null) => (d ? d.split("-").reverse().join("/") : "—");
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
-const lastDay = (ym: string) => { const [y, m] = ym.split("-").map(Number) as [number, number]; return `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
-const addMonthsYm = (ym: string, n: number) => {
-  const [y, m] = ym.split("-").map(Number) as [number, number];
-  const t = y * 12 + (m - 1) + n;
-  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
-};
 const scoreTone = (s: number) => (s >= 90 ? "bg-emerald-600" : s >= 70 ? "bg-amber-500" : "bg-destructive");
 
 function Kpi({ label, value, tone }: { label: string; value: string; tone?: "bad" }) {
@@ -31,22 +23,20 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: "bad
 
 /** Frota › Abastecimento › Ranking: motoristas pela entrega da foto da nota (motorista pela Transporte). */
 export function DriverRanking() {
-  const [until, setUntil] = useState(() => new Date().toISOString().slice(0, 7));
-  const [months, setMonths] = useState("1");
+  const [range, setRange] = useState<DayRange>(() => currentMonthRange());
   const [open, setOpen] = useState<string | null>(null);
-  const fromYm = addMonthsYm(until, 1 - Number(months));
   const today = new Date().toISOString().slice(0, 10);
 
   const notes = useQuery({
-    queryKey: ["fleet-ranking-notes", fromYm, until],
+    queryKey: ["fleet-ranking-notes", range.from, range.to],
     queryFn: () => fetchAll<RankingNote>((a, b) => supabase.from("fleet_fuel_notes")
       .select("id, nf_number, issued_at, plate, plate_fix, driver, driver_fix, total, note_file")
-      .gte("ref_month", fromYm).lte("ref_month", until).order("issued_at").range(a, b)),
+      .gte("issued_at", `${range.from}T00:00:00-03:00`).lte("issued_at", `${range.to}T23:59:59-03:00`).order("issued_at").range(a, b)),
   });
   const schedules = useQuery({
-    queryKey: ["fleet-ranking-schedules", fromYm, until],
+    queryKey: ["fleet-ranking-schedules", range.from, range.to],
     queryFn: () => fetchAll<RankingSchedule>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date, driver_id, extra_driver_ids")
-      .gte("schedule_date", addDays(`${fromYm}-01`, -1)).lte("schedule_date", lastDay(until)).order("schedule_date").range(a, b)),
+      .gte("schedule_date", addDays(range.from, -1)).lte("schedule_date", range.to).order("schedule_date").range(a, b)),
   });
   const vehicles = useQuery({ queryKey: ["fleet-vehicles-basic"], queryFn: async () => (await supabase.from("vehicles").select("id, plate, model").order("plate")).data ?? [] });
   const names = useQuery({ queryKey: ["fleet-driver-names"], queryFn: async () => new Map(((await supabase.from("collaborators").select("id, full_name")).data ?? []).map((c) => [c.id, c.full_name])) });
@@ -65,22 +55,7 @@ export function DriverRanking() {
         O motorista de cada abastecimento é o que estava com o veículo na Transporte naquele dia (ou no dia anterior, para abastecimento de madrugada); sem programação, vale o nome escrito na nota. Pontuação = % das notas entregues (100 = sempre entrega). Abastecimentos dos últimos {NOTE_GRACE_DAYS} dias ainda estão no prazo e não contam. Clique em quem tem pendência para ver os XML sem nota.
       </p>
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="rank-until">Até o mês</Label>
-          <Input id="rank-until" type="month" className="w-44" value={until} onChange={(e) => e.target.value && setUntil(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label>Período</Label>
-          <Select value={months} onValueChange={setMonths}>
-            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">Só este mês</SelectItem>
-              <SelectItem value="3">Últimos 3 meses</SelectItem>
-              <SelectItem value="6">Últimos 6 meses</SelectItem>
-              <SelectItem value="12">Últimos 12 meses</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <DateRangePicker id="rank-range" value={range} onChange={setRange} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
