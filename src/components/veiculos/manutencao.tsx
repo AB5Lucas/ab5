@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAll, loadResultShared } from "@/lib/results-engine";
 import { BUDGET_KM_RATE, dayKm, dayToll, normalizePlate, vehicleMonth, type VehicleMonth } from "@/lib/fleet-costs";
-import { serviceTransportBudget } from "@/lib/fleet-budget";
+import { serviceTransportBudget, type BudgetPart } from "@/lib/fleet-budget";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { financeBatches, financeList, loadFinanceActive, loadFinanceRaws } from "@/lib/finance-data";
 import { syncFleetCostsNow } from "@/lib/fleet-costs.functions";
 
@@ -150,20 +151,26 @@ export function FleetMaintenancePage() {
 
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => addMonths(first, i)), [first]);
   /** Orçado de transporte da frota por mês: soma dos serviços (mensal inteiro; demais pelo andamento do mês). */
-  const fleetBudget = useMemo(() => {
-    const out = new Map<string, number>();
+  const budgetParts = useMemo(() => {
+    const out = new Map<string, BudgetPart[]>();
     if (!raws.data) return out;
     const opts = { holidays: holidays.data ?? [], allWorks: allWorks.data ?? [] };
     for (const ym of months) {
-      let sum = 0;
+      const parts: BudgetPart[] = [];
       for (const w of serviceList) {
         const raw = raws.data.get(w.id);
-        if (raw) sum += serviceTransportBudget(w, raw, ym, opts);
+        const p = raw ? serviceTransportBudget(w, raw, ym, opts) : null;
+        if (p) parts.push(p);
       }
-      out.set(ym, Math.round(sum * 100) / 100);
+      out.set(ym, parts.sort((a, b) => b.value - a.value));
     }
     return out;
   }, [raws.data, serviceList, months, holidays.data, allWorks.data]);
+  const fleetBudget = useMemo(
+    () => new Map([...budgetParts].map(([ym, parts]) => [ym, Math.round(parts.reduce((s, p) => s + p.value, 0) * 100) / 100])),
+    [budgetParts],
+  );
+  const [showBudget, setShowBudget] = useState(false);
 
   /** O orçado da frota no mês é dividido entre os veículos pelo km rodado de cada um. */
   const rowFor = (v: Vehicle, ym: string): Row => {
@@ -194,7 +201,7 @@ export function FleetMaintenancePage() {
     <div className="space-y-4">
       <PageHeader
         title="Manutenção"
-        description={`Orçado: soma do transporte orçado dos serviços no mês (mensais: o mês inteiro; demais: pelo andamento do mês), dividida entre os veículos pelo km. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação. Km × ${brl(BUDGET_KM_RATE)} fica só como referência.`}
+        description={`Orçado: soma do transporte orçado dos serviços no mês (Indústria: VT real; mensais: o mês inteiro; sem orçado de transporte: o real; demais: pelo andamento do mês), dividida entre os veículos pelo km. Clique no Orçado para ver o detalhe. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação. Km × ${brl(BUDGET_KM_RATE)} fica só como referência.`}
         actions={
           <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
             <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Lendo planilhas..." : "Atualizar planilhas"}
@@ -227,7 +234,7 @@ export function FleetMaintenancePage() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Kpi label="Km rodados" value={total.km.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} />
-        <Kpi label="Orçado" value={budgetLoading ? "Calculando..." : brl(total.budget)} hint="transporte orçado dos serviços" />
+        <Kpi label="Orçado" value={budgetLoading ? "Calculando..." : brl(total.budget)} hint="clique para ver o que compõe" onClick={budgetLoading ? undefined : () => setShowBudget(true)} />
         <Kpi label="Real" value={brl(total.real)} />
         <Kpi label="Diferença" value={`${diff < 0 ? "−" : "+"} ${brl(Math.abs(diff))}`} tone={diff < 0 ? "bad" : "good"} hint={total.budget ? `${diff < 0 ? "acima" : "abaixo"} do orçado em ${Math.abs((diff / total.budget) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : undefined} />
         <Kpi label="Custo real por km" value={total.km ? brl(total.real / total.km) : "—"} hint={`referência ${brl(BUDGET_KM_RATE)} por km`} />
@@ -343,6 +350,49 @@ export function FleetMaintenancePage() {
         </Table>
       </div>
 
+      <Dialog open={showBudget} onOpenChange={setShowBudget}>
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Orçado de transporte · {monthLabel(month)}</DialogTitle>
+            <DialogDescription>
+              Soma do transporte orçado dos serviços no mês: {brl(fleetBudget.get(month) ?? 0)}.
+              {vehicleFilter !== "all" ? ` O veículo filtrado recebe ${brl(total.budget)}, a parte proporcional ao km dele.` : " Entre os veículos, o valor é dividido pelo km rodado."}
+            </DialogDescription>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente · Serviço</TableHead>
+                <TableHead>Regra</TableHead>
+                <TableHead>Base</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(budgetParts.get(month) ?? []).map((p) => (
+                <TableRow key={p.workId}>
+                  <TableCell className="text-sm"><span className="text-muted-foreground">{p.client} · </span>{p.service}</TableCell>
+                  <TableCell className="text-xs">{p.rule}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{p.base}</TableCell>
+                  <TableCell className="text-right tabular-nums">{brl(p.value)}</TableCell>
+                </TableRow>
+              ))}
+              {!(budgetParts.get(month) ?? []).length && (
+                <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground">Nenhum serviço com transporte orçado neste mês.</TableCell></TableRow>
+              )}
+            </TableBody>
+            {(budgetParts.get(month) ?? []).length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3}>Total</TableCell>
+                  <TableCell className="text-right tabular-nums">{brl(fleetBudget.get(month) ?? 0)}</TableCell>
+                </TableRow>
+              </TableFooter>
+            )}
+          </Table>
+        </DialogContent>
+      </Dialog>
+
       <section className="panel space-y-3 p-4">
         <div>
           <h3 className="text-sm font-medium">Locação</h3>
@@ -356,13 +406,18 @@ export function FleetMaintenancePage() {
   );
 }
 
-function Kpi({ label, value, hint, tone, small }: { label: string; value: string; hint?: string | undefined; tone?: "good" | "bad"; small?: boolean }) {
-  return (
-    <div className="panel p-3">
+function Kpi({ label, value, hint, tone, small, onClick }: { label: string; value: string; hint?: string | undefined; tone?: "good" | "bad"; small?: boolean; onClick?: (() => void) | undefined }) {
+  const body = (
+    <>
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className={`${small ? "text-base" : "font-display text-xl"} tabular-nums ${tone === "bad" ? "text-destructive" : tone === "good" ? "text-emerald-600" : ""}`}>{value}</p>
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} className="panel p-3 text-left transition hover:ring-2 hover:ring-primary/40">{body}</button>
+  ) : (
+    <div className="panel p-3">{body}</div>
   );
 }
 

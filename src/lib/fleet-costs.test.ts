@@ -30,7 +30,7 @@ describe("manutenção da frota", () => {
     expect(parseFuel(rows)).toEqual([{ plate: "TDJ9B47", date: "2026-01-02", amount: 45.82, document: "NF 4859", description: "GASOLINA COMUM · 7,98 L" }]);
   });
   it("km, pedágio e orçado × real do mês", () => {
-    const s = { km: 100, trips: 2, extra_km: 10, client: { has_toll: true, toll_amount: 5 } };
+    const s = { km: 100, trips: 2, extra_km: 10, clients: { has_toll: true, toll_amount: 5 } };
     expect(dayKm(s)).toBe(410);
     expect(dayToll(s)).toBe(20);
     expect(dayToll({ ...s, is_suzano_local: true })).toBe(0);
