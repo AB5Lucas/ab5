@@ -2196,16 +2196,34 @@ export type Database = {
         Row: {
           file_name: string
           item_id: string | null
+          read_at: string | null
+          read_error: string | null
+          read_key: string | null
+          read_nf: string | null
+          read_plate: string | null
+          read_total: number | null
           ref_month: string
         }
         Insert: {
           file_name: string
           item_id?: string | null
+          read_at?: string | null
+          read_error?: string | null
+          read_key?: string | null
+          read_nf?: string | null
+          read_plate?: string | null
+          read_total?: number | null
           ref_month: string
         }
         Update: {
           file_name?: string
           item_id?: string | null
+          read_at?: string | null
+          read_error?: string | null
+          read_key?: string | null
+          read_nf?: string | null
+          read_plate?: string | null
+          read_total?: number | null
           ref_month?: string
         }
         Relationships: []

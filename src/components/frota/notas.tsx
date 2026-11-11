@@ -29,7 +29,7 @@ const num = (v: number | null | undefined, d = 2) => (v == null ? "—" : Number
 const brDate = (d: string | null) => (d ? d.split("-").reverse().join("/") : "—");
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 const lastDay = (ym: string) => { const [y, m] = ym.split("-").map(Number) as [number, number]; return `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
-const MATCH_LABEL: Record<string, string> = { chave: "ok", nf: "pelo nº da NF", manual: "atribuída", hora: "pela hora: confira" };
+const MATCH_LABEL: Record<string, string> = { chave: "ok", nf: "pelo nº da NF", manual: "atribuída", hora: "pela hora: confira", leitura: "lido na foto" };
 
 /** Frota › Notas: abastecimentos (XML do posto) e equivalências de item conta. */
 export function FleetNotesPage() {
@@ -68,7 +68,7 @@ function FuelNotes() {
     queryFn: () => fetchAll<Note>((a, b) => supabase.from("fleet_fuel_notes").select("*")
       .or(`ref_month.eq.${month},and(issued_at.gte.${lookback},issued_at.lte.${end}T23:59:59)`).order("issued_at").range(a, b)),
   });
-  const docs = useQuery({ queryKey: ["fleet-note-docs", month], queryFn: async () => (await supabase.from("fleet_note_docs").select("file_name, item_id").eq("ref_month", month).order("file_name")).data ?? [] });
+  const docs = useQuery({ queryKey: ["fleet-note-docs", month], queryFn: async () => (await supabase.from("fleet_note_docs").select("file_name, item_id, read_nf, read_plate, read_total, read_error").eq("ref_month", month).order("file_name")).data ?? [] });
   const vehicles = useQuery({ queryKey: ["fleet-vehicles-basic"], queryFn: async () => (await supabase.from("vehicles").select("id, plate, model").order("plate")).data ?? [] });
   const schedules = useQuery({
     queryKey: ["fleet-rateio-schedules", lookback, end],
@@ -84,7 +84,7 @@ function FuelNotes() {
   const sync = useMutation({
     mutationFn: () => syncFn({ data: { month } }),
     onSuccess: (r) => {
-      toast.success(`${r.saved} abastecimento(s) de ${r.xml} XML · ${r.docs} nota(s) na pasta.`);
+      toast.success(`${r.saved} abastecimento(s) de ${r.xml} XML · ${r.docs} nota(s) na pasta${r.photosRead ? ` · ${r.photosRead} foto(s) lida(s)` : ""}.`);
       r.errors.slice(0, 3).forEach((e) => toast.warning(e));
       qc.invalidateQueries({ queryKey: ["fleet-fuel-notes"] });
       qc.invalidateQueries({ queryKey: ["fleet-note-docs"] });
@@ -285,7 +285,7 @@ function FuelNotes() {
 
       <ApproveDialog row={approve} onClose={() => setApprove(null)} />
       <EditDialog row={edit} onClose={() => setEdit(null)} />
-      <AttachDialog row={attach} month={month} docs={attach?.note_file ? [{ file_name: attach.note_file, item_id: null }, ...freeDocs] : freeDocs} onClose={() => setAttach(null)} />
+      <AttachDialog row={attach} month={month} docs={attach?.note_file ? [...(docs.data ?? []).filter((d) => d.file_name === attach.note_file), ...freeDocs] : freeDocs} onClose={() => setAttach(null)} />
       <FoldersDialog open={folders} onClose={() => setFolders(false)} values={settings.data ?? {}} />
     </div>
   );
@@ -392,7 +392,10 @@ function EditDialog({ row, onClose }: { row: Row | null; onClose: () => void }) 
 
 const timeLabel = (t: number | null) => (t == null ? null : new Date(t).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }));
 
-function AttachDialog({ row, month, docs, onClose }: { row: Row | null; month: string; docs: { file_name: string; item_id: string | null }[]; onClose: () => void }) {
+type Doc = { file_name: string; item_id: string | null; read_nf?: string | null; read_plate?: string | null; read_total?: number | null; read_error?: string | null };
+const readingLabel = (d: Doc) => [d.read_nf ? `NF ${d.read_nf}` : null, d.read_plate, d.read_total != null ? brl(d.read_total) : null].filter(Boolean).join(" · ");
+
+function AttachDialog({ row, month, docs, onClose }: { row: Row | null; month: string; docs: Doc[]; onClose: () => void }) {
   const [file, setFile] = useState("");
   const [q, setQ] = useState("");
   useEffect(() => { setFile(row?.note_file ?? ""); setQ(""); }, [row?.id]);
@@ -408,6 +411,8 @@ function AttachDialog({ row, month, docs, onClose }: { row: Row | null; month: s
   const list = docs.filter((d) => d.file_name.toLowerCase().includes(q.toLowerCase()))
     .map((d) => ({ ...d, time: photoTime(d.file_name) }))
     .sort((a, b) => (a.file_name === row.note_file ? -1 : b.file_name === row.note_file ? 1 : 0)
+      || Number(b.read_nf === row.nf_number) - Number(a.read_nf === row.nf_number)
+      || Number(b.read_plate === row.plateShown) - Number(a.read_plate === row.plateShown)
       || (emitted == null ? 0 : Math.abs((a.time ?? 0) - emitted) - Math.abs((b.time ?? 0) - emitted)) || a.file_name.localeCompare(b.file_name));
   const preview = file ? thumbs.data?.get(file)?.large : null;
   const confirming = !!file && file === row.note_file && row.note_match === "hora";
@@ -417,7 +422,7 @@ function AttachDialog({ row, month, docs, onClose }: { row: Row | null; month: s
         <DialogHeader>
           <DialogTitle>Nota do abastecimento</DialogTitle>
           <DialogDescription>
-            NF {row.nf_number ?? "—"} · {row.plateShown ?? "sem placa"} · {brl(row.total)} · abastecido em {timeLabel(emitted) ?? "—"}. Escolha a foto da nota (as mais próximas da hora do abastecimento vêm primeiro; só aparecem as que não estão em outra linha).
+            NF {row.nf_number ?? "—"} · {row.plateShown ?? "sem placa"} · {brl(row.total)} · abastecido em {timeLabel(emitted) ?? "—"}. Escolha a foto da nota. Vêm primeiro as que a leitura da foto achou com o mesmo nº de NF ou a mesma placa, depois as mais próximas da hora; só aparecem as que não estão em outra linha.
           </DialogDescription>
         </DialogHeader>
         {preview && <img src={preview} alt={`Nota ${file}`} className="mx-auto max-h-[45vh] rounded-md border border-border object-contain" />}
@@ -435,6 +440,7 @@ function AttachDialog({ row, month, docs, onClose }: { row: Row | null; month: s
                   {t?.small ? <img src={t.small} alt="" className="mb-1 h-24 w-full rounded object-cover" loading="lazy" />
                     : <div className="mb-1 flex h-24 items-center justify-center rounded bg-muted text-muted-foreground">{thumbs.isLoading ? "carregando..." : "sem prévia"}</div>}
                   <div className="truncate font-medium">{timeLabel(d.time) ?? d.file_name}</div>
+                  {readingLabel(d) && <div className={`truncate ${d.read_nf === row.nf_number ? "font-medium text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}`}>{readingLabel(d)}</div>}
                   {d.file_name === row.note_file && <div className="text-muted-foreground">atual</div>}
                 </button>
               );
