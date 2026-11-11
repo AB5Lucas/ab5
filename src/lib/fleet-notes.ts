@@ -241,8 +241,15 @@ export function fuelRateio(opts: {
     const cents = i === all.length - 1 ? totalCents - given : Math.round((totalCents * w) / sum);
     given += cents;
     const client = opts.clients.get(id);
-    const { cc, rule } = clientCc(client, opts.works, opts.accounts);
-    return { client_id: id, client: client?.name ?? "Cliente", days: Math.round(w * 100) / 100, pct: Math.round((w / sum) * 10000) / 100, value: cents / 100, cc, cc_rule: rule, item_account: itemAccountFor(cc, opts.accounts, client?.name) };
+    let { cc, rule } = clientCc(client, opts.works, opts.accounts);
+    let item = itemAccountFor(cc, opts.accounts, client?.name);
+    // O CC calculado não está na tabela Item Conta para este cliente, mas o rateio tem uma linha com o nome dele
+    // (ex.: ADM → linha "ADM" no CC 2000 da Diretoria): vale a linha da tabela.
+    if (!item) {
+      const byName = opts.accounts.filter((a) => sameName(a.description, client?.name));
+      if (byName.length === 1) { cc = byName[0]!.cc_code.trim(); item = byName[0]!.item_account; rule = "pelo nome do rateio na tabela Item Conta"; }
+    }
+    return { client_id: id, client: client?.name ?? "Cliente", days: Math.round(w * 100) / 100, pct: Math.round((w / sum) * 10000) / 100, value: cents / 100, cc, cc_rule: rule, item_account: item };
   });
   return { from, to: opts.day, fallback, parts };
 }

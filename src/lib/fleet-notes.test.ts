@@ -122,3 +122,17 @@ describe("manutenção", () => {
     expect(maintenanceState(null, null, 1000, "2026-11-11").status).toBe("sem-regra");
   });
 });
+
+describe("ADM como Diretoria", () => {
+  it("cliente cujo CC calculado não está na tabela usa a linha com o nome dele", () => {
+    const clients = new Map([["a", { id: "a", name: "ADM", cc_prefix: "2000" }]]);
+    const works = [{ id: "w", client_id: "a", cc_suffix: null, active: true }];
+    const accounts = [
+      { cc_code: "2000999", item_account: "013", description: "COMERCIAL SERVIÇOS" },
+      { cc_code: "2000999", item_account: "007", description: "SERVIÇOS" },
+      { cc_code: "2000", item_account: "010", description: "ADM" },
+    ];
+    const r = fuelRateio({ vehicleId: "v", day: "2026-11-05", prevDay: "2026-11-01", total: 100, schedules: [{ vehicle_id: "v", schedule_date: "2026-11-03", client_id: "a" }], clients, works, accounts });
+    expect([r.parts[0]!.cc, r.parts[0]!.item_account]).toEqual(["2000", "010"]);
+  });
+});
