@@ -119,6 +119,8 @@ const synthetic = (): FakeDb => ({
     { id: "ap2", type: "exame", client_id: C1, collaborator_id: "p1", scheduled_date: "2026-10-06", completed_date: null, status: "agendado", pays_transport_voucher: false },
   ],
   result_support_allocations: [{ id: "sa1", client_id: C1, collaborator_id: "p1" }],
+  // Integração do p2 em 06/10 lançada no serviço W1 (arca com 100%).
+  integration_service_choices: [{ id: "ic1", schedule_date: "2026-10-06", collaborator_id: "p2", client_id: C1, work_id: W1 }],
   medical_leaves: [], days_off: [{ id: "o1", collaborator_id: "p2", date: "2026-10-07", end_date: null }], vacations: [],
   transport_voucher_rules: [], driver_bonus_rules: [], travel_bonus_rules: [], city_distances: [{ city_a: "Suzano", city_b: "Mogi", km: 20 }],
 });

@@ -87,11 +87,27 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
       const scopeIds = general
         ? ((await supabase.from("works").select("id").eq("client_id", work.client_id!)).data ?? []).map((w) => w.id)
         : [work.id];
-      // Quem faz integração no cliente desta obra no dia também entra no RDO dela.
-      const { data: integ } = await supabase.from("appointments").select("collaborator_id, work_id, collaborators(position_id)")
-        .eq("type", "integracao").eq("scheduled_date", date).neq("status", "cancelado")
-        .or(general ? `client_id.eq.${work.client_id},work_id.in.(${scopeIds.join(",")})` : work.client_id ? `work_id.eq.${work.id},and(work_id.is.null,client_id.eq.${work.client_id})` : `work_id.eq.${work.id}`);
-      const integAllocs = (integ ?? []).filter((a) => a.collaborator_id).map((a) => ({ id: null as unknown as string, collaborator_id: a.collaborator_id!, position_id: null as string | null, collaborators: (a.collaborators as { position_id: string | null } | null) ?? null, lastPos: null as string | null }));
+      // Integração: só entra no RDO quem foi lançado neste serviço na aba Serviços (integration_service_choices;
+      // no RDO Geral, em qualquer serviço do cliente). Quem fica no Rateio não aparece em RDO nenhum.
+      const { data: chosen } = await supabase.from("integration_service_choices").select("collaborator_id, client_id, collaborators(position_id)")
+        .eq("schedule_date", date).in("work_id", scopeIds);
+      const chosenIds = [...new Set((chosen ?? []).map((c) => c.collaborator_id))];
+      // A escolha só vale se a pessoa ainda estiver em integração no cliente no dia (agendamento ou quadro).
+      const stillInteg = new Set<string>();
+      if (chosenIds.length && work.client_id) {
+        const [{ data: ap }, { data: cl }] = await Promise.all([
+          supabase.from("appointments").select("collaborator_id").eq("type", "integracao").eq("client_id", work.client_id)
+            .eq("scheduled_date", date).neq("status", "cancelado").in("collaborator_id", chosenIds),
+          supabase.from("clients").select("name").eq("id", work.client_id).maybeSingle(),
+        ]);
+        (ap ?? []).forEach((a) => a.collaborator_id && stillInteg.add(a.collaborator_id));
+        if (s && cl?.name) {
+          const { data: bx } = await supabase.from("daily_status_entries").select("collaborator_id")
+            .eq("schedule_id", s.id).eq("box_key", `integracao:${cl.name}`).in("collaborator_id", chosenIds);
+          (bx ?? []).forEach((b) => stillInteg.add(b.collaborator_id));
+        }
+      }
+      const integAllocs = (chosen ?? []).filter((a) => stillInteg.has(a.collaborator_id)).map((a) => ({ id: null as unknown as string, collaborator_id: a.collaborator_id, position_id: null as string | null, collaborators: (a.collaborators as { position_id: string | null } | null) ?? null, lastPos: null as string | null }));
       const integIds = new Set(integAllocs.map((a) => a.collaborator_id));
       if (!s) return { scheduleId: null as string | null, blocked: new Set<string>(), allocs: integAllocs as { id: string; collaborator_id: string; position_id: string | null; collaborators: { position_id: string | null } | null; lastPos: string | null }[] };
       const { data: raw } = await supabase

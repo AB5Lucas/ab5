@@ -196,8 +196,25 @@ function ServicesPage() {
           .eq("schedule_id", sched.id).eq("box_key", `integracao:${clientName}`);
         (st ?? []).forEach((a: any) => m.set(a.collaborator_id, a.collaborators?.full_name ?? "—"));
       }
-      return [...m.entries()].map(([collaborator_id, name]) => ({ collaborator_id, name: `${name} (Integração)` }));
+      // Rateio (sem linha) ou serviço escolhido para quem está em integração neste cliente no dia.
+      const { data: ch } = await supabase.from("integration_service_choices").select("collaborator_id, work_id")
+        .eq("client_id", clientId).eq("schedule_date", date);
+      const choice = new Map((ch ?? []).map((c) => [c.collaborator_id, c.work_id]));
+      return [...m.entries()].map(([collaborator_id, name]) => ({ collaborator_id, name: `${name} (Integração)`, work_id: choice.get(collaborator_id) ?? null }));
     },
+  });
+  const setIntegChoice = useMutation({
+    mutationFn: async ({ collaboratorId, workId }: { collaboratorId: string; workId: string | null }) => {
+      const { error } = workId
+        ? await supabase.from("integration_service_choices").upsert({ schedule_date: date, collaborator_id: collaboratorId, client_id: clientId, work_id: workId })
+        : await supabase.from("integration_service_choices").delete().eq("schedule_date", date).eq("collaborator_id", collaboratorId).eq("client_id", clientId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      toast.success(v.workId ? "Integração lançada no serviço: ele arca com o custo e a pessoa entra no RDO dele." : "Integração no rateio: custo dividido entre os serviços, fora do RDO.");
+      qc.invalidateQueries({ queryKey: ["servicos-integ"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
   const assigned = useMemo(() => allocs.filter((a) => a.service_assigned), [allocs]);
   const pool = useMemo(() => allocs.filter((a) => !a.service_assigned), [allocs]);
@@ -718,9 +735,24 @@ function ServicesPage() {
                   </h2>
                   <Badge variant="outline" className="px-1 py-0 text-[10px]"><Users className="mr-0.5 h-2.5 w-2.5" />{integ.data!.length}</Badge>
                 </header>
+                <p className="border-b border-border px-2 py-1 text-[10px] leading-tight text-muted-foreground">
+                  Rateio: custo dividido entre os serviços e fora do RDO. Serviço: ele arca com todo o custo e a pessoa entra no RDO dele.
+                </p>
                 <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
                   {[...integ.data!].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((p) => (
-                    <li key={p.collaborator_id} className="px-2 py-1.5 text-xs">{p.name.replace(" (Integração)", "")}</li>
+                    <li key={p.collaborator_id} className="space-y-1 px-2 py-1.5 text-xs">
+                      <div className="font-medium">{p.name.replace(" (Integração)", "")}</div>
+                      <select
+                        aria-label={`Destino da integração de ${p.name.replace(" (Integração)", "")}`}
+                        className="block h-7 w-full rounded-md border border-input bg-background px-1.5 text-xs"
+                        value={p.work_id ?? ""}
+                        disabled={setIntegChoice.isPending}
+                        onChange={(e) => setIntegChoice.mutate({ collaboratorId: p.collaborator_id, workId: e.target.value || null })}
+                      >
+                        <option value="">Rateio (todos os serviços)</option>
+                        {works.filter((w) => w.active || w.id === p.work_id).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    </li>
                   ))}
                 </ul>
               </section>

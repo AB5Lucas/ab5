@@ -125,7 +125,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
       const clientName = (client as any).data?.name as string | undefined;
-      const [sibAllocs, sibRdo, integAppts, integBoxes, clientRdos, supportRows, allRdoWorkforce] = await Promise.all([
+      const [sibAllocs, sibRdo, integAppts, integBoxes, clientRdos, supportRows, allRdoWorkforce, integChoices] = await Promise.all([
         sibIds.length
           ? fetchAll<any>((a, b) =>
               supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
@@ -149,6 +149,10 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         fetchAll<any>((a, b) => supabase.from("rdos").select("work_id, report_date").in("work_id", [...new Set([...workIds, ...sibIds])]).range(a, b)),
         w.client_id ? supabase.from("result_support_allocations").select("collaborator_id").eq("client_id", w.client_id) : Promise.resolve({ data: [] }),
         shared ? Promise.resolve(shared.allRdoWorkforce) : fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date").order("id").range(a, b)),
+        // Integração lançada num serviço (aba Serviços): esse serviço arca com o dia todo; sem linha = rateio.
+        w.client_id
+          ? fetchAll<any>((a, b) => supabase.from("integration_service_choices").select("collaborator_id, schedule_date, work_id").eq("client_id", w.client_id!).order("schedule_date").order("collaborator_id").range(a, b))
+          : Promise.resolve([] as any[]),
       ]);
       const supportResult = supportRows as { data: { collaborator_id: string }[] | null; error?: unknown };
       if (supportResult.error) throw supportResult.error;
@@ -159,6 +163,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         sibRdo,
         integAppts,
         integBoxes,
+        integChoices,
         rdoWf,
         progress: progress.data ?? [],
         // Faturamento com mês de competência: cálculos usam a competência; doc_date guarda a data real
@@ -483,8 +488,10 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       bump(date.slice(0, 7), "transport", cost);
     }
     // Integração no cliente: dia de integração (seg–qui 9h, sex 8h) × valor hora × encargos + VT + prêmio viagem,
-    // rateado entre os serviços do cliente pelas horas trabalhadas (RDO)
+    // rateado entre os serviços do cliente pelas horas trabalhadas (RDO). Se na aba Serviços a pessoa foi lançada
+    // num serviço (integration_service_choices), esse serviço arca com 100% do dia e os demais com nada.
     const integTravel = new Map<string, number>();
+    const integChoice = new Map<string, string>(((raw as any).integChoices ?? []).map((c: any) => [`${c.collaborator_id}|${String(c.schedule_date).slice(0, 10)}`, c.work_id as string]));
     {
       // Rateio por mês entre todos os serviços com efetivo no mês (inclui concluídos).
       const allByM = new Map<string, number>();
@@ -533,7 +540,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         if (absent(id, date)) continue;
         const wd = new Date(`${date}T12:00:00`).getDay();
         const hours = wd >= 1 && wd <= 4 ? 9 : 8;
-        const shareF = shareOf(date);
+        const chosenWork = integChoice.get(`${id}|${date}`);
+        const shareF = chosenWork ? (idSet.has(chosenWork) ? 1 : 0) : shareOf(date);
         if (!shareF) continue;
         const mo = hours * (rate.get(id) ?? 0) * enc(id) * shareF;
         const p = person.get(id);

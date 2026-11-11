@@ -2321,6 +2321,55 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_service_choices: {
+        Row: {
+          client_id: string
+          collaborator_id: string
+          schedule_date: string
+          updated_at: string
+          updated_by: string | null
+          work_id: string
+        }
+        Insert: {
+          client_id: string
+          collaborator_id: string
+          schedule_date: string
+          updated_at?: string
+          updated_by?: string | null
+          work_id: string
+        }
+        Update: {
+          client_id?: string
+          collaborator_id?: string
+          schedule_date?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_service_choices_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_service_choices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_service_choices_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       epi_sheets: {
         Row: {
           archived: boolean

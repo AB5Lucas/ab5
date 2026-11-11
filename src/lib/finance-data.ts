@@ -86,7 +86,7 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
   const scope = [...new Set([...allIds, ...batches.flatMap(sibIdsOf)])];
   const clientNames = [...new Set(clientIds.map((id) => clientById.get(id)?.name).filter(Boolean))] as string[];
 
-  const [allocs, rdoWf, progress, entries, vs, workVt, workTravel, integAppts, integBoxes, rdos, support] = await Promise.all([
+  const [allocs, rdoWf, progress, entries, vs, workVt, workTravel, integAppts, integBoxes, rdos, support, integChoices] = await Promise.all([
     byWorks<any>(scope, (ids, a, b) => supabase.from("daily_allocations").select("id, work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", ids).order("id").range(a, b)),
     byWorks<any>(scope, (ids, a, b) => supabase.from("rdo_workforce").select("id, work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, position_id, collaborators(position_id), rdos(shift)").in("work_id", ids).order("id").range(a, b)),
     supabase.from("work_progress").select("*").in("work_id", allIds).order("month"),
@@ -104,6 +104,9 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
       : Promise.resolve([] as any[]),
     byWorks<any>(scope, (ids, a, b) => supabase.from("rdos").select("id, work_id, report_date").in("work_id", ids).order("id").range(a, b)),
     clientIds.length ? supabase.from("result_support_allocations").select("client_id, collaborator_id").in("client_id", clientIds) : Promise.resolve({ data: [], error: null }),
+    clientIds.length
+      ? fetchAll<any>((a, b) => supabase.from("integration_service_choices").select("client_id, collaborator_id, schedule_date, work_id").in("client_id", clientIds).order("schedule_date").order("collaborator_id").order("client_id").range(a, b))
+      : Promise.resolve([] as any[]),
   ]);
   for (const r of [progress, support] as any[]) if (r.error) throw r.error;
 
@@ -120,6 +123,7 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
   const boxBy = groupBy(integBoxes, (r) => r.box_key);
   const rdosBy = groupBy(strip(rdos, ["id"]), (r) => r.work_id);
   const supportBy = groupBy(((support as any).data ?? []) as any[], (r) => r.client_id);
+  const choiceBy = groupBy(integChoices, (r) => (r as any).client_id);
 
   for (const batch of batches) {
     const w = batch.work, workIds = batch.ids;
@@ -140,6 +144,7 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
       sibRdo: sibIds.length ? pick(sibRdoBy, sibIds) : [],
       integAppts: w.client_id ? strip(apptBy.get(w.client_id) ?? [], ["client_id"]) : [],
       integBoxes: client?.name ? strip(boxBy.get(`integracao:${client.name}`) ?? [], ["id", "box_key"]) : [],
+      integChoices: w.client_id ? strip(choiceBy.get(w.client_id) ?? [], ["client_id"]) : [],
       rdoWf: pick(rdoWfBy, workIds),
       progress: pick(progressBy, workIds).sort((a: any, b: any) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0)),
       entries: activeFinancialEntries(pick(entriesBy, workIds).sort((a: any, b: any) => (a.entry_date === b.entry_date ? (a.id < b.id ? -1 : 1) : a.entry_date < b.entry_date ? 1 : -1))).map((e: any) =>
