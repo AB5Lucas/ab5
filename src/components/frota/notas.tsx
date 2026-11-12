@@ -20,6 +20,7 @@ import { baseFolderPath, fixedRateio, fuelRateio, isoDay, plateRuleSplit, FIXED_
 import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
 import { DriverRanking } from "./ranking";
 import { PlateFilter } from "./plate-filter";
+import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 import { currentMonthRange, DateRangePicker, monthsInRange, type DayRange } from "@/components/date-range-picker";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -147,6 +148,29 @@ function FuelNotes() {
   const plates = [...new Set(rows.map((r) => r.plateShown).filter((p): p is string => !!p))].sort();
   const shown = rows.filter((r) => (plate === "all" || r.plateShown === plate) && (
     filter === "todas" ? true : filter === "pendentes" ? r.status !== "aprovada" : filter === "sem-nota" ? r.status === "sem-nota" : filter === "aguardando" ? r.status === "pendente" : r.status === "aprovada"));
+  // Filtros e ordenação por coluna, como no Excel (em cima dos filtros de Situação e Placa).
+  const [colFilters, setColFilters] = useState<ColumnFilters>({});
+  const [colSort, setColSort] = useState<ColumnSort>(null);
+  const columns = useMemo<ColumnDef<Row>[]>(() => [
+    { key: "data", label: "Data", values: (r) => [brDate(r.day)], sort: (r) => r.day },
+    { key: "nf", label: "NF", values: (r) => [r.nf_number ?? ""], sort: (r) => (r.nf_number ? Number(r.nf_number) : null) },
+    { key: "placa", label: "Placa", values: (r) => [r.plateShown ?? "sem placa"] },
+    { key: "motorista", label: "Motorista", values: (r) => [r.driverShown ?? ""] },
+    { key: "veiculo", label: "Veículo", values: (r) => [r.vehicleLabel ?? (r.plateShown ? "não cadastrado" : "")] },
+    { key: "km", label: "Km", align: "right", values: (r) => [r.kmShown == null ? "" : num(r.kmShown, 0)], sort: (r) => (r.kmShown == null ? null : Number(r.kmShown)) },
+    { key: "combustivel", label: "Combustível", values: (r) => [r.fuel ?? ""] },
+    { key: "qtd", label: "Qtd (L)", align: "right", values: (r) => [r.quantity == null ? "" : num(r.quantity, 2)], sort: (r) => (r.quantity == null ? null : Number(r.quantity)) },
+    { key: "rl", label: "R$/L", align: "right", values: (r) => [r.unit_price == null ? "" : num(r.unit_price, 3)], sort: (r) => (r.unit_price == null ? null : Number(r.unit_price)) },
+    { key: "total", label: "Valor total", align: "right", values: (r) => [r.total == null ? "" : brl(r.total)], sort: (r) => (r.total == null ? null : Number(r.total)) },
+    { key: "rateio", label: "Local rateio", values: (r) => (r.rateio?.parts.length ? r.rateio.parts.map((p) => p.client) : ["sem programação"]) },
+    { key: "cc", label: "Centro de custo", values: (r) => (r.rateio?.parts ?? []).map((p) => p.cc ?? p.cc_rule) },
+    { key: "item", label: "Item conta", values: (r) => (r.rateio?.parts ?? []).map((p) => p.item_account ?? "sem equivalência") },
+    { key: "nota", label: "Nota", values: (r) => [r.note_file ? MATCH_LABEL[r.note_match ?? "manual"] ?? "atribuída" : "sem nota"] },
+    { key: "obs", label: "Observações", values: (r) => [r.notes ?? ""] },
+    { key: "aprovacao", label: "Aprovação", align: "right", values: (r) => [r.approved_at ? "Aprovada" : "Não aprovada"] },
+  ], []);
+  const tableRows = useMemo(() => applyColumnFilters(shown, columns, colFilters, colSort), [shown, columns, colFilters, colSort]);
+  const colFiltered = Object.keys(colFilters).length > 0;
   const count = (s: Row["status"]) => rows.filter((r) => r.status === s).length;
   // Fotos ligadas a algum XML do mês (não só aos do período), por mês + arquivo.
   const usedDocs = new Set((notes.data ?? []).filter((n) => n.note_file).map((n) => `${n.ref_month}|${n.note_file}`));
@@ -213,34 +237,28 @@ function FuelNotes() {
         <Kpi label="Total do período" value={brl(rows.reduce((s, r) => s + Number(r.total ?? 0), 0))} />
       </div>
 
+      {colFiltered && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          Filtro nas colunas: {Object.keys(colFilters).map((k) => columns.find((c) => c.key === k)?.label).filter(Boolean).join(", ")}.
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setColFilters({})}>Limpar filtros das colunas</Button>
+        </div>
+      )}
       <div className="panel overflow-x-auto">
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>NF</TableHead>
-              <TableHead>Placa</TableHead>
-              <TableHead>Motorista</TableHead>
-              <TableHead>Veículo</TableHead>
-              <TableHead className="text-right">Km</TableHead>
-              <TableHead>Combustível</TableHead>
-              <TableHead className="text-right">Qtd (L)</TableHead>
-              <TableHead className="text-right">R$/L</TableHead>
-              <TableHead className="text-right">Valor total</TableHead>
-              <TableHead>Local rateio</TableHead>
-              <TableHead>Centro de custo</TableHead>
-              <TableHead>Item conta</TableHead>
-              <TableHead>Nota</TableHead>
-              <TableHead>Observações</TableHead>
-              <TableHead className="text-right">Aprovação</TableHead>
+              {columns.map((c) => (
+                <FilterHead key={c.key} column={c} rows={rowsForColumn(shown, columns, colFilters, c.key)}
+                  filters={colFilters} setFilters={setColFilters} sort={colSort} setSort={setColSort} />
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={16} className="text-muted-foreground">Carregando...</TableCell></TableRow>
-            ) : !shown.length ? (
-              <TableRow><TableCell colSpan={16} className="text-muted-foreground">{rows.length ? "Nenhum abastecimento nesta situação." : "Nenhum XML lido neste mês."}</TableCell></TableRow>
-            ) : shown.map((r) => {
+            ) : !tableRows.length ? (
+              <TableRow><TableCell colSpan={16} className="text-muted-foreground">{!rows.length ? "Nenhum XML lido neste período." : colFiltered ? "Nenhum abastecimento com esses filtros nas colunas." : "Nenhum abastecimento nesta situação."}</TableCell></TableRow>
+            ) : tableRows.map((r) => {
               const parts = r.rateio?.parts ?? [];
               return (
                 <TableRow key={r.id} className="align-top">
@@ -301,13 +319,13 @@ function FuelNotes() {
               );
             })}
           </TableBody>
-          {shown.length > 0 && (
+          {tableRows.length > 0 && (
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={7}>{shown.length} abastecimento(s)</TableCell>
-                <TableCell className="text-right tabular-nums">{num(shown.reduce((s, r) => s + Number(r.quantity ?? 0), 0), 2)}</TableCell>
+                <TableCell colSpan={7}>{tableRows.length} abastecimento(s){colFiltered ? " (com filtro nas colunas)" : ""}</TableCell>
+                <TableCell className="text-right tabular-nums">{num(tableRows.reduce((s, r) => s + Number(r.quantity ?? 0), 0), 2)}</TableCell>
                 <TableCell />
-                <TableCell className="text-right tabular-nums">{brl(shown.reduce((s, r) => s + Number(r.total ?? 0), 0))}</TableCell>
+                <TableCell className="text-right tabular-nums">{brl(tableRows.reduce((s, r) => s + Number(r.total ?? 0), 0))}</TableCell>
                 <TableCell colSpan={6} />
               </TableRow>
             </TableFooter>
