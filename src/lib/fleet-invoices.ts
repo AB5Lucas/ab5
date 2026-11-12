@@ -76,17 +76,26 @@ export function parseInvoiceTexts(parts: string[]): FleetInvoice | null {
   };
 }
 
-/** Mês e quinzena da cobrança pelo período faturado (dia 1 a 15 = 1ª quinzena). */
+/**
+ * Mês e quinzena da cobrança, pela data de emissão (regra de Compras): emitida do dia 1 ao 5 = 2ª quinzena do mês
+ * anterior; do dia 16 ao 20 = 1ª quinzena do mesmo mês. Emitida em outro dia: pelo período faturado do PDF
+ * (início até o dia 15 = 1ª quinzena) e, sem período, pela emissão (até o dia 15 = 2ª do mês anterior).
+ */
 export function invoiceFortnight(periodFrom: string | null, issuedOn: string | null): { month: number | null; year: number | null; fortnight: 1 | 2 | null } {
+  const prevMonth = (y: number, m: number) => (m === 1 ? { month: 12, year: y - 1 } : { month: m - 1, year: y });
+  const issued = issuedOn ? (issuedOn.split("-").map(Number) as [number, number, number]) : null;
+  if (issued) {
+    const [y, m, d] = issued;
+    if (d >= 1 && d <= 5) return { ...prevMonth(y, m), fortnight: 2 };
+    if (d >= 16 && d <= 20) return { month: m, year: y, fortnight: 1 };
+  }
   if (periodFrom) {
     const [y, m, d] = periodFrom.split("-").map(Number) as [number, number, number];
     return { month: m, year: y, fortnight: d <= 15 ? 1 : 2 };
   }
-  // Sem período no PDF: a fatura sai logo depois da quinzena (emitida no dia 16 = 1ª quinzena do mesmo mês).
-  if (!issuedOn) return { month: null, year: null, fortnight: null };
-  const [y, m, d] = issuedOn.split("-").map(Number) as [number, number, number];
-  if (d > 15) return { month: m, year: y, fortnight: 1 };
-  return m === 1 ? { month: 12, year: y - 1, fortnight: 2 } : { month: m - 1, year: y, fortnight: 2 };
+  if (!issued) return { month: null, year: null, fortnight: null };
+  const [y, m, d] = issued;
+  return d > 15 ? { month: m, year: y, fortnight: 1 } : { ...prevMonth(y, m), fortnight: 2 };
 }
 
 /** Número como na planilha de Compras: 9 dígitos ("1105629" → "001105629"). */

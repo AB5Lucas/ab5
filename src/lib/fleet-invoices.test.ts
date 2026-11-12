@@ -61,5 +61,9 @@ describe("fatura do posto (PDF)", () => {
     expect(invoiceFortnight("2026-09-16", "2026-10-01")).toEqual({ month: 9, year: 2026, fortnight: 2 });
     expect(invoiceFortnight(null, "2026-01-02")).toEqual({ month: 12, year: 2025, fortnight: 2 });
     expect(invoiceFortnight(null, "2026-01-16")).toEqual({ month: 1, year: 2026, fortnight: 1 });
+    // A emissão manda: dia 1 a 5 = 2ª do mês anterior; 16 a 20 = 1ª do mesmo mês (mesmo com outro período no PDF).
+    expect(invoiceFortnight("2026-01-01", "2026-02-03")).toEqual({ month: 1, year: 2026, fortnight: 2 });
+    expect(invoiceFortnight("2026-02-16", "2026-03-18")).toEqual({ month: 3, year: 2026, fortnight: 1 });
+    expect(invoiceFortnight("2026-03-16", "2026-04-10")).toEqual({ month: 3, year: 2026, fortnight: 2 });
   });
 });
