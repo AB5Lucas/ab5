@@ -19,6 +19,7 @@ import { normalizePlate } from "@/lib/fleet-costs";
 import { baseFolderPath, fixedRateio, fuelRateio, isoDay, plateRuleSplit, FIXED_PLATE_CC, type CcSplitItem, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
 import { DriverRanking } from "./ranking";
+import { PlateFilter } from "./plate-filter";
 import { currentMonthRange, DateRangePicker, monthsInRange, type DayRange } from "@/components/date-range-picker";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -188,16 +189,8 @@ function FuelNotes() {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <Label>Placa</Label>
-          <Select value={plate} onValueChange={setPlate}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {plates.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        <PlateFilter id="notes-plate" value={plate} onChange={setPlate}
+          options={plates.map((p) => ({ plate: p, name: rows.find((r) => r.plateShown === p)?.vehicleLabel ?? null }))} />
         <Button variant="outline" onClick={() => setFolders(true)}><FolderCog className="h-4 w-4" /> Pastas</Button>
         <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
           <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Lendo pastas..." : "Ler pastas"}
