@@ -49,3 +49,13 @@ export const fleetNoteLink = createServerFn({ method: "POST" })
     const { noteFileUrl } = await import("./fleet-notes.server");
     return noteFileUrl(data.itemId, credentials());
   });
+
+/** Lê a pasta das faturas do posto (Frota › Abastecimento › Fiscal). */
+export const syncFleetInvoicesNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: allowed, error } = await context.supabase.rpc("can_access_page", { _path: "/frota/notas" });
+    if (error || !allowed) throw new Error("Você não tem acesso a Frota › Abastecimento");
+    const { executeFleetInvoicesSync } = await import("./fleet-notes.server");
+    return executeFleetInvoicesSync(credentials());
+  });

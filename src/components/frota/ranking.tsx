@@ -54,8 +54,8 @@ export function DriverRanking() {
       const vIds = release.vehicleIdsOn(day), dIds = release.driverIdsOn(day);
       return {
         ...n,
-        plate_fix: n.plate_fix ?? closestPlate(n.plate, (vehicles.data ?? []).filter((v) => vIds.has(v.id)).map((v) => v.plate), allPlates),
-        driver_fix: n.driver_fix ?? matchDriverName(n.driver, (cnh.data ?? []).filter((c) => dIds.has(c.id)).map((c) => c.full_name), cnhNames),
+        plate_fix: n.plate_fix ?? closestPlate(n.plate, [...(vehicles.data ?? []).filter((v) => vIds.has(v.id)).map((v) => v.plate), ...release.freePlatesOn(day)], allPlates),
+        driver_fix: n.driver_fix ?? matchDriverName(n.driver, [...(cnh.data ?? []).filter((c) => dIds.has(c.id)).map((c) => c.full_name), ...release.freeNamesOn(day)], cnhNames),
       };
     });
   }, [notes.data, vehicles.data, cnh.data, release.drivers, release.vehicles]);

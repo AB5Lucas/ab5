@@ -2183,6 +2183,57 @@ export type Database = {
         }
         Relationships: []
       }
+      fleet_invoices: {
+        Row: {
+          coupon_keys: Json
+          due_on: string | null
+          file_name: string
+          id: string
+          issued_on: string | null
+          item_id: string | null
+          number: string | null
+          paid: boolean
+          paid_at: string | null
+          paid_by: string | null
+          period_from: string | null
+          period_to: string | null
+          synced_at: string
+          total: number | null
+        }
+        Insert: {
+          coupon_keys?: Json
+          due_on?: string | null
+          file_name: string
+          id?: string
+          issued_on?: string | null
+          item_id?: string | null
+          number?: string | null
+          paid?: boolean
+          paid_at?: string | null
+          paid_by?: string | null
+          period_from?: string | null
+          period_to?: string | null
+          synced_at?: string
+          total?: number | null
+        }
+        Update: {
+          coupon_keys?: Json
+          due_on?: string | null
+          file_name?: string
+          id?: string
+          issued_on?: string | null
+          item_id?: string | null
+          number?: string | null
+          paid?: boolean
+          paid_at?: string | null
+          paid_by?: string | null
+          period_from?: string | null
+          period_to?: string | null
+          synced_at?: string
+          total?: number | null
+        }
+        Relationships: []
+      }
       fleet_item_accounts: {
         Row: {
           cc_code: string
@@ -2248,21 +2299,27 @@ export type Database = {
           active: boolean
           released_at: string | null
           removed_at: string | null
-          collaborator_id: string
+          collaborator_id: string | null
+          id: string
+          name: string | null
           created_at: string
         }
         Insert: {
           active?: boolean
           released_at?: string | null
           removed_at?: string | null
-          collaborator_id: string
+          collaborator_id?: string | null
+          id?: string
+          name?: string | null
           created_at?: string
         }
         Update: {
           active?: boolean
           released_at?: string | null
           removed_at?: string | null
-          collaborator_id?: string
+          collaborator_id?: string | null
+          id?: string
+          name?: string | null
           created_at?: string
         }
         Relationships: []
@@ -2273,21 +2330,30 @@ export type Database = {
           released_at: string | null
           removed_at: string | null
           created_at: string
-          vehicle_id: string
+          id: string
+          label: string | null
+          plate: string | null
+          vehicle_id: string | null
         }
         Insert: {
           active?: boolean
           released_at?: string | null
           removed_at?: string | null
           created_at?: string
-          vehicle_id: string
+          id?: string
+          label?: string | null
+          plate?: string | null
+          vehicle_id?: string | null
         }
         Update: {
           active?: boolean
           released_at?: string | null
           removed_at?: string | null
           created_at?: string
-          vehicle_id?: string
+          id?: string
+          label?: string | null
+          plate?: string | null
+          vehicle_id?: string | null
         }
         Relationships: []
       }
@@ -5477,6 +5543,10 @@ export type Database = {
         Returns: string
       }
       driver_bonus_default: { Args: { _driver_id: string }; Returns: boolean }
+      fleet_invoices_sync: {
+        Args: { p_rows: Json }
+        Returns: number
+      }
       fleet_fuel_notes_sync: {
         Args: { p_docs: Json; p_month: string; p_notes: Json }
         Returns: number

@@ -201,3 +201,41 @@ export async function noteFileUrl(itemId: string, c: Credentials): Promise<strin
   const item: any = await graph(`${DRIVE}/items/${itemId}?$select=webUrl`, c);
   return item?.webUrl ?? null;
 }
+
+// ---------- Fiscal: faturas do posto (PDF) ----------
+/**
+ * Lê a pasta das faturas (configurável; padrão 03 FATURAS) e as subpastas de ano ("2026"): cada PDF vira uma
+ * fatura. Só baixa os novos ou alterados. O "Pago?" é marcado na tela e nunca é apagado pela leitura.
+ */
+export async function executeFleetInvoicesSync(c: Credentials) {
+  const { DEFAULT_INVOICE_FOLDER, parseInvoiceTexts, pdfTexts } = await import("./fleet-invoices");
+  const base = baseFolderPath((await setting("invoice_folder")) ?? DEFAULT_INVOICE_FOLDER);
+  const top = await children(base, c);
+  const files: (Item & { path: string })[] = top.filter((i) => i.file && /\.pdf$/i.test(i.name)).map((i) => ({ ...i, path: base }));
+  for (const y of top.filter((i) => i.folder && /^\d{4}$/.test(i.name.trim()))) {
+    files.push(...(await children(`${base}/${y.name}`, c)).filter((i) => i.file && /\.pdf$/i.test(i.name)).map((i) => ({ ...i, path: `${base}/${y.name}` })));
+  }
+  const { data: known } = await supabaseAdmin.from("fleet_invoices").select("file_name, number, issued_on, due_on, total, period_from, period_to, coupon_keys, synced_at");
+  const byFile = new Map((known ?? []).map((k) => [k.file_name, k]));
+  const errors: string[] = [];
+  const rows = (await pool(files, 6, async (f) => {
+    const name = `${f.path.slice(base.length + 1) ? `${f.path.slice(base.length + 1)}/` : ""}${f.name}`;
+    const old = byFile.get(name);
+    if (old?.number && f.lastModifiedDateTime && Date.parse(old.synced_at) >= Date.parse(f.lastModifiedDateTime)) {
+      const { synced_at: _s, ...rest } = old;
+      return { ...rest, file_name: name, item_id: f.id };
+    }
+    try {
+      const buf: ArrayBuffer = await graph(`${DRIVE}/items/${f.id}/content`, c, true);
+      const inv = parseInvoiceTexts(await pdfTexts(buf));
+      if (!inv) { errors.push(`${name}: não achei o número da fatura no PDF`); return null; }
+      return { file_name: name, item_id: f.id, ...inv };
+    } catch (err) {
+      errors.push(`${name}: ${err instanceof Error ? err.message : String(err)}`);
+      return old ? (({ synced_at: _s, ...rest }) => ({ ...rest, file_name: name, item_id: f.id }))(old) : null;
+    }
+  })).filter((r): r is NonNullable<typeof r> => !!r);
+  const { data: n, error } = await supabaseAdmin.rpc("fleet_invoices_sync", { p_rows: JSON.parse(JSON.stringify(rows)) });
+  if (error) throw error;
+  return { folder: base, files: files.length, saved: n as number, errors: errors.slice(0, 20) };
+}

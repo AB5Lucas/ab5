@@ -21,6 +21,7 @@ import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fle
 import { DriverRanking } from "./ranking";
 import { PlateFilter } from "./plate-filter";
 import { FleetRelease, useCnhPeople, useFleetRelease } from "./liberacao";
+import { FleetFiscal } from "./fiscal";
 import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 import { currentMonthRange, DateRangePicker, monthsInRange, type DayRange } from "@/components/date-range-picker";
 import type { Tables } from "@/integrations/supabase/types";
@@ -48,11 +49,13 @@ export function FleetNotesPage() {
           <TabsTrigger value="abastecimentos">Abastecimentos</TabsTrigger>
           <TabsTrigger value="ranking">Ranking</TabsTrigger>
           <TabsTrigger value="liberacao">Liberação</TabsTrigger>
+          <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
           <TabsTrigger value="equivalencias">Item Conta</TabsTrigger>
         </TabsList>
         <TabsContent value="abastecimentos" className="mt-4"><FuelNotes /></TabsContent>
         <TabsContent value="ranking" className="mt-4"><DriverRanking /></TabsContent>
         <TabsContent value="liberacao" className="mt-4"><FleetRelease /></TabsContent>
+        <TabsContent value="fiscal" className="mt-4"><FleetFiscal /></TabsContent>
         <TabsContent value="equivalencias" className="mt-4"><ItemAccounts /></TabsContent>
       </Tabs>
     </div>
@@ -130,8 +133,8 @@ function FuelNotes() {
       if (!dayCache.has(k)) {
         const vIds = release.vehicleIdsOn(day), dIds = release.driverIdsOn(day);
         dayCache.set(k, {
-          plates: (vehicles.data ?? []).filter((v) => vIds.has(v.id)).map((v) => v.plate),
-          names: (cnh.data ?? []).filter((c) => dIds.has(c.id)).map((c) => c.full_name),
+          plates: [...(vehicles.data ?? []).filter((v) => vIds.has(v.id)).map((v) => v.plate), ...release.freePlatesOn(day)],
+          names: [...(cnh.data ?? []).filter((c) => dIds.has(c.id)).map((c) => c.full_name), ...release.freeNamesOn(day)],
         });
       }
       return dayCache.get(k)!;
@@ -177,7 +180,7 @@ function FuelNotes() {
         ...(n.plate_fix ? [] : otherPlates(n.info, normalizePlate(n.plate ?? "") || p).filter((o) => o !== p).map((o) => `outra placa no texto da nota: ${o}`)),
         ...(kmShown != null && prevKm != null && Number(kmShown) < Number(prevKm) ? [`km menor que o abastecimento anterior (${Number(prevKm).toLocaleString("pt-BR")})`] : []),
       ];
-      return { ...n, day, plateShown: p, kmShown, driverShown: driverOf(n), vehicleLabel: v ? (v.model ?? v.plate) : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
+      return { ...n, day, plateShown: p, kmShown, driverShown: driverOf(n), vehicleLabel: v ? (v.model ?? v.plate) : p ? release.freeVehicleLabel.get(p) ?? null : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
     });
   }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, start, end, cnh.data, release.drivers, release.vehicles]);
 
