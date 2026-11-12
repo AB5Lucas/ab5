@@ -58,26 +58,28 @@ export async function executeFleetNotesSync(ym: string, c: Credentials) {
   const files = (await children(xmlDir, c)).filter((i) => i.file && /\.xml$/i.test(i.name));
 
   const { data: known } = await supabaseAdmin.from("fleet_fuel_notes")
-    .select("access_key, xml_file, issued_at, nf_number, issuer, plate, km, driver, fuel, quantity, unit_price, total, info, synced_at").eq("ref_month", ym);
-  const byFile = new Map((known ?? []).map((k) => [k.xml_file, k]));
+    .select("access_key, item_no, xml_file, issued_at, nf_number, issuer, plate, km, driver, fuel, quantity, unit_price, total, info, synced_at").eq("ref_month", ym);
+  const byFile = new Map<string, NonNullable<typeof known>>();
+  for (const k of known ?? []) byFile.set(k.xml_file, [...(byFile.get(k.xml_file) ?? []), k]);
+  const strip = (list: NonNullable<typeof known>) => list.map(({ synced_at: _s, ...rest }) => rest as FuelNoteRow);
   const errors: string[] = [];
-  const rows = (await pool(files, 6, async (f): Promise<FuelNoteRow | null> => {
+  const rows = (await pool(files, 6, async (f): Promise<FuelNoteRow[]> => {
     const old = byFile.get(f.name);
-    if (old && f.lastModifiedDateTime && Date.parse(old.synced_at) >= Date.parse(f.lastModifiedDateTime)) {
-      const { synced_at: _s, ...rest } = old;
-      return rest as FuelNoteRow;
+    // XML sem mudança é reaproveitado; o que ainda tem dois combustíveis numa linha só (" + ") é lido de novo.
+    if (old?.length && f.lastModifiedDateTime && old.every((o) => Date.parse(o.synced_at) >= Date.parse(f.lastModifiedDateTime!)) && !old.some((o) => (o.fuel ?? "").includes(" + "))) {
+      return strip(old);
     }
     try {
       const buf: ArrayBuffer = await graph(`${DRIVE}/items/${f.id}/content`, c, true);
-      const row = parseFuelXml(new TextDecoder("utf-8").decode(buf), f.name);
-      if (!row) errors.push(`${f.name}: não é uma NF-e`);
-      return row;
+      const parsed = parseFuelXml(new TextDecoder("utf-8").decode(buf), f.name);
+      if (!parsed) errors.push(`${f.name}: não é uma NF-e`);
+      return parsed ?? [];
     } catch (err) {
       errors.push(`${f.name}: ${err instanceof Error ? err.message : String(err)}`);
-      return old ? (({ synced_at: _s, ...rest }) => rest as FuelNoteRow)(old) : null;
+      return old ? strip(old) : [];
     }
-  })).filter((r): r is FuelNoteRow => !!r);
-  const unique = [...new Map(rows.map((r) => [r.access_key, r])).values()];
+  })).flat();
+  const unique = [...new Map(rows.map((r) => [`${r.access_key}|${r.item_no}`, r])).values()];
 
   let docs: { id: string; name: string }[] = [];
   let notesDir: string | null = null;

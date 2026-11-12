@@ -73,14 +73,18 @@ export function FilterHead<T>({ column, rows, filters, setFilters, sort, setSort
     setOpen(false);
   };
   return (
-    <TableHead className={column.align === "right" ? "text-right" : undefined}>
-      <div className={`inline-flex items-center gap-0.5 ${column.align === "right" ? "flex-row-reverse" : ""}`}>
-        <span>{column.label}</span>
+    <TableHead className={`px-1 py-1 ${column.align === "right" ? "text-right" : ""}`}>
+      <div className={column.align === "right" ? "flex justify-end" : undefined}>
         <Popover open={open} onOpenChange={onOpen}>
+          {/* Card com o nome da coluna; o símbolo do filtro fica pequeno no canto (destacado quando filtrada/ordenada). */}
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className={`h-5 w-5 ${current || sorted ? "text-primary" : "text-muted-foreground"}`} aria-label={`Filtrar ${column.label}`}>
-              {sorted === "asc" ? <ArrowDownAZ className="h-3.5 w-3.5" /> : sorted === "desc" ? <ArrowUpAZ className="h-3.5 w-3.5" /> : <Filter className={`h-3 w-3 ${current ? "fill-current" : ""}`} />}
-            </Button>
+            <button type="button" aria-label={`Filtrar ${column.label}`} title="Filtrar / ordenar"
+              className={`relative whitespace-nowrap rounded-md border px-2 py-1 pr-4 text-left text-xs font-medium transition-colors hover:bg-muted ${current || sorted ? "border-primary/50 bg-primary/5 text-foreground" : "border-border/60 bg-muted/30 text-muted-foreground"}`}>
+              {column.label}
+              <span className={`absolute right-0.5 top-0.5 ${current || sorted ? "text-primary" : "text-muted-foreground/50"}`}>
+                {sorted === "asc" ? <ArrowDownAZ className="h-2.5 w-2.5" /> : sorted === "desc" ? <ArrowUpAZ className="h-2.5 w-2.5" /> : <Filter className={`h-2.5 w-2.5 ${current ? "fill-current" : ""}`} />}
+              </span>
+            </button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-2 text-sm font-normal" align="start">
             <div className="mb-2 flex gap-1">

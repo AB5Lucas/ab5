@@ -2096,6 +2096,7 @@ export type Database = {
           fuel: string | null
           id: string
           info: string | null
+          item_no: number
           item_account_fix: string | null
           issued_at: string | null
           issuer: string | null
@@ -2128,6 +2129,7 @@ export type Database = {
           fuel?: string | null
           id?: string
           info?: string | null
+          item_no?: number
           item_account_fix?: string | null
           issued_at?: string | null
           issuer?: string | null
@@ -2160,6 +2162,7 @@ export type Database = {
           fuel?: string | null
           id?: string
           info?: string | null
+          item_no?: number
           item_account_fix?: string | null
           issued_at?: string | null
           issuer?: string | null
@@ -2237,6 +2240,36 @@ export type Database = {
           read_plate?: string | null
           read_total?: number | null
           ref_month?: string
+        }
+        Relationships: []
+      }
+      fleet_release_drivers: {
+        Row: {
+          collaborator_id: string
+          created_at: string
+        }
+        Insert: {
+          collaborator_id: string
+          created_at?: string
+        }
+        Update: {
+          collaborator_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      fleet_release_vehicles: {
+        Row: {
+          created_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          created_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          created_at?: string
+          vehicle_id?: string
         }
         Relationships: []
       }

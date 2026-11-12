@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { driverRanking, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
+import { closestPlate, driverRanking, matchDriverName, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
+import { useCnhPeople, useFleetRelease } from "./liberacao";
 import { currentMonthRange, DateRangePicker, type DayRange } from "@/components/date-range-picker";
 
 const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
@@ -29,8 +30,8 @@ export function DriverRanking() {
 
   const notes = useQuery({
     queryKey: ["fleet-ranking-notes", range.from, range.to],
-    queryFn: () => fetchAll<RankingNote>((a, b) => supabase.from("fleet_fuel_notes")
-      .select("id, nf_number, issued_at, plate, plate_fix, driver, driver_fix, total, note_file")
+    queryFn: () => fetchAll<RankingNote & { access_key: string; item_no: number }>((a, b) => supabase.from("fleet_fuel_notes")
+      .select("id, access_key, item_no, nf_number, issued_at, plate, plate_fix, driver, driver_fix, total, note_file")
       .gte("issued_at", `${range.from}T00:00:00-03:00`).lte("issued_at", `${range.to}T23:59:59-03:00`).order("issued_at").range(a, b)),
   });
   const schedules = useQuery({
@@ -41,10 +42,24 @@ export function DriverRanking() {
   const vehicles = useQuery({ queryKey: ["fleet-vehicles-basic"], queryFn: async () => (await supabase.from("vehicles").select("id, plate, model").order("plate")).data ?? [] });
   const names = useQuery({ queryKey: ["fleet-driver-names"], queryFn: async () => new Map(((await supabase.from("collaborators").select("id, full_name")).data ?? []).map((c) => [c.id, c.full_name])) });
 
+  const cnh = useCnhPeople();
+  const release = useFleetRelease();
+  // Um XML = um abastecimento (itens de outro combustível não contam de novo); placa e nome casados como no Abastecimento.
+  const matched = useMemo<RankingNote[]>(() => {
+    const allPlates = (vehicles.data ?? []).map((v) => v.plate);
+    const releasedPlates = (vehicles.data ?? []).filter((v) => release.vehicleIds.has(v.id)).map((v) => v.plate);
+    const cnhNames = (cnh.data ?? []).map((c) => c.full_name);
+    const releasedNames = (cnh.data ?? []).filter((c) => release.driverIds.has(c.id)).map((c) => c.full_name);
+    return (notes.data ?? []).filter((n) => n.item_no === 1).map((n) => ({
+      ...n,
+      plate_fix: n.plate_fix ?? closestPlate(n.plate, releasedPlates, allPlates),
+      driver_fix: n.driver_fix ?? matchDriverName(n.driver, releasedNames, cnhNames),
+    }));
+  }, [notes.data, vehicles.data, cnh.data, release.driverIds, release.vehicleIds]);
   const ranking = useMemo(() => driverRanking(
-    notes.data ?? [], schedules.data ?? [],
+    matched, schedules.data ?? [],
     new Map((vehicles.data ?? []).map((v) => [normalizePlate(v.plate), v.id])), names.data ?? new Map<string, string>(), today,
-  ), [notes.data, schedules.data, vehicles.data, names.data, today]);
+  ), [matched, schedules.data, vehicles.data, names.data, today]);
   const loading = notes.isLoading || schedules.isLoading || vehicles.isLoading || names.isLoading;
   const totals = ranking.reduce((s, r) => ({ delivered: s.delivered + r.delivered, pending: s.pending + r.pending, waiting: s.waiting + r.waiting }), { delivered: 0, pending: 0, waiting: 0 });
   const overall = totals.delivered + totals.pending ? Math.round((totals.delivered / (totals.delivered + totals.pending)) * 100) : null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseFolderPath, clientCc, driverRanking, fixedRateio, plateRuleSplit, folderMonthScore, fuelRateio, infoFields, itemAccountFor, maintenanceState, matchPhotosByTime, otherPlates, parseFuelXml, photoTime, pickMonthFolder, sharepointPath } from "./fleet-notes";
+import { baseFolderPath, clientCc, closestPlate, driverRanking, fixedRateio, matchDriverName, plateRuleSplit, folderMonthScore, fuelRateio, infoFields, itemAccountFor, maintenanceState, matchPhotosByTime, otherPlates, parseFuelXml, photoTime, pickMonthFolder, sharepointPath } from "./fleet-notes";
 
 const KEY = "35261112345678000199550010000482111000482115";
 const XML = `<?xml version="1.0"?><nfeProc><NFe><infNFe Id="NFe${KEY}" versao="4.00">
@@ -12,7 +12,10 @@ const XML = `<?xml version="1.0"?><nfeProc><NFe><infNFe Id="NFe${KEY}" versao="4
 
 describe("XML do posto", () => {
   it("lê chave, NF, combustível, placa, km e motorista", () => {
-    const r = parseFuelXml(XML, `${KEY}.xml`)!;
+    const rows = parseFuelXml(XML, `${KEY}.xml`)!;
+    expect(rows).toHaveLength(1);
+    const r = rows[0]!;
+    expect(r.item_no).toBe(1);
     expect(r.access_key).toBe(KEY);
     expect(r.nf_number).toBe("48211");
     expect(r.issuer).toBe("Posto X");
@@ -165,5 +168,50 @@ describe("CC à mão e placa com CC fixo", () => {
   it("DAJ5I66 vai sempre para o 2004221", () => {
     expect(plateRuleSplit("DAJ5I66", acc)).toEqual([{ cc_code: "2004221", item_account: "018", label: "ADM MARS", pct: 100 }]);
     expect(plateRuleSplit("TDJ9B39", acc)).toBeNull();
+  });
+});
+
+describe("nota com dois combustíveis", () => {
+  const TWO = XML.replace(/<det nItem="1">[\s\S]*?<\/det>/, `<det nItem="1"><prod><xProd>OLEO DIESEL B S10</xProd><uCom>L</uCom><qCom>50</qCom><vUnCom>6.00</vUnCom><vProd>300.00</vProd><comb><cProdANP>820101034</cProdANP></comb></prod></det>
+<det nItem="2"><prod><xProd>ARLA 32</xProd><uCom>L</uCom><qCom>20</qCom><vUnCom>4.313</vUnCom><vProd>86.26</vProd><comb><cProdANP>810102001</cProdANP></comb></prod></det>`);
+  it("vira duas linhas do mesmo XML, cada uma com o seu valor", () => {
+    const rows = parseFuelXml(TWO, `${KEY}.xml`)!;
+    expect(rows.map((r) => [r.item_no, r.fuel, r.quantity, r.total])).toEqual([[1, "OLEO DIESEL B S10", 50, 300], [2, "ARLA 32", 20, 86.26]]);
+    expect(rows.every((r) => r.access_key === KEY && r.plate === "TDJ9B37")).toBe(true);
+  });
+});
+
+describe("placa e motorista da nota → cadastro", () => {
+  it("placa antiga vira a Mercosul cadastrada e erro de digitação acha a mais próxima", () => {
+    expect(closestPlate("ECM8414", ["ECM8E14", "TDJ9B39"])).toBe("ECM8E14");
+    expect(closestPlate("ECM-8E14", [], ["ECM8E14"])).toBe("ECM8E14");
+    expect(closestPlate("TDJ9B3O", ["TDJ9B30", "TDJ9B39"])).toBe("TDJ9B30");
+    expect(closestPlate("TDJ9B38", ["TDJ9B39"])).toBe("TDJ9B39");
+    expect(closestPlate("XYZ1A23", ["TDJ9B39"])).toBe("XYZ1A23");
+  });
+  it("nome da nota vira o nome completo, primeiro entre os liberados", () => {
+    const liberados = ["MATHEUS QUIRINO DA SILVA", "ANDRE DE JESUS SANTOS"];
+    expect(matchDriverName("Matheus Quirino", liberados)).toBe("MATHEUS QUIRINO DA SILVA");
+    expect(matchDriverName("Andre Jesus", liberados)).toBe("ANDRE DE JESUS SANTOS");
+    expect(matchDriverName("Andre Jesu", liberados)).toBe("ANDRE DE JESUS SANTOS");
+    expect(matchDriverName("Andre", liberados)).toBe("ANDRE DE JESUS SANTOS");
+    expect(matchDriverName("Andre", [], ["ANDRE DE JESUS SANTOS", "ANDRE LUIZ"])).toBeNull();
+    expect(matchDriverName("Carlos Souza", liberados, ["CARLOS EDUARDO SOUZA"])).toBe("CARLOS EDUARDO SOUZA");
+    expect(matchDriverName("Carlos", liberados)).toBeNull();
+  });
+});
+
+describe("rateio pelo km", () => {
+  it("divide pelo km rodado em cada cliente no período", () => {
+    const clients = new Map([["a", { id: "a", name: "Suzano", cc_prefix: "0102" }], ["b", { id: "b", name: "Mars", cc_prefix: "0200" }]]);
+    const schedules = [
+      { vehicle_id: "v", schedule_date: "2026-11-02", client_id: "a", km: 50, trips: 1 },
+      { vehicle_id: "v", schedule_date: "2026-11-03", client_id: "a", km: 50, trips: 1 },
+      { vehicle_id: "v", schedule_date: "2026-11-04", client_id: "b", km: 10, trips: 1, extra_client_ids: ["a"], extra_km: 20 },
+    ];
+    const r = fuelRateio({ vehicleId: "v", day: "2026-11-05", prevDay: "2026-11-01", total: 240, schedules, clients, works: [], accounts: [] });
+    expect(r.basis).toBe("km");
+    // Suzano: 100 + 100 + 20 extra = 220 km; Mars: 20 km.
+    expect(r.parts.map((p) => [p.client, p.km, p.value])).toEqual([["Suzano", 220, 220], ["Mars", 20, 20]]);
   });
 });

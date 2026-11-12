@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { isoDay, maintenanceState, type MaintenanceState } from "@/lib/fleet-notes";
+import { closestPlate, isoDay, maintenanceState, type MaintenanceState } from "@/lib/fleet-notes";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Vehicle = { id: string; plate: string; model: string | null; ownership: string; status: string | null };
@@ -54,8 +54,10 @@ export function FleetServicePage() {
 
   const rows = useMemo<Row[]>(() => {
     const lastKm = new Map<string, { km: number; date: string | null }>();
+    const allPlates = (vehicles.data ?? []).map((v) => v.plate);
     for (const r of readings.data ?? []) {
-      const p = normalizePlate(r.plate_fix ?? r.plate ?? "");
+      // Placa da nota → placa cadastrada mais próxima (ECM8414 = ECM8E14), como no Abastecimento.
+      const p = r.plate_fix ? normalizePlate(r.plate_fix) : closestPlate(r.plate, allPlates);
       const k = r.km_fix ?? r.km;
       if (p && k != null && !lastKm.has(p)) lastKm.set(p, { km: Number(k), date: isoDay(r.issued_at) });
     }

@@ -3,7 +3,7 @@ import { normalizePlate } from "./fleet-costs";
 /** Frota › Notas: abastecimentos lidos dos XML do posto, conferência com as notas, rateio e centro de custo. */
 
 export type FuelNoteRow = {
-  access_key: string; xml_file: string; issued_at: string | null; nf_number: string | null; issuer: string | null;
+  access_key: string; item_no: number; xml_file: string; issued_at: string | null; nf_number: string | null; issuer: string | null;
   plate: string | null; km: number | null; driver: string | null; fuel: string | null;
   quantity: number | null; unit_price: number | null; total: number | null; info: string | null;
 };
@@ -128,41 +128,124 @@ export function infoFields(text: string): { plate: string | null; km: number | n
 const PLACA_FALLBACK = new RegExp(PLATE.source);
 
 const FUEL = /DIESEL|GASOLINA|ETANOL|ALCOOL|GNV|ARLA|S-?10|S-?500/i;
-/** Lê um XML do posto. Devolve null se não for uma NF-e/NFC-e. */
-export function parseFuelXml(xml: string, fileName: string): FuelNoteRow | null {
+/**
+ * Lê um XML do posto: um abastecimento por item de combustível da nota (ex.: Diesel S10 + Arla viram duas linhas,
+ * cada uma pode ir para uma placa). Sem item de combustível, uma linha com a nota toda. Null se não for NF-e/NFC-e.
+ */
+export function parseFuelXml(xml: string, fileName: string): FuelNoteRow[] | null {
   if (!/<(?:\w+:)?infNFe\b/.test(xml)) return null;
   const key = xml.match(/Id="NFe(\d{44})"/)?.[1] ?? tag(xml, "chNFe") ?? fileName.replace(/\D/g, "").match(/\d{44}/)?.[0] ?? null;
   if (!key) return null;
   const items = tags(xml, "det").map((d) => ({
-    name: tag(d, "xProd") ?? "", unit: (tag(d, "uCom") ?? "").toUpperCase(), qty: num(tag(d, "qCom")),
-    price: num(tag(d, "vUnCom")), value: num(tag(d, "vProd")), comb: /<(?:\w+:)?comb\b/.test(d),
+    name: tag(d, "xProd") ?? "", qty: num(tag(d, "qCom")), price: num(tag(d, "vUnCom")), value: num(tag(d, "vProd")), comb: /<(?:\w+:)?comb\b/.test(d),
+    net: (num(tag(d, "vProd")) ?? 0) - (num(tag(d, "vDesc")) ?? 0) + (num(tag(d, "vOutro")) ?? 0) + (num(tag(d, "vFrete")) ?? 0) + (num(tag(d, "vSeg")) ?? 0),
   }));
-  const fuels = items.filter((i) => i.comb).length ? items.filter((i) => i.comb) : items.filter((i) => FUEL.test(i.name)).length ? items.filter((i) => FUEL.test(i.name)) : items;
-  const qty = fuels.reduce((s, i) => s + (i.qty ?? 0), 0);
-  const value = fuels.reduce((s, i) => s + (i.value ?? 0), 0);
+  const combItems = items.filter((i) => i.comb);
+  const named = items.filter((i) => FUEL.test(i.name));
+  const fuels = combItems.length ? combItems : named.length ? named : items;
   const obs = [...xml.matchAll(/<(?:\w+:)?obsCont[^>]*xCampo="([^"]*)"[^>]*>([\s\S]*?)<\/(?:\w+:)?obsCont>/g)]
     .map((m) => `${decode(m[1]!)}: ${tag(m[2]!, "xTexto") ?? ""}`);
   const info = [tag(xml, "infCpl"), ...obs].filter(Boolean).join(" | ");
   const fields = infoFields(info);
   const nf = (tag(xml, "nNF") ?? "").replace(/\D/g, "") || null;
-  return {
+  const noteTotal = num(tag(xml, "vNF")) ?? (fuels.reduce((s, i) => s + (i.value ?? 0), 0) || null);
+  const base = {
     access_key: key, xml_file: fileName, issued_at: tag(xml, "dhEmi") ?? (tag(xml, "dEmi") ? `${tag(xml, "dEmi")}T12:00:00-03:00` : null),
     nf_number: nf, issuer: tag(tags(xml, "emit")[0] ?? "", "xFant") ?? tag(tags(xml, "emit")[0] ?? "", "xNome"),
-    plate: fields.plate, km: fields.km, driver: fields.driver,
-    fuel: [...new Set(fuels.map((i) => i.name).filter(Boolean))].join(" + ") || null,
-    quantity: qty ? Math.round(qty * 1000) / 1000 : null,
-    unit_price: qty ? Math.round((value / qty) * 10000) / 10000 : fuels[0]?.price ?? null,
-    total: num(tag(xml, "vNF")) ?? (value || null), info: info || null,
+    plate: fields.plate, km: fields.km, driver: fields.driver, info: info || null,
   };
+  // Mais de um item de combustível: uma linha por item. Senão, uma linha só (como antes).
+  const groups = (combItems.length || named.length) && fuels.length > 1 ? fuels.map((i) => [i]) : [fuels];
+  // Cada linha fica com o valor líquido do seu item; o que sobra da nota (outros itens, arredondamento) vai para a última.
+  const cents = groups.map((g) => Math.round(g.reduce((s, i) => s + i.net, 0) * 100));
+  if (noteTotal != null) cents[cents.length - 1] = cents[cents.length - 1]! + Math.round(noteTotal * 100) - cents.reduce((s, c) => s + c, 0);
+  return groups.map((g, idx) => {
+    const qty = g.reduce((s, i) => s + (i.qty ?? 0), 0);
+    const value = g.reduce((s, i) => s + (i.value ?? 0), 0);
+    return {
+      ...base, item_no: idx + 1,
+      fuel: [...new Set(g.map((i) => i.name).filter(Boolean))].join(" + ") || null,
+      quantity: qty ? Math.round(qty * 1000) / 1000 : null,
+      unit_price: qty ? Math.round((value / qty) * 10000) / 10000 : g[0]?.price ?? null,
+      total: groups.length === 1 ? noteTotal : cents[idx]! / 100,
+    };
+  });
+}
+
+// ---------- Placa e motorista da nota → cadastro ----------
+const lev = (a: string, b: string) => {
+  const d = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = d[0]!;
+    d[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cur = d[j]!;
+      d[j] = Math.min(d[j]! + 1, d[j - 1]! + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+  }
+  return d[b.length]!;
+};
+// Letras e números que se confundem na escrita (O/0, I/1...).
+const LOOKS: Record<string, string> = { O: "0", Q: "0", D: "0", I: "1", L: "1", Z: "2", S: "5", B: "8", G: "6", T: "7" };
+const looksSame = (a: string, b: string) => a.length === b.length && [...a].every((c, i) => c === b[i] || LOOKS[c] === b[i] || LOOKS[b[i]!] === c);
+
+/**
+ * Placa da nota → placa cadastrada mais próxima. A placa antiga já vira Mercosul (ECM8414 = ECM8E14); depois vale a
+ * igual, a que só troca letra por número parecido (O/0, I/1) e, por fim, a com até 2 caracteres diferentes, desde que
+ * uma só fique mais perto. `preferred` (placas liberadas no posto) é procurada antes de `all` (todas as cadastradas).
+ */
+export function closestPlate(raw: string | null | undefined, preferred: string[], all: string[] = []): string | null {
+  const p = normalizePlate(raw ?? "");
+  if (!p) return null;
+  for (const list of [preferred, all]) {
+    const plates = [...new Set(list.map((x) => normalizePlate(x)).filter(Boolean))];
+    if (plates.includes(p)) return p;
+    const looks = plates.filter((x) => looksSame(p, x));
+    if (looks.length === 1) return looks[0]!;
+    const scored = plates.map((x) => ({ x, d: lev(p, x) })).filter((s) => s.d <= 2).sort((a, b) => a.d - b.d);
+    if (scored.length && (scored.length === 1 || scored[1]!.d > scored[0]!.d)) return scored[0]!.x;
+  }
+  return p;
+}
+
+const NAME_STOP = new Set(["DA", "DE", "DO", "DAS", "DOS", "E"]);
+const nameTokens = (s: string) => plain(s).replace(/[^A-Z ]/g, " ").split(/\s+/).filter((t) => t && !NAME_STOP.has(t));
+const tokenHit = (w: string, words: string[]) =>
+  words.some((x) => x === w || (w.length === 1 && x.startsWith(w)) || (w.length >= 4 && x.length >= 4 && lev(w, x) <= 1));
+
+/**
+ * Nome escrito na nota → nome completo cadastrado. O primeiro nome tem que bater (aceita 1 letra errada) e as outras
+ * palavras escritas têm que estar no nome cadastrado (iniciais e 1 letra errada valem). Só casa se um único
+ * colaborador combinar; `preferred` (motoristas liberados no posto) é procurada antes de `all`. Só o primeiro nome
+ * escrito casa apenas se for o único motorista liberado com esse primeiro nome.
+ */
+export function matchDriverName(written: string | null | undefined, preferred: string[], all: string[] = []): string | null {
+  const ws = nameTokens(written ?? "");
+  if (!ws.length) return null;
+  for (const [i, list] of [preferred, all].entries()) {
+    const names = [...new Set(list)];
+    const hits = names.filter((full) => {
+      const words = nameTokens(full);
+      if (!words.length || !tokenHit(ws[0]!, [words[0]!])) return false;
+      if (ws.length === 1) return i === 0;
+      const rest = ws.slice(1);
+      const missing = rest.filter((w) => !tokenHit(w, words.slice(1))).length;
+      return missing === 0 || (rest.length >= 3 && missing === 1);
+    });
+    if (hits.length === 1) return hits[0]!;
+  }
+  return null;
 }
 
 // ---------- Rateio, centro de custo e item conta ----------
-export type RateioSchedule = { vehicle_id: string; schedule_date: string; client_id: string | null; extra_client_ids?: string[] | null; is_maintenance?: boolean | null };
 export type RateioClient = { id: string; name: string; cc_prefix: string | null };
 export type RateioWork = { id: string; client_id: string | null; cc_suffix: string | null; active: boolean };
 export type ItemAccount = { cc_code: string; item_account: string; description?: string | null };
-export type RateioPart = { client_id: string; client: string; days: number; pct: number; value: number; cc: string | null; cc_rule: string; item_account: string | null };
-export type Rateio = { from: string; to: string; fallback: boolean; parts: RateioPart[] };
+export type RateioSchedule = { vehicle_id: string; schedule_date: string; client_id: string | null; extra_client_ids?: string[] | null; is_maintenance?: boolean | null; km?: number | null; trips?: number | null; extra_km?: number | null };
+export type RateioPart = { client_id: string; client: string; days: number; km?: number; pct: number; value: number; cc: string | null; cc_rule: string; item_account: string | null };
+/** basis: "km" = pelo km rodado em cada cliente; "dias" = sem km lançado, pelos dias (rateios antigos não têm). */
+export type Rateio = { from: string; to: string; fallback: boolean; basis?: "km" | "dias"; parts: RateioPart[] };
 
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 export const isoDay = (ts: string | null) => {
@@ -210,8 +293,8 @@ export function itemAccountFor(cc: string | null, accounts: ItemAccount[], clien
 }
 
 /**
- * Rateio de um abastecimento: dias em que o veículo esteve em cada cliente (Transporte) desde o
- * abastecimento anterior até este. Sem programação no período, usa o último dia programado antes dele.
+ * Rateio de um abastecimento: km que o veículo rodou em cada cliente (Transporte) desde o abastecimento anterior
+ * até este (sem km lançado, os dias). Sem programação no período, usa o último dia programado antes dele.
  */
 export function fuelRateio(opts: {
   vehicleId: string | null; day: string; prevDay: string | null; total: number;
@@ -227,12 +310,26 @@ export function fuelRateio(opts: {
       .sort((a, b) => b.schedule_date.localeCompare(a.schedule_date))[0];
     if (last) { days = own.filter((s) => s.schedule_date === last.schedule_date && clientsOf(s).length); fallback = true; }
   }
+  // Peso = km rodados em cada cliente no período: km da programação × 2 × viagens para o cliente principal e o
+  // km extra dividido entre os clientes extras do dia. Sem km lançado no período, cai para os dias (como antes).
+  const kmWeight = new Map<string, number>();
+  for (const s of days) {
+    const main = s.client_id ? Number(s.km ?? 0) * 2 * Math.max(1, Number(s.trips ?? 1)) : 0;
+    const extras = [...new Set((s.extra_client_ids ?? []).filter((c) => c && c !== s.client_id))];
+    if (s.client_id && main > 0) kmWeight.set(s.client_id, (kmWeight.get(s.client_id) ?? 0) + main);
+    const extraKm = Number(s.extra_km ?? 0);
+    if (extras.length && extraKm > 0) for (const c of extras) kmWeight.set(c, (kmWeight.get(c) ?? 0) + extraKm / extras.length);
+  }
+  const byKm = [...kmWeight.values()].some((v) => v > 0);
   const weight = new Map<string, number>();
-  const byDate = new Map<string, RateioSchedule[]>();
-  for (const s of days) byDate.set(s.schedule_date, [...(byDate.get(s.schedule_date) ?? []), s]);
-  for (const list of byDate.values()) {
-    const cs = [...new Set(list.flatMap(clientsOf))];
-    for (const c of cs) weight.set(c, (weight.get(c) ?? 0) + 1 / cs.length);
+  if (byKm) for (const [c, v] of kmWeight) { if (v > 0) weight.set(c, v); }
+  else {
+    const byDate = new Map<string, RateioSchedule[]>();
+    for (const s of days) byDate.set(s.schedule_date, [...(byDate.get(s.schedule_date) ?? []), s]);
+    for (const list of byDate.values()) {
+      const cs = [...new Set(list.flatMap(clientsOf))];
+      for (const c of cs) weight.set(c, (weight.get(c) ?? 0) + 1 / cs.length);
+    }
   }
   const sum = [...weight.values()].reduce((s, v) => s + v, 0);
   const totalCents = Math.round(opts.total * 100);
@@ -249,9 +346,12 @@ export function fuelRateio(opts: {
       const byName = opts.accounts.filter((a) => sameName(a.description, client?.name));
       if (byName.length === 1) { cc = byName[0]!.cc_code.trim(); item = byName[0]!.item_account; rule = "pelo nome do rateio na tabela Item Conta"; }
     }
-    return { client_id: id, client: client?.name ?? "Cliente", days: Math.round(w * 100) / 100, pct: Math.round((w / sum) * 10000) / 100, value: cents / 100, cc, cc_rule: rule, item_account: item };
+    return {
+      client_id: id, client: client?.name ?? "Cliente", days: byKm ? 0 : Math.round(w * 100) / 100, km: byKm ? Math.round(w) : undefined,
+      pct: Math.round((w / sum) * 10000) / 100, value: cents / 100, cc, cc_rule: rule, item_account: item,
+    };
   });
-  return { from, to: opts.day, fallback, parts };
+  return { from, to: opts.day, fallback, basis: byKm ? "km" : "dias", parts };
 }
 
 /** CC informado à mão no Editar: um ou mais centros de custo, cada um com a sua % do abastecimento. */

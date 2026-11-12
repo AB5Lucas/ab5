@@ -16,16 +16,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { baseFolderPath, fixedRateio, fuelRateio, isoDay, plateRuleSplit, FIXED_PLATE_CC, type CcSplitItem, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
+import { baseFolderPath, closestPlate, fixedRateio, fuelRateio, isoDay, matchDriverName, plateRuleSplit, FIXED_PLATE_CC, type CcSplitItem, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
 import { DriverRanking } from "./ranking";
 import { PlateFilter } from "./plate-filter";
+import { FleetRelease, useCnhPeople, useFleetRelease } from "./liberacao";
 import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 import { currentMonthRange, DateRangePicker, monthsInRange, type DayRange } from "@/components/date-range-picker";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Note = Tables<"fleet_fuel_notes">;
-type Row = Note & { day: string | null; plateShown: string | null; kmShown: number | null; driverShown: string | null; vehicleLabel: string | null; rateio: Rateio | null; status: ReturnType<typeof noteStatus>; warnings: string[] };
+type Row = Note & { itemCount: number; day: string | null; plateShown: string | null; kmShown: number | null; driverShown: string | null; vehicleLabel: string | null; rateio: Rateio | null; status: ReturnType<typeof noteStatus>; warnings: string[] };
 type Filter = "pendentes" | "sem-nota" | "aguardando" | "aprovadas" | "todas";
 
 const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
@@ -40,16 +41,18 @@ export function FleetNotesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Abastecimento"
-        description="Cada XML do posto na pasta do mês vira um abastecimento. A nota é procurada na pasta de notas do mês pelo código de acesso (nome do arquivo); se não achar, atribua à mão. O rateio usa os dias em que o veículo esteve em cada cliente na Transporte, desde o abastecimento anterior."
+        description="Cada XML do posto na pasta do mês vira um abastecimento. A nota é procurada na pasta de notas do mês pelo código de acesso (nome do arquivo); se não achar, atribua à mão. Nota com dois combustíveis vira duas linhas. Nome e placa da nota viram os cadastrados (aba Liberação). O rateio usa o km que o veículo rodou em cada cliente na Transporte desde o abastecimento anterior (sem km lançado, os dias)."
       />
       <Tabs defaultValue="abastecimentos">
         <TabsList>
           <TabsTrigger value="abastecimentos">Abastecimentos</TabsTrigger>
           <TabsTrigger value="ranking">Ranking</TabsTrigger>
+          <TabsTrigger value="liberacao">Liberação</TabsTrigger>
           <TabsTrigger value="equivalencias">Item Conta</TabsTrigger>
         </TabsList>
         <TabsContent value="abastecimentos" className="mt-4"><FuelNotes /></TabsContent>
         <TabsContent value="ranking" className="mt-4"><DriverRanking /></TabsContent>
+        <TabsContent value="liberacao" className="mt-4"><FleetRelease /></TabsContent>
         <TabsContent value="equivalencias" className="mt-4"><ItemAccounts /></TabsContent>
       </Tabs>
     </div>
@@ -76,9 +79,11 @@ function FuelNotes() {
   });
   const docs = useQuery({ queryKey: ["fleet-note-docs", months.join(",")], queryFn: async () => (await supabase.from("fleet_note_docs").select("ref_month, file_name, item_id, read_nf, read_plate, read_total, read_error").in("ref_month", months).order("file_name")).data ?? [] });
   const vehicles = useQuery({ queryKey: ["fleet-vehicles-basic"], queryFn: async () => (await supabase.from("vehicles").select("id, plate, model").order("plate")).data ?? [] });
+  const cnh = useCnhPeople();
+  const release = useFleetRelease();
   const schedules = useQuery({
     queryKey: ["fleet-rateio-schedules", lookback, end],
-    queryFn: () => fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date, client_id, extra_client_ids, is_maintenance")
+    queryFn: () => fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date, client_id, extra_client_ids, is_maintenance, km, trips, extra_km")
       .gte("schedule_date", lookback).lte("schedule_date", end).order("schedule_date").range(a, b)),
   });
   const clients = useQuery({ queryKey: ["fleet-rateio-clients"], queryFn: async () => ((await supabase.from("clients").select("id, name, cc_prefix")).data ?? []) as RateioClient[] });
@@ -114,16 +119,31 @@ function FuelNotes() {
 
   const rows = useMemo<Row[]>(() => {
     const all = notes.data ?? [];
-    const plateOf = (n: Note) => normalizePlate(n.plate_fix ?? n.plate ?? "") || null;
+    // Placa e motorista da nota → cadastrados: primeiro entre os liberados no posto (aba Liberação), depois todos.
+    const allPlates = (vehicles.data ?? []).map((v) => v.plate);
+    const releasedPlates = (vehicles.data ?? []).filter((v) => release.vehicleIds.has(v.id)).map((v) => v.plate);
+    const cnhNames = (cnh.data ?? []).map((c) => c.full_name);
+    const releasedNames = (cnh.data ?? []).filter((c) => release.driverIds.has(c.id)).map((c) => c.full_name);
+    const plateCache = new Map<string, string | null>();
+    const plateOf = (n: Note) => {
+      if (n.plate_fix) return normalizePlate(n.plate_fix) || null;
+      const raw = n.plate ?? "";
+      if (!plateCache.has(raw)) plateCache.set(raw, closestPlate(raw, releasedPlates, allPlates));
+      return plateCache.get(raw)!;
+    };
+    const driverOf = (n: Note) => n.driver_fix ?? matchDriverName(n.driver, releasedNames, cnhNames) ?? n.driver;
     const vehicleByPlate = new Map((vehicles.data ?? []).map((v) => [normalizePlate(v.plate), v]));
     const clientMap = new Map((clients.data ?? []).map((c) => [c.id, c]));
-    const ordered = [...all].sort((a, b) => String(a.issued_at).localeCompare(String(b.issued_at)) || a.access_key.localeCompare(b.access_key));
+    const items = new Map<string, number>();
+    for (const n of all) items.set(n.access_key, (items.get(n.access_key) ?? 0) + 1);
+    const ordered = [...all].sort((a, b) => String(a.issued_at).localeCompare(String(b.issued_at)) || a.access_key.localeCompare(b.access_key) || a.item_no - b.item_no);
     return ordered.filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= start && d <= end; }).map((n) => {
       const p = plateOf(n);
       const v = p ? vehicleByPlate.get(p) : undefined;
       const day = isoDay(n.issued_at);
       const idx = ordered.indexOf(n);
-      const prev = p ? [...ordered.slice(0, idx)].reverse().find((o) => plateOf(o) === p) : undefined;
+      // Abastecimento anterior do mesmo veículo (outro XML: os itens do mesmo XML são o mesmo abastecimento).
+      const prev = p ? [...ordered.slice(0, idx)].reverse().find((o) => o.access_key !== n.access_key && plateOf(o) === p) : undefined;
       const acc = (accounts.data ?? []) as ItemAccount[];
       const split = (Array.isArray(n.cc_split) ? n.cc_split : []) as unknown as CcSplitItem[];
       const plateSplit = plateRuleSplit(p, acc);
@@ -138,12 +158,12 @@ function FuelNotes() {
       const kmShown = n.km_fix ?? n.km;
       const prevKm = prev ? prev.km_fix ?? prev.km : null;
       const warnings = [
-        ...(n.plate_fix ? [] : otherPlates(n.info, p).map((o) => `outra placa no texto da nota: ${o}`)),
+        ...(n.plate_fix ? [] : otherPlates(n.info, normalizePlate(n.plate ?? "") || p).filter((o) => o !== p).map((o) => `outra placa no texto da nota: ${o}`)),
         ...(kmShown != null && prevKm != null && Number(kmShown) < Number(prevKm) ? [`km menor que o abastecimento anterior (${Number(prevKm).toLocaleString("pt-BR")})`] : []),
       ];
-      return { ...n, day, plateShown: p, kmShown, driverShown: n.driver_fix ?? n.driver, vehicleLabel: v ? (v.model ?? v.plate) : null, rateio, status: noteStatus(n), warnings };
+      return { ...n, day, plateShown: p, kmShown, driverShown: driverOf(n), vehicleLabel: v ? (v.model ?? v.plate) : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
     });
-  }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, start, end]);
+  }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, start, end, cnh.data, release.driverIds, release.vehicleIds]);
 
   const plates = [...new Set(rows.map((r) => r.plateShown).filter((p): p is string => !!p))].sort();
   const shown = rows.filter((r) => (plate === "all" || r.plateShown === plate) && (
@@ -263,12 +283,12 @@ function FuelNotes() {
               return (
                 <TableRow key={r.id} className="align-top">
                   <TableCell className="whitespace-nowrap">{brDate(r.day)}</TableCell>
-                  <TableCell>{r.nf_number ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap">{r.nf_number ?? "—"}{r.itemCount > 1 && <div className="text-muted-foreground" title="Mesmo XML, outro combustível">item {r.item_no} de {r.itemCount}</div>}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {r.plateShown ?? <span className="text-destructive">sem placa</span>}{r.plate_fix ? " *" : ""}
                     {r.warnings.map((w) => <div key={w} className="max-w-48 whitespace-normal text-amber-600 dark:text-amber-400">⚠ {w}</div>)}
                   </TableCell>
-                  <TableCell>{r.driverShown ?? "—"}</TableCell>
+                  <TableCell title={r.driver && r.driver !== r.driverShown ? `Na nota: ${r.driver}` : undefined}>{r.driverShown ?? "—"}{r.driver && r.driverShown && r.driver !== r.driverShown && <div className="text-muted-foreground">nota: {r.driver}</div>}</TableCell>
                   <TableCell>{r.vehicleLabel ?? (r.plateShown ? <span className="text-destructive">não cadastrado</span> : "—")}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.kmShown == null ? "—" : num(r.kmShown, 0)}</TableCell>
                   <TableCell>{r.fuel ?? "—"}</TableCell>
@@ -279,6 +299,7 @@ function FuelNotes() {
                     {parts.length ? parts.map((p) => <div key={p.client_id} className="whitespace-nowrap">{p.client} {p.pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</div>)
                       : <span className="text-destructive">sem programação</span>}
                     {r.rateio?.fallback && <div className="text-muted-foreground">último dia programado</div>}
+                    {!r.rateio?.fallback && r.rateio?.basis === "dias" && <div className="text-muted-foreground">sem km lançado: pelos dias</div>}
                     {!r.approved_at && r.rateio?.parts[0]?.client_id.startsWith("manual") && <div className="text-muted-foreground">{r.rateio.parts[0].cc_rule}</div>}
                   </TableCell>
                   <TableCell>{parts.map((p) => <div key={p.client_id} className="whitespace-nowrap" title={p.cc_rule}>{p.cc ?? <span className="text-destructive">{p.cc_rule}</span>}</div>)}</TableCell>
@@ -377,8 +398,10 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: "bad
 function useNoteUpdate(onDone?: () => void) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Partial<Note> }) => {
-      const { error } = await supabase.from("fleet_fuel_notes").update(patch as never).eq("id", id);
+    // sameXml: a foto é do XML todo, então nota atribuída/tirada vale para todos os itens dele ainda não aprovados.
+    mutationFn: async ({ id, patch, sameXml }: { id: string; patch: Partial<Note>; sameXml?: string }) => {
+      const q = supabase.from("fleet_fuel_notes").update(patch as never);
+      const { error } = sameXml ? await q.eq("access_key", sameXml).is("approved_at", null) : await q.eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fleet-fuel-notes"] }); onDone?.(); },
@@ -410,12 +433,12 @@ function ApproveDialog({ row, onClose }: { row: Row | null; onClose: () => void 
         <div className="rounded-md border border-border text-sm">
           {parts.length ? parts.map((p) => (
             <div key={p.client_id} className="flex justify-between gap-2 border-b border-border px-3 py-1.5 last:border-0">
-              <span>{p.client} · {p.pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%<span className="block text-xs text-muted-foreground">CC {p.cc ?? p.cc_rule} · item conta {p.item_account ?? "sem equivalência"}</span></span>
+              <span>{p.client} · {p.pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%{p.km ? ` · ${p.km.toLocaleString("pt-BR")} km` : ""}<span className="block text-xs text-muted-foreground">CC {p.cc ?? p.cc_rule} · item conta {p.item_account ?? "sem equivalência"}</span></span>
               <span className="tabular-nums">{brl(p.value)}</span>
             </div>
           )) : <p className="p-3 text-destructive">Sem programação do veículo para ratear.</p>}
         </div>
-        {row.rateio && <p className="text-xs text-muted-foreground">Período do rateio: {brDate(row.rateio.from)} a {brDate(row.rateio.to)}{row.rateio.fallback ? " (sem programação no período: último dia programado)" : ""}. Ao aprovar, o rateio fica guardado como está.</p>}
+        {row.rateio && <p className="text-xs text-muted-foreground">Período do rateio: {brDate(row.rateio.from)} a {brDate(row.rateio.to)}{row.rateio.basis === "km" ? ", pelo km rodado em cada cliente" : row.rateio.basis === "dias" ? ", pelos dias (sem km lançado na Transporte)" : ""}{row.rateio.fallback ? " (sem programação no período: último dia programado)" : ""}. Ao aprovar, o rateio fica guardado como está.</p>}
         <div className="space-y-1">
           <Label htmlFor="approve-notes">Observações da aprovação</Label>
           <Textarea id="approve-notes" rows={3} value={text} onChange={(e) => setText(e.target.value)} />
@@ -432,11 +455,10 @@ function ApproveDialog({ row, onClose }: { row: Row | null; onClose: () => void 
 }
 
 type SplitLine = { account: string; pct: string };
-const NOTE_DRIVER = "__nota__";
 const pctNum = (s: string) => Number(String(s).replace(",", "."));
 
 function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tables<"fleet_item_accounts">[]; onClose: () => void }) {
-  const [form, setForm] = useState({ plate: "", km: "", driver: "", notes: "" });
+  const [form, setForm] = useState({ plate: "", km: "", notes: "" });
   // Vazio = automático (rateio pela Transporte ou regra da placa); com linhas = CCs à mão, cada um com a sua %.
   const [split, setSplit] = useState<SplitLine[]>([]);
   useEffect(() => {
@@ -445,17 +467,10 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
     const saved = (Array.isArray(row.cc_split) ? row.cc_split : []) as unknown as CcSplitItem[];
     const lines = saved.length ? saved.map((s) => ({ account: findId(s.cc_code, s.label), pct: String(s.pct) }))
       : row.cc_fix ? [{ account: findId(row.cc_fix, row.cc_label_fix), pct: "100" }] : [];
-    setForm({ plate: row.plate_fix ?? "", km: row.km_fix == null ? "" : String(row.km_fix), driver: row.driver_fix ?? "", notes: row.notes ?? "" });
+    setForm({ plate: row.plate_fix ?? "", km: row.km_fix == null ? "" : String(row.km_fix), notes: row.notes ?? "" });
     setSplit(lines);
   }, [row?.id]);
   const m = useNoteUpdate(() => { toast.success("Abastecimento atualizado."); onClose(); });
-  // Motorista: lista de quem tem CNH cadastrada (categoria ou validade), vencida ou não, ativo ou não.
-  const cnh = useQuery({
-    queryKey: ["fleet-cnh-people"], staleTime: 5 * 60_000, enabled: !!row,
-    queryFn: async () => ((await supabase.from("collaborators").select("id, full_name, status, driver_license_category, driver_license_expiry")
-      .order("full_name")).data ?? [])
-      .filter((c) => c.driver_license_expiry || (c.driver_license_category ?? "").trim()),
-  });
   if (!row) return null;
   const km = form.km.trim() ? Number(form.km.replace(/\./g, "").replace(",", ".")) : null;
   const totalPct = split.reduce((s, l) => s + (pctNum(l.pct) || 0), 0);
@@ -482,26 +497,11 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
           <DialogDescription>NF {row.nf_number ?? "—"} · {brl(row.total)}. Deixe em branco para usar o que veio no XML.</DialogDescription>
         </DialogHeader>
         {row.info && <p className="max-h-28 overflow-y-auto rounded-md bg-muted p-2 text-xs">{row.info}</p>}
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="space-y-1"><Label htmlFor="fix-plate">Placa</Label><Input id="fix-plate" placeholder={row.plate ?? ""} value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })} /></div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1"><Label htmlFor="fix-plate">Placa</Label><Input id="fix-plate" placeholder={row.plateShown ?? row.plate ?? ""} value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })} /></div>
           <div className="space-y-1"><Label htmlFor="fix-km">Km</Label><Input id="fix-km" inputMode="decimal" placeholder={row.km == null ? "" : String(row.km)} value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} /></div>
-          <div className="space-y-1">
-            <Label>Motorista</Label>
-            <Select value={form.driver || NOTE_DRIVER} onValueChange={(v) => setForm({ ...form, driver: v === NOTE_DRIVER ? "" : v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent className="max-h-72">
-                <SelectItem value={NOTE_DRIVER}>Como veio na nota{row.driver ? `: ${row.driver}` : ""}</SelectItem>
-                {/* Nome corrigido antes da lista existir (texto livre) continua aparecendo. */}
-                {form.driver && !(cnh.data ?? []).some((c) => c.full_name === form.driver) && <SelectItem value={form.driver}>{form.driver}</SelectItem>}
-                {(cnh.data ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.full_name}>
-                    {c.full_name}{c.status === "inactive" ? " (inativo)" : ""}{c.driver_license_expiry && c.driver_license_expiry < new Date().toISOString().slice(0, 10) ? " · CNH vencida" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </div>
+        <p className="text-xs text-muted-foreground">Motorista: {row.driverShown ?? "não identificado"}{row.driver && row.driverShown !== row.driver ? ` (na nota: ${row.driver})` : ""}. O nome vem da aba Liberação; para corrigir, libere o motorista lá.</p>
         <div className="space-y-2">
           <Label className="block">Centros de custo</Label>
           {!split.length ? (
@@ -543,7 +543,7 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button disabled={m.isPending || !!splitError || (km != null && !Number.isFinite(km))} onClick={() => m.mutate({ id: row.id, patch: {
-            plate_fix: form.plate.trim() ? normalizePlate(form.plate) : null, km_fix: km, driver_fix: form.driver.trim() || null, notes: form.notes.trim() || null,
+            plate_fix: form.plate.trim() ? normalizePlate(form.plate) : null, km_fix: km, notes: form.notes.trim() || null,
             cc_split: (toSave.length ? toSave : null) as never, cc_fix: null, item_account_fix: null, cc_label_fix: null,
           } })}>Salvar</Button>
         </DialogFooter>
@@ -610,11 +610,11 @@ function AttachDialog({ row, month, docs, onClose }: { row: Row | null; month: s
           </div>
         ) : <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">Nenhuma foto livre na pasta de notas deste mês.</p>}
         <DialogFooter>
-          {row.note_file && <Button variant="ghost" className="mr-auto text-destructive" disabled={m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_file: null } })}><Trash2 className="h-4 w-4" /> Tirar nota</Button>}
+          {row.note_file && <Button variant="ghost" className="mr-auto text-destructive" disabled={m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_file: null }, sameXml: row.itemCount > 1 ? row.access_key : undefined })}><Trash2 className="h-4 w-4" /> Tirar nota</Button>}
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           {confirming
-            ? <Button disabled={m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_match: "manual" } })}><Check className="h-4 w-4" /> Confirmar esta nota</Button>
-            : <Button disabled={!file || file === row.note_file || m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_file: file } })}>Atribuir</Button>}
+            ? <Button disabled={m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_match: "manual" }, sameXml: row.itemCount > 1 ? row.access_key : undefined })}><Check className="h-4 w-4" /> Confirmar esta nota</Button>
+            : <Button disabled={!file || file === row.note_file || m.isPending} onClick={() => m.mutate({ id: row.id, patch: { note_file: file }, sameXml: row.itemCount > 1 ? row.access_key : undefined })}>Atribuir</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
