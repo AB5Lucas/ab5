@@ -421,6 +421,7 @@ function ApproveDialog({ row, onClose }: { row: Row | null; onClose: () => void 
 }
 
 type SplitLine = { account: string; pct: string };
+const NOTE_DRIVER = "__nota__";
 const pctNum = (s: string) => Number(String(s).replace(",", "."));
 
 function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tables<"fleet_item_accounts">[]; onClose: () => void }) {
@@ -437,6 +438,13 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
     setSplit(lines);
   }, [row?.id]);
   const m = useNoteUpdate(() => { toast.success("Abastecimento atualizado."); onClose(); });
+  // Motorista: lista de quem tem CNH cadastrada (categoria ou validade), vencida ou não, ativo ou não.
+  const cnh = useQuery({
+    queryKey: ["fleet-cnh-people"], staleTime: 5 * 60_000, enabled: !!row,
+    queryFn: async () => ((await supabase.from("collaborators").select("id, full_name, status, driver_license_category, driver_license_expiry")
+      .order("full_name")).data ?? [])
+      .filter((c) => c.driver_license_expiry || (c.driver_license_category ?? "").trim()),
+  });
   if (!row) return null;
   const km = form.km.trim() ? Number(form.km.replace(/\./g, "").replace(",", ".")) : null;
   const totalPct = split.reduce((s, l) => s + (pctNum(l.pct) || 0), 0);
@@ -466,7 +474,22 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1"><Label htmlFor="fix-plate">Placa</Label><Input id="fix-plate" placeholder={row.plate ?? ""} value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })} /></div>
           <div className="space-y-1"><Label htmlFor="fix-km">Km</Label><Input id="fix-km" inputMode="decimal" placeholder={row.km == null ? "" : String(row.km)} value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} /></div>
-          <div className="space-y-1"><Label htmlFor="fix-driver">Motorista</Label><Input id="fix-driver" placeholder={row.driver ?? ""} value={form.driver} onChange={(e) => setForm({ ...form, driver: e.target.value })} /></div>
+          <div className="space-y-1">
+            <Label>Motorista</Label>
+            <Select value={form.driver || NOTE_DRIVER} onValueChange={(v) => setForm({ ...form, driver: v === NOTE_DRIVER ? "" : v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={NOTE_DRIVER}>Como veio na nota{row.driver ? `: ${row.driver}` : ""}</SelectItem>
+                {/* Nome corrigido antes da lista existir (texto livre) continua aparecendo. */}
+                {form.driver && !(cnh.data ?? []).some((c) => c.full_name === form.driver) && <SelectItem value={form.driver}>{form.driver}</SelectItem>}
+                {(cnh.data ?? []).map((c) => (
+                  <SelectItem key={c.id} value={c.full_name}>
+                    {c.full_name}{c.status === "inactive" ? " (inativo)" : ""}{c.driver_license_expiry && c.driver_license_expiry < new Date().toISOString().slice(0, 10) ? " · CNH vencida" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="space-y-2">
           <Label className="block">Centros de custo</Label>
