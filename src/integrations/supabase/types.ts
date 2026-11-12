@@ -2081,6 +2081,104 @@ export type Database = {
         }
         Relationships: []
       }
+      epi_sheets: {
+        Row: {
+          archived: boolean
+          collaborator_id: string
+          created_at: string
+          delivered_at: string | null
+          expires_at: string | null
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived?: boolean
+          collaborator_id: string
+          created_at?: string
+          delivered_at?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived?: boolean
+          collaborator_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epi_sheets_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: true
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_expense_files: {
+        Row: {
+          file_path: string
+          rows: number
+          source: string
+          synced_at: string
+        }
+        Insert: {
+          file_path: string
+          rows?: number
+          source: string
+          synced_at?: string
+        }
+        Update: {
+          file_path?: string
+          rows?: number
+          source?: string
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      fleet_expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          document: string | null
+          expense_date: string
+          file_path: string
+          id: string
+          plate: string
+          source: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          document?: string | null
+          expense_date: string
+          file_path: string
+          id?: string
+          plate: string
+          source: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          document?: string | null
+          expense_date?: string
+          file_path?: string
+          id?: string
+          plate?: string
+          source?: string
+        }
+        Relationships: []
+      }
       fleet_fuel_notes: {
         Row: {
           access_key: string
@@ -2096,10 +2194,10 @@ export type Database = {
           fuel: string | null
           id: string
           info: string | null
-          item_no: number
-          item_account_fix: string | null
           issued_at: string | null
           issuer: string | null
+          item_account_fix: string | null
+          item_no: number
           km: number | null
           km_fix: number | null
           nf_number: string | null
@@ -2129,10 +2227,10 @@ export type Database = {
           fuel?: string | null
           id?: string
           info?: string | null
-          item_no?: number
-          item_account_fix?: string | null
           issued_at?: string | null
           issuer?: string | null
+          item_account_fix?: string | null
+          item_no?: number
           km?: number | null
           km_fix?: number | null
           nf_number?: string | null
@@ -2162,10 +2260,10 @@ export type Database = {
           fuel?: string | null
           id?: string
           info?: string | null
-          item_no?: number
-          item_account_fix?: string | null
           issued_at?: string | null
           issuer?: string | null
+          item_account_fix?: string | null
+          item_no?: number
           km?: number | null
           km_fix?: number | null
           nf_number?: string | null
@@ -2297,65 +2395,81 @@ export type Database = {
       fleet_release_drivers: {
         Row: {
           active: boolean
-          released_at: string | null
-          removed_at: string | null
           collaborator_id: string | null
+          created_at: string
           id: string
           name: string | null
-          created_at: string
+          released_at: string | null
+          removed_at: string | null
         }
         Insert: {
           active?: boolean
-          released_at?: string | null
-          removed_at?: string | null
           collaborator_id?: string | null
+          created_at?: string
           id?: string
           name?: string | null
-          created_at?: string
+          released_at?: string | null
+          removed_at?: string | null
         }
         Update: {
           active?: boolean
-          released_at?: string | null
-          removed_at?: string | null
           collaborator_id?: string | null
+          created_at?: string
           id?: string
           name?: string | null
-          created_at?: string
+          released_at?: string | null
+          removed_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fleet_release_drivers_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fleet_release_vehicles: {
         Row: {
           active: boolean
-          released_at: string | null
-          removed_at: string | null
           created_at: string
           id: string
           label: string | null
           plate: string | null
+          released_at: string | null
+          removed_at: string | null
           vehicle_id: string | null
         }
         Insert: {
           active?: boolean
-          released_at?: string | null
-          removed_at?: string | null
           created_at?: string
           id?: string
           label?: string | null
           plate?: string | null
+          released_at?: string | null
+          removed_at?: string | null
           vehicle_id?: string | null
         }
         Update: {
           active?: boolean
-          released_at?: string | null
-          removed_at?: string | null
           created_at?: string
           id?: string
           label?: string | null
           plate?: string | null
+          released_at?: string | null
+          removed_at?: string | null
           vehicle_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fleet_release_vehicles_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fleet_settings: {
         Row: {
@@ -2372,219 +2486,6 @@ export type Database = {
           key?: string
           updated_at?: string
           value?: string | null
-        }
-        Relationships: []
-      }
-      vehicle_maintenance_plans: {
-        Row: {
-          base_date: string | null
-          base_km: number | null
-          interval_km: number | null
-          interval_months: number | null
-          notes: string | null
-          updated_at: string
-          vehicle_id: string
-        }
-        Insert: {
-          base_date?: string | null
-          base_km?: number | null
-          interval_km?: number | null
-          interval_months?: number | null
-          notes?: string | null
-          updated_at?: string
-          vehicle_id: string
-        }
-        Update: {
-          base_date?: string | null
-          base_km?: number | null
-          interval_km?: number | null
-          interval_months?: number | null
-          notes?: string | null
-          updated_at?: string
-          vehicle_id?: string
-        }
-        Relationships: []
-      }
-      vehicle_maintenance_records: {
-        Row: {
-          cost: number | null
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          kind: string
-          km: number | null
-          service_date: string
-          vehicle_id: string
-        }
-        Insert: {
-          cost?: number | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          kind?: string
-          km?: number | null
-          service_date: string
-          vehicle_id: string
-        }
-        Update: {
-          cost?: number | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          kind?: string
-          km?: number | null
-          service_date?: string
-          vehicle_id?: string
-        }
-        Relationships: []
-      }
-      integration_service_choices: {
-        Row: {
-          client_id: string
-          collaborator_id: string
-          schedule_date: string
-          updated_at: string
-          updated_by: string | null
-          work_id: string
-        }
-        Insert: {
-          client_id: string
-          collaborator_id: string
-          schedule_date: string
-          updated_at?: string
-          updated_by?: string | null
-          work_id: string
-        }
-        Update: {
-          client_id?: string
-          collaborator_id?: string
-          schedule_date?: string
-          updated_at?: string
-          updated_by?: string | null
-          work_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "integration_service_choices_collaborator_id_fkey"
-            columns: ["collaborator_id"]
-            isOneToOne: false
-            referencedRelation: "collaborators"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_service_choices_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_service_choices_work_id_fkey"
-            columns: ["work_id"]
-            isOneToOne: false
-            referencedRelation: "works"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      epi_sheets: {
-        Row: {
-          archived: boolean
-          collaborator_id: string
-          created_at: string
-          delivered_at: string | null
-          expires_at: string | null
-          id: string
-          notes: string | null
-          updated_at: string
-        }
-        Insert: {
-          archived?: boolean
-          collaborator_id: string
-          created_at?: string
-          delivered_at?: string | null
-          expires_at?: string | null
-          id?: string
-          notes?: string | null
-          updated_at?: string
-        }
-        Update: {
-          archived?: boolean
-          collaborator_id?: string
-          created_at?: string
-          delivered_at?: string | null
-          expires_at?: string | null
-          id?: string
-          notes?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "epi_sheets_collaborator_id_fkey"
-            columns: ["collaborator_id"]
-            isOneToOne: true
-            referencedRelation: "collaborators"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      fleet_expense_files: {
-        Row: {
-          file_path: string
-          rows: number
-          source: string
-          synced_at: string
-        }
-        Insert: {
-          file_path: string
-          rows?: number
-          source: string
-          synced_at?: string
-        }
-        Update: {
-          file_path?: string
-          rows?: number
-          source?: string
-          synced_at?: string
-        }
-        Relationships: []
-      }
-      fleet_expenses: {
-        Row: {
-          amount: number
-          created_at: string
-          description: string | null
-          document: string | null
-          expense_date: string
-          file_path: string
-          id: string
-          plate: string
-          source: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          description?: string | null
-          document?: string | null
-          expense_date: string
-          file_path: string
-          id?: string
-          plate: string
-          source: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          description?: string | null
-          document?: string | null
-          expense_date?: string
-          file_path?: string
-          id?: string
-          plate?: string
-          source?: string
         }
         Relationships: []
       }
@@ -3028,6 +2929,55 @@ export type Database = {
           },
           {
             foreignKeyName: "industry_orders_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_service_choices: {
+        Row: {
+          client_id: string
+          collaborator_id: string
+          schedule_date: string
+          updated_at: string
+          updated_by: string | null
+          work_id: string
+        }
+        Insert: {
+          client_id: string
+          collaborator_id: string
+          schedule_date: string
+          updated_at?: string
+          updated_by?: string | null
+          work_id: string
+        }
+        Update: {
+          client_id?: string
+          collaborator_id?: string
+          schedule_date?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_service_choices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_service_choices_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_service_choices_work_id_fkey"
             columns: ["work_id"]
             isOneToOne: false
             referencedRelation: "works"
@@ -4753,6 +4703,88 @@ export type Database = {
           },
         ]
       }
+      vehicle_maintenance_plans: {
+        Row: {
+          base_date: string | null
+          base_km: number | null
+          interval_km: number | null
+          interval_months: number | null
+          notes: string | null
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          base_date?: string | null
+          base_km?: number | null
+          interval_km?: number | null
+          interval_months?: number | null
+          notes?: string | null
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          base_date?: string | null
+          base_km?: number | null
+          interval_km?: number | null
+          interval_months?: number | null
+          notes?: string | null
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_maintenance_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: true
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_maintenance_records: {
+        Row: {
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          kind: string
+          km: number | null
+          service_date: string
+          vehicle_id: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          kind?: string
+          km?: number | null
+          service_date: string
+          vehicle_id: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          kind?: string
+          km?: number | null
+          service_date?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_maintenance_records_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_schedules: {
         Row: {
           client_id: string | null
@@ -5543,18 +5575,15 @@ export type Database = {
         Returns: string
       }
       driver_bonus_default: { Args: { _driver_id: string }; Returns: boolean }
-      fleet_invoices_sync: {
-        Args: { p_rows: Json }
+      fleet_expenses_replace: {
+        Args: { p_file: string; p_rows: Json; p_source: string }
         Returns: number
       }
       fleet_fuel_notes_sync: {
         Args: { p_docs: Json; p_month: string; p_notes: Json }
         Returns: number
       }
-      fleet_expenses_replace: {
-        Args: { p_file: string; p_rows: Json; p_source: string }
-        Returns: number
-      }
+      fleet_invoices_sync: { Args: { p_rows: Json }; Returns: number }
       generate_recurring_entries: {
         Args: { _work_ids?: string[] }
         Returns: number
