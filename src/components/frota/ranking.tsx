@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { closestPlate, driverRanking, matchDriverName, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
+import { closestPlate, driverRanking, isoDay, matchDriverName, titleCase, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
 import { useCnhPeople, useFleetRelease } from "./liberacao";
 import { currentMonthRange, DateRangePicker, type DayRange } from "@/components/date-range-picker";
 
@@ -40,22 +40,25 @@ export function DriverRanking() {
       .gte("schedule_date", addDays(range.from, -1)).lte("schedule_date", range.to).order("schedule_date").range(a, b)),
   });
   const vehicles = useQuery({ queryKey: ["fleet-vehicles-basic"], queryFn: async () => (await supabase.from("vehicles").select("id, plate, model").order("plate")).data ?? [] });
-  const names = useQuery({ queryKey: ["fleet-driver-names"], queryFn: async () => new Map(((await supabase.from("collaborators").select("id, full_name")).data ?? []).map((c) => [c.id, c.full_name])) });
+  const names = useQuery({ queryKey: ["fleet-driver-names"], queryFn: async () => new Map(((await supabase.from("collaborators").select("id, full_name")).data ?? []).map((c) => [c.id, titleCase(c.full_name)])) });
 
   const cnh = useCnhPeople();
   const release = useFleetRelease();
   // Um XML = um abastecimento (itens de outro combustível não contam de novo); placa e nome casados como no Abastecimento.
   const matched = useMemo<RankingNote[]>(() => {
     const allPlates = (vehicles.data ?? []).map((v) => v.plate);
-    const releasedPlates = (vehicles.data ?? []).filter((v) => release.vehicleIds.has(v.id)).map((v) => v.plate);
     const cnhNames = (cnh.data ?? []).map((c) => c.full_name);
-    const releasedNames = (cnh.data ?? []).filter((c) => release.driverIds.has(c.id)).map((c) => c.full_name);
-    return (notes.data ?? []).filter((n) => n.item_no === 1).map((n) => ({
-      ...n,
-      plate_fix: n.plate_fix ?? closestPlate(n.plate, releasedPlates, allPlates),
-      driver_fix: n.driver_fix ?? matchDriverName(n.driver, releasedNames, cnhNames),
-    }));
-  }, [notes.data, vehicles.data, cnh.data, release.driverIds, release.vehicleIds]);
+    return (notes.data ?? []).filter((n) => n.item_no === 1).map((n) => {
+      // Liberados na data do abastecimento (ativo e entre liberação e exclusão).
+      const day = isoDay(n.issued_at);
+      const vIds = release.vehicleIdsOn(day), dIds = release.driverIdsOn(day);
+      return {
+        ...n,
+        plate_fix: n.plate_fix ?? closestPlate(n.plate, (vehicles.data ?? []).filter((v) => vIds.has(v.id)).map((v) => v.plate), allPlates),
+        driver_fix: n.driver_fix ?? matchDriverName(n.driver, (cnh.data ?? []).filter((c) => dIds.has(c.id)).map((c) => c.full_name), cnhNames),
+      };
+    });
+  }, [notes.data, vehicles.data, cnh.data, release.drivers, release.vehicles]);
   const ranking = useMemo(() => driverRanking(
     matched, schedules.data ?? [],
     new Map((vehicles.data ?? []).map((v) => [normalizePlate(v.plate), v.id])), names.data ?? new Map<string, string>(), today,

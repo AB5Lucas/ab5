@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { baseFolderPath, closestPlate, fixedRateio, fuelRateio, isoDay, matchDriverName, plateRuleSplit, FIXED_PLATE_CC, type CcSplitItem, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
+import { baseFolderPath, closestPlate, fixedRateio, fuelRateio, isoDay, matchDriverName, plateRuleSplit, titleCase, FIXED_PLATE_CC, type CcSplitItem, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
 import { DriverRanking } from "./ranking";
 import { PlateFilter } from "./plate-filter";
@@ -119,19 +119,35 @@ function FuelNotes() {
 
   const rows = useMemo<Row[]>(() => {
     const all = notes.data ?? [];
-    // Placa e motorista da nota → cadastrados: primeiro entre os liberados no posto (aba Liberação), depois todos.
+    // Placa e motorista da nota → cadastrados: primeiro entre os liberados no posto na data da nota (aba Liberação:
+    // ativo e entre a data de liberação e a de exclusão), depois todos. O nome aparece como o cadastrado, com
+    // maiúscula só na primeira letra de cada nome.
     const allPlates = (vehicles.data ?? []).map((v) => v.plate);
-    const releasedPlates = (vehicles.data ?? []).filter((v) => release.vehicleIds.has(v.id)).map((v) => v.plate);
     const cnhNames = (cnh.data ?? []).map((c) => c.full_name);
-    const releasedNames = (cnh.data ?? []).filter((c) => release.driverIds.has(c.id)).map((c) => c.full_name);
+    const dayCache = new Map<string, { plates: string[]; names: string[] }>();
+    const releasedOn = (day: string | null) => {
+      const k = day ?? "";
+      if (!dayCache.has(k)) {
+        const vIds = release.vehicleIdsOn(day), dIds = release.driverIdsOn(day);
+        dayCache.set(k, {
+          plates: (vehicles.data ?? []).filter((v) => vIds.has(v.id)).map((v) => v.plate),
+          names: (cnh.data ?? []).filter((c) => dIds.has(c.id)).map((c) => c.full_name),
+        });
+      }
+      return dayCache.get(k)!;
+    };
     const plateCache = new Map<string, string | null>();
     const plateOf = (n: Note) => {
       if (n.plate_fix) return normalizePlate(n.plate_fix) || null;
-      const raw = n.plate ?? "";
-      if (!plateCache.has(raw)) plateCache.set(raw, closestPlate(raw, releasedPlates, allPlates));
-      return plateCache.get(raw)!;
+      const day = isoDay(n.issued_at);
+      const k = `${n.plate ?? ""}|${day ?? ""}`;
+      if (!plateCache.has(k)) plateCache.set(k, closestPlate(n.plate, releasedOn(day).plates, allPlates));
+      return plateCache.get(k)!;
     };
-    const driverOf = (n: Note) => n.driver_fix ?? matchDriverName(n.driver, releasedNames, cnhNames) ?? n.driver;
+    const driverOf = (n: Note) => {
+      const name = n.driver_fix ?? matchDriverName(n.driver, releasedOn(isoDay(n.issued_at)).names, cnhNames) ?? n.driver;
+      return name ? titleCase(name) : null;
+    };
     const vehicleByPlate = new Map((vehicles.data ?? []).map((v) => [normalizePlate(v.plate), v]));
     const clientMap = new Map((clients.data ?? []).map((c) => [c.id, c]));
     const items = new Map<string, number>();
@@ -163,7 +179,7 @@ function FuelNotes() {
       ];
       return { ...n, day, plateShown: p, kmShown, driverShown: driverOf(n), vehicleLabel: v ? (v.model ?? v.plate) : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
     });
-  }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, start, end, cnh.data, release.driverIds, release.vehicleIds]);
+  }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, start, end, cnh.data, release.drivers, release.vehicles]);
 
   const plates = [...new Set(rows.map((r) => r.plateShown).filter((p): p is string => !!p))].sort();
   const shown = rows.filter((r) => (plate === "all" || r.plateShown === plate) && (
@@ -288,7 +304,7 @@ function FuelNotes() {
                     {r.plateShown ?? <span className="text-destructive">sem placa</span>}{r.plate_fix ? " *" : ""}
                     {r.warnings.map((w) => <div key={w} className="max-w-48 whitespace-normal text-amber-600 dark:text-amber-400">⚠ {w}</div>)}
                   </TableCell>
-                  <TableCell title={r.driver && r.driver !== r.driverShown ? `Na nota: ${r.driver}` : undefined}>{r.driverShown ?? "—"}{r.driver && r.driverShown && r.driver !== r.driverShown && <div className="text-muted-foreground">nota: {r.driver}</div>}</TableCell>
+                  <TableCell title={r.driver && titleCase(r.driver) !== r.driverShown ? `Na nota: ${r.driver}` : undefined}>{r.driverShown ?? "—"}{r.driver && r.driverShown && titleCase(r.driver) !== r.driverShown && <div className="text-muted-foreground">nota: {r.driver}</div>}</TableCell>
                   <TableCell>{r.vehicleLabel ?? (r.plateShown ? <span className="text-destructive">não cadastrado</span> : "—")}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.kmShown == null ? "—" : num(r.kmShown, 0)}</TableCell>
                   <TableCell>{r.fuel ?? "—"}</TableCell>
@@ -501,7 +517,7 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
           <div className="space-y-1"><Label htmlFor="fix-plate">Placa</Label><Input id="fix-plate" placeholder={row.plateShown ?? row.plate ?? ""} value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })} /></div>
           <div className="space-y-1"><Label htmlFor="fix-km">Km</Label><Input id="fix-km" inputMode="decimal" placeholder={row.km == null ? "" : String(row.km)} value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} /></div>
         </div>
-        <p className="text-xs text-muted-foreground">Motorista: {row.driverShown ?? "não identificado"}{row.driver && row.driverShown !== row.driver ? ` (na nota: ${row.driver})` : ""}. O nome vem da aba Liberação; para corrigir, libere o motorista lá.</p>
+        <p className="text-xs text-muted-foreground">Motorista: {row.driverShown ?? "não identificado"}{row.driver && row.driverShown !== titleCase(row.driver) ? ` (na nota: ${row.driver})` : ""}. O nome vem da aba Liberação; para corrigir, libere o motorista lá.</p>
         <div className="space-y-2">
           <Label className="block">Centros de custo</Label>
           {!split.length ? (

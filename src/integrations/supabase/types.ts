@@ -2245,14 +2245,23 @@ export type Database = {
       }
       fleet_release_drivers: {
         Row: {
+          active: boolean
+          released_at: string | null
+          removed_at: string | null
           collaborator_id: string
           created_at: string
         }
         Insert: {
+          active?: boolean
+          released_at?: string | null
+          removed_at?: string | null
           collaborator_id: string
           created_at?: string
         }
         Update: {
+          active?: boolean
+          released_at?: string | null
+          removed_at?: string | null
           collaborator_id?: string
           created_at?: string
         }
@@ -2260,14 +2269,23 @@ export type Database = {
       }
       fleet_release_vehicles: {
         Row: {
+          active: boolean
+          released_at: string | null
+          removed_at: string | null
           created_at: string
           vehicle_id: string
         }
         Insert: {
+          active?: boolean
+          released_at?: string | null
+          removed_at?: string | null
           created_at?: string
           vehicle_id: string
         }
         Update: {
+          active?: boolean
+          released_at?: string | null
+          removed_at?: string | null
           created_at?: string
           vehicle_id?: string
         }

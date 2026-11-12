@@ -115,7 +115,8 @@ export function kmNumber(v: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 const PLATE = /\b([A-Z]{3})[\s-]?(\d[A-Z0-9]\d{2})\b/;
-const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, a, b) => a + b.toUpperCase()).replace(/\s+(D[aeo]s?|E)\s+/g, (m) => m.toLowerCase());
+/** "ANDRE DE JESUS" → "Andre de Jesus": maiúscula só na primeira letra de cada nome (da/de/do/dos/e ficam minúsculos). */
+export const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, a, b) => a + b.toUpperCase()).replace(/\s+(D[aeo]s?|E)\s+/g, (m) => m.toLowerCase());
 
 /** Placa, km e condutor do texto livre da nota (infCpl e campos de observação). */
 export function infoFields(text: string): { plate: string | null; km: number | null; driver: string | null } {
