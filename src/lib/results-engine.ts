@@ -30,6 +30,19 @@ export const monthEnd = (ym: string) => {
   const [y, m] = ym.split("-").map(Number);
   return `${ym}-${String(new Date(y!, m!, 0).getDate()).padStart(2, "0")}`;
 };
+/**
+ * Fração do mês dentro do período escolhido por dias (Resultados): dias do mês entre fromDate e toDate ÷ dias do mês.
+ * Sem datas (ou mês inteiro dentro do período) = 1. Faturamento, andamento e pedidos de um mês parcial entram por essa fração.
+ */
+export function monthShare(ym: string, fromDate?: string | null, toDate?: string | null): number {
+  if (!fromDate && !toDate) return 1;
+  const first = `${ym}-01`, last = monthEnd(ym);
+  const a = fromDate && fromDate > first ? fromDate : first;
+  const b = toDate && toDate < last ? toDate : last;
+  if (a > b) return 0;
+  const days = (x: string, y: string) => Math.round((Date.parse(`${y}T12:00:00Z`) - Date.parse(`${x}T12:00:00Z`)) / 86_400_000) + 1;
+  return days(a, b) / days(first, last);
+}
 
 const PAGE = 1000;
 const PARALLEL_PAGES = 8;
@@ -192,7 +205,8 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       };
 }
 
-export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[]; selectedMonths?: readonly string[]; accumulated?: boolean };
+/** fromDate/toDate (AAAA-MM-DD): período por dias da aba Resultados. Sem eles o cálculo é por mês inteiro, como sempre. */
+export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[]; selectedMonths?: readonly string[]; accumulated?: boolean; fromDate?: string; toDate?: string };
 
 /** Contrato: work_id → último dia do mês do último faturamento (custos depois disso não entram). */
 export function contractCutoffs(work: any, entries: any[], isAll: boolean, allWorks?: any[]) {
@@ -276,14 +290,20 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
   const { isAll, workIds } = opts;
     // Fechamento: do início da obra até o último dia do mês selecionado
     let cut = untilMonth ? monthEnd(untilMonth) : "9999-12-31";
+    // Período por dias: custos só até o último dia escolhido
+    if (opts.toDate && opts.toDate < cut) cut = opts.toDate;
+    const share = (ym: string) => monthShare(ym, opts.fromDate, opts.toDate);
     // HH: realizado só até o último RDO (andamento é automático pelos RDOs)
     if (!isAll && (work as any).hh_enabled) {
       const lastRdo = raw.rdoWf.reduce((m: string, r: any) => (r.report_date > m ? r.report_date : m), "");
       if (lastRdo && lastRdo < cut) cut = lastRdo;
     }
     // Com mês inicial: só o que estiver dentro do período; sem mês inicial: desde o começo da obra
-    const from = fromMonth ? `${fromMonth}-01` : "";
+    const from = opts.fromDate ?? (fromMonth ? `${fromMonth}-01` : "");
     const okDate = (dt?: string | null) => !dt || (dt.slice(0, 10) <= cut && dt.slice(0, 10) >= from && isResultMonth(dt.slice(0, 7), "", "", opts.selectedMonths));
+    // Faturamento é por mês (competência cai no dia 01): entra o mês do período, proporcional aos dias escolhidos.
+    const byDays = !!(opts.fromDate || opts.toDate);
+    const okBillMonth = (dt?: string | null) => !byDays ? okDate(dt) : !dt || (isResultMonth(dt.slice(0, 7), fromMonth, untilMonth, opts.selectedMonths) && dt.slice(0, 7) <= cut.slice(0, 7) && share(dt.slice(0, 7)) > 0);
     // Contrato: custos só até o fim do mês do último faturamento do serviço
     const contractCut = contractCutoffs(work, raw.entries, isAll, opts.allWorks);
     // Demais serviços: custos só até o dia do último andamento (% conclusão) apontado
@@ -312,7 +332,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       sibRdo: (raw.sibRdo ?? []).filter((r: any) => okW(r.work_id, r.report_date)),
       // Carros "Suzano Local" (sem cliente) entram só nos serviços da Suzano
       vs: raw.vs.filter((v: any) => okW(v.work_id, v.schedule_date) && (!v.is_suzano_local || /suzano/i.test(String(raw.client?.name ?? "")))),
-      entries: raw.entries.filter((e: any) => e.category === "faturamento" ? okDate(e.entry_date) : okW(e.work_id, e.entry_date)),
+      entries: raw.entries.filter((e: any) => e.category === "faturamento" ? okBillMonth(e.entry_date) : okW(e.work_id, e.entry_date)),
       progress: raw.progress.filter((p: any) => !untilMonth || String(p.month).slice(0, 7) <= untilMonth),
     };
     const idSet = new Set(workIds);
@@ -616,7 +636,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const travelTotal = travelRows.reduce((s, r) => s + r.cost, 0);
     driverRows.sort((a, b) => a.date.localeCompare(b.date));
     for (const e of d.entries) {
-      bump(e.entry_date.slice(0, 7), e.category === "faturamento" ? "billing" : "entries", Number(e.amount));
+      // Faturamento de mês parcial (período por dias) entra proporcional aos dias; sem datas, share = 1.
+      bump(e.entry_date.slice(0, 7), e.category === "faturamento" ? "billing" : "entries", Number(e.amount) * (e.category === "faturamento" ? share(e.entry_date.slice(0, 7)) : 1));
     }
     let progMap = new Map<string, number>(d.progress.map((p: any) => [String(p.month).slice(0, 7), Number(p.percent)]));
     if (!isAll && (work as any).contract_enabled) {
@@ -690,7 +711,13 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     if (monthlyWork) for (const ym of [...monthly.keys(), ...orderMonths]) progMap.set(ym, 100);
     const months = [...new Set([...monthly.keys(), ...progMap.keys()])].filter((ym) => isResultMonth(ym, fromMonth, "", opts.selectedMonths)).sort();
     // Valor do pedido: sempre o informado em Dados do Cliente (HH ou não)
-    const order = monthlyWork ? monthlyOrderRevenue(work, fromMonth, untilMonth, opts.selectedMonths) : Number(work.order_value ?? 0);
+    // Pedidos mensais no período; por dias, o mês parcial entra proporcional (monthShare).
+    const ordersUntil = (until: string) => byDays
+      ? ((Array.isArray(work.orders) ? work.orders : []) as any[])
+          .filter((o) => o?.date && isResultMonth(String(o.date).slice(0, 7), fromMonth, until, opts.selectedMonths))
+          .reduce((sum, o) => sum + Number(o.value ?? 0) * share(String(o.date).slice(0, 7)), 0)
+      : monthlyOrderRevenue(work, fromMonth, until, opts.selectedMonths);
+    const order = monthlyWork ? ordersUntil(untilMonth) : Number(work.order_value ?? 0);
     const biRaw = ((work as any).budget_items ?? {}) as Record<string, number>;
     const bdiOn = !isAll && Number(biRaw["bdi"] ?? 0) === 1;
     const budget = bdiOn ? order * BDI_RATE : Number(work.budget_cost ?? 0);
@@ -701,13 +728,17 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     let accCost = 0;
     let lastPct = basePct;
     let accBilling = 0;
+    let accAdvance = 0; // avanço do período; por dias, o avanço do mês parcial entra proporcional
     const rows = months.map((ym) => {
       const m = monthly.get(ym) ?? { labor: 0, transport: 0, entries: 0, billing: 0 };
       accCost += m.labor + m.transport + m.entries;
       accBilling += m.billing;
       const prev = lastPct;
       if (progMap.has(ym)) lastPct = progMap.get(ym)!;
-      const revenue = monthlyWork ? monthlyOrderRevenue(work, fromMonth, ym, opts.selectedMonths) : (order * Math.max(0, lastPct - basePct)) / 100;
+      accAdvance += (lastPct - prev) * share(ym);
+      const revenue = monthlyWork
+        ? ordersUntil(ym)
+        : byDays ? (order * Math.max(0, accAdvance)) / 100 : (order * Math.max(0, lastPct - basePct)) / 100;
       const margin = revenue - revenue * TAX_RATE - accCost;
       const marginPct = marginPercent(margin, revenue);
       return {

@@ -36,7 +36,8 @@ export function monthsInRange(r: DayRange): string[] {
  * Filtro de período por calendário: clique no primeiro e no último dia. Atalhos para os períodos mais usados.
  * O título fica em cima do campo, como nos outros filtros.
  */
-export function DateRangePicker({ value, onChange, label = "Período", id }: { value: DayRange; onChange: (r: DayRange) => void; label?: string; id?: string }) {
+/** value null = sem período (texto emptyLabel); com onClear aparece o atalho para voltar a "sem período". */
+export function DateRangePicker({ value, onChange, onClear, emptyLabel = "Desde o início", label = "Período", id }: { value: DayRange | null; onChange: (r: DayRange) => void; onClear?: () => void; emptyLabel?: string; label?: string; id?: string }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange | undefined>();
   const today = new Date();
@@ -52,24 +53,25 @@ export function DateRangePicker({ value, onChange, label = "Período", id }: { v
     <div className="space-y-1">
       {/* block: o botão do calendário é inline e, sem isso, o título fica ao lado em vez de em cima. */}
       <Label htmlFor={id} className="block">{label}</Label>
-      <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setDraft({ from: toDate(value.from), to: toDate(value.to) }); }}>
+      <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setDraft(value ? { from: toDate(value.from), to: toDate(value.to) } : undefined); }}>
         <PopoverTrigger asChild>
           <Button id={id} variant="outline" className="flex w-60 justify-start font-normal">
             <CalendarDays className="h-4 w-4" />
-            {value.from === value.to ? br(value.from) : `${br(value.from)} a ${br(value.to)}`}
+            {!value ? emptyLabel : value.from === value.to ? br(value.from) : `${br(value.from)} a ${br(value.to)}`}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <div className="flex flex-col sm:flex-row">
             <div className="flex flex-row flex-wrap gap-1 border-b border-border p-2 sm:flex-col sm:border-b-0 sm:border-r">
               {presets.map((p) => <Button key={p.label} variant="ghost" size="sm" className="justify-start" onClick={() => pick(p.range)}>{p.label}</Button>)}
+              {onClear && <Button variant="ghost" size="sm" className="justify-start" onClick={() => { onClear(); setOpen(false); }}>{emptyLabel}</Button>}
             </div>
             <div>
               <Calendar
                 mode="range"
                 locale={ptBR}
                 numberOfMonths={2}
-                defaultMonth={draft?.from ?? toDate(value.from)}
+                defaultMonth={draft?.from ?? (value ? toDate(value.from) : new Date())}
                 selected={draft}
                 onSelect={(r) => setDraft(r)}
               />

@@ -5,9 +5,10 @@ import { ResultRecurrences } from "@/components/result-recurrences";
 import { contractFraction } from "@/lib/contract";
 import { resultWorksForRole } from "@/lib/result-work-access";
 import { isResultMonth } from "@/lib/result-period";
+import { DateRangePicker, type DayRange } from "@/components/date-range-picker";
 import { displayedBudgetItems } from "@/lib/result-budget";
 import { filterPurchaseEntries } from "@/lib/purchase-policy";
-import { loadWorkData, buildBase as engineBuildBase, fetchAll, totalMargin, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, bdiBudget, BDI_RATE, type ItemKey } from "@/lib/results-engine";
+import { loadWorkData, buildBase as engineBuildBase, fetchAll, totalMargin, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, monthShare, bdiBudget, BDI_RATE, type ItemKey } from "@/lib/results-engine";
 import { resplitClient, splitDesc } from "@/lib/resplit";
 import { Switch } from "@/components/ui/switch";
 import { useEffect, useMemo, useState } from "react";
@@ -80,14 +81,23 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   const [workId, setWorkId] = useState<string>("");
   const [clientKey, setClientKey] = useState<string>("");
   const [selectedMonths, setSelectedMonths] = useState<string[]>(() => [...initialMonths].sort());
-  const [fromMonth, setFromMonth] = useState<string>(() => [...initialMonths].sort()[0] ?? "");
-  const [toMonth, setToMonth] = useState<string>(() => [...initialMonths].sort().pop() ?? "");
+  // Período por dias (calendário). Do Financeiro chegam meses: do dia 1 do primeiro ao último dia do último.
+  // Custos pelos dias exatos; faturamento, andamento e pedidos de mês parcial proporcionais aos dias (monthShare).
+  const [range, setRange] = useState<DayRange | null>(() => {
+    const ms = [...initialMonths].sort();
+    return ms.length ? { from: `${ms[0]}-01`, to: monthEnd(ms[ms.length - 1]!) } : null;
+  });
+  const fromMonth = range?.from.slice(0, 7) ?? "";
+  const toMonth = range?.to.slice(0, 7) ?? "";
+  const fromDate = range?.from;
+  const toDate = range?.to;
   // Cálculos consideram tudo até o fim do período escolhido
   const untilMonth = toMonth;
-  const hasPeriod = !!(fromMonth || toMonth);
-  // Sem mês inicial: desde o começo da obra
-  const periodStart = fromMonth ? `${fromMonth}-01` : "1900-01-01";
-  const periodEnd = toMonth ? monthEnd(toMonth) : "9999-12-31";
+  const hasPeriod = !!range;
+  // Sem período: desde o começo da obra
+  const periodStart = range?.from ?? "1900-01-01";
+  const periodEnd = range?.to ?? "9999-12-31";
+  const share = (ym: string) => monthShare(ym, fromDate, toDate);
   const activeIds = useQuery({
     queryKey: ["works-active-period", periodStart, periodEnd],
     enabled: hasPeriod,
@@ -176,8 +186,8 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   });
   // ---------- Cálculos ----------
   const buildBase = (fromMonth: string, untilMonth: string) =>
-    engineBuildBase(work, data.data, fromMonth, untilMonth, { isAll, workIds, holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], selectedMonths });
-  const calcBase = useMemo(() => buildBase(fromMonth, untilMonth), [work, data.data, untilMonth, fromMonth, selectedMonths, isAll, holidaysQ.data, works.data]);
+    engineBuildBase(work, data.data, fromMonth, untilMonth, { isAll, workIds, holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], selectedMonths, fromDate, toDate });
+  const calcBase = useMemo(() => buildBase(fromMonth, untilMonth), [work, data.data, untilMonth, fromMonth, fromDate, toDate, selectedMonths, isAll, holidaysQ.data, works.data]);
   // Margem realizada total da obra (sem filtro), para o card discreto
   const totalReal = useMemo(() => {
     const w: any = work;
@@ -196,7 +206,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
             entries: (raw.entries ?? []).filter((e: any) => e.work_id === s.id),
             progress: (raw.progress ?? []).filter((p: any) => p.work_id === s.id),
           };
-          const b = engineBuildBase(s, sub, "", untilMonth, { isAll: false, workIds: [s.id], holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], accumulated: true });
+          const b = engineBuildBase(s, sub, "", untilMonth, { isAll: false, workIds: [s.id], holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], accumulated: true, toDate });
           return b?.last ? totalMargin(s, b) : null;
         }).filter(Boolean) as { margin: number; pct: number | null }[];
         if (res.length) return {
@@ -207,14 +217,14 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     }
     const mensal = !isAll && w?.monthly_enabled;
     if (!hasPeriod && !mensal) return null;
-    const b = engineBuildBase(work, data.data, "", untilMonth, { isAll, workIds, holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], accumulated: true });
+    const b = engineBuildBase(work, data.data, "", untilMonth, { isAll, workIds, holidays: (holidaysQ.data ?? []) as string[], allWorks: works.data ?? [], accumulated: true, toDate });
     if (!b?.last) return null;
     if (!isAll && w?.monthly_enabled) {
       return totalMargin(w, b);
     }
     const margin = b.last.revenue * (1 - TAX_RATE) - b.last.cost;
     return { margin, pct: marginPercent(margin, b.last.revenue) };
-  }, [work, data.data, hasPeriod, isAll, holidaysQ.data, works.data, workIds, fromMonth, untilMonth, selectedMonths]);
+  }, [work, data.data, hasPeriod, isAll, holidaysQ.data, works.data, workIds, fromMonth, untilMonth, toDate, selectedMonths]);
 
   // ---------- Edição ----------
   const [orderList, setOrderList] = useState<{ number: string; value: string; date?: string }[]>([]);
@@ -353,10 +363,10 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     const list = (Array.isArray(w.orders) ? w.orders : []) as any[];
     const total = list.reduce((a, o) => a + Number(o.value ?? 0), 0);
     const order = hasPeriod
-      ? list.filter((o) => o.date && isResultMonth(String(o.date).slice(0, 7), fromMonth, untilMonth, selectedMonths)).reduce((a, o) => a + Number(o.value ?? 0), 0)
+      ? list.filter((o) => o.date && isResultMonth(String(o.date).slice(0, 7), fromMonth, untilMonth, selectedMonths)).reduce((a, o) => a + Number(o.value ?? 0) * share(String(o.date).slice(0, 7)), 0)
       : total;
     return { order, f: total ? order / total : 0 };
-  }, [calcRt, hhSavedWork, isAll, hasPeriod, periodStart, periodEnd, fromMonth, untilMonth, selectedMonths]);
+  }, [calcRt, hhSavedWork, isAll, hasPeriod, periodStart, periodEnd, fromMonth, untilMonth, fromDate, toDate, selectedMonths]);
   const calc = useMemo(() => {
     if (!calcRt || !monthlyInfo) return calcRt;
     // Mensal: custo orçado = pedidos do período × BDI (distribuído como em Custos BDI)
@@ -370,13 +380,13 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     // Mensal com período: receita = soma dos pedidos datados no período (até o mês da linha), sem avanço de andamento
     const list = (Array.isArray(hhSavedWork?.orders) ? hhSavedWork.orders : []) as any[];
     const rows = calcRt.rows.map((r) => {
-      const revenue = list.filter((o) => o.date && isResultMonth(String(o.date).slice(0, 7), fromMonth, r.ym, selectedMonths)).reduce((a, o) => a + Number(o.value ?? 0), 0);
+      const revenue = list.filter((o) => o.date && isResultMonth(String(o.date).slice(0, 7), fromMonth, r.ym, selectedMonths)).reduce((a, o) => a + Number(o.value ?? 0) * share(String(o.date).slice(0, 7)), 0);
       const margin = revenue - revenue * TAX_RATE - r.cost;
       return { ...r, progress: 100, revenue, margin, marginPct: marginPercent(margin, revenue), consumed: budget ? (r.cost / budget) * 100 : 0 };
     });
     const last = rows.length ? { ...rows[rows.length - 1]!, progress: calcRt.last?.progress ?? rows[rows.length - 1]!.progress } : calcRt.last;
     return { ...calcRt, items, budget, order, rows, last, budgetMarginPct: order ? ((order - order * TAX_RATE - budget) / order) * 100 : 0 };
-  }, [calcRt, monthlyInfo, hhSavedWork, hasPeriod, periodStart, fromMonth, selectedMonths]);
+  }, [calcRt, monthlyInfo, hhSavedWork, hasPeriod, periodStart, fromMonth, fromDate, toDate, selectedMonths]);
   const [ctOn, setCtOn] = useState(false);
   const [moOn, setMoOn] = useState(false);
   const [hhFrom, setHhFrom] = useState("");
@@ -609,7 +619,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     const svcs = (works.data ?? []).filter((x: any) => workIds.includes(x.id));
     if (!svcs.some((s: any) => s.monthly_enabled)) return null;
     return svcs.reduce((a: number, s: any) => a + (s.monthly_enabled
-      ? ((Array.isArray(s.orders) ? s.orders : []) as any[]).filter((o) => o?.date && inP(String(o.date).slice(0, 7))).reduce((b, o) => b + Number(o.value ?? 0), 0)
+      ? ((Array.isArray(s.orders) ? s.orders : []) as any[]).filter((o) => o?.date && inP(String(o.date).slice(0, 7))).reduce((b, o) => b + Number(o.value ?? 0) * share(String(o.date).slice(0, 7)), 0)
       : Number(s.order_value ?? 0)), 0);
   })();
   const order = monthlyInfo ? monthlyInfo.order : allOrder ?? calc?.order ?? 0;
@@ -692,7 +702,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     if (!isAll) return null;
     const inP = (ym: string) => isResultMonth(ym, fromMonth, untilMonth, selectedMonths);
     const svcs = (works.data ?? []).filter((x: any) => workIds.includes(x.id) && x.monthly_enabled);
-    const tot = svcs.reduce((a: number, s: any) => a + ((Array.isArray(s.orders) ? s.orders : []) as any[]).filter((o) => o?.date && inP(String(o.date).slice(0, 7))).reduce((b, o) => b + Number(o.value ?? 0), 0), 0);
+    const tot = svcs.reduce((a: number, s: any) => a + ((Array.isArray(s.orders) ? s.orders : []) as any[]).filter((o) => o?.date && inP(String(o.date).slice(0, 7))).reduce((b, o) => b + Number(o.value ?? 0) * share(String(o.date).slice(0, 7)), 0), 0);
     return tot > 0 ? tot : null;
   })();
   const fixedBudgetPct = allMonthlyOrders != null ? (1 - TAX_RATE - BDI_RATE) * 100 : calc?.budgetMarginPct ?? 0;
@@ -784,15 +794,23 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Período:</span>
-                <input type="month" value={fromMonth} onChange={(e) => { setSelectedMonths([]); setFromMonth(e.target.value); }} className="h-9 rounded-md border border-input bg-background px-2" aria-label="Mês inicial" title={hasPeriod ? (activeIds.isLoading ? "Buscando obras do período…" : `${visibleWorks.length} serviço(s) com programação no período`) : "Sem período: mostrando todas as obras"} />
-                <span className="text-muted-foreground">até</span>
-                <input type="month" value={toMonth} onChange={(e) => { setSelectedMonths([]); setToMonth(e.target.value); }} className="h-9 rounded-md border border-input bg-background px-2" aria-label="Mês final" />
+              <div className="flex flex-wrap items-end gap-2 text-sm" title={hasPeriod ? (activeIds.isLoading ? "Buscando obras do período…" : `${visibleWorks.length} serviço(s) com programação no período`) : "Sem período: mostrando todas as obras"}>
+                <DateRangePicker
+                  id="result-range"
+                  value={range}
+                  emptyLabel="Desde o início"
+                  onChange={(r) => { setSelectedMonths([]); setRange(r); }}
+                  onClear={() => { setSelectedMonths([]); setRange(null); }}
+                />
                 {hasPeriod && (
-                  <Button variant="ghost" size="sm" onClick={() => { setSelectedMonths([]); setFromMonth(""); setToMonth(""); }}>Limpar</Button>
+                  <Button variant="ghost" size="sm" onClick={() => { setSelectedMonths([]); setRange(null); }}>Limpar</Button>
                 )}
               </div>
+              {hasPeriod && (fromDate!.slice(8) !== "01" || toDate !== monthEnd(toMonth)) && (
+                <p className="w-full text-xs text-muted-foreground">
+                  Custos pelos dias escolhidos; faturamento, andamento e pedidos do mês parcial entram proporcionais aos dias.
+                </p>
+              )}
               {ck && (
                 <ServiceDaysCalendar
                   workIds={workId && workId !== ALL ? [workId] : services.map((x) => x.id)}
