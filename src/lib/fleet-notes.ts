@@ -254,6 +254,36 @@ export function fuelRateio(opts: {
   return { from, to: opts.day, fallback, parts };
 }
 
+/** CC informado à mão no Editar: um ou mais centros de custo, cada um com a sua % do abastecimento. */
+export type CcSplitItem = { cc_code: string; item_account: string | null; label: string | null; pct: number };
+
+/** Placas que vão sempre para o mesmo centro de custo, sem rateio pela Transporte (pedido do usuário). */
+export const FIXED_PLATE_CC: Record<string, string> = { DAJ5I66: "2004221" };
+
+/** Rateio fixo a partir de CCs informados (à mão ou pela regra da placa): divide o valor pelas % (o último fecha os centavos). */
+export function fixedRateio(split: CcSplitItem[], total: number, day: string | null, rule: string, accounts: ItemAccount[]): Rateio {
+  const sum = split.reduce((s, x) => s + Number(x.pct || 0), 0) || 100;
+  const totalCents = Math.round(total * 100);
+  let given = 0;
+  const parts = split.map((x, i) => {
+    const cents = i === split.length - 1 ? totalCents - given : Math.round((totalCents * Number(x.pct || 0)) / sum);
+    given += cents;
+    return {
+      client_id: `manual:${i}`, client: x.label ?? `CC ${x.cc_code}`, days: 0, pct: Math.round((Number(x.pct || 0) / sum) * 10000) / 100, value: cents / 100,
+      cc: x.cc_code, cc_rule: rule, item_account: x.item_account ?? itemAccountFor(x.cc_code, accounts, x.label),
+    };
+  });
+  return { from: day ?? "", to: day ?? "", fallback: false, parts };
+}
+
+/** CC fixo da placa (FIXED_PLATE_CC), com rateio e item conta da tabela Item Conta quando o CC tem uma linha só. */
+export function plateRuleSplit(plate: string | null, accounts: ItemAccount[]): CcSplitItem[] | null {
+  const cc = plate ? FIXED_PLATE_CC[plate] : undefined;
+  if (!cc) return null;
+  const rows = accounts.filter((a) => a.cc_code.trim() === cc);
+  return [{ cc_code: cc, item_account: rows.length === 1 ? rows[0]!.item_account : null, label: rows.length === 1 ? rows[0]!.description ?? null : null, pct: 100 }];
+}
+
 /** Situação de uma linha para os filtros. */
 export type NoteStatus = "sem-nota" | "pendente" | "aprovada";
 export const noteStatus = (n: { note_file: string | null; approved_at: string | null }): NoteStatus =>

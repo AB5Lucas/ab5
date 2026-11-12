@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { baseFolderPath, fuelRateio, isoDay, itemAccountFor, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
+import { baseFolderPath, fixedRateio, fuelRateio, isoDay, plateRuleSplit, FIXED_PLATE_CC, type CcSplitItem, monthLabel, noteStatus, otherPlates, photoTime, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { fleetNoteLink, fleetNoteThumbnails, syncFleetNotesNow } from "@/lib/fleet-notes.functions";
 import { DriverRanking } from "./ranking";
 import { currentMonthRange, DateRangePicker, monthsInRange, type DayRange } from "@/components/date-range-picker";
@@ -122,12 +122,15 @@ function FuelNotes() {
       const day = isoDay(n.issued_at);
       const idx = ordered.indexOf(n);
       const prev = p ? [...ordered.slice(0, idx)].reverse().find((o) => plateOf(o) === p) : undefined;
+      const acc = (accounts.data ?? []) as ItemAccount[];
+      const split = (Array.isArray(n.cc_split) ? n.cc_split : []) as unknown as CcSplitItem[];
+      const plateSplit = plateRuleSplit(p, acc);
       const rateio = n.approved_at && n.allocation ? (n.allocation as unknown as Rateio)
-        // CC informado à mão no Editar: 100% nesse CC, sem rateio pela Transporte.
-        : n.cc_fix ? { from: day ?? "", to: day ?? "", fallback: false, parts: [{
-            client_id: "manual", client: n.cc_label_fix ?? "CC manual", days: 0, pct: 100, value: Number(n.total ?? 0), cc: n.cc_fix, cc_rule: "CC informado à mão",
-            item_account: n.item_account_fix ?? itemAccountFor(n.cc_fix, (accounts.data ?? []) as ItemAccount[], n.cc_label_fix),
-          }] }
+        // CCs informados à mão no Editar (um ou mais, com %): sem rateio pela Transporte.
+        : split.length ? fixedRateio(split, Number(n.total ?? 0), day, "CC informado à mão", acc)
+        : n.cc_fix ? fixedRateio([{ cc_code: n.cc_fix, item_account: n.item_account_fix, label: n.cc_label_fix, pct: 100 }], Number(n.total ?? 0), day, "CC informado à mão", acc)
+        // Placa com CC fixo (ex.: DAJ5I66 → 2004221).
+        : plateSplit ? fixedRateio(plateSplit, Number(n.total ?? 0), day, `placa ${p} vai sempre para o CC ${plateSplit[0]!.cc_code}`, acc)
         : day && schedules.data ? fuelRateio({ vehicleId: v?.id ?? null, day, prevDay: isoDay(prev?.issued_at ?? null), total: Number(n.total ?? 0), schedules: schedules.data, clients: clientMap, works: works.data ?? [], accounts: (accounts.data ?? []) as ItemAccount[] })
         : null;
       const kmShown = n.km_fix ?? n.km;
@@ -144,8 +147,18 @@ function FuelNotes() {
   const shown = rows.filter((r) => (plate === "all" || r.plateShown === plate) && (
     filter === "todas" ? true : filter === "pendentes" ? r.status !== "aprovada" : filter === "sem-nota" ? r.status === "sem-nota" : filter === "aguardando" ? r.status === "pendente" : r.status === "aprovada"));
   const count = (s: Row["status"]) => rows.filter((r) => r.status === s).length;
-  const usedDocs = new Set(rows.map((r) => r.note_file).filter(Boolean));
-  const freeDocs = (docs.data ?? []).filter((d) => !usedDocs.has(d.file_name) && d.ref_month === attach?.ref_month);
+  // Fotos ligadas a algum XML do mês (não só aos do período), por mês + arquivo.
+  const usedDocs = new Set((notes.data ?? []).filter((n) => n.note_file).map((n) => `${n.ref_month}|${n.note_file}`));
+  const freeDocs = (docs.data ?? []).filter((d) => !usedDocs.has(`${d.ref_month}|${d.file_name}`) && d.ref_month === attach?.ref_month);
+  // Cupons sem XML: fotos das notas que não ficaram ligadas a nenhum XML (pela data da foto, dentro do período).
+  const orphanDocs = (docs.data ?? []).filter((d) => {
+    if (usedDocs.has(`${d.ref_month}|${d.file_name}`)) return false;
+    const t = photoTime(d.file_name);
+    if (t == null) return true;
+    const day = new Date(t - 3 * 3600_000).toISOString().slice(0, 10);
+    return day >= start && day <= end;
+  }).sort((a, b) => (photoTime(a.file_name) ?? 0) - (photoTime(b.file_name) ?? 0) || a.file_name.localeCompare(b.file_name));
+  const [showOrphans, setShowOrphans] = useState(false);
   const loading = notes.isLoading || schedules.isLoading || vehicles.isLoading;
   const notRead = months.filter((m) => !settings.data?.[`synced:${m}`]);
   const lastRead = months.map((m) => settings.data?.[`synced:${m}`]).filter((v): v is string => !!v).sort().at(-1);
@@ -196,9 +209,12 @@ function FuelNotes() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Kpi label="XML no período" value={String(rows.length)} />
         <Kpi label="Sem nota" value={String(count("sem-nota"))} tone={count("sem-nota") ? "bad" : undefined} />
+        <button type="button" className="text-left" onClick={() => setShowOrphans(true)} disabled={!orphanDocs.length} title={orphanDocs.length ? "Ver os cupons" : undefined}>
+          <Kpi label="Cupons sem XML" value={String(orphanDocs.length)} tone={orphanDocs.length ? "bad" : undefined} />
+        </button>
         <Kpi label="Aguardando aprovação" value={String(count("pendente"))} />
         <Kpi label="Aprovadas" value={String(count("aprovada"))} />
         <Kpi label="Total do período" value={brl(rows.reduce((s, r) => s + Number(r.total ?? 0), 0))} />
@@ -252,7 +268,7 @@ function FuelNotes() {
                     {parts.length ? parts.map((p) => <div key={p.client_id} className="whitespace-nowrap">{p.client} {p.pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</div>)
                       : <span className="text-destructive">sem programação</span>}
                     {r.rateio?.fallback && <div className="text-muted-foreground">último dia programado</div>}
-                    {r.cc_fix && !r.approved_at && <div className="text-muted-foreground">CC informado à mão</div>}
+                    {!r.approved_at && r.rateio?.parts[0]?.client_id.startsWith("manual") && <div className="text-muted-foreground">{r.rateio.parts[0].cc_rule}</div>}
                   </TableCell>
                   <TableCell>{parts.map((p) => <div key={p.client_id} className="whitespace-nowrap" title={p.cc_rule}>{p.cc ?? <span className="text-destructive">{p.cc_rule}</span>}</div>)}</TableCell>
                   <TableCell>{parts.map((p) => <div key={p.client_id} className="whitespace-nowrap">{p.item_account ?? <span className="text-muted-foreground">sem equivalência</span>}</div>)}</TableCell>
@@ -310,6 +326,30 @@ function FuelNotes() {
       <EditDialog row={edit} accounts={accounts.data ?? []} onClose={() => setEdit(null)} />
       <AttachDialog row={attach} month={attach?.ref_month ?? months[0]!} docs={attach?.note_file ? [...(docs.data ?? []).filter((d) => d.file_name === attach.note_file && d.ref_month === attach.ref_month), ...freeDocs] : freeDocs} onClose={() => setAttach(null)} />
       <FoldersDialog open={folders} onClose={() => setFolders(false)} values={settings.data ?? {}} />
+      <Dialog open={showOrphans} onOpenChange={setShowOrphans}>
+        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Cupons sem XML</DialogTitle>
+            <DialogDescription>
+              {orphanDocs.length} foto(s) de nota na pasta do mês que não ficaram ligadas a nenhum XML do posto. Pode faltar o XML na pasta, ou a foto ser de outro abastecimento: ligue pelo botão Atribuir da linha certa.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="divide-y divide-border rounded-md border border-border text-sm">
+            {orphanDocs.map((d) => {
+              const reading = [d.read_nf ? `NF ${d.read_nf}` : null, d.read_plate, d.read_total != null ? brl(d.read_total) : null].filter(Boolean).join(" · ");
+              return (
+                <li key={`${d.ref_month}|${d.file_name}`} className="flex items-center gap-2 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{timeLabel(photoTime(d.file_name)) ?? d.file_name}</div>
+                    <div className="truncate text-xs text-muted-foreground">{reading || "sem leitura da foto"}</div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => openDoc(d.file_name)}><ExternalLink className="h-4 w-4" /> Abrir</Button>
+                </li>
+              );
+            })}
+          </ul>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -380,25 +420,47 @@ function ApproveDialog({ row, onClose }: { row: Row | null; onClose: () => void 
   );
 }
 
-const AUTO_CC = "__auto__";
+type SplitLine = { account: string; pct: string };
+const pctNum = (s: string) => Number(String(s).replace(",", "."));
 
 function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tables<"fleet_item_accounts">[]; onClose: () => void }) {
-  const [form, setForm] = useState({ plate: "", km: "", driver: "", notes: "", cc: AUTO_CC });
+  const [form, setForm] = useState({ plate: "", km: "", driver: "", notes: "" });
+  // Vazio = automático (rateio pela Transporte ou regra da placa); com linhas = CCs à mão, cada um com a sua %.
+  const [split, setSplit] = useState<SplitLine[]>([]);
   useEffect(() => {
     if (!row) return;
-    const current = row.cc_fix ? accounts.find((a) => a.cc_code === row.cc_fix && (a.description ?? null) === (row.cc_label_fix ?? null)) ?? accounts.find((a) => a.cc_code === row.cc_fix) : null;
-    setForm({ plate: row.plate_fix ?? "", km: row.km_fix == null ? "" : String(row.km_fix), driver: row.driver_fix ?? "", notes: row.notes ?? "", cc: current?.id ?? AUTO_CC });
+    const findId = (cc: string, label: string | null) => (accounts.find((a) => a.cc_code === cc && (a.description ?? null) === (label ?? null)) ?? accounts.find((a) => a.cc_code === cc))?.id ?? "";
+    const saved = (Array.isArray(row.cc_split) ? row.cc_split : []) as unknown as CcSplitItem[];
+    const lines = saved.length ? saved.map((s) => ({ account: findId(s.cc_code, s.label), pct: String(s.pct) }))
+      : row.cc_fix ? [{ account: findId(row.cc_fix, row.cc_label_fix), pct: "100" }] : [];
+    setForm({ plate: row.plate_fix ?? "", km: row.km_fix == null ? "" : String(row.km_fix), driver: row.driver_fix ?? "", notes: row.notes ?? "" });
+    setSplit(lines);
   }, [row?.id]);
-  const ccRow = form.cc === AUTO_CC ? null : accounts.find((a) => a.id === form.cc) ?? null;
   const m = useNoteUpdate(() => { toast.success("Abastecimento atualizado."); onClose(); });
   if (!row) return null;
   const km = form.km.trim() ? Number(form.km.replace(/\./g, "").replace(",", ".")) : null;
+  const totalPct = split.reduce((s, l) => s + (pctNum(l.pct) || 0), 0);
+  const splitError = !split.length ? null
+    : split.some((l) => !l.account) ? "Escolha o centro de custo de cada linha."
+    : split.some((l) => !(pctNum(l.pct) > 0)) ? "Cada centro de custo precisa de uma % maior que zero."
+    : new Set(split.map((l) => l.account)).size !== split.length ? "Há centro de custo repetido."
+    : Math.abs(totalPct - 100) > 0.01 ? `A soma das % precisa dar 100 (está em ${totalPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}).` : null;
+  const addLine = () => setSplit((s) => [...s, { account: "", pct: String(Math.max(0, Math.round((100 - s.reduce((a, l) => a + (pctNum(l.pct) || 0), 0)) * 100) / 100)) }]);
+  const evenOut = () => setSplit((s) => {
+    const each = Math.floor(10000 / s.length) / 100;
+    return s.map((l, i) => ({ ...l, pct: String(i === s.length - 1 ? Math.round((100 - each * (s.length - 1)) * 100) / 100 : each) }));
+  });
+  const plateRule = FIXED_PLATE_CC[normalizePlate(form.plate || row.plate || "")];
+  const toSave: CcSplitItem[] = split.map((l) => {
+    const a = accounts.find((x) => x.id === l.account);
+    return { cc_code: a?.cc_code ?? "", item_account: a?.item_account ?? null, label: a?.description ?? null, pct: pctNum(l.pct) };
+  });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[92vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Corrigir abastecimento</DialogTitle>
-          <DialogDescription>NF {row.nf_number ?? "—"}. Deixe em branco para usar o que veio no XML.</DialogDescription>
+          <DialogDescription>NF {row.nf_number ?? "—"} · {brl(row.total)}. Deixe em branco para usar o que veio no XML.</DialogDescription>
         </DialogHeader>
         {row.info && <p className="max-h-28 overflow-y-auto rounded-md bg-muted p-2 text-xs">{row.info}</p>}
         <div className="grid gap-3 sm:grid-cols-3">
@@ -406,25 +468,49 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
           <div className="space-y-1"><Label htmlFor="fix-km">Km</Label><Input id="fix-km" inputMode="decimal" placeholder={row.km == null ? "" : String(row.km)} value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} /></div>
           <div className="space-y-1"><Label htmlFor="fix-driver">Motorista</Label><Input id="fix-driver" placeholder={row.driver ?? ""} value={form.driver} onChange={(e) => setForm({ ...form, driver: e.target.value })} /></div>
         </div>
-        <div className="space-y-1">
-          <Label>Centro de custo</Label>
-          <Select value={form.cc} onValueChange={(v) => setForm({ ...form, cc: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent className="max-h-72">
-              <SelectItem value={AUTO_CC}>Automático (rateio pela Transporte)</SelectItem>
-              {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.description ?? "—"} · CC {a.cc_code} · item {a.item_account}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            {ccRow ? `100% do abastecimento vai para o CC ${ccRow.cc_code} (item conta ${ccRow.item_account}), sem rateio.` : "Os CC vêm da aba Item Conta; para um CC que não está lá, cadastre-o primeiro."}
-          </p>
+        <div className="space-y-2">
+          <Label className="block">Centros de custo</Label>
+          {!split.length ? (
+            <p className="rounded-md border border-dashed border-border p-2 text-xs text-muted-foreground">
+              {plateRule ? `Automático: esta placa vai sempre para o CC ${plateRule}.` : "Automático: rateio pelos dias do veículo em cada cliente na Transporte."}
+            </p>
+          ) : split.map((l, i) => {
+            const value = Number(row.total ?? 0) * ((pctNum(l.pct) || 0) / 100);
+            return (
+              <div key={i} className="flex items-end gap-2">
+                <div className="min-w-0 flex-1 space-y-1">
+                  {i === 0 && <span className="block text-xs text-muted-foreground">Centro de custo (aba Item Conta)</span>}
+                  <Select value={l.account || undefined} onValueChange={(v) => setSplit((s) => s.map((x, j) => (j === i ? { ...x, account: v } : x)))}>
+                    <SelectTrigger><SelectValue placeholder="Escolha o CC" /></SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.description ?? "—"} · CC {a.cc_code} · item {a.item_account}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-20 space-y-1">
+                  {i === 0 && <span className="block text-xs text-muted-foreground">%</span>}
+                  <Input inputMode="decimal" aria-label="Porcentagem" value={l.pct} onChange={(e) => setSplit((s) => s.map((x, j) => (j === i ? { ...x, pct: e.target.value } : x)))} />
+                </div>
+                <span className="w-24 pb-2 text-right text-xs tabular-nums text-muted-foreground">{brl(value)}</span>
+                <Button type="button" variant="ghost" size="icon" aria-label="Remover centro de custo" onClick={() => setSplit((s) => s.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              </div>
+            );
+          })}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={addLine}>+ Centro de custo</Button>
+            {split.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={evenOut}>Dividir igual</Button>}
+            {split.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => setSplit([])}>Voltar ao automático</Button>}
+            {split.length > 0 && <span className={`ml-auto text-xs tabular-nums ${splitError ? "text-destructive" : "text-muted-foreground"}`}>Total {totalPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</span>}
+          </div>
+          {splitError && <p className="text-xs text-destructive">{splitError}</p>}
+          {!splitError && split.length > 0 && <p className="text-xs text-muted-foreground">Sem rateio pela Transporte: o valor vai para esses CCs nessas %. Para um CC que não está na lista, cadastre-o na aba Item Conta.</p>}
         </div>
         <div className="space-y-1"><Label htmlFor="fix-notes">Observações</Label><Textarea id="fix-notes" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button disabled={m.isPending || (km != null && !Number.isFinite(km))} onClick={() => m.mutate({ id: row.id, patch: {
+          <Button disabled={m.isPending || !!splitError || (km != null && !Number.isFinite(km))} onClick={() => m.mutate({ id: row.id, patch: {
             plate_fix: form.plate.trim() ? normalizePlate(form.plate) : null, km_fix: km, driver_fix: form.driver.trim() || null, notes: form.notes.trim() || null,
-            cc_fix: ccRow?.cc_code ?? null, item_account_fix: ccRow?.item_account ?? null, cc_label_fix: ccRow?.description ?? null,
+            cc_split: (toSave.length ? toSave : null) as never, cc_fix: null, item_account_fix: null, cc_label_fix: null,
           } })}>Salvar</Button>
         </DialogFooter>
       </DialogContent>

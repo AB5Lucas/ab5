@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseFolderPath, clientCc, driverRanking, folderMonthScore, fuelRateio, infoFields, itemAccountFor, maintenanceState, matchPhotosByTime, otherPlates, parseFuelXml, photoTime, pickMonthFolder, sharepointPath } from "./fleet-notes";
+import { baseFolderPath, clientCc, driverRanking, fixedRateio, plateRuleSplit, folderMonthScore, fuelRateio, infoFields, itemAccountFor, maintenanceState, matchPhotosByTime, otherPlates, parseFuelXml, photoTime, pickMonthFolder, sharepointPath } from "./fleet-notes";
 
 const KEY = "35261112345678000199550010000482111000482115";
 const XML = `<?xml version="1.0"?><nfeProc><NFe><infNFe Id="NFe${KEY}" versao="4.00">
@@ -153,5 +153,17 @@ describe("ranking de entrega de notas", () => {
     expect([maycon.total, maycon.delivered, maycon.pending, maycon.score]).toEqual([2, 1, 1, 50]);
     const andre = r.find((x) => x.key === "id:m2")!;
     expect([andre.source, andre.waiting, andre.pending]).toEqual(["nota", 1, 0]);
+  });
+});
+
+describe("CC à mão e placa com CC fixo", () => {
+  const acc = [{ cc_code: "2004221", item_account: "018", description: "ADM MARS" }, { cc_code: "2030999", item_account: "008", description: "SUZANO" }];
+  it("divide o valor pelas % de cada CC, fechando os centavos no último", () => {
+    const r = fixedRateio([{ cc_code: "2004221", item_account: null, label: "ADM MARS", pct: 33.33 }, { cc_code: "2030999", item_account: null, label: "SUZANO", pct: 66.67 }], 100, "2026-11-05", "CC informado à mão", acc);
+    expect(r.parts.map((p) => [p.cc, p.item_account, p.value])).toEqual([["2004221", "018", 33.33], ["2030999", "008", 66.67]]);
+  });
+  it("DAJ5I66 vai sempre para o 2004221", () => {
+    expect(plateRuleSplit("DAJ5I66", acc)).toEqual([{ cc_code: "2004221", item_account: "018", label: "ADM MARS", pct: 100 }]);
+    expect(plateRuleSplit("TDJ9B39", acc)).toBeNull();
   });
 });

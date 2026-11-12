@@ -2090,6 +2090,7 @@ export type Database = {
           approved_by: string | null
           cc_fix: string | null
           cc_label_fix: string | null
+          cc_split: Json | null
           driver: string | null
           driver_fix: string | null
           fuel: string | null
@@ -2121,6 +2122,7 @@ export type Database = {
           approved_by?: string | null
           cc_fix?: string | null
           cc_label_fix?: string | null
+          cc_split?: Json | null
           driver?: string | null
           driver_fix?: string | null
           fuel?: string | null
@@ -2152,6 +2154,7 @@ export type Database = {
           approved_by?: string | null
           cc_fix?: string | null
           cc_label_fix?: string | null
+          cc_split?: Json | null
           driver?: string | null
           driver_fix?: string | null
           fuel?: string | null
