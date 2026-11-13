@@ -5,6 +5,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LogOut, User2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ClassicSidebar } from "@/components/app-sidebar-classic";
+import { MenuSearch } from "@/components/nav/menu-search";
+import { NotificationsBell } from "@/components/nav/notifications-bell";
+import { useMenuStyle } from "@/components/nav/menu-prefs";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +49,8 @@ function AuthenticatedLayout() {
   const queryClient = useQueryClient();
   const { canAccess, loading: accessLoading } = useAccess();
   const pageUrl = menuUrlFor(pathname);
+  const [menuStyle] = useMenuStyle();
+  const modern = menuStyle !== "classic";
   const blocked = !accessLoading && !!pageUrl && !canAccess(pageUrl);
   useEffect(() => {
     if (!blocked) return;
@@ -86,7 +92,8 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <AppSidebar />
+        {modern ? <AppSidebar /> : <ClassicSidebar />}
+        {modern && <MenuSearch />}
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-card/90 px-3 backdrop-blur">
             <SidebarTrigger />
@@ -98,6 +105,7 @@ function AuthenticatedLayout() {
               </Link>
             )}
             <div className="ml-auto flex items-center gap-3">
+              {modern && <NotificationsBell />}
               <Badge variant="secondary" className="hidden sm:inline-flex">
                 {ROLE_LABEL[role]}
               </Badge>

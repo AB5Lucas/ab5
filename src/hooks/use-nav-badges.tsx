@@ -9,7 +9,8 @@ import { isoDay } from "@/lib/fleet-notes";
 import { nonTicketTotal } from "@/lib/fleet-fiscal";
 import { currentMonthRange } from "@/components/date-range-picker";
 
-export type MenuBadge = { count: number; tone: "red" | "orange"; title?: string; label?: string };
+/** Aviso do menu: vermelho = exige ação/vencido; laranja = atenção/a vencer; label "!" = alerta de valor. detail = texto do sino e do mouse. */
+export type MenuBadge = { count: number; tone: "red" | "orange"; title?: string; label?: string; detail?: string };
 
 const WARN_DAYS = 30;
 
@@ -17,8 +18,10 @@ const WARN_DAYS = 30;
 function useBadgeData() {
   return useQuery({
     queryKey: ["menu-badges"],
-    refetchInterval: 60000,
-    staleTime: 30000,
+    // Atualiza a cada 5 min e quando a janela volta ao foco (a consulta é pesada para todos os usuários).
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 2 * 60_000,
     queryFn: async () => {
       const today = todayISO();
       const warn = addDays(today, WARN_DAYS);
@@ -104,16 +107,22 @@ export function useMenuBadges() {
   const distribution = useServiceDistribution().data;
   const w = useWorkflowBadges().data;
   const out: Record<string, MenuBadge | undefined> = {};
-  if (distribution?.pendingClients) out["/programacao/servicos"] = { count: distribution.pendingClients, tone: "red" };
-  if (w?.ponto) out["/relatorios/ajuste-ponto"] = { count: w.ponto, tone: "red" };
-  if (w?.andaimes) out["/andaimes/solicitacoes"] = { count: w.andaimes, tone: "red" };
-  if (w?.hiring) out["/demandas/contratacoes"] = { count: w.hiring, tone: w.hiringTone ?? "red" };
+  if (distribution?.pendingClients) out["/programacao/servicos"] = { count: distribution.pendingClients, tone: "red", detail: `${distribution.pendingClients} cliente(s) com distribuição de serviço pendente` };
+  if (w?.ponto) out["/relatorios/ajuste-ponto"] = { count: w.ponto, tone: "red", detail: `${w.ponto} ocorrência(s) de ponto sem tratamento` };
+  if (w?.andaimes) out["/andaimes/solicitacoes"] = { count: w.andaimes, tone: "red", detail: `${w.andaimes} solicitação(ões) aguardando você` };
+  if (w?.hiring) out["/demandas/contratacoes"] = { count: w.hiring, tone: w.hiringTone ?? "red", detail: `${w.hiring} contratação(ões) com novidade` };
   if (d) {
-    const docs = toBadge(d); if (docs) out["/agendamentos"] = docs;
-    const c = conferenceBadge(d.conference); if (c) out["/conferencia"] = c;
+    const docs = toBadge(d);
+    if (docs) {
+      const names: Record<string, string> = { agendamentos: "Agendamentos atrasados", aso: "ASO", int: "Integrações", trn: "Treinamentos", epi: "Fichas de EPI" };
+      const parts = Object.entries(d.byKind).filter(([, v]) => v.expired + v.expiring)
+        .map(([k, v]) => `${names[k] ?? k}: ${[v.expired ? `${v.expired} vencido(s)` : "", v.expiring ? `${v.expiring} a vencer` : ""].filter(Boolean).join(", ")}`);
+      out["/agendamentos"] = { ...docs, detail: parts.join(" · ") };
+    }
+    const c = conferenceBadge(d.conference); if (c) out["/conferencia"] = { ...c, detail: c.tone === "red" ? `${c.count} conferência(s) com prazo vencido` : `${c.count} conferência(s) para hoje` };
     const ft = balanceBadgeTone(d.fleetSaldo);
     if (ft) out["/frota/notas"] = { count: 1, label: "!", tone: ft, title: `Saldo do posto: ${d.fleetSaldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}` };
-    if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red" };
+    if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red", detail: `${d.purchases} linha(s) de compra pendente(s)` };
     // Vermelho = Serviços, laranja = Indústria; basta 1 da Serviços para ficar vermelho.
     if (d.orders) out["/fechamentos/suzano"] = { count: d.orders, tone: "orange", title: "Pendentes da Indústria" };
     if (d.billing) out["/relatorios/sincronizacao"] = { count: d.billing, tone: d.billingSrv ? "red" : "orange", title: d.billingSrv ? `Pendentes: ${d.billingSrv} da Serviços, ${d.billingInd} da Indústria` : "Pendentes da Indústria" };
@@ -156,8 +165,9 @@ export function markHiringSeen(uid: string | undefined, reqId: string) {
 export function useWorkflowBadges() {
   return useQuery({
     queryKey: ["workflow-badges"],
-    refetchInterval: 60000,
-    staleTime: 30000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth.user?.id;
