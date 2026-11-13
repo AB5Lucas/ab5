@@ -373,11 +373,11 @@ function GenerateTab() {
 
       <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3">
         <div className="w-full text-sm font-medium">Adicionar colaborador fora da escalação</div>
-        <div className="w-64">
+        <div className="w-80">
           <Label>Treinamento</Label>
           <Select value={addT} onValueChange={setAddT}>
             <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-            <SelectContent>{(trainings.data ?? []).filter((t) => t.active !== false).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+            <SelectContent className="max-h-80">{(trainings.data ?? []).filter((t) => t.active !== false).map((t) => <SelectItem key={t.id} value={t.id}>{t.description ? `${t.name} - ${t.description}` : t.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="w-48">
