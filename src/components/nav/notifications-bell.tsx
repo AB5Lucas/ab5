@@ -23,7 +23,7 @@ export function NotificationsBell() {
         <Button variant="ghost" size="icon" className="relative" aria-label={items.length ? `${items.length} aviso(s)` : "Sem avisos"} title="Avisos">
           <Bell className="h-4 w-4" />
           {tone && (
-            <span className={`absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none ${tone === "red" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground"}`}>
+            <span className={`absolute right-1 top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[9px] font-semibold leading-none ${tone === "red" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground"}`}>
               {items.length}
             </span>
           )}
