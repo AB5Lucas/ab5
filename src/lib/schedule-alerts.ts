@@ -39,11 +39,13 @@ export type AlertData = {
   holidays: Set<string>;
   scheduleExists: boolean;
   /** Pessoas escaladas no dia e no dia anterior (data corrida). */
-  allocations: { collaborator_id: string; work_id: string }[];
+  allocations: { collaborator_id: string; work_id: string; vt?: boolean }[];
   prevAllocations: { collaborator_id: string; work_id: string }[];
   works: Map<string, AlertWork>;
   clients: Map<string, { name: string; needs_company_transport: boolean | null }>;
   people: Map<string, { name: string; position: string | null; cnh: string | null; active: boolean; contract?: string | null }>;
+  /** Clientes com transporte montado no dia (aba Serviços → Montar transporte). */
+  builtTransport?: Set<string>;
   vehicles: { plate: string; driver_id: string | null; extra_driver_ids: string[]; client_id: string | null; extra_client_ids: string[]; is_maintenance: boolean; is_external: boolean }[];
   appointments: { collaborator_id: string; type: string; status: string; client_booked: boolean; label: string }[];
   /** Agendamentos futuros (ASO/treinamento/integração) que já cobrem um vencimento: tipo|pessoa|treino-ou-cliente. */
@@ -90,7 +92,9 @@ export function scheduleAlerts(d: AlertData): ScheduleAlert[] {
   // V9: cliente que usa transporte da empresa, com equipe escalada e sem veículo montado.
   const served = new Set(d.vehicles.filter((v) => !v.is_maintenance).flatMap((v) => [v.client_id, ...v.extra_client_ids]).filter(Boolean));
   const teamClients = [...new Set(d.allocations.map((a) => clientOf(a.work_id)).filter((x): x is string => !!x))];
-  const noTransport = teamClients.filter((c) => d.clients.get(c)?.needs_company_transport && !served.has(c)).map((c) => d.clients.get(c)!.name).sort();
+  // Cliente em que todos os escalados vão de VT (ex.: Três Corações com 1 pessoa) ou com transporte montado na aba Serviços não precisa de veículo.
+  const allVt = (c: string) => d.allocations.filter((a) => clientOf(a.work_id) === c).every((a) => a.vt);
+  const noTransport = teamClients.filter((c) => d.clients.get(c)?.needs_company_transport && !served.has(c) && !d.builtTransport?.has(c) && !allVt(c)).map((c) => d.clients.get(c)!.name).sort();
   if (noTransport.length) out.push({ key: "v9", tone: "red", title: `${noTransport.length} cliente(s) com equipe e sem transporte montado`, people: noTransport });
 
   // V10: descanso menor que 11h entre a saída do dia anterior e a entrada do dia.
@@ -133,9 +137,9 @@ export function scheduleAlerts(d: AlertData): ScheduleAlert[] {
     if (soon(x.expires_at) && !d.covered.has(`trn|${x.collaborator_id}|${x.training_id}`)) expiring.push(`${name(x.collaborator_id)} · ${x.name} vence ${br(x.expires_at!)}`);
   if (expiring.length) out.push({ key: "l1", tone: "orange", title: `${expiring.length} documento(s) de escalados vencendo em até 7 dias`, people: expiring.sort() });
 
-  // L2: agendamento do dia sem confirmação na plataforma do cliente.
-  const unbooked = d.appointments.filter((a) => a.status === "agendado" && !a.client_booked);
-  if (unbooked.length) out.push({ key: "l2", tone: "orange", title: `${unbooked.length} agendamento(s) sem confirmação na plataforma`, people: unbooked.map((a) => `${name(a.collaborator_id)} · ${a.label}`).sort() });
+  // L2: integração agendada no dia sem confirmação na plataforma do cliente (só integrações têm a bolinha verde).
+  const unbooked = d.appointments.filter((a) => a.type === "integracao" && a.status === "agendado" && !a.client_booked);
+  if (unbooked.length) out.push({ key: "l2", tone: "orange", title: `${unbooked.length} integração(ões) sem confirmação na plataforma`, people: unbooked.map((a) => `${name(a.collaborator_id)} · ${a.label}`).sort() });
 
   // L5: quem trabalhou nos últimos 14 dias e está sem escalação, quadro, férias, folga ou agendamento (só em dia útil).
   if (businessDay && d.scheduleExists && d.allocations.length) {

@@ -38,6 +38,8 @@ describe("avisos da programação", () => {
     expect(keys(d)).toEqual(expect.arrayContaining(["v8a", "v8b"]));
     expect(keys(d)).not.toContain("v9");
     expect(keys(base({ allocations: [{ collaborator_id: "p2", work_id: "w1" }] }))).toContain("v9");
+    expect(keys(base({ allocations: [{ collaborator_id: "p2", work_id: "w1", vt: true }] }))).not.toContain("v9");
+    expect(keys(base({ allocations: [{ collaborator_id: "p2", work_id: "w1" }], builtTransport: new Set(["c1"]) }))).not.toContain("v9");
   });
   it("V10 descanso menor que 11h depois do noturno", () => {
     const d = base({ allocations: [{ collaborator_id: "p2", work_id: "adm" }], prevAllocations: [{ collaborator_id: "p2", work_id: "n1" }] });
@@ -48,12 +50,13 @@ describe("avisos da programação", () => {
     const d = base({
       allocations: [{ collaborator_id: "p2", work_id: "adm" }],
       asos: [{ collaborator_id: "p2", expires_at: "2026-11-20" }],
-      appointments: [{ collaborator_id: "p1", type: "aso", status: "agendado", client_booked: false, label: "ASO" }],
+      appointments: [{ collaborator_id: "p1", type: "integracao", status: "agendado", client_booked: false, label: "integração YARA" }, { collaborator_id: "p1", type: "aso", status: "agendado", client_booked: false, label: "ASO" }],
       recent: new Set(["p2", "tst", "p1"]), accounted: new Set(["p1"]),
     });
     const a = scheduleAlerts(d);
     expect(a.map((x) => x.key)).toEqual(expect.arrayContaining(["l1", "l2", "l5"]));
     expect(a.find((x) => x.key === "l5")!.people).toEqual(["Ana"]);
+    expect(a.find((x) => x.key === "l2")!.people).toEqual(["Beto · integração YARA"]);
     expect(keys({ ...d, covered: new Set(["aso|p2"]) })).not.toContain("l1");
     const pj = new Map(d.people); pj.set("tst", { ...pj.get("tst")!, contract: "intermitente" });
     expect(keys({ ...d, people: pj })).not.toContain("l5");
