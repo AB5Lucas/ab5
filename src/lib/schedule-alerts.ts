@@ -3,7 +3,7 @@
  * Vermelho = alto impacto; laranja = pequeno impacto. Regras escolhidas pelo usuário:
  * V1 treinamento sem TST no ADM · V8 veículo sem motorista / CNH vencida · V9 cliente sem transporte ·
  * V10 descanso < 11h entre jornadas · V11 programação do próximo dia útil não criada após o horário de corte ·
- * L1 documentos vencendo em 7 dias · L2 agendamento sem confirmação na plataforma · L5 pessoas sem escalação.
+ * L1 documentos vencendo em 7 dias · L2 agendamento sem confirmação na plataforma · L5 pessoas sem escalação (sem intermitentes e PJ).
  * (L4, manutenção de veículo, aguarda a aba Manutenção estar alimentada.)
  */
 export type AlertTone = "red" | "orange";
@@ -43,7 +43,7 @@ export type AlertData = {
   prevAllocations: { collaborator_id: string; work_id: string }[];
   works: Map<string, AlertWork>;
   clients: Map<string, { name: string; needs_company_transport: boolean | null }>;
-  people: Map<string, { name: string; position: string | null; cnh: string | null; active: boolean }>;
+  people: Map<string, { name: string; position: string | null; cnh: string | null; active: boolean; contract?: string | null }>;
   vehicles: { plate: string; driver_id: string | null; extra_driver_ids: string[]; client_id: string | null; extra_client_ids: string[]; is_maintenance: boolean; is_external: boolean }[];
   appointments: { collaborator_id: string; type: string; status: string; client_booked: boolean; label: string }[];
   /** Agendamentos futuros (ASO/treinamento/integração) que já cobrem um vencimento: tipo|pessoa|treino-ou-cliente. */
@@ -139,7 +139,8 @@ export function scheduleAlerts(d: AlertData): ScheduleAlert[] {
 
   // L5: quem trabalhou nos últimos 14 dias e está sem escalação, quadro, férias, folga ou agendamento (só em dia útil).
   if (businessDay && d.scheduleExists && d.allocations.length) {
-    const idle = [...d.recent].filter((id) => d.people.get(id)?.active && !staff.has(id) && !d.accounted.has(id)).map(name).sort();
+    // Intermitentes e PJ não contam: trabalham só quando chamados.
+    const idle = [...d.recent].filter((id) => { const p = d.people.get(id); return p?.active && !["intermitente", "pj"].includes(String(p.contract ?? "").toLowerCase()) && !staff.has(id) && !d.accounted.has(id); }).map(name).sort();
     if (idle.length) out.push({ key: "l5", tone: "orange", title: `${idle.length} pessoa(s) sem escalação no dia`, people: idle });
   }
   return out.sort((a, b) => Number(b.tone === "red") - Number(a.tone === "red"));

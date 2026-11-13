@@ -55,5 +55,7 @@ describe("avisos da programação", () => {
     expect(a.map((x) => x.key)).toEqual(expect.arrayContaining(["l1", "l2", "l5"]));
     expect(a.find((x) => x.key === "l5")!.people).toEqual(["Ana"]);
     expect(keys({ ...d, covered: new Set(["aso|p2"]) })).not.toContain("l1");
+    const pj = new Map(d.people); pj.set("tst", { ...pj.get("tst")!, contract: "intermitente" });
+    expect(keys({ ...d, people: pj })).not.toContain("l5");
   });
 });

@@ -14,7 +14,7 @@ export async function fetchScheduleAlerts(date: string) {
     safe(fetchAll<any>((a, b) => supabase.from("holidays").select("date").gte("date", addDaysIso(today, -1)).lte("date", addDaysIso(date, 40)).range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, night_shift").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("clients").select("id, name, needs_company_transport").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("collaborators").select("id, full_name, status, driver_license_expiry, positions(name)").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("collaborators").select("id, full_name, status, contract_type, driver_license_expiry, positions(name)").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("driver_id, extra_driver_ids, client_id, extra_client_ids, is_maintenance, is_external, vehicles(plate, model)").eq("schedule_date", date).range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, status, client_booked, training_id, client_id, trainings(name), clients(name)").eq("scheduled_date", date).neq("status", "cancelado").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, training_id, client_id").eq("status", "agendado").gte("scheduled_date", today).range(a, b))),
@@ -54,7 +54,7 @@ export async function fetchScheduleAlerts(date: string) {
     allocations: allocs, prevAllocations: prevAllocs,
     works: new Map(works.map((w) => [w.id, w as AlertWork])),
     clients: new Map(clients.map((c) => [c.id, { name: c.name, needs_company_transport: c.needs_company_transport }])),
-    people: new Map(people.map((p) => [p.id, { name: p.full_name, position: p.positions?.name ?? null, cnh: p.driver_license_expiry, active: p.status === "active" }])),
+    people: new Map(people.map((p) => [p.id, { name: p.full_name, position: p.positions?.name ?? null, cnh: p.driver_license_expiry, active: p.status === "active", contract: p.contract_type }])),
     vehicles: vehicles.map((v) => ({
       plate: v.vehicles ? `${v.vehicles.plate}${v.vehicles.model ? ` - ${v.vehicles.model}` : ""}` : "veículo", driver_id: v.driver_id,
       extra_driver_ids: v.extra_driver_ids ?? [], client_id: v.client_id, extra_client_ids: v.extra_client_ids ?? [], is_maintenance: !!v.is_maintenance, is_external: !!v.is_external,
