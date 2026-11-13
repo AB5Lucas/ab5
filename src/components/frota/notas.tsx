@@ -133,7 +133,8 @@ function FuelNotes() {
   ], []);
   const tableRows = useMemo(() => applyColumnFilters(shown, columns, colFilters, colSort), [shown, columns, colFilters, colSort]);
   const colFiltered = Object.keys(colFilters).length > 0;
-  const count = (s: Row["status"]) => rows.filter((r) => r.status === s).length;
+  // Quadros contam XML (chave de acesso), como o "XML no período": XML com dois combustíveis conta uma vez.
+  const count = (s: Row["status"]) => new Set(rows.filter((r) => r.status === s).map((r) => r.access_key)).size;
   // Fotos ligadas a algum XML do mês (não só aos do período), por mês + arquivo.
   const usedDocs = new Set((notes.data ?? []).filter((n) => n.note_file).map((n) => `${n.ref_month}|${n.note_file}`));
   const freeDocs = (docs.data ?? []).filter((d) => !usedDocs.has(`${d.ref_month}|${d.file_name}`) && d.ref_month === attach?.ref_month);
