@@ -3,7 +3,7 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { todayISO } from "@/lib/scheduling";
-import { mergePendingClients, serviceDistribution, recentRange, isTresCoracoes, isWeekend, type DistributionAllocation, type DistributionWork } from "@/lib/service-distribution";
+import { mergePendingClients, serviceDistribution, recentRange, isIndustria, isTresCoracoes, isWeekend, type DistributionAllocation, type DistributionWork } from "@/lib/service-distribution";
 
 export const SERVICE_BADGE_DATE = ["service-badge-date"];
 
@@ -28,6 +28,7 @@ export function useServiceDistribution(selectedDate?: string) {
         fetchAll<{ id: string; name: string }>((a, b) => supabase.from("clients").select("id, name").order("id").range(a, b)),
       ]);
       const tres = new Set(clientRows.filter((c) => isTresCoracoes(c.name)).map((c) => c.id));
+      const industria = new Set(clientRows.filter((c) => isIndustria(c.name)).map((c) => c.id));
       const allowed = links ? new Set(links.map((l) => l.works?.client_id)) : null;
       const works = allowed ? allWorks.filter((w) => allowed.has(w.client_id)) : allWorks;
       if (!schedules.length) return serviceDistribution(works, []);
@@ -50,7 +51,8 @@ export function useServiceDistribution(selectedDate?: string) {
           ...trainingBox.filter((t) => t.schedule_id === s.id),
         ].map((r) => r.collaborator_id));
         const r = serviceDistribution(works, allocations.filter((a) => a.schedule_id === s.id), excluded);
-        return isWeekend(date) ? r : { pendingClientIds: r.pendingClientIds.filter((id) => !tres.has(id)) };
+        const ids = r.pendingClientIds.filter((id) => !industria.has(id));
+        return { pendingClientIds: isWeekend(date) ? ids : ids.filter((id) => !tres.has(id)) };
       });
       return mergePendingClients(days);
     },

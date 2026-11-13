@@ -32,6 +32,8 @@ export function recentRange(today: string) {
 
 /** Três Corações só é sinalizada no sábado e domingo. */
 export const isTresCoracoes = (name: string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("tres coracoes");
+/** Indústria nunca é sinalizada na aba Serviços (pedido do usuário: sem escalação nos serviços é normal). */
+export const isIndustria = (name: string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() === "INDUSTRIA";
 export const isWeekend = (date: string) => [0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay());
 
 /** Une os clientes pendentes de vários dias: cada cliente conta uma única vez. */
