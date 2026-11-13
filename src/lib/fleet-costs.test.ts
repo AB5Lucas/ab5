@@ -37,3 +37,12 @@ describe("manutenção da frota", () => {
     expect(vehicleMonth(1000, 1500, 20, 800, 300, 100)).toEqual({ km: 1000, kmCost: 1350, budget: 1500, toll: 20, fuel: 800, maintenance: 300, rent: 100, real: 1220, diff: 280 });
   });
 });
+
+import { registeredPlate } from "./fleet-costs";
+describe("registeredPlate", () => {
+  it("mostra a placa como cadastrada", () => {
+    expect(registeredPlate("ABC1C34", ["XYZ9A99", "abc1234"])).toBe("ABC1234");
+    expect(registeredPlate("FFF1F11", ["ABC1234"])).toBe("FFF1F11");
+    expect(registeredPlate(null, ["ABC1234"])).toBeNull();
+  });
+});

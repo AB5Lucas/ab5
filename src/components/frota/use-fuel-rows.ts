@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
-import { normalizePlate } from "@/lib/fleet-costs";
+import { normalizePlate, registeredPlate } from "@/lib/fleet-costs";
 import { closestPlate, fixedRateio, fuelRateio, isoDay, matchDriverName, plateRuleSplit, titleCase, type CcSplitItem, noteStatus, otherPlates, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { monthsInRange, type DayRange } from "@/components/date-range-picker";
 import { useCnhPeople, useFleetRelease } from "./liberacao";
@@ -71,6 +71,8 @@ export function useFuelRows(range: DayRange) {
       const name = n.driver_fix ?? matchDriverName(n.driver, releasedOn(isoDay(n.issued_at)).names, cnhNames) ?? n.driver;
       return name ? titleCase(name) : null;
     };
+    // Placa mostrada como cadastrada na Liberação/Veículos (o casamento continua pela forma Mercosul).
+    const registered = [...(vehicles.data ?? []).map((v) => v.plate), ...release.vehicles.map((e) => e.plate)];
     const vehicleByPlate = new Map((vehicles.data ?? []).map((v) => [normalizePlate(v.plate), v]));
     const clientMap = new Map((clients.data ?? []).map((c) => [c.id, c]));
     const items = new Map<string, number>();
@@ -100,7 +102,7 @@ export function useFuelRows(range: DayRange) {
         ...(n.plate_fix ? [] : otherPlates(n.info, normalizePlate(n.plate ?? "") || p).filter((o) => o !== p).map((o) => `outra placa no texto da nota: ${o}`)),
         ...(kmShown != null && prevKm != null && Number(kmShown) < Number(prevKm) ? [`km menor que o abastecimento anterior (${Number(prevKm).toLocaleString("pt-BR")})`] : []),
       ];
-      return { ...n, day, plateShown: p, kmShown, driverShown: driverOf(n), vehicleLabel: v ? (v.model ?? v.plate) : p ? release.freeVehicleLabel.get(p) ?? null : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
+      return { ...n, day, plateShown: registeredPlate(p, registered), kmShown, driverShown: driverOf(n), vehicleLabel: v ? (v.model ?? v.plate) : p ? release.freeVehicleLabel.get(p) ?? null : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
     });
   }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, start, end, cnh.data, release.drivers, release.vehicles]);
   const loading = notes.isLoading || schedules.isLoading || vehicles.isLoading;

@@ -521,7 +521,7 @@ function AttachDialog({ row, month, docs, onClose }: { row: Row | null; month: s
     .map((d) => ({ ...d, time: photoTime(d.file_name) }))
     .sort((a, b) => (a.file_name === row.note_file ? -1 : b.file_name === row.note_file ? 1 : 0)
       || Number(b.read_nf === row.nf_number) - Number(a.read_nf === row.nf_number)
-      || Number(b.read_plate === row.plateShown) - Number(a.read_plate === row.plateShown)
+      || Number(!!b.read_plate && normalizePlate(b.read_plate) === normalizePlate(row.plateShown ?? "")) - Number(!!a.read_plate && normalizePlate(a.read_plate) === normalizePlate(row.plateShown ?? ""))
       || (emitted == null ? 0 : Math.abs((a.time ?? 0) - emitted) - Math.abs((b.time ?? 0) - emitted)) || a.file_name.localeCompare(b.file_name));
   const preview = file ? thumbs.data?.get(file)?.large : null;
   const confirming = !!file && file === row.note_file && row.note_match === "hora";

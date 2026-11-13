@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAll } from "@/lib/results-engine";
-import { normalizePlate } from "@/lib/fleet-costs";
+import { normalizePlate, registeredPlate } from "@/lib/fleet-costs";
 import { closestPlate, driverRanking, isoDay, matchDriverName, titleCase, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
 import { useCnhPeople, useFleetRelease } from "./liberacao";
 import { currentMonthRange, DateRangePicker, type DayRange } from "@/components/date-range-picker";
@@ -130,7 +130,7 @@ export function DriverRanking() {
                       <TableCell colSpan={6} className="text-sm">
                         <div className="mb-1 font-medium">XML sem nota</div>
                         {r.pendingNotes.map((p) => (
-                          <div key={p.id} className="tabular-nums">{brDate(p.day)} · NF {p.nf ?? "—"} · {p.plate ?? "sem placa"} · {brl(p.total)}</div>
+                          <div key={p.id} className="tabular-nums">{brDate(p.day)} · NF {p.nf ?? "—"} · {registeredPlate(p.plate, [...(vehicles.data ?? []).map((v) => v.plate), ...release.vehicles.map((e) => e.plate)]) ?? "sem placa"} · {brl(p.total)}</div>
                         ))}
                       </TableCell>
                     </TableRow>

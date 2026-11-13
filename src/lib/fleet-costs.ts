@@ -17,6 +17,16 @@ export function normalizePlate(v: unknown): string {
   return /^[A-Z]{3}\d{4}$/.test(p) ? p.slice(0, 4) + String.fromCharCode(65 + Number(p[4])) + p.slice(5) : p;
 }
 
+/**
+ * Placa escrita como no cadastro (aba Liberação / Veículos): a comparação é sempre pela forma Mercosul
+ * (normalizePlate), mas a tela mostra a placa cadastrada (ex.: ABC1234, e não ABC1C34).
+ */
+export function registeredPlate(p: string | null | undefined, registered: (string | null | undefined)[]): string | null {
+  if (!p) return null;
+  const key = normalizePlate(p);
+  return registered.find((r) => r && normalizePlate(r) === key)?.trim().toUpperCase() ?? p;
+}
+
 export type FleetExpenseRow = { plate: string; date: string; amount: number; document: string; description: string };
 
 const norm = (v: unknown) => String(v ?? "").trim().toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ");
