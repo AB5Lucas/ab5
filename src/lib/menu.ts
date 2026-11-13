@@ -85,7 +85,7 @@ const RAW_GROUPS: MenuGroup[] = [
     icon: Building2,
     items: [
       { title: "Cadastros", url: "/obras", icon: Building2 },
-      { title: "Compras", url: "/obras/compras", icon: ShoppingCart },
+      { title: "Fechamento", url: "/fechamentos/financeiro", icon: Calculator },
       { title: "Resultados", url: "/obras/resultado", icon: TrendingUp },
     ],
   },
@@ -93,7 +93,7 @@ const RAW_GROUPS: MenuGroup[] = [
     label: "Financeiro",
     icon: Wallet,
     items: [
-      { title: "Fechamento", url: "/fechamentos/financeiro", icon: Calculator },
+      { title: "Compras", url: "/obras/compras", icon: ShoppingCart },
       { title: "Pedidos", url: "/fechamentos/suzano", icon: Receipt },
       { title: "Faturamento", url: "/relatorios/sincronizacao", icon: FileText },
     ],
