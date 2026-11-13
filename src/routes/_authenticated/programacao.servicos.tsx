@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { addDays, checkAso, checkIntegration, checkRequirements, fetchScheduleContext, formatBR, pendingForWork, todayISO, workRequiresIntegration } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
@@ -620,9 +621,25 @@ function ServicesPage() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button variant="outline" disabled={!clientId || copy.isPending} onClick={() => copy.mutate()}>
-          <Copy className="h-4 w-4" /> Copiar dia anterior
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" disabled={!clientId || copy.isPending}>
+              <Copy className="h-4 w-4" /> Copiar dia anterior
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Copiar o dia anterior?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Os serviços de {clientName || "este cliente"} em {date.split("-").reverse().join("/")} vão ficar iguais aos do dia útil anterior: quem estava escalado nos dois dias volta para o mesmo serviço, substituindo o que está distribuído agora. Essa troca não pode ser desfeita automaticamente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => copy.mutate()}>Copiar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <Button variant="outline" disabled={!clientId} onClick={() => setEffOpen(true)}>
           <ClipboardList className="h-4 w-4" /> Montar Efetivo
         </Button>
