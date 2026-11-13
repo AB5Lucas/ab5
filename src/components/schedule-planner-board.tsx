@@ -1,3 +1,4 @@
+import { ScheduleAlertsButton } from "@/components/schedule-alerts-button";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -1704,6 +1705,7 @@ export function SchedulePlannerBoard({
             <CalendarDays className="h-4 w-4" /> Folgas
           </Button>
           <WeeklyDaysOffDialog date={date} open={openFolgas} onOpenChange={setOpenFolgas} editable={editable} />
+          <ScheduleAlertsButton date={date} />
         </div>
       </div>
 
