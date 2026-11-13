@@ -193,7 +193,9 @@ function FuelNotes() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Kpi label="XML no período" value={String(rows.length)} />
+        {/* XML com dois combustíveis vira duas linhas: o quadro conta os arquivos (chaves), não as linhas. */}
+        <Kpi label="XML no período" value={String(new Set(rows.map((r) => r.access_key)).size)}
+          title={rows.length !== new Set(rows.map((r) => r.access_key)).size ? `${rows.length} abastecimentos: XML com dois combustíveis viram duas linhas.` : undefined} />
         <Kpi label="Sem nota" value={String(count("sem-nota"))} tone={count("sem-nota") ? "bad" : undefined} />
         <button type="button" className="text-left" onClick={() => setShowOrphans(true)} disabled={!orphanDocs.length} title={orphanDocs.length ? "Ver os cupons" : undefined}>
           <Kpi label="Cupons sem XML" value={String(orphanDocs.length)} tone={orphanDocs.length ? "bad" : undefined} />
@@ -333,7 +335,7 @@ function FuelNotes() {
   );
 }
 
-function Kpi({ label, value, tone, title }: { label: string; value: string; tone?: "bad" | "warn" | undefined; title?: string }) {
+function Kpi({ label, value, tone, title }: { label: string; value: string; tone?: "bad" | "warn" | undefined; title?: string | undefined }) {
   return (
     <div className="panel p-3" title={title}>
       <div className="text-xs text-muted-foreground">{label}</div>

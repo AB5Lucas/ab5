@@ -86,7 +86,11 @@ export async function executeFleetNotesSync(ym: string, c: Credentials) {
   if (notesBase) {
     notesDir = await monthFolder(baseFolderPath(notesBase), ym, c);
     if (notesDir) docs = (await children(notesDir, c)).filter((i) => i.file).map((i) => ({ id: i.id, name: i.name }));
-    else errors.push(`Não achei a pasta de notas de ${ym} dentro de ${baseFolderPath(notesBase)}.`);
+    else {
+      // Meses anteriores ao envio de fotos (antes do 1º mês com nota lida) não têm pasta de notas: sem aviso.
+      const { data: first } = await supabaseAdmin.from("fleet_note_docs").select("ref_month").order("ref_month").limit(1).maybeSingle();
+      if (first?.ref_month && ym >= first.ref_month) errors.push(`Não achei a pasta de notas de ${ym} dentro de ${baseFolderPath(notesBase)}.`);
+    }
   } else errors.push("Pasta das notas ainda não informada: todas as linhas ficam sem nota.");
 
   // Sem ligação pela hora da foto (os motoristas mandam as fotos em lote e a hora erra: nov/2026, 17 de 30).
