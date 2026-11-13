@@ -557,13 +557,13 @@ export function IntegrationsPage() {
                   <TableCell className="hidden md:table-cell">{formatDateBR(r.integration_date)}</TableCell>
                   <TableCell className="hidden md:table-cell">{formatDateBR(r.expires_at)}</TableCell>
                   <TableCell>
-                    {canWrite && (st === "expired" || st === "documentation") ? (
+                    {canWrite && (st === "expired" || st === "expiring" || st === "documentation") ? (
                       <button
                         type="button"
-                        title={st === "expired" ? "Marcar como Documentação" : "Voltar para Vencida"}
-                        onClick={() => toggleDoc.mutate({ id: r.id, value: st === "expired" })}
+                        title={st === "documentation" ? `Voltar para ${STATUS_LABEL[statusOf(r.expires_at, today)]}` : "Marcar como Documentação"}
+                        onClick={() => toggleDoc.mutate({ id: r.id, value: st !== "documentation" })}
                       >
-                        <Badge variant="destructive" className="cursor-pointer">{STATUS_LABEL[st]}</Badge>
+                        <Badge variant={st === "expiring" ? "secondary" : "destructive"} className="cursor-pointer">{STATUS_LABEL[st]}</Badge>
                       </button>
                     ) : (
                       <Badge

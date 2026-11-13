@@ -256,7 +256,8 @@ export function checkIntegration(
   if (!clientId) return { status: "no_client", expiresAt: null };
   if (work?.clients?.requires_integration === false) return { status: "not_required", expiresAt: null };
   const rec = ctx.integrations.find((i) => i.collaborator_id === collaboratorId && i.client_id === clientId);
-  if (!rec || rec.documentation) {
+  // Em Documentação, segue liberada enquanto não vence (pode ser marcada já perto do vencimento).
+  if (!rec || (rec.documentation && (!rec.expires_at || rec.expires_at < date))) {
     // Integração agendada + documento aceito por este cliente na Conferência: libera a escalação.
     for (const k of ctx.conferenceAccepted ?? [])
       if (k.startsWith(`${collaboratorId}|`) && k.endsWith(`|${clientId}`)) return { status: "valid", expiresAt: null };
