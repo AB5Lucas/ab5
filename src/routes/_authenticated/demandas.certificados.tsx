@@ -543,6 +543,9 @@ function AttendanceTab() {
   const { certData, tsts } = useBase();
   const day = useDay(date);
   const [sel, setSel] = useState<Record<string, boolean>>({});
+  // Pessoa fora da lista (desmarcada) por treinamento|colaborador; padrão = todos marcados.
+  const [off, setOff] = useState<Record<string, boolean>>({});
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   const [tstBy, setTstBy] = useState<Record<string, string>>({});
   const activeTsts = (tsts.data ?? []).filter((t) => t.active);
 
@@ -554,8 +557,37 @@ function AttendanceTab() {
       return data ?? [];
     },
   });
+  // Certificados emitidos com esta data de treinamento: entram na lista mesmo sem escalação/agendamento.
+  const certs = useQuery({
+    queryKey: ["att-certs", date],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("training_certificates")
+        .select("collaborator_id, training_id, collaborators(full_name, cpf, registration_number), trainings(name)")
+        .eq("training_date", date);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
 
-  const chosen = (day.data ?? []).filter((g) => sel[g.trainingId]);
+  type AttPerson = { collabId: string; name: string; cpf: string | null; hasCert: boolean };
+  const groups = useMemo(() => {
+    const map = new Map<string, { trainingId: string; name: string; people: AttPerson[] }>();
+    for (const g of day.data ?? []) map.set(g.trainingId, { trainingId: g.trainingId, name: g.name, people: g.people.map((p) => ({ collabId: p.collabId, name: p.name, cpf: p.cpf, hasCert: false })) });
+    for (const c of certs.data ?? []) {
+      const g = map.get(c.training_id) ?? { trainingId: c.training_id as string, name: (c.trainings?.name ?? "—") as string, people: [] as AttPerson[] };
+      const p = g.people.find((x) => x.collabId === c.collaborator_id);
+      if (p) p.hasCert = true;
+      else g.people.push({ collabId: c.collaborator_id, name: String(c.collaborators?.full_name ?? "").toUpperCase(), cpf: c.collaborators?.cpf ?? null, hasCert: true });
+      map.set(c.training_id, g);
+    }
+    return [...map.values()].map((g) => ({ ...g, people: g.people.sort((a, b) => a.name.localeCompare(b.name)) })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [day.data, certs.data]);
+  const pk = (t: string, c: string) => `${t}|${c}`;
+  const picked = (g: (typeof groups)[number]) => g.people.filter((p) => !off[pk(g.trainingId, p.collabId)]);
+  const setAll = (g: (typeof groups)[number], keep: (p: AttPerson) => boolean) =>
+    setOff((s) => ({ ...s, ...Object.fromEntries(g.people.map((p) => [pk(g.trainingId, p.collabId), !keep(p)])) }));
+
+  const chosen = groups.filter((g) => sel[g.trainingId] && picked(g).length);
   const missing = chosen.filter((g) => !tstBy[g.trainingId]).map((g) => g.name);
 
   const gen = useMutation({
@@ -572,7 +604,7 @@ function AttendanceTab() {
             date,
             schedule: cd?.schedule_text ?? "",
             hours: Number(cd?.workload_hours ?? 0),
-            people: g.people.map((p) => ({ name: p.name, cpf: formatCpf(p.cpf) })),
+            people: picked(g).map((p) => ({ name: p.name, cpf: formatCpf(p.cpf) })),
           },
         };
       });
@@ -596,24 +628,52 @@ function AttendanceTab() {
     <div className="space-y-4">
       <div>
         <Label>Data do treinamento</Label>
-        <TrainingDatePicker value={date} onChange={(v) => { setDate(v); setSel({}); }} />
+        <TrainingDatePicker value={date} onChange={(v) => { setDate(v); setSel({}); setOff({}); }} />
       </div>
-      {day.data && day.data.length === 0 && (
-        <p className="rounded-md border border-border bg-secondary p-3 text-sm text-muted-foreground">Nenhum treinamento registrado em {brDate(date)}.</p>
+      {day.data && certs.data && groups.length === 0 && (
+        <p className="rounded-md border border-border bg-secondary p-3 text-sm text-muted-foreground">Nenhum treinamento registrado, agendado ou com certificado emitido em {brDate(date)}.</p>
       )}
-      {(day.data ?? []).map((g) => (
-        <div key={g.trainingId} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
-          <Checkbox checked={!!sel[g.trainingId]} onCheckedChange={(v) => setSel((s) => ({ ...s, [g.trainingId]: !!v }))} />
-          <span className="font-semibold">{g.name}</span>
-          <Badge variant="secondary">{g.people.length} participante(s)</Badge>
-          <div className="ml-auto w-64">
-            <Select value={tstBy[g.trainingId] ?? ""} onValueChange={(v) => setTstBy((s) => ({ ...s, [g.trainingId]: v }))}>
-              <SelectTrigger><SelectValue placeholder="Instrutor / TST" /></SelectTrigger>
-              <SelectContent>{activeTsts.map((t) => <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>)}</SelectContent>
-            </Select>
+      {groups.map((g) => {
+        const n = picked(g).length;
+        const withCert = g.people.filter((p) => p.hasCert).length;
+        return (
+          <div key={g.trainingId} className="space-y-2 rounded-lg border border-border bg-card p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Checkbox checked={!!sel[g.trainingId]} onCheckedChange={(v) => setSel((s) => ({ ...s, [g.trainingId]: !!v }))} />
+              <span className="font-semibold">{g.name}</span>
+              <Badge variant="secondary">{n} de {g.people.length} participante(s)</Badge>
+              {withCert > 0 && <Badge variant="outline">{withCert} com certificado</Badge>}
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen((s) => ({ ...s, [g.trainingId]: !s[g.trainingId] }))}>
+                {open[g.trainingId] ? "Ocultar pessoas" : "Escolher pessoas"}
+              </Button>
+              <div className="ml-auto w-64">
+                <Select value={tstBy[g.trainingId] ?? ""} onValueChange={(v) => setTstBy((s) => ({ ...s, [g.trainingId]: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Instrutor / TST" /></SelectTrigger>
+                  <SelectContent>{activeTsts.map((t) => <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            {open[g.trainingId] && (
+              <div className="space-y-2 border-t border-border pt-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAll(g, () => true)}>Todos</Button>
+                  {withCert > 0 && <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAll(g, (p) => p.hasCert)}>Só com certificado emitido</Button>}
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAll(g, () => false)}>Nenhum</Button>
+                </div>
+                <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {g.people.map((p) => (
+                    <label key={p.collabId} className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-accent">
+                      <Checkbox checked={!off[pk(g.trainingId, p.collabId)]} onCheckedChange={(v) => setOff((s) => ({ ...s, [pk(g.trainingId, p.collabId)]: !v }))} />
+                      <span className="truncate">{p.name}</span>
+                      {p.hasCert && <Badge variant="outline" className="ml-auto px-1 py-0 text-[10px]">certificado</Badge>}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
       {chosen.length > 0 && (
         <div className="flex items-center gap-3">
           <Button disabled={missing.length > 0 || gen.isPending} onClick={() => gen.mutate()}>
