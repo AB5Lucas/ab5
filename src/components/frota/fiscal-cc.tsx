@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import * as XLSX from "xlsx";
+import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,6 +29,33 @@ export function FleetFiscalCc() {
   const range = inv ? fortnightRange(inv.year!, inv.month!, inv.fortnight!) : { from: "1900-01-01", to: "1900-01-01" };
   const { rows, loading } = useFuelRows(range);
   const t = useMemo(() => ccTotals(rows), [rows]);
+  const br = (d: string) => d.split("-").reverse().join("/");
+
+  function exportSheet() {
+    if (!inv) return;
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    const aoa: (string | number | null)[][] = [
+      ["Fatura", inv.numberShown],
+      ["Valor total da fatura (R$)", inv.total == null ? null : Number(inv.total)],
+      ["Mês de cobrança", `${MONTHS[inv.month! - 1]}/${inv.year}`],
+      ["Quinzena", `${inv.fortnight}ª quinzena`],
+      ["Abastecimentos", `${br(range.from)} a ${br(range.to)}`],
+      [],
+      ["Centro de custo", "Item conta", "Valor (R$)", "% da quinzena"],
+      ...t.lines.map((l) => [l.cc ?? "sem CC (sem programação)", l.item ?? "sem equivalência", l.value, r2(l.pct)]),
+      ["Total", "", t.total, t.lines.length ? 100 : 0],
+      [],
+      ["Serviços (CC 2…) %", r2(t.share.servicos)],
+      ["Indústria (CC 1…) %", r2(t.share.industria)],
+      ...(t.share.outros > 0 ? [["Sem CC / outros %", r2(t.share.outros)]] : []),
+      ...(t.ticket > 0 ? [["TICKET fora da tabela (R$)", t.ticket]] : []),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 14 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Fiscal");
+    XLSX.writeFile(wb, `Fiscal_${inv.numberShown}_${inv.year}-${String(inv.month).padStart(2, "0")}_Q${inv.fortnight}.xlsx`);
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -46,8 +76,13 @@ export function FleetFiscalCc() {
               <div className="col-span-2"><dt className="text-xs text-muted-foreground">Valor total da fatura</dt><dd className="text-lg font-semibold tabular-nums">{brl(inv.total)}</dd></div>
               <div><dt className="text-xs text-muted-foreground">Mês de cobrança</dt><dd className="font-medium capitalize">{MONTHS[inv.month! - 1]}/{inv.year}</dd></div>
               <div><dt className="text-xs text-muted-foreground">Quinzena</dt><dd className="font-medium">{inv.fortnight}ª quinzena</dd></div>
-              <div className="col-span-2 text-xs text-muted-foreground">Abastecimentos de {range.from.split("-").reverse().join("/")} a {range.to.split("-").reverse().join("/")}.</div>
+              <div className="col-span-2 text-xs text-muted-foreground">Abastecimentos de {br(range.from)} a {br(range.to)}.</div>
             </dl>
+          )}
+          {inv && (
+            <Button variant="outline" className="w-full" disabled={loading || !t.lines.length} onClick={exportSheet}>
+              <Download className="h-4 w-4" /> Exportar planilha
+            </Button>
           )}
         </div>
         {inv && (
