@@ -51,10 +51,10 @@ export function AppSidebar() {
     return (
       <SidebarMenuItem key={keyPrefix + item.url}>
         <SidebarMenuButton asChild isActive={active} tooltip={item.title}
-          className="relative h-9 rounded-lg transition-colors data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground">
+          className="relative h-9 rounded-lg text-sidebar-foreground transition-colors data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground">
           <Link to={item.url} onClick={closeMobile} className="flex items-center gap-2.5">
             {active && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-r-full bg-sidebar-primary" aria-hidden />}
-            <Icon className={`h-4 w-4 shrink-0 ${active ? "text-sidebar-primary" : "opacity-70"}`} />
+            <Icon className={`h-4 w-4 shrink-0 ${active ? "text-sidebar-primary" : "opacity-90"}`} />
             <span className="truncate">{item.title}</span>
             {b && <BadgePill b={b} className="ml-auto" />}
           </Link>
@@ -76,7 +76,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="leading-tight">
               <p className="font-display text-sm font-semibold uppercase tracking-wide">AB5 Hub</p>
-              <p className="text-[11px] text-sidebar-foreground/55">Gestão de obras e equipes</p>
+              <p className="text-[11px] text-sidebar-foreground/75">Gestão de obras e equipes</p>
             </div>
           )}
         </div>
@@ -86,7 +86,7 @@ export function AppSidebar() {
           </SidebarMenuItem></SidebarMenu>
         ) : (
           <button type="button" onClick={openMenuSearch}
-            className="flex h-9 w-full items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-2.5 text-sm text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
+            className="flex h-9 w-full items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-2.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
             <Search className="h-4 w-4" /> Buscar página...
             <kbd className="ml-auto rounded border border-sidebar-border px-1.5 font-mono text-[10px]">{isMac ? "⌘" : "Ctrl"} K</kbd>
           </button>
@@ -130,7 +130,7 @@ export function AppSidebar() {
           <>
             {favItems.length > 0 && (
               <SidebarGroup className="py-1">
-                <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/45">
+                <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/80">
                   <Star className="mr-1.5 h-3 w-3" /> Favoritos
                 </SidebarGroupLabel>
                 <SidebarGroupContent><SidebarMenu className="gap-0.5">{favItems.map(({ item, group }) => itemRow(item, group, "fav-"))}</SidebarMenu></SidebarGroupContent>
@@ -144,14 +144,14 @@ export function AppSidebar() {
               return (
                 // Grupo em uso: destacado num cartão, com espaço acima e abaixo do resto do menu.
                 <SidebarGroup key={group.label} className={hasCurrent ? "mx-2 my-2.5 w-auto rounded-xl bg-sidebar-accent/35 px-1 py-1.5 ring-1 ring-sidebar-border" : "py-1"}>
-                  <SidebarGroupLabel asChild className={`h-7 text-[10px] font-semibold uppercase tracking-[0.12em] hover:text-sidebar-foreground/80 ${hasCurrent ? "text-sidebar-foreground/75" : "text-sidebar-foreground/45"}`}>
+                  <SidebarGroupLabel asChild className={`h-7 text-[10px] font-semibold uppercase tracking-[0.12em] hover:text-sidebar-foreground ${hasCurrent ? "text-sidebar-foreground" : "text-sidebar-foreground/80"}`}>
                     <button type="button" onClick={() => toggleGroup(group.label)} className="flex w-full items-center gap-1.5 text-left" aria-expanded={!isClosed}>
                       <group.icon className="h-3 w-3" />
                       {group.label}
                       {isClosed && tone && (
                         <span title="Há avisos neste grupo" className={`h-2 w-2 rounded-full ${tone === "red" ? "bg-destructive" : "bg-warning"}`} />
                       )}
-                      {isClosed ? <ChevronRight className="ml-auto h-3 w-3 opacity-60" /> : <ChevronDown className="ml-auto h-3 w-3 opacity-60" />}
+                      {isClosed ? <ChevronRight className="ml-auto h-3 w-3 opacity-80" /> : <ChevronDown className="ml-auto h-3 w-3 opacity-80" />}
                     </button>
                   </SidebarGroupLabel>
                   {!isClosed && (
@@ -172,7 +172,7 @@ export function AppSidebar() {
               {!collapsed && (
                 <span className="min-w-0 leading-tight">
                   <span className="block truncate text-sm font-medium">{profile?.full_name || profile?.email}</span>
-                  <span className="block truncate text-[11px] text-sidebar-foreground/55">{ROLE_LABEL[role]}</span>
+                  <span className="block truncate text-[11px] text-sidebar-foreground/75">{ROLE_LABEL[role]}</span>
                 </span>
               )}
             </SidebarMenuButton>
