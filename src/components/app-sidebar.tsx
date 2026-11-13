@@ -142,8 +142,9 @@ export function AppSidebar() {
               const isClosed = !!closed[group.label] && !hasCurrent;
               const tone = worstTone(group.items.map((i) => badges[i.url]));
               return (
-                <SidebarGroup key={group.label} className="py-1">
-                  <SidebarGroupLabel asChild className="h-7 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/45 hover:text-sidebar-foreground/80">
+                // Grupo em uso: destacado num cartão, com espaço acima e abaixo do resto do menu.
+                <SidebarGroup key={group.label} className={hasCurrent ? "mx-2 my-2.5 w-auto rounded-xl bg-sidebar-accent/35 px-1 py-1.5 ring-1 ring-sidebar-border" : "py-1"}>
+                  <SidebarGroupLabel asChild className={`h-7 text-[10px] font-semibold uppercase tracking-[0.12em] hover:text-sidebar-foreground/80 ${hasCurrent ? "text-sidebar-foreground/75" : "text-sidebar-foreground/45"}`}>
                     <button type="button" onClick={() => toggleGroup(group.label)} className="flex w-full items-center gap-1.5 text-left" aria-expanded={!isClosed}>
                       <group.icon className="h-3 w-3" />
                       {group.label}
