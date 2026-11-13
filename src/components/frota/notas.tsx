@@ -25,6 +25,7 @@ import { FleetFiscal } from "./fiscal";
 import { FleetFiscalCc } from "./fiscal-cc";
 import { useFuelRows, useOpenInvoicesTotal, type Note, type Row } from "./use-fuel-rows";
 import { balanceTone, fleetBalance } from "@/lib/fleet-balance";
+import { nonTicketTotal } from "@/lib/fleet-fiscal";
 import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 import { currentMonthRange, DateRangePicker, monthsInRange, type DayRange } from "@/components/date-range-picker";
 import type { Tables } from "@/integrations/supabase/types";
@@ -146,7 +147,8 @@ function FuelNotes() {
   }).sort((a, b) => (photoTime(a.file_name) ?? 0) - (photoTime(b.file_name) ?? 0) || a.file_name.localeCompare(b.file_name));
   const [showOrphans, setShowOrphans] = useState(false);
   const openInvoices = useOpenInvoicesTotal();
-  const periodTotal = rows.reduce((s, r) => s + Number(r.total ?? 0), 0);
+  // TICKET (pago no ticket) não entra nas somas nem desconta do Saldo.
+  const periodTotal = rows.reduce((s, r) => s + nonTicketTotal(r), 0);
   const balance = fleetBalance(openInvoices.data ?? 0, periodTotal);
   const loading = notes.isLoading || schedules.isLoading || vehicles.isLoading;
   const notRead = months.filter((m) => !settings.data?.[`synced:${m}`]);
@@ -289,9 +291,9 @@ function FuelNotes() {
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={7}>{tableRows.length} abastecimento(s){colFiltered ? " (com filtro nas colunas)" : ""}</TableCell>
-                <TableCell className="text-right tabular-nums">{num(tableRows.reduce((s, r) => s + Number(r.quantity ?? 0), 0), 2)}</TableCell>
+                <TableCell className="text-right tabular-nums">{num(tableRows.reduce((s, r) => s + Number(r.quantity ?? 0) * (r.total ? nonTicketTotal(r) / Number(r.total) : 1), 0), 2)}</TableCell>
                 <TableCell />
-                <TableCell className="text-right tabular-nums">{brl(tableRows.reduce((s, r) => s + Number(r.total ?? 0), 0))}</TableCell>
+                <TableCell className="text-right tabular-nums">{brl(tableRows.reduce((s, r) => s + nonTicketTotal(r), 0))}</TableCell>
                 <TableCell colSpan={6} />
               </TableRow>
             </TableFooter>

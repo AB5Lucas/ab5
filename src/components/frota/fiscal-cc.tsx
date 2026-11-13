@@ -95,7 +95,7 @@ export function FleetFiscalCc() {
         </Table>
         {inv && t.ticket > 0 && (
           <p className="border-t border-border p-3 text-xs text-muted-foreground">
-            CC {"TICKET"} fora da tabela: {brl(t.ticket)}. Com ele, {brl(t.total + t.ticket)} = Total do período na aba Abastecimentos filtrando esta quinzena.
+            CC TICKET fora da tabela, do total e do Saldo: {brl(t.ticket)}.
           </p>
         )}
       </div>

@@ -4,6 +4,27 @@ import type { Rateio } from "./fleet-notes";
 export const TICKET_CC = "TICKET";
 export const isTicketCc = (cc: string | null | undefined) => (cc ?? "").trim().toUpperCase() === TICKET_CC;
 
+type TicketNote = { total: number | null; approved_at?: string | null; allocation?: unknown; cc_split?: unknown; cc_fix?: string | null };
+
+/**
+ * Parte do abastecimento que foi para o CC TICKET (pago no ticket, fora do posto): não desconta do Saldo nem entra
+ * nas somas. Mesma prioridade do rateio: aprovado (congelado) → CCs à mão (cc_split) → CC único antigo (cc_fix).
+ */
+export function ticketValue(n: TicketNote): number {
+  const total = Number(n.total ?? 0);
+  const alloc = n.approved_at ? (n.allocation as Rateio | null) : null;
+  if (alloc?.parts?.length) return alloc.parts.filter((p) => isTicketCc(p.cc)).reduce((s, p) => s + Number(p.value ?? 0), 0);
+  const split = (Array.isArray(n.cc_split) ? n.cc_split : []) as { cc_code: string; pct: number }[];
+  if (split.length) {
+    const sum = split.reduce((s, x) => s + Number(x.pct || 0), 0) || 100;
+    return Math.round(split.filter((x) => isTicketCc(x.cc_code)).reduce((s, x) => s + (total * Number(x.pct || 0)) / sum, 0) * 100) / 100;
+  }
+  return isTicketCc(n.cc_fix) ? total : 0;
+}
+
+/** Valor do abastecimento sem a parte TICKET. */
+export const nonTicketTotal = (n: TicketNote) => Number(n.total ?? 0) - ticketValue(n);
+
 /** Dias da quinzena cobrada: 1ª = 1 a 15; 2ª = 16 ao último dia do mês. */
 export function fortnightRange(year: number, month: number, fortnight: 1 | 2): { from: string; to: string } {
   const mm = String(month).padStart(2, "0");

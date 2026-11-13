@@ -6,6 +6,7 @@ import { useServiceDistribution } from "@/hooks/use-service-distribution";
 import { hiringBadge } from "@/lib/hiring-badge";
 import { balanceBadgeTone, fleetBalance } from "@/lib/fleet-balance";
 import { isoDay } from "@/lib/fleet-notes";
+import { nonTicketTotal } from "@/lib/fleet-fiscal";
 import { currentMonthRange } from "@/components/date-range-picker";
 
 export type MenuBadge = { count: number; tone: "red" | "orange"; title?: string; label?: string };
@@ -37,9 +38,9 @@ function useBadgeData() {
         safe(fetchAll<any>((a, b) => supabase.from("billing_sync_notes").select("id").not("status", "in", '("posted","cancelled")').range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("epi_sheets").select("collaborator_id, expires_at, archived").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("fleet_invoices").select("total").eq("paid", false).range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("issued_at, total").gte("issued_at", addDays(month.from, -1)).lte("issued_at", `${addDays(month.to, 1)}T23:59:59`).range(a, b))),
+        safe(fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("issued_at, total, approved_at, allocation, cc_split, cc_fix").gte("issued_at", addDays(month.from, -1)).lte("issued_at", `${addDays(month.to, 1)}T23:59:59`).range(a, b))),
       ]);
-      const fleetPeriod = fleetNotes.filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= month.from && d <= month.to; }).reduce((s, n) => s + Number(n.total ?? 0), 0);
+      const fleetPeriod = fleetNotes.filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= month.from && d <= month.to; }).reduce((s, n) => s + nonTicketTotal(n), 0);
       const fleetSaldo = fleetBalance(fleetOpen.reduce((s, i) => s + Number(i.total ?? 0), 0), fleetPeriod);
       const confIds = new Set(conf.map((c) => c.id));
       const checks = await safe(fetchAll<any>((a, b) => supabase.from("conference_checks").select("item_id, next_check_date").eq("approved", false).range(a, b)));

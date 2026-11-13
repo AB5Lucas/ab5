@@ -24,3 +24,13 @@ describe("fleet fiscal", () => {
     expect(t.share.outros).toBeCloseTo(25);
   });
 });
+
+import { nonTicketTotal, ticketValue } from "./fleet-fiscal";
+describe("ticket", () => {
+  it("parte TICKET por cc_split, cc_fix e rateio aprovado", () => {
+    expect(ticketValue({ total: 200, cc_split: [{ cc_code: "TICKET", pct: 25 }, { cc_code: "2004221", pct: 75 }] })).toBe(50);
+    expect(nonTicketTotal({ total: 80, cc_fix: "ticket" })).toBe(0);
+    expect(ticketValue({ total: 90, approved_at: "x", allocation: { parts: [{ cc: "TICKET", value: 90 }] } })).toBe(90);
+    expect(nonTicketTotal({ total: 90 })).toBe(90);
+  });
+});
