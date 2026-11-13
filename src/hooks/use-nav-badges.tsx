@@ -4,8 +4,11 @@ import { fetchAll } from "@/lib/results-engine";
 import { addDays, todayISO } from "@/lib/scheduling";
 import { useServiceDistribution } from "@/hooks/use-service-distribution";
 import { hiringBadge } from "@/lib/hiring-badge";
+import { balanceBadgeTone, fleetBalance } from "@/lib/fleet-balance";
+import { isoDay } from "@/lib/fleet-notes";
+import { currentMonthRange } from "@/components/date-range-picker";
 
-export type MenuBadge = { count: number; tone: "red" | "orange"; title?: string };
+export type MenuBadge = { count: number; tone: "red" | "orange"; title?: string; label?: string };
 
 const WARN_DAYS = 30;
 
@@ -19,7 +22,9 @@ function useBadgeData() {
       const today = todayISO();
       const warn = addDays(today, WARN_DAYS);
       const safe = async <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
-      const [colabs, asos, trns, ints, appts, conf, purchases, orders, invoices, notes, epis] = await Promise.all([
+      // Saldo do posto como na aba Abastecimento ao abrir (período = mês atual).
+      const month = currentMonthRange();
+      const [colabs, asos, trns, ints, appts, conf, purchases, orders, invoices, notes, epis, fleetOpen, fleetNotes] = await Promise.all([
         safe(fetchAll<any>((a, b) => supabase.from("collaborators").select("id").eq("status", "active").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("asos").select("collaborator_id, expires_at").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at").range(a, b))),
@@ -31,7 +36,11 @@ function useBadgeData() {
         safe(fetchAll<any>((a, b) => supabase.from("industry_invoices").select("id").eq("status", "pending").range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("billing_sync_notes").select("id").not("status", "in", '("posted","cancelled")').range(a, b))),
         safe(fetchAll<any>((a, b) => supabase.from("epi_sheets").select("collaborator_id, expires_at, archived").range(a, b))),
+        safe(fetchAll<any>((a, b) => supabase.from("fleet_invoices").select("total").eq("paid", false).range(a, b))),
+        safe(fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("issued_at, total").gte("issued_at", addDays(month.from, -1)).lte("issued_at", `${addDays(month.to, 1)}T23:59:59`).range(a, b))),
       ]);
+      const fleetPeriod = fleetNotes.filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= month.from && d <= month.to; }).reduce((s, n) => s + Number(n.total ?? 0), 0);
+      const fleetSaldo = fleetBalance(fleetOpen.reduce((s, i) => s + Number(i.total ?? 0), 0), fleetPeriod);
       const confIds = new Set(conf.map((c) => c.id));
       const checks = await safe(fetchAll<any>((a, b) => supabase.from("conference_checks").select("item_id, next_check_date").eq("approved", false).range(a, b)));
       const nextByItem = new Map<string, string>();
@@ -72,7 +81,7 @@ function useBadgeData() {
       const vals = Object.values(byKind);
       const expired = vals.reduce((a, v) => a + v.expired, 0);
       const expiring = vals.reduce((a, v) => a + v.expiring, 0);
-      return { conference, byKind, expired, expiring, purchases: purchases.length, orders: orders.length, billing: invoices.length + notes.length, billingInd: invoices.length, billingSrv: notes.length };
+      return { fleetSaldo, conference, byKind, expired, expiring, purchases: purchases.length, orders: orders.length, billing: invoices.length + notes.length, billingInd: invoices.length, billingSrv: notes.length };
     },
   });
 }
@@ -101,6 +110,8 @@ export function useMenuBadges() {
   if (d) {
     const docs = toBadge(d); if (docs) out["/agendamentos"] = docs;
     const c = conferenceBadge(d.conference); if (c) out["/conferencia"] = c;
+    const ft = balanceBadgeTone(d.fleetSaldo);
+    if (ft) out["/frota/notas"] = { count: 1, label: "!", tone: ft, title: `Saldo do posto: ${d.fleetSaldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}` };
     if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red" };
     // Vermelho = Serviços, laranja = Indústria; basta 1 da Serviços para ficar vermelho.
     if (d.orders) out["/fechamentos/suzano"] = { count: d.orders, tone: "orange", title: "Pendentes da Indústria" };
@@ -121,7 +132,7 @@ export function BadgeDot({ b }: { b?: MenuBadge | undefined }) {
   if (!b) return null;
   return (
     <span className={`ml-1.5 min-w-4 rounded-full px-1 text-center text-[10px] font-semibold leading-4 tabular-nums ${b.tone === "red" ? "bg-destructive/85 text-destructive-foreground" : "bg-warning/85 text-warning-foreground"}`}>
-      {b.count > 99 ? "99+" : b.count}
+      {b.label ?? (b.count > 99 ? "99+" : b.count)}
     </span>
   );
 }
