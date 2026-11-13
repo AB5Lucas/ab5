@@ -4,6 +4,7 @@ import { fetchAll } from "@/lib/results-engine";
 import { addDays, todayISO } from "@/lib/scheduling";
 import { useServiceDistribution } from "@/hooks/use-service-distribution";
 import { useNextBusinessDayAlerts } from "@/hooks/use-schedule-alerts";
+import { useSeenAlerts } from "@/hooks/use-seen-alerts";
 import { worstAlertTone } from "@/lib/schedule-alerts";
 import { hiringBadge } from "@/lib/hiring-badge";
 import { balanceBadgeTone, fleetBalance } from "@/lib/fleet-balance";
@@ -111,8 +112,10 @@ export function useMenuBadges() {
   const out: Record<string, MenuBadge | undefined> = {};
   // "!" na Programação: avisos do próximo dia útil (vermelho = alto impacto, laranja = pequeno impacto).
   const next = useNextBusinessDayAlerts().data;
-  const nt = next ? worstAlertTone(next.alerts) : null;
-  if (next && nt) out["/programacao/diaria"] = { count: next.alerts.length, label: "!", tone: nt, detail: `${next.date.split("-").reverse().join("/")}: ${next.alerts.map((x) => x.title).join(" · ")}` };
+  const { isSeen } = useSeenAlerts();
+  const nextPending = next ? next.alerts.filter((x) => !isSeen(next.date, x)) : [];
+  const nt = worstAlertTone(nextPending);
+  if (next && nt) out["/programacao/diaria"] = { count: nextPending.length, label: "!", tone: nt, detail: `${next.date.split("-").reverse().join("/")}: ${nextPending.map((x) => x.title).join(" · ")}` };
   if (distribution?.pendingClients) out["/programacao/servicos"] = { count: distribution.pendingClients, tone: "red", detail: `${distribution.pendingClients} cliente(s) com distribuição de serviço pendente` };
   if (w?.ponto) out["/relatorios/ajuste-ponto"] = { count: w.ponto, tone: "red", detail: `${w.ponto} ocorrência(s) de ponto sem tratamento` };
   if (w?.andaimes) out["/andaimes/solicitacoes"] = { count: w.andaimes, tone: "red", detail: `${w.andaimes} solicitação(ões) aguardando você` };
