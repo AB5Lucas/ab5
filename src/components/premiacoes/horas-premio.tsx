@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Plus, Trash2 } from "lucide-react";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -79,7 +78,8 @@ export function PrizeHoursPage() {
     const existing = entryMap.get(`${id}:${date}`);
     setSelected((current) => [...current, { id, hours: existing ? String(existing.hours) : commonHours }]);
   }
-  function exportSheet() {
+  async function exportSheet() {
+    const XLSX = await import("xlsx");
     const workbook = XLSX.utils.book_new();
     const visibleIds = new Set(rows.map((person) => person.id));
     const detailRows = entries.filter((entry) => visibleIds.has(entry.collaborator_id)).map((entry) => {

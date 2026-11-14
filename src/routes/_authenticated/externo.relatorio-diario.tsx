@@ -15,8 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCurrentUser } from "@/hooks/use-auth";
 import { todayISO, formatDateBR } from "@/lib/scheduling";
 import { RDO_STATUS_LABEL } from "@/lib/rdo";
-import { exportRdoPdf, generateRdoPdfBlob } from "@/lib/rdo-pdf";
 import { deliverRdoFile, downloadRdoFile, prepareRdoDownload, type RdoPdfFile } from "@/lib/rdo-download";
+
+/** PDF do RDO (jspdf, ~390 KB) só é baixado ao gerar. */
+const exportRdoPdf = (id: string) => import("@/lib/rdo-pdf").then((m) => m.exportRdoPdf(id));
+const generateRdoPdfBlob = (id: string) => import("@/lib/rdo-pdf").then((m) => m.generateRdoPdfBlob(id));
 
 export const Route = createFileRoute("/_authenticated/externo/relatorio-diario")({
   head: () => ({

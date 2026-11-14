@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 import { ArrowUpDown, ChevronLeft, ChevronRight, Download, Filter, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,6 +22,9 @@ import { VoucherPage } from "@/components/premiacoes/vale-transporte";
 import { PrizeHoursPage } from "@/components/premiacoes/horas-premio";
 import { canManagePrizeHours } from "@/lib/prize-hours";
 import { loadClosing, periodOf, type Adjustment, type ClosingRow } from "@/lib/closing";
+
+/** xlsx (~480 KB) só é baixado ao exportar. */
+const loadXlsx = () => import("xlsx");
 
 export const Route = createFileRoute("/_authenticated/fechamento")({
   head: () => ({
@@ -137,7 +139,8 @@ function ClosingPage() {
   const endIncl = new Date(end + "T12:00:00"); endIncl.setDate(endIncl.getDate() - 1);
   const endLabel = endIncl.toISOString().slice(0, 10);
 
-  function exportXlsx() {
+  async function exportXlsx() {
+    const XLSX = await loadXlsx();
     const main = list.map((r) => ({ Matrícula: r.reg, "Nome completo": r.name, "Quantidade de refeição": r.meals, "Vale Transporte": vt(r), "Prêmio Viagem": prize(r) }));
     main.push({ Matrícula: "TOTAL", "Nome completo": "", "Quantidade de refeição": tot.meals, "Vale Transporte": tot.vt, "Prêmio Viagem": tot.prize });
     const det: Record<string, unknown>[] = [];

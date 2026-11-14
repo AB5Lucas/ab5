@@ -170,7 +170,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       const supportResult = supportRows as { data: { collaborator_id: string }[] | null; error?: unknown };
       if (supportResult.error) throw supportResult.error;
       return {
-        clientRdos, otherClientRdos: allRdoWorkforce.filter((r: any) => ![...workIds, ...sibIds].includes(r.work_id)), supportIds: (supportResult.data ?? []).map((r) => r.collaborator_id),
+        clientRdos, otherClientRdos: ((own) => allRdoWorkforce.filter((r: any) => !own.has(r.work_id)))(new Set<string>([...workIds, ...sibIds])), supportIds: (supportResult.data ?? []).map((r) => r.collaborator_id),
         allocs,
         sibAllocs,
         sibRdo,

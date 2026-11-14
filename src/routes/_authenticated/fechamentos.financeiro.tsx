@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated/fechamentos/financeiro")({
 
 const EMPTY_RAWS = new Map<string, any>();
 // Detalhe (tela Resultados) só é baixado quando o usuário abre um serviço
-const ResultadoPage = lazy(() => import("./obras.resultado").then((m) => ({ default: m.ResultadoPage })));
+const ResultadoPage = lazy(() => import("@/components/resultado-page").then((m) => ({ default: m.ResultadoPage })));
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;

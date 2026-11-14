@@ -41,8 +41,10 @@ import { cn } from "@/lib/utils";
 import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
 import { SignaturePad } from "@/components/signature-pad";
 import { RDO_STATUS_LABEL, SCAFFOLD_OPS, SERVICE_CATEGORIES, reasonLabel, workedHours, positionLabel } from "@/lib/rdo";
-import { exportRdoPdf } from "@/lib/rdo-pdf";
 import { useCurrentUser } from "@/hooks/use-auth";
+
+/** PDF do RDO (jspdf, ~390 KB) só é baixado ao gerar. */
+const exportRdoPdf = (id: string) => import("@/lib/rdo-pdf").then((m) => m.exportRdoPdf(id));
 
 /** Horário padrão do turno noturno (entra num dia, sai no outro). */
 const NIGHT_ENTRY = "21:30";

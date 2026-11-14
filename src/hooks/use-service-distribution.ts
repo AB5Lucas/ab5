@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { useAccess } from "@/hooks/use-access";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { todayISO } from "@/lib/scheduling";
@@ -12,13 +13,15 @@ type Alloc = DistributionAllocation & { schedule_id: string };
 /** Sem data: ontem até sete dias atrás. Com data: apenas o dia selecionado na tela. */
 export function useServiceDistribution(selectedDate?: string) {
   const { user, role, loading } = useCurrentUser();
+  const { canAccess } = useAccess();
   const today = todayISO();
   const range = selectedDate ? { start: selectedDate, end: selectedDate } : recentRange(today);
   return useQuery({
     queryKey: ["service-distribution", user?.id, role, range.start, range.end],
-    enabled: !!user && !loading,
-    staleTime: 0,
-    refetchInterval: 60000,
+    // Na tela Serviços (com data) fica sempre atual; o contador do menu atualiza a cada 5 min.
+    enabled: !!user && !loading && (!!selectedDate || canAccess("/programacao/servicos")),
+    staleTime: selectedDate ? 0 : 2 * 60_000,
+    refetchInterval: selectedDate ? 60_000 : 5 * 60_000,
     queryFn: async () => {
       const { start, end } = range;
       const [schedules, allWorks, links, clientRows] = await Promise.all([
@@ -35,7 +38,7 @@ export function useServiceDistribution(selectedDate?: string) {
       const ids = schedules.map((s) => s.id);
       const [allocations, off, vacations, medical, training, trainingBox] = await Promise.all([
         fetchAll<Alloc>((a, b) => supabase.from("daily_allocations").select("schedule_id, work_id, collaborator_id, service_assigned").in("schedule_id", ids).eq("service_assigned", false).order("id").range(a, b)),
-        fetchAll<{ collaborator_id: string; date: string; end_date: string | null }>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", end).order("id").range(a, b)),
+        fetchAll<{ collaborator_id: string; date: string; end_date: string | null }>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", end).or(`end_date.gte.${start},and(end_date.is.null,date.gte.${start})`).order("id").range(a, b)),
         fetchAll<{ collaborator_id: string; start_date: string; end_date: string }>((a, b) => supabase.from("vacations").select("collaborator_id, start_date, end_date").lte("start_date", end).gte("end_date", start).order("id").range(a, b)),
         fetchAll<{ collaborator_id: string; start_date: string; end_date: string }>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").lte("start_date", end).gte("end_date", start).order("id").range(a, b)),
         fetchAll<{ collaborator_id: string; scheduled_date: string }>((a, b) => supabase.from("appointments").select("collaborator_id, scheduled_date").in("type", ["treinamento", "integracao"]).gte("scheduled_date", start).lte("scheduled_date", end).neq("status", "cancelado").order("id").range(a, b)),

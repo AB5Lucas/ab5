@@ -146,10 +146,18 @@ function RootComponent() {
   }, []);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
-      router.invalidate();
-      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+    // O supabase manda SIGNED_IN toda vez que a aba volta a ficar visível: só recarrega tudo se o usuário mudou
+    // (antes recarregava todas as consultas a cada volta à aba).
+    let lastUser: string | null | undefined;
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      const uid = session?.user?.id ?? null;
+      const first = lastUser === undefined;
+      const changed = !first && uid !== lastUser;
+      lastUser = uid;
+      if (event === "SIGNED_OUT" || event === "USER_UPDATED" || (event === "SIGNED_IN" && changed)) {
+        router.invalidate();
+        if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [router, queryClient]);

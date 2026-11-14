@@ -1,7 +1,6 @@
 import type React from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { ArrowDown, ArrowUp, Download, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCurrentUser } from "@/hooks/use-auth";
 import { fetchAll, monthEnd } from "@/lib/results-engine";
 import { parseOrder } from "@/lib/andaimes";
+
+/** xlsx (~480 KB) só é baixado ao exportar. */
+const loadXlsx = () => import("xlsx");
 
 /** Apontamentos e Produtividade de andaimes lidos ao vivo dos RDOs. */
 export function useRdoFilters() {
@@ -142,7 +144,8 @@ export function Apontamentos({ workId, start, end, ym }: { workId: string; start
     return out;
   }, [present.data, prio.data]);
 
-  const exportXlsx = () => {
+  const exportXlsx = async () => {
+    const XLSX = await loadXlsx();
     const ws = XLSX.utils.json_to_sheet(rows.map((r) => ({ Data: br(r.date), "Nome completo": r.name, CPF: r.cpf, "Função": r.role })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Apontamentos");
@@ -293,7 +296,8 @@ export function useProdRows(workId: string, start: string, end: string) {
 
 export function Produtividade({ workId, start, end }: { workId: string; start: string; end: string }) {
   const { rows, loading } = useProdRows(workId, start, end);
-  const exportXlsx = () => {
+  const exportXlsx = async () => {
+    const XLSX = await loadXlsx();
     const ws = XLSX.utils.json_to_sheet(rows.map((r) => ({
       Data: br(r.date), Ordem: r.ord, Atividade: r.op === "desmontagem" ? "Desmontagem" : "Montagem",
       "Comprimento (m)": r.l, "Largura (m)": r.w, "Altura (m)": r.h, "Volume (m³)": Number(r.vol.toFixed(2)),

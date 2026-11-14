@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,6 +10,8 @@ import { invoiceFortnight, invoiceNumber } from "@/lib/fleet-invoices";
 import { ccTotals, fortnightRange } from "@/lib/fleet-fiscal";
 import { useFuelRows } from "./use-fuel-rows";
 
+/** xlsx (~480 KB) só é baixado ao exportar. */
+const loadXlsx = () => import("xlsx");
 const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 const pct = (v: number) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -31,8 +32,9 @@ export function FleetFiscalCc() {
   const t = useMemo(() => ccTotals(rows), [rows]);
   const br = (d: string) => d.split("-").reverse().join("/");
 
-  function exportSheet() {
+  async function exportSheet() {
     if (!inv) return;
+    const XLSX = await loadXlsx();
     const r2 = (v: number) => Math.round(v * 100) / 100;
     const aoa: (string | number | null)[][] = [
       ["Fatura", inv.numberShown],

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAccess } from "@/hooks/use-access";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { addDays, todayISO } from "@/lib/scheduling";
@@ -19,8 +20,18 @@ const WARN_DAYS = 30;
 
 /** Contadores discretos do menu lateral: vencidos (vermelho) ou a vencer (laranja) e pendências de sincronização. */
 function useBadgeData() {
+  // Cada bloco só é lido por quem acessa a página do aviso (antes todos os usuários liam tudo).
+  const { canAccess, loading } = useAccess();
+  const can = {
+    docs: canAccess("/agendamentos") || canAccess("/conferencia"),
+    purchases: canAccess("/obras/compras"),
+    orders: canAccess("/fechamentos/suzano"),
+    billing: canAccess("/relatorios/sincronizacao"),
+    fleet: canAccess("/frota/notas"),
+  };
   return useQuery({
-    queryKey: ["menu-badges"],
+    queryKey: ["menu-badges", can],
+    enabled: !loading,
     // Atualiza a cada 5 min e quando a janela volta ao foco (a consulta é pesada para todos os usuários).
     refetchInterval: 5 * 60_000,
     refetchOnWindowFocus: true,
@@ -29,27 +40,28 @@ function useBadgeData() {
       const today = todayISO();
       const warn = addDays(today, WARN_DAYS);
       const safe = async <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
+      const when = <T,>(ok: boolean, f: () => Promise<T[]>) => (ok ? safe(f()) : Promise.resolve([] as T[]));
       // Saldo do posto como na aba Abastecimento ao abrir (período = mês atual).
       const month = currentMonthRange();
       const [colabs, asos, trns, ints, appts, conf, purchases, orders, invoices, notes, epis, fleetOpen, fleetNotes] = await Promise.all([
-        safe(fetchAll<any>((a, b) => supabase.from("collaborators").select("id").eq("status", "active").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("asos").select("collaborator_id, expires_at").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("client_integrations").select("collaborator_id, client_id, expires_at, documentation").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, training_id, client_id, type, scheduled_date").eq("status", "agendado").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("conference_items").select("id, collaborator_id, training_id, client_id, type").neq("status", "concluido").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("purchase_cc_lines").select("id").eq("status", "pending").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("industry_orders").select("id").eq("status", "pending").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("industry_invoices").select("id").eq("status", "pending").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("billing_sync_notes").select("id").not("status", "in", '("posted","cancelled")').range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("epi_sheets").select("collaborator_id, expires_at, archived").range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("fleet_invoices").select("total").eq("paid", false).range(a, b))),
-        safe(fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("issued_at, total, approved_at, allocation, cc_split, cc_fix").gte("issued_at", addDays(month.from, -1)).lte("issued_at", `${addDays(month.to, 1)}T23:59:59`).range(a, b))),
+        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("collaborators").select("id").eq("status", "active").range(a, b))),
+        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("asos").select("collaborator_id, expires_at").range(a, b))),
+        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at").range(a, b))),
+        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("client_integrations").select("collaborator_id, client_id, expires_at, documentation").range(a, b))),
+        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, training_id, client_id, type, scheduled_date").eq("status", "agendado").range(a, b))),
+        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("conference_items").select("id, collaborator_id, training_id, client_id, type").neq("status", "concluido").range(a, b))),
+        when(can.purchases, () => fetchAll<any>((a, b) => supabase.from("purchase_cc_lines").select("id").eq("status", "pending").range(a, b))),
+        when(can.orders, () => fetchAll<any>((a, b) => supabase.from("industry_orders").select("id").eq("status", "pending").range(a, b))),
+        when(can.billing, () => fetchAll<any>((a, b) => supabase.from("industry_invoices").select("id").eq("status", "pending").range(a, b))),
+        when(can.billing, () => fetchAll<any>((a, b) => supabase.from("billing_sync_notes").select("id").not("status", "in", '("posted","cancelled")').range(a, b))),
+        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("epi_sheets").select("collaborator_id, expires_at, archived").range(a, b))),
+        when(can.fleet, () => fetchAll<any>((a, b) => supabase.from("fleet_invoices").select("total").eq("paid", false).range(a, b))),
+        when(can.fleet, () => fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("issued_at, total, approved_at, allocation, cc_split, cc_fix").gte("issued_at", addDays(month.from, -1)).lte("issued_at", `${addDays(month.to, 1)}T23:59:59`).range(a, b))),
       ]);
       const fleetPeriod = fleetNotes.filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= month.from && d <= month.to; }).reduce((s, n) => s + nonTicketTotal(n), 0);
       const fleetSaldo = fleetBalance(fleetOpen.reduce((s, i) => s + Number(i.total ?? 0), 0), fleetPeriod);
       const confIds = new Set(conf.map((c) => c.id));
-      const checks = await safe(fetchAll<any>((a, b) => supabase.from("conference_checks").select("item_id, next_check_date").eq("approved", false).range(a, b)));
+      const checks = await when(can.docs && conf.length > 0, () => fetchAll<any>((a, b) => supabase.from("conference_checks").select("item_id, next_check_date").eq("approved", false).range(a, b)));
       const nextByItem = new Map<string, string>();
       for (const c of checks) if (c.next_check_date && confIds.has(c.item_id)) { const cur = nextByItem.get(c.item_id); if (!cur || c.next_check_date < cur) nextByItem.set(c.item_id, c.next_check_date); }
       const conference = { expired: 0, expiring: 0 };
@@ -172,24 +184,28 @@ export function markHiringSeen(uid: string | undefined, reqId: string) {
 
 /** Avisos individuais: Ajuste de Ponto, Solicitações de andaimes e Contratações. */
 export function useWorkflowBadges() {
+  const { canAccess, loading } = useAccess();
+  const can = { ponto: canAccess("/relatorios/ajuste-ponto"), andaimes: canAccess("/andaimes/solicitacoes"), hiring: canAccess("/demandas/contratacoes") };
   return useQuery({
-    queryKey: ["workflow-badges"],
+    queryKey: ["workflow-badges", can],
+    enabled: !loading,
     refetchInterval: 5 * 60_000,
     refetchOnWindowFocus: true,
     staleTime: 2 * 60_000,
     queryFn: async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id;
+      // Sessão local (sem ir ao servidor de login a cada atualização).
+      const { data: auth } = await supabase.auth.getSession();
+      const uid = auth.session?.user?.id;
       if (!uid) return { ponto: 0, andaimes: 0, hiring: 0 };
       const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", uid);
       const rh = (roles ?? []).some((r: any) => r.role === "admin" || r.role === "programmer");
       const { computeOccurrences, fetchTimeclockData, timeclockDefaultFrom } = await import("@/lib/timeclock");
       const { flowPendingFor } = await import("@/lib/andaimes");
       const [tc, flowRoles, reqs, hires] = await Promise.all([
-        fetchTimeclockData(timeclockDefaultFrom(), todayISO()).catch(() => undefined),
-        supabase.from("andam_flow_roles").select("key, user_id").then((r) => r.data ?? []),
-        supabase.from("andam_requests").select("flow_stage, user_id").neq("flow_stage", "encerrada").then((r) => (r.data ?? []) as any[]),
-        supabase.from("hiring_requests").select("id, status, requester_id").then((r) => (r.data ?? []) as any[]),
+        can.ponto ? fetchTimeclockData(timeclockDefaultFrom(), todayISO()).catch(() => undefined) : Promise.resolve(undefined),
+        can.andaimes ? supabase.from("andam_flow_roles").select("key, user_id").then((r) => r.data ?? []) : Promise.resolve([]),
+        can.andaimes ? supabase.from("andam_requests").select("flow_stage, user_id").neq("flow_stage", "encerrada").then((r) => (r.data ?? []) as any[]) : Promise.resolve([] as any[]),
+        can.hiring ? supabase.from("hiring_requests").select("id, status, requester_id").then((r) => (r.data ?? []) as any[]) : Promise.resolve([] as any[]),
       ]);
       let ponto = 0;
       if (tc) { const { occs, treated } = computeOccurrences(tc); ponto = occs.filter((o) => !treated.has(o.key)).length; }
