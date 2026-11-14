@@ -110,7 +110,7 @@ function Page() {
     <div className="space-y-4">
       <PageHeader title="Solicitações" description="Fluxo único: solicitação, aprovações, separação, romaneio de saída, obra e retorno ao pátio."
         actions={canEdit ? <Button onClick={() => setForm({ client: "", work: CANTEIRO, request_date: new Date().toISOString().slice(0, 10), needed_date: "", priority: "normal", notes: "", lines: [{ item: "", qty: "" }] })}><Plus className="mr-1 h-4 w-4" />Nova solicitação</Button> : undefined} />
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs pageTabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="aprovacoes">Aprovações{myCount ? ` (${myCount})` : ""}</TabsTrigger>
           <TabsTrigger value="andamento">Em andamento</TabsTrigger>

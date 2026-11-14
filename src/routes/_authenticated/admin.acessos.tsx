@@ -120,7 +120,7 @@ function AccessPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Acessos" description="Escolha o tipo de usuário e ligue ou desligue cada página do menu." />
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs pageTabs value={tab} onValueChange={setTab}>
         <TabsList>
           {CONFIG_ROLES.map((r) => (
             <TabsTrigger key={r} value={r}>

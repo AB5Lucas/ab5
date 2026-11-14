@@ -94,7 +94,7 @@ function HiringPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Contratações" description="Solicitações de contratação e acompanhamento pelo RH." />
-      <Tabs defaultValue="req">
+      <Tabs pageTabs defaultValue="req">
         <TabsList>
           <TabsTrigger value="req">Solicitações</TabsTrigger>
           {isRh && <TabsTrigger value="mail">Configuração de E-mails</TabsTrigger>}

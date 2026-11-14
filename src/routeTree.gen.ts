@@ -45,6 +45,9 @@ import { Route as AuthenticatedDemandasContratacoesRouteImport } from './routes/
 import { Route as AuthenticatedExternoRelatorioDiarioRouteImport } from './routes/_authenticated/externo.relatorio-diario'
 import { Route as AuthenticatedFechamentosFinanceiroRouteImport } from './routes/_authenticated/fechamentos.financeiro'
 import { Route as AuthenticatedFechamentosSuzanoRouteImport } from './routes/_authenticated/fechamentos.suzano'
+import { Route as AuthenticatedFrotaCustosRouteImport } from './routes/_authenticated/frota.custos'
+import { Route as AuthenticatedFrotaManutencaoRouteImport } from './routes/_authenticated/frota.manutencao'
+import { Route as AuthenticatedFrotaNotasRouteImport } from './routes/_authenticated/frota.notas'
 import { Route as AuthenticatedObrasIndexRouteImport } from './routes/_authenticated/obras.index'
 import { Route as AuthenticatedObrasComprasRouteImport } from './routes/_authenticated/obras.compras'
 import { Route as AuthenticatedObrasIntegracoesRouteImport } from './routes/_authenticated/obras.integracoes'
@@ -52,7 +55,6 @@ import { Route as AuthenticatedObrasResultadoRouteImport } from './routes/_authe
 import { Route as AuthenticatedProgramacaoDiariaRouteImport } from './routes/_authenticated/programacao.diaria'
 import { Route as AuthenticatedProgramacaoHistoricoRouteImport } from './routes/_authenticated/programacao.historico'
 import { Route as AuthenticatedProgramacaoHojeRouteImport } from './routes/_authenticated/programacao.hoje'
-import { Route as AuthenticatedProgramacaoSemanalRouteImport } from './routes/_authenticated/programacao.semanal'
 import { Route as AuthenticatedProgramacaoServicosRouteImport } from './routes/_authenticated/programacao.servicos'
 import { Route as AuthenticatedRelatoriosIndexRouteImport } from './routes/_authenticated/relatorios.index'
 import { Route as AuthenticatedRelatoriosAjustePontoRouteImport } from './routes/_authenticated/relatorios.ajuste-ponto'
@@ -60,9 +62,6 @@ import { Route as AuthenticatedRelatoriosSincronizacaoRouteImport } from './rout
 import { Route as AuthenticatedRelatoriosValeAlimentacaoRouteImport } from './routes/_authenticated/relatorios.vale-alimentacao'
 import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authenticated/veiculos.index'
 import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_authenticated/veiculos.motoristas'
-import { Route as AuthenticatedFrotaCustosRouteImport } from './routes/_authenticated/frota.custos'
-import { Route as AuthenticatedFrotaManutencaoRouteImport } from './routes/_authenticated/frota.manutencao'
-import { Route as AuthenticatedFrotaNotasRouteImport } from './routes/_authenticated/frota.notas'
 import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
 import { Route as AuthenticatedVeiculosTransporteRouteImport } from './routes/_authenticated/veiculos.transporte'
 import { Route as ApiPublicJobsBillingSyncRouteImport } from './routes/api/public/jobs/billing-sync'
@@ -275,6 +274,23 @@ const AuthenticatedFechamentosSuzanoRoute =
     path: '/fechamentos/suzano',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFrotaCustosRoute =
+  AuthenticatedFrotaCustosRouteImport.update({
+    id: '/frota/custos',
+    path: '/frota/custos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFrotaManutencaoRoute =
+  AuthenticatedFrotaManutencaoRouteImport.update({
+    id: '/frota/manutencao',
+    path: '/frota/manutencao',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFrotaNotasRoute = AuthenticatedFrotaNotasRouteImport.update({
+  id: '/frota/notas',
+  path: '/frota/notas',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedObrasIndexRoute = AuthenticatedObrasIndexRouteImport.update({
   id: '/obras/',
   path: '/obras/',
@@ -314,12 +330,6 @@ const AuthenticatedProgramacaoHojeRoute =
   AuthenticatedProgramacaoHojeRouteImport.update({
     id: '/programacao/hoje',
     path: '/programacao/hoje',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedProgramacaoSemanalRoute =
-  AuthenticatedProgramacaoSemanalRouteImport.update({
-    id: '/programacao/semanal',
-    path: '/programacao/semanal',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedProgramacaoServicosRoute =
@@ -364,21 +374,6 @@ const AuthenticatedVeiculosMotoristasRoute =
     path: '/veiculos/motoristas',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedFrotaCustosRoute = AuthenticatedFrotaCustosRouteImport.update({
-  id: '/frota/custos',
-  path: '/frota/custos',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedFrotaManutencaoRoute = AuthenticatedFrotaManutencaoRouteImport.update({
-  id: '/frota/manutencao',
-  path: '/frota/manutencao',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedFrotaNotasRoute = AuthenticatedFrotaNotasRouteImport.update({
-  id: '/frota/notas',
-  path: '/frota/notas',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedVeiculosRelatoriosRoute =
   AuthenticatedVeiculosRelatoriosRouteImport.update({
     id: '/veiculos/relatorios',
@@ -438,21 +433,20 @@ export interface FileRoutesByFullPath {
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
+  '/frota/custos': typeof AuthenticatedFrotaCustosRoute
+  '/frota/manutencao': typeof AuthenticatedFrotaManutencaoRoute
+  '/frota/notas': typeof AuthenticatedFrotaNotasRoute
   '/obras/compras': typeof AuthenticatedObrasComprasRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
   '/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
   '/programacao/historico': typeof AuthenticatedProgramacaoHistoricoRoute
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
-  '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
   '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
-  '/frota/custos': typeof AuthenticatedFrotaCustosRoute
-  '/frota/manutencao': typeof AuthenticatedFrotaManutencaoRoute
-  '/frota/notas': typeof AuthenticatedFrotaNotasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/ausencias/': typeof AuthenticatedAusenciasIndexRoute
@@ -497,21 +491,20 @@ export interface FileRoutesByTo {
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
+  '/frota/custos': typeof AuthenticatedFrotaCustosRoute
+  '/frota/manutencao': typeof AuthenticatedFrotaManutencaoRoute
+  '/frota/notas': typeof AuthenticatedFrotaNotasRoute
   '/obras/compras': typeof AuthenticatedObrasComprasRoute
   '/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/obras/resultado': typeof AuthenticatedObrasResultadoRoute
   '/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
   '/programacao/historico': typeof AuthenticatedProgramacaoHistoricoRoute
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
-  '/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
   '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
-  '/frota/custos': typeof AuthenticatedFrotaCustosRoute
-  '/frota/manutencao': typeof AuthenticatedFrotaManutencaoRoute
-  '/frota/notas': typeof AuthenticatedFrotaNotasRoute
   '/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/ausencias': typeof AuthenticatedAusenciasIndexRoute
@@ -558,21 +551,20 @@ export interface FileRoutesById {
   '/_authenticated/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
   '/_authenticated/fechamentos/financeiro': typeof AuthenticatedFechamentosFinanceiroRoute
   '/_authenticated/fechamentos/suzano': typeof AuthenticatedFechamentosSuzanoRoute
+  '/_authenticated/frota/custos': typeof AuthenticatedFrotaCustosRoute
+  '/_authenticated/frota/manutencao': typeof AuthenticatedFrotaManutencaoRoute
+  '/_authenticated/frota/notas': typeof AuthenticatedFrotaNotasRoute
   '/_authenticated/obras/compras': typeof AuthenticatedObrasComprasRoute
   '/_authenticated/obras/integracoes': typeof AuthenticatedObrasIntegracoesRoute
   '/_authenticated/obras/resultado': typeof AuthenticatedObrasResultadoRoute
   '/_authenticated/programacao/diaria': typeof AuthenticatedProgramacaoDiariaRoute
   '/_authenticated/programacao/historico': typeof AuthenticatedProgramacaoHistoricoRoute
   '/_authenticated/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
-  '/_authenticated/programacao/semanal': typeof AuthenticatedProgramacaoSemanalRoute
   '/_authenticated/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
   '/_authenticated/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/_authenticated/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/_authenticated/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/_authenticated/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
-  '/_authenticated/frota/custos': typeof AuthenticatedFrotaCustosRoute
-  '/_authenticated/frota/manutencao': typeof AuthenticatedFrotaManutencaoRoute
-  '/_authenticated/frota/notas': typeof AuthenticatedFrotaNotasRoute
   '/_authenticated/veiculos/relatorios': typeof AuthenticatedVeiculosRelatoriosRoute
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/_authenticated/ausencias/': typeof AuthenticatedAusenciasIndexRoute
@@ -619,21 +611,20 @@ export interface FileRouteTypes {
     | '/externo/relatorio-diario'
     | '/fechamentos/financeiro'
     | '/fechamentos/suzano'
+    | '/frota/custos'
+    | '/frota/manutencao'
+    | '/frota/notas'
     | '/obras/compras'
     | '/obras/integracoes'
     | '/obras/resultado'
     | '/programacao/diaria'
     | '/programacao/historico'
     | '/programacao/hoje'
-    | '/programacao/semanal'
     | '/programacao/servicos'
     | '/relatorios/ajuste-ponto'
     | '/relatorios/sincronizacao'
     | '/relatorios/vale-alimentacao'
     | '/veiculos/motoristas'
-    | '/frota/custos'
-    | '/frota/manutencao'
-    | '/frota/notas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
     | '/ausencias/'
@@ -678,21 +669,20 @@ export interface FileRouteTypes {
     | '/externo/relatorio-diario'
     | '/fechamentos/financeiro'
     | '/fechamentos/suzano'
+    | '/frota/custos'
+    | '/frota/manutencao'
+    | '/frota/notas'
     | '/obras/compras'
     | '/obras/integracoes'
     | '/obras/resultado'
     | '/programacao/diaria'
     | '/programacao/historico'
     | '/programacao/hoje'
-    | '/programacao/semanal'
     | '/programacao/servicos'
     | '/relatorios/ajuste-ponto'
     | '/relatorios/sincronizacao'
     | '/relatorios/vale-alimentacao'
     | '/veiculos/motoristas'
-    | '/frota/custos'
-    | '/frota/manutencao'
-    | '/frota/notas'
     | '/veiculos/relatorios'
     | '/veiculos/transporte'
     | '/ausencias'
@@ -738,21 +728,20 @@ export interface FileRouteTypes {
     | '/_authenticated/externo/relatorio-diario'
     | '/_authenticated/fechamentos/financeiro'
     | '/_authenticated/fechamentos/suzano'
+    | '/_authenticated/frota/custos'
+    | '/_authenticated/frota/manutencao'
+    | '/_authenticated/frota/notas'
     | '/_authenticated/obras/compras'
     | '/_authenticated/obras/integracoes'
     | '/_authenticated/obras/resultado'
     | '/_authenticated/programacao/diaria'
     | '/_authenticated/programacao/historico'
     | '/_authenticated/programacao/hoje'
-    | '/_authenticated/programacao/semanal'
     | '/_authenticated/programacao/servicos'
     | '/_authenticated/relatorios/ajuste-ponto'
     | '/_authenticated/relatorios/sincronizacao'
     | '/_authenticated/relatorios/vale-alimentacao'
     | '/_authenticated/veiculos/motoristas'
-    | '/_authenticated/frota/custos'
-    | '/_authenticated/frota/manutencao'
-    | '/_authenticated/frota/notas'
     | '/_authenticated/veiculos/relatorios'
     | '/_authenticated/veiculos/transporte'
     | '/_authenticated/ausencias/'
@@ -1027,6 +1016,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFechamentosSuzanoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/frota/custos': {
+      id: '/_authenticated/frota/custos'
+      path: '/frota/custos'
+      fullPath: '/frota/custos'
+      preLoaderRoute: typeof AuthenticatedFrotaCustosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/frota/manutencao': {
+      id: '/_authenticated/frota/manutencao'
+      path: '/frota/manutencao'
+      fullPath: '/frota/manutencao'
+      preLoaderRoute: typeof AuthenticatedFrotaManutencaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/frota/notas': {
+      id: '/_authenticated/frota/notas'
+      path: '/frota/notas'
+      fullPath: '/frota/notas'
+      preLoaderRoute: typeof AuthenticatedFrotaNotasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/obras/': {
       id: '/_authenticated/obras/'
       path: '/obras'
@@ -1076,13 +1086,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProgramacaoHojeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/programacao/semanal': {
-      id: '/_authenticated/programacao/semanal'
-      path: '/programacao/semanal'
-      fullPath: '/programacao/semanal'
-      preLoaderRoute: typeof AuthenticatedProgramacaoSemanalRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/programacao/servicos': {
       id: '/_authenticated/programacao/servicos'
       path: '/programacao/servicos'
@@ -1130,27 +1133,6 @@ declare module '@tanstack/react-router' {
       path: '/veiculos/motoristas'
       fullPath: '/veiculos/motoristas'
       preLoaderRoute: typeof AuthenticatedVeiculosMotoristasRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/frota/custos': {
-      id: '/_authenticated/frota/custos'
-      path: '/frota/custos'
-      fullPath: '/frota/custos'
-      preLoaderRoute: typeof AuthenticatedFrotaCustosRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/frota/manutencao': {
-      id: '/_authenticated/frota/manutencao'
-      path: '/frota/manutencao'
-      fullPath: '/frota/manutencao'
-      preLoaderRoute: typeof AuthenticatedFrotaManutencaoRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/frota/notas': {
-      id: '/_authenticated/frota/notas'
-      path: '/frota/notas'
-      fullPath: '/frota/notas'
-      preLoaderRoute: typeof AuthenticatedFrotaNotasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/veiculos/relatorios': {
@@ -1215,21 +1197,20 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedExternoRelatorioDiarioRoute: typeof AuthenticatedExternoRelatorioDiarioRoute
   AuthenticatedFechamentosFinanceiroRoute: typeof AuthenticatedFechamentosFinanceiroRoute
   AuthenticatedFechamentosSuzanoRoute: typeof AuthenticatedFechamentosSuzanoRoute
+  AuthenticatedFrotaCustosRoute: typeof AuthenticatedFrotaCustosRoute
+  AuthenticatedFrotaManutencaoRoute: typeof AuthenticatedFrotaManutencaoRoute
+  AuthenticatedFrotaNotasRoute: typeof AuthenticatedFrotaNotasRoute
   AuthenticatedObrasComprasRoute: typeof AuthenticatedObrasComprasRoute
   AuthenticatedObrasIntegracoesRoute: typeof AuthenticatedObrasIntegracoesRoute
   AuthenticatedObrasResultadoRoute: typeof AuthenticatedObrasResultadoRoute
   AuthenticatedProgramacaoDiariaRoute: typeof AuthenticatedProgramacaoDiariaRoute
   AuthenticatedProgramacaoHistoricoRoute: typeof AuthenticatedProgramacaoHistoricoRoute
   AuthenticatedProgramacaoHojeRoute: typeof AuthenticatedProgramacaoHojeRoute
-  AuthenticatedProgramacaoSemanalRoute: typeof AuthenticatedProgramacaoSemanalRoute
   AuthenticatedProgramacaoServicosRoute: typeof AuthenticatedProgramacaoServicosRoute
   AuthenticatedRelatoriosAjustePontoRoute: typeof AuthenticatedRelatoriosAjustePontoRoute
   AuthenticatedRelatoriosSincronizacaoRoute: typeof AuthenticatedRelatoriosSincronizacaoRoute
   AuthenticatedRelatoriosValeAlimentacaoRoute: typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   AuthenticatedVeiculosMotoristasRoute: typeof AuthenticatedVeiculosMotoristasRoute
-  AuthenticatedFrotaCustosRoute: typeof AuthenticatedFrotaCustosRoute
-  AuthenticatedFrotaManutencaoRoute: typeof AuthenticatedFrotaManutencaoRoute
-  AuthenticatedFrotaNotasRoute: typeof AuthenticatedFrotaNotasRoute
   AuthenticatedVeiculosRelatoriosRoute: typeof AuthenticatedVeiculosRelatoriosRoute
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
   AuthenticatedAusenciasIndexRoute: typeof AuthenticatedAusenciasIndexRoute
@@ -1280,6 +1261,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFechamentosFinanceiroRoute:
     AuthenticatedFechamentosFinanceiroRoute,
   AuthenticatedFechamentosSuzanoRoute: AuthenticatedFechamentosSuzanoRoute,
+  AuthenticatedFrotaCustosRoute: AuthenticatedFrotaCustosRoute,
+  AuthenticatedFrotaManutencaoRoute: AuthenticatedFrotaManutencaoRoute,
+  AuthenticatedFrotaNotasRoute: AuthenticatedFrotaNotasRoute,
   AuthenticatedObrasComprasRoute: AuthenticatedObrasComprasRoute,
   AuthenticatedObrasIntegracoesRoute: AuthenticatedObrasIntegracoesRoute,
   AuthenticatedObrasResultadoRoute: AuthenticatedObrasResultadoRoute,
@@ -1287,7 +1271,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProgramacaoHistoricoRoute:
     AuthenticatedProgramacaoHistoricoRoute,
   AuthenticatedProgramacaoHojeRoute: AuthenticatedProgramacaoHojeRoute,
-  AuthenticatedProgramacaoSemanalRoute: AuthenticatedProgramacaoSemanalRoute,
   AuthenticatedProgramacaoServicosRoute: AuthenticatedProgramacaoServicosRoute,
   AuthenticatedRelatoriosAjustePontoRoute:
     AuthenticatedRelatoriosAjustePontoRoute,
@@ -1296,9 +1279,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRelatoriosValeAlimentacaoRoute:
     AuthenticatedRelatoriosValeAlimentacaoRoute,
   AuthenticatedVeiculosMotoristasRoute: AuthenticatedVeiculosMotoristasRoute,
-  AuthenticatedFrotaCustosRoute: AuthenticatedFrotaCustosRoute,
-  AuthenticatedFrotaManutencaoRoute: AuthenticatedFrotaManutencaoRoute,
-  AuthenticatedFrotaNotasRoute: AuthenticatedFrotaNotasRoute,
   AuthenticatedVeiculosRelatoriosRoute: AuthenticatedVeiculosRelatoriosRoute,
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
   AuthenticatedAusenciasIndexRoute: AuthenticatedAusenciasIndexRoute,

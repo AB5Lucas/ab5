@@ -103,7 +103,7 @@ function Page() {
   return (
     <div className="space-y-4">
       <PageHeader title="Acompanhamento" description="Andaimes montados nas obras, apontamentos e produtividade a partir dos RDOs." />
-      <Tabs defaultValue="andaimes" className="space-y-4">
+      <Tabs pageTabs defaultValue="andaimes" className="space-y-4">
         <TabsList>
           <TabsTrigger value="andaimes">Andaimes</TabsTrigger>
           <TabsTrigger value="apontamentos">Apontamentos</TabsTrigger>

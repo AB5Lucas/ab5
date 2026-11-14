@@ -43,7 +43,7 @@ function useSettings() {
 
 function VAPage() {
   return <div className="space-y-5"><PageHeader title="Vale Alimentação" description="Apuração pela planilha Justificativa e Atraso da competência (26 ao 25)." />
-    <Tabs defaultValue="relatorio"><TabsList><TabsTrigger value="relatorio">Relatório</TabsTrigger><TabsTrigger value="regras">Regras e valores</TabsTrigger></TabsList>
+    <Tabs pageTabs defaultValue="relatorio"><TabsList><TabsTrigger value="relatorio">Relatório</TabsTrigger><TabsTrigger value="regras">Regras e valores</TabsTrigger></TabsList>
       <TabsContent value="relatorio"><Report /></TabsContent><TabsContent value="regras"><Rules /></TabsContent></Tabs></div>;
 }
 

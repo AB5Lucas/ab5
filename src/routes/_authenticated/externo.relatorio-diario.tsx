@@ -107,7 +107,7 @@ function RdoPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <PageHeader title="Relatório Diário de Obras — RDO" />
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs pageTabs value={tab} onValueChange={setTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="fill">Preencher</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>

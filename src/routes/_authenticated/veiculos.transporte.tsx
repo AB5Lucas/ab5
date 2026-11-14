@@ -71,7 +71,7 @@ function TransportTabs() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   return (
-    <Tabs value={tab} onValueChange={(v) => navigate({ search: v === "transporte" ? {} : { tab: v as Tab }, replace: true, resetScroll: false })}>
+    <Tabs pageTabs value={tab} onValueChange={(v) => navigate({ search: v === "transporte" ? {} : { tab: v as Tab }, replace: true, resetScroll: false })}>
       <TabsList>
         {TABS.map((t) => <TabsTrigger key={t.v} value={t.v}>{t.l}</TabsTrigger>)}
       </TabsList>

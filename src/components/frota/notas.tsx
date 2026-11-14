@@ -46,7 +46,7 @@ export function FleetNotesPage() {
         title="Abastecimento"
         description="Cada XML do posto na pasta do mês vira um abastecimento. A nota é procurada na pasta de notas do mês pelo código de acesso (nome do arquivo); se não achar, atribua à mão. Nota com dois combustíveis vira duas linhas. Nome e placa da nota viram os cadastrados (aba Liberação). O rateio usa o km que o veículo rodou em cada cliente na Transporte desde o abastecimento anterior (sem km lançado, os dias)."
       />
-      <Tabs defaultValue="abastecimentos">
+      <Tabs pageTabs defaultValue="abastecimentos">
         <TabsList>
           <TabsTrigger value="abastecimentos">Abastecimentos</TabsTrigger>
           <TabsTrigger value="liberacao">Liberação</TabsTrigger>

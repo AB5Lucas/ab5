@@ -47,7 +47,7 @@ function useFilters() {
 }
 
 function SuzanoPage() {
-  return <div className="space-y-6"><PageHeader title="Pedidos" description="Pedidos e faturamentos do cliente selecionado." /><Tabs defaultValue="servicos"><TabsList><TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="industria">Indústria</TabsTrigger></TabsList><TabsContent value="servicos"><ServicesOrders /></TabsContent><TabsContent value="industria"><IndustryOrders /></TabsContent></Tabs></div>;
+  return <div className="space-y-6"><PageHeader title="Pedidos" description="Pedidos e faturamentos do cliente selecionado." /><Tabs pageTabs defaultValue="servicos"><TabsList><TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="industria">Indústria</TabsTrigger></TabsList><TabsContent value="servicos"><ServicesOrders /></TabsContent><TabsContent value="industria"><IndustryOrders /></TabsContent></Tabs></div>;
 }
 
 function ServicesOrders() {

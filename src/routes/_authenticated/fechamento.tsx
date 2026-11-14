@@ -55,7 +55,7 @@ function PrizesPage() {
   const { tab = "fechamento" } = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
-    <Tabs value={tab === "horas-premio" && !canHP ? "fechamento" : tab} onValueChange={(v) => navigate({ search: v === "fechamento" ? {} : { tab: v as Tab }, replace: true })}>
+    <Tabs pageTabs value={tab === "horas-premio" && !canHP ? "fechamento" : tab} onValueChange={(v) => navigate({ search: v === "fechamento" ? {} : { tab: v as Tab }, replace: true })}>
       <TabsList>
         {TABS.filter((t) => t.v !== "horas-premio" || canHP).map((t) => <TabsTrigger key={t.v} value={t.v}>{t.l}</TabsTrigger>)}
       </TabsList>

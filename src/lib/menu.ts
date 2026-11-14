@@ -28,24 +28,27 @@ import {
   Wrench,
   type LucideIcon,
   CalendarDays,
-  CalendarClock,
   Users,
   Building2,
   Truck,
   Wallet,
-  FileBarChart,
   Shield,
   ClipboardList,
   Boxes,
+  ShieldCheck,
 } from "lucide-react";
 
 export type MenuItem = { title: string; url: string; icon?: LucideIcon };
-export type MenuGroup = { label: string; icon: typeof Users; items: MenuItem[] };
+/** userMenu = grupo que fica no menu do usuário (rodapé), fora da lista principal (ex.: Administração). */
+export type MenuGroup = { label: string; icon: typeof Users; items: MenuItem[]; userMenu?: boolean };
 
-/** Menu real do sistema — fonte única para o menu lateral e a página Acessos. */
+/**
+ * Menu real do sistema — fonte única para o menu lateral e a página Acessos.
+ * Módulos por área de trabalho; páginas sempre em ordem alfabética.
+ */
 const RAW_GROUPS: MenuGroup[] = [
   {
-    label: "Planejamento",
+    label: "Operação",
     icon: CalendarDays,
     items: [
       { title: "Programação", url: "/programacao/diaria", icon: CalendarDays },
@@ -54,21 +57,51 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Controles",
-    icon: CalendarClock,
-    items: [
-      { title: "Documentação", url: "/agendamentos", icon: FileCheck },
-      { title: "Conferência", url: "/conferencia", icon: ClipboardCheck },
-      { title: "Consulta", url: "/consulta", icon: Search },
-    ],
-  },
-  {
-    label: "Funcionários",
+    label: "Pessoas",
     icon: Users,
     items: [
       { title: "Colaboradores", url: "/colaboradores", icon: Users },
       { title: "Ausências", url: "/ausencias", icon: UserX },
       { title: "Contratações", url: "/demandas/contratacoes", icon: UserPlus },
+      { title: "Consulta", url: "/consulta", icon: Search },
+    ],
+  },
+  {
+    label: "Documentos e SST",
+    icon: ShieldCheck,
+    items: [
+      { title: "Documentação", url: "/agendamentos", icon: FileCheck },
+      { title: "Conferência", url: "/conferencia", icon: ClipboardCheck },
+      { title: "Certificados", url: "/demandas/certificados", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Folha e benefícios",
+    icon: Wallet,
+    items: [
+      { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto", icon: Clock },
+      { title: "Premiações", url: "/fechamento", icon: Award },
+      { title: "Vale Alimentação", url: "/relatorios/vale-alimentacao", icon: Utensils },
+      { title: "Alocações", url: "/relatorios", icon: ChartPie },
+    ],
+  },
+  {
+    label: "Obras e custos",
+    icon: Building2,
+    items: [
+      { title: "Cadastros", url: "/obras", icon: Building2 },
+      { title: "Compras", url: "/obras/compras", icon: ShoppingCart },
+      { title: "Resultados", url: "/obras/resultado", icon: TrendingUp },
+      { title: "Fechamento", url: "/fechamentos/financeiro", icon: Calculator },
+      { title: "Relatório Diário", url: "/externo/relatorio-diario", icon: NotebookPen },
+    ],
+  },
+  {
+    label: "Faturamento",
+    icon: Receipt,
+    items: [
+      { title: "Pedidos", url: "/fechamentos/suzano", icon: Receipt },
+      { title: "Faturamento", url: "/relatorios/sincronizacao", icon: FileText },
     ],
   },
   {
@@ -80,26 +113,6 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Visão Geral", url: "/frota/custos", icon: Gauge },
     ],
   },
-  {
-    label: "Obras",
-    icon: Building2,
-    items: [
-      { title: "Cadastros", url: "/obras", icon: Building2 },
-      { title: "Fechamento", url: "/fechamentos/financeiro", icon: Calculator },
-      { title: "Resultados", url: "/obras/resultado", icon: TrendingUp },
-    ],
-  },
-  {
-    label: "Financeiro",
-    icon: Wallet,
-    items: [
-      { title: "Compras", url: "/obras/compras", icon: ShoppingCart },
-      { title: "Pedidos", url: "/fechamentos/suzano", icon: Receipt },
-      { title: "Faturamento", url: "/relatorios/sincronizacao", icon: FileText },
-    ],
-  },
-  { label: "Relatórios", icon: FileBarChart, items: [{ title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto", icon: Clock }, { title: "Premiações", url: "/fechamento", icon: Award }, { title: "Vale Alimentação", url: "/relatorios/vale-alimentacao", icon: Utensils }] },
-  { label: "Demandas", icon: ClipboardList, items: [{ title: "Alocações", url: "/relatorios", icon: ChartPie }, { title: "Certificados", url: "/demandas/certificados", icon: GraduationCap }, { title: "Relatório Diário", url: "/externo/relatorio-diario", icon: NotebookPen }] },
   {
     label: "Andaimes",
     icon: Boxes,
@@ -114,6 +127,7 @@ const RAW_GROUPS: MenuGroup[] = [
   {
     label: "Administração",
     icon: Shield,
+    userMenu: true,
     items: [
       { title: "Usuários", url: "/admin/usuarios", icon: UserCog },
       { title: "Configurações", url: "/admin/configuracoes", icon: Settings },
@@ -123,27 +137,16 @@ const RAW_GROUPS: MenuGroup[] = [
 ];
 
 const byName = (a: string, b: string) => a.localeCompare(b, "pt-BR");
-/** Grupos na ordem original; páginas de cada grupo em ordem alfabética. */
-export const MENU_GROUPS: MenuGroup[] = RAW_GROUPS.map((g) => ({
-  ...g,
-  // Andaimes segue a ordem do processo, não alfabética
-  // Andaimes segue a ordem do processo; em Controles, Documentação vem primeiro
-  items:
-    g.label === "Andaimes" || g.label === "Frota"
-      ? g.items
-      : [...g.items].sort((a, b) =>
-          g.label === "Controles" && (a.url === "/agendamentos" || b.url === "/agendamentos")
-            ? (a.url === "/agendamentos" ? -1 : 1)
-            : byName(a.title, b.title),
-        ),
-}));
+/** Módulos na ordem acima; páginas de cada módulo em ordem alfabética. */
+export const MENU_GROUPS: MenuGroup[] = RAW_GROUPS.map((g) => ({ ...g, items: [...g.items].sort((a, b) => byName(a.title, b.title)) }));
 
 export const ALL_MENU_URLS = MENU_GROUPS.flatMap((g) => g.items.map((i) => i.url));
 
-/** Página do menu que "contém" a rota atual (ex.: /programacao/semanal → Programação). */
+/** Página do menu que "contém" a rota atual (ex.: /ausencias/ferias → Ausências). */
 export function menuUrlFor(pathname: string): string | null {
   if (ALL_MENU_URLS.includes(pathname)) return pathname;
   if (pathname.startsWith("/programacao")) return "/programacao/diaria";
   if (pathname === "/clientes") return "/obras";
+  if (pathname.startsWith("/ausencias")) return "/ausencias";
   return null;
 }

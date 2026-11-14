@@ -83,7 +83,7 @@ function ControlsPage() {
   const navigate = Route.useNavigate();
   const badges = useControlBadges();
   return (
-    <SubTabs value={tab} onValueChange={(v) => navigate({ search: v === "agendamentos" ? {} : { tab: v as CtrlTab }, replace: true })}>
+    <SubTabs pageTabs value={tab} onValueChange={(v) => navigate({ search: v === "agendamentos" ? {} : { tab: v as CtrlTab }, replace: true })}>
       <SubTabsList>
         {CTRL_TABS.map((t) => {
           const b = badges[t.v];

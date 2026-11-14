@@ -105,7 +105,7 @@ function ConsultaPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Consulta" description="Vencimentos por colaborador e colaboradores liberados por cliente." />
-      <Tabs defaultValue="colab">
+      <Tabs pageTabs defaultValue="colab">
         <TabsList>
           <TabsTrigger value="colab">Por colaborador</TabsTrigger>
           <TabsTrigger value="client">Por cliente</TabsTrigger>

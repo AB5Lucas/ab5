@@ -1,27 +1,28 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, ChevronRight, LayoutList, Search, Star } from "lucide-react";
+import { ChevronDown, ChevronUp, LayoutList, PanelLeftClose, PanelLeftOpen, Search, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
-  Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader,
-  SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem, useSidebar,
+  Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem, useSidebar,
 } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MENU_GROUPS, menuUrlFor, type MenuGroup, type MenuItem } from "@/lib/menu";
 import { useAccess } from "@/hooks/use-access";
 import { useMenuBadges } from "@/hooks/use-nav-badges";
 import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
+import { pageTabsStore, usePageTabs } from "@/lib/page-tabs-store";
 import { BadgePill, openMenuSearch, useFavorites, useMenuStyle, worstTone } from "@/components/nav/menu-prefs";
 
-const STORAGE_KEY = "sidebar-closed-groups";
 const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+const dotClass = (tone: string) => (tone === "red" ? "bg-destructive" : "bg-warning");
 
 /**
- * Menu lateral: um ícone por página, página atual com barra vermelha, avisos com detalhe ao passar o mouse,
- * grupo fechado mostra o pior aviso, favoritos no topo, busca (Ctrl+K) e, recolhido, um ícone por grupo com a lista
- * ao clicar. O menu antigo segue disponível em "Usar menu clássico" (rodapé).
+ * Menu lateral (modelo B): módulos em árvore, só o da página atual aberto, com as subabas da página embaixo dela.
+ * Botão quadrado ao lado de Buscar recolhe para a faixa de ícones; recolhido, clicar num módulo abre um quadro
+ * pequeno com as páginas. Administração fica no menu do usuário (rodapé). O menu antigo segue em "Usar menu clássico".
  */
 export function AppSidebar() {
-  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed" && !isMobile;
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const current = menuUrlFor(pathname) ?? pathname;
@@ -30,49 +31,100 @@ export function AppSidebar() {
   const { user, profile, role } = useCurrentUser();
   const { favs, toggle: toggleFav, isFav } = useFavorites(user?.id);
   const [, setStyle] = useMenuStyle();
-  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const tabs = usePageTabs();
+  // Um módulo aberto por vez: o da página atual, salvo se o usuário abrir/fechar outro.
+  const [openMod, setOpenMod] = useState<string | null | undefined>(undefined);
+  const [fly, setFly] = useState<string | null>(null);
+  useEffect(() => { setOpenMod(undefined); setFly(null); }, [current]);
+  // Com o menu estendido (fora do celular), as subabas saem do topo da página e ficam no menu.
   useEffect(() => {
-    try { setClosed(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}")); } catch { /* ignora */ }
-  }, []);
-  const toggleGroup = (label: string) => setClosed((prev) => {
-    const next = { ...prev, [label]: !prev[label] };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* ignora */ }
-    return next;
-  });
-  const visible = loading ? [] : MENU_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canAccess(i.url)) })).filter((g) => g.items.length);
-  const favItems = visible.flatMap((g) => g.items.map((i) => ({ item: i, group: g }))).filter((x) => favs.includes(x.item.url));
+    pageTabsStore.set({ menuExtended: !isMobile && state === "expanded" });
+    return () => pageTabsStore.set({ menuExtended: false });
+  }, [isMobile, state]);
+
+  const all = loading ? [] : MENU_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canAccess(i.url)) })).filter((g) => g.items.length);
+  const modules = all.filter((g) => !g.userMenu);
+  const adminItems = all.filter((g) => g.userMenu).flatMap((g) => g.items.map((i) => ({ item: i, group: g })));
+  const currentMod = modules.find((g) => g.items.some((i) => i.url === current))?.label ?? null;
+  const openLabel = openMod === undefined ? currentMod : openMod;
+  const favItems = all.flatMap((g) => g.items.map((i) => ({ item: i, group: g }))).filter((x) => favs.includes(x.item.url));
   const closeMobile = () => { if (isMobile) setOpenMobile(false); };
   const initials = (profile?.full_name || profile?.email || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 
-  const itemRow = (item: MenuItem, group: MenuGroup, keyPrefix = "") => {
+  const pageRow = (item: MenuItem, group: MenuGroup, opts: { icon?: boolean; key?: string } = {}) => {
     const b = badges[item.url];
     const Icon = item.icon ?? group.icon;
     const active = current === item.url;
     return (
-      <SidebarMenuItem key={keyPrefix + item.url}>
-        <SidebarMenuButton asChild isActive={active} tooltip={item.title}
-          className="relative h-9 rounded-lg text-sidebar-foreground transition-colors data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground">
+      <SidebarMenuItem key={(opts.key ?? "") + item.url}>
+        <SidebarMenuButton asChild isActive={active}
+          className="relative h-8 rounded-lg text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold">
           <Link to={item.url} onClick={closeMobile} className="flex items-center gap-2.5">
-            {active && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-r-full bg-sidebar-primary" aria-hidden />}
-            <Icon className={`h-4 w-4 shrink-0 ${active ? "text-sidebar-primary" : "opacity-90"}`} />
+            {active && <span className="absolute inset-y-1.5 -left-2 w-[3px] rounded-r-full bg-sidebar-primary" aria-hidden />}
+            {opts.icon && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-sidebar-primary" : "opacity-90"}`} />}
             <span className="truncate">{item.title}</span>
             {b && <BadgePill b={b} className="ml-auto" />}
           </Link>
         </SidebarMenuButton>
-        <SidebarMenuAction showOnHover onClick={() => toggleFav(item.url)} title={isFav(item.url) ? "Tirar dos favoritos" : "Fixar nos favoritos"} aria-label="Favorito">
+        <SidebarMenuAction showOnHover onClick={() => toggleFav(item.url)} title={isFav(item.url) ? "Tirar dos fixados" : "Fixar no topo do menu"} aria-label="Fixar">
           <Star className={`h-3.5 w-3.5 ${isFav(item.url) ? "fill-warning text-warning" : ""}`} />
         </SidebarMenuAction>
+        {active && tabs.items.length > 1 && (
+          <div className="mb-1 ml-3 mt-0.5 grid gap-px border-l border-sidebar-border pl-2">
+            {tabs.items.map((t) => (
+              <button key={t.value} type="button" onClick={() => { tabs.setValue?.(t.value); closeMobile(); }}
+                className={`truncate rounded-md px-2 py-1 text-left text-[13px] transition-colors hover:bg-sidebar-accent ${tabs.value === t.value ? "font-semibold text-sidebar-foreground" : "text-sidebar-foreground/70"}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
       </SidebarMenuItem>
     );
   };
 
+  const userMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <SidebarMenuButton className="h-11" tooltip={profile?.full_name ?? "Usuário"}>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-[11px] font-semibold">{initials}</span>
+          {!collapsed && (
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-sm font-medium">{profile?.full_name || profile?.email}</span>
+              <span className="block truncate text-[11px] text-sidebar-foreground/75">{ROLE_LABEL[role]}</span>
+            </span>
+          )}
+        </SidebarMenuButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side={collapsed ? "right" : "top"} align="start" className="w-56">
+        {adminItems.length > 0 && (
+          <>
+            <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">Administração</DropdownMenuLabel>
+            {adminItems.map(({ item, group }) => {
+              const Icon = item.icon ?? group.icon;
+              return <DropdownMenuItem key={item.url} asChild><Link to={item.url} onClick={closeMobile}><Icon className="h-4 w-4" /> {item.title}</Link></DropdownMenuItem>;
+            })}
+            <DropdownMenuSeparator />
+          </>
+        )}
+        <DropdownMenuItem onSelect={openMenuSearch}><Search className="h-4 w-4" /> Buscar <span className="ml-auto text-xs text-muted-foreground">{isMac ? "⌘" : "Ctrl"} K</span></DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setStyle("classic")}><LayoutList className="h-4 w-4" /> Usar menu clássico</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const toggleBtn = (
+    <button type="button" onClick={toggleSidebar} title={collapsed ? "Estender menu" : "Recolher menu"} aria-label={collapsed ? "Estender menu" : "Recolher menu"}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-accent/60 text-sidebar-foreground transition-colors hover:bg-sidebar-accent">
+      {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+    </button>
+  );
+
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="gap-3 border-b border-sidebar-border px-3 py-4">
+      <SidebarHeader className={`gap-3 border-b border-sidebar-border py-4 ${collapsed ? "items-center px-1" : "px-3"}`}>
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sidebar-primary to-sidebar-primary/70 font-display text-xs font-bold tracking-tight text-sidebar-primary-foreground shadow-md shadow-sidebar-primary/30">
-            AB5
-          </span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary font-display text-xs font-bold tracking-tight text-sidebar-primary-foreground">AB5</span>
           {!collapsed && (
             <div className="leading-tight">
               <p className="font-display text-sm font-semibold uppercase tracking-wide">AB5 Hub</p>
@@ -81,109 +133,99 @@ export function AppSidebar() {
           )}
         </div>
         {collapsed ? (
-          <SidebarMenu><SidebarMenuItem>
-            <SidebarMenuButton tooltip="Buscar página (Ctrl+K)" onClick={openMenuSearch}><Search className="h-4 w-4" /></SidebarMenuButton>
-          </SidebarMenuItem></SidebarMenu>
+          <div className="grid justify-items-center gap-1">
+            {!isMobile && toggleBtn}
+            <SidebarMenu><SidebarMenuItem>
+              <SidebarMenuButton tooltip="Buscar (Ctrl+K)" onClick={openMenuSearch}><Search className="h-4 w-4" /></SidebarMenuButton>
+            </SidebarMenuItem></SidebarMenu>
+          </div>
         ) : (
-          <button type="button" onClick={openMenuSearch}
-            className="flex h-9 w-full items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-2.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
-            <Search className="h-4 w-4" /> Buscar página...
-            <kbd className="ml-auto rounded border border-sidebar-border px-1.5 font-mono text-[10px]">{isMac ? "⌘" : "Ctrl"} K</kbd>
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={openMenuSearch} title="Buscar (Ctrl+K)"
+              className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-2.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
+              <Search className="h-4 w-4" /> Buscar
+            </button>
+            {!isMobile && toggleBtn}
+          </div>
         )}
       </SidebarHeader>
 
-      <SidebarContent className="gap-0 py-2">
+      <SidebarContent className="gap-0 px-2 py-2">
         {collapsed ? (
-          // Recolhido: um ícone por grupo; clique abre as páginas do grupo ao lado.
-          <SidebarGroup><SidebarMenu className="gap-1">
-            {visible.map((group) => {
-              const tone = worstTone(group.items.map((i) => badges[i.url]));
-              const activeGroup = group.items.some((i) => i.url === current);
+          <SidebarMenu className="gap-1">
+            {modules.map((g) => {
+              const tone = worstTone(g.items.map((i) => badges[i.url]));
+              const isCur = g.label === currentMod;
               return (
-                <SidebarMenuItem key={group.label}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton isActive={activeGroup} tooltip={group.label} className="relative data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-primary">
-                        <group.icon className="h-4 w-4" />
-                        {tone && <span className={`absolute right-1 top-1 h-2 w-2 rounded-full ring-2 ring-sidebar ${tone === "red" ? "bg-destructive" : "bg-warning"}`} />}
+                <SidebarMenuItem key={g.label}>
+                  <Popover open={fly === g.label} onOpenChange={(o) => setFly(o ? g.label : null)}>
+                    <PopoverTrigger asChild>
+                      <SidebarMenuButton isActive={isCur} {...(fly === g.label ? {} : { tooltip: g.label })}
+                        className="relative data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-primary">
+                        <g.icon className="h-4 w-4" />
+                        {tone && <span className={`absolute right-1 top-1 h-2 w-2 rounded-full ring-2 ring-sidebar ${dotClass(tone)}`} />}
                       </SidebarMenuButton>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent side="right" align="start" className="w-60">
-                      <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">{group.label}</DropdownMenuLabel>
-                      {group.items.map((item) => {
-                        const Icon = item.icon ?? group.icon;
-                        const b = badges[item.url];
-                        return (
-                          <DropdownMenuItem key={item.url} asChild className={current === item.url ? "bg-accent font-semibold" : ""}>
-                            <Link to={item.url} className="flex items-center gap-2"><Icon className="h-4 w-4" />{item.title}{b && <BadgePill b={b} className="ml-auto" />}</Link>
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    </PopoverTrigger>
+                    <PopoverContent side="right" align="start" sideOffset={10}
+                      className="w-56 border-sidebar-border bg-sidebar p-1.5 text-sidebar-foreground">
+                      <p className="flex items-center gap-1.5 px-2 pb-1.5 pt-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/75">
+                        <g.icon className="h-3 w-3" /> {g.label}
+                      </p>
+                      <div className="grid gap-px">
+                        {g.items.map((i) => {
+                          const b = badges[i.url];
+                          return (
+                            <Link key={i.url} to={i.url} onClick={() => setFly(null)}
+                              className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-sidebar-accent ${current === i.url ? "bg-sidebar-accent font-semibold" : ""}`}>
+                              <span className="truncate">{i.title}</span>
+                              {b && <BadgePill b={b} className="ml-auto" />}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </SidebarMenuItem>
               );
             })}
-          </SidebarMenu></SidebarGroup>
+          </SidebarMenu>
         ) : (
           <>
             {favItems.length > 0 && (
-              <SidebarGroup className="py-1">
-                <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/80">
-                  <Star className="mr-1.5 h-3 w-3" /> Favoritos
-                </SidebarGroupLabel>
-                <SidebarGroupContent><SidebarMenu className="gap-0.5">{favItems.map(({ item, group }) => itemRow(item, group, "fav-"))}</SidebarMenu></SidebarGroupContent>
-              </SidebarGroup>
+              <div className="mb-2 border-b border-sidebar-border pb-2">
+                <p className="flex items-center gap-1.5 px-2 pb-1 pt-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/75">
+                  <Star className="h-3 w-3" /> Fixados
+                </p>
+                <SidebarMenu className="gap-0.5">{favItems.map(({ item, group }) => pageRow(item, group, { icon: true, key: "fav-" }))}</SidebarMenu>
+              </div>
             )}
-            {visible.map((group) => {
-              const hasCurrent = group.items.some((i) => i.url === current);
-              // O grupo da página atual fica sempre aberto.
-              const isClosed = !!closed[group.label] && !hasCurrent;
-              const tone = worstTone(group.items.map((i) => badges[i.url]));
-              return (
-                // Grupo em uso: destacado num cartão, com espaço acima e abaixo do resto do menu.
-                <SidebarGroup key={group.label} className={hasCurrent ? "mx-2 my-2.5 w-auto rounded-xl bg-sidebar-accent/35 px-1 py-1.5 ring-1 ring-sidebar-border" : "py-1"}>
-                  <SidebarGroupLabel asChild className={`h-7 text-[10px] font-semibold uppercase tracking-[0.12em] hover:text-sidebar-foreground ${hasCurrent ? "text-sidebar-foreground" : "text-sidebar-foreground/80"}`}>
-                    <button type="button" onClick={() => toggleGroup(group.label)} className="flex w-full items-center gap-1.5 text-left" aria-expanded={!isClosed}>
-                      <group.icon className="h-3 w-3" />
-                      {group.label}
-                      {isClosed && tone && (
-                        <span title="Há avisos neste grupo" className={`h-2 w-2 rounded-full ${tone === "red" ? "bg-destructive" : "bg-warning"}`} />
-                      )}
-                      {isClosed ? <ChevronRight className="ml-auto h-3 w-3 opacity-80" /> : <ChevronDown className="ml-auto h-3 w-3 opacity-80" />}
-                    </button>
-                  </SidebarGroupLabel>
-                  {!isClosed && (
-                    <SidebarGroupContent><SidebarMenu className="gap-0.5">{group.items.map((item) => itemRow(item, group))}</SidebarMenu></SidebarGroupContent>
-                  )}
-                </SidebarGroup>
-              );
-            })}
+            <SidebarMenu className="gap-0.5">
+              {modules.map((g) => {
+                const open = openLabel === g.label;
+                const tone = worstTone(g.items.map((i) => badges[i.url]));
+                return (
+                  <SidebarMenuItem key={g.label}>
+                    <SidebarMenuButton onClick={() => setOpenMod(open ? null : g.label)} aria-expanded={open}
+                      className={`h-9 rounded-lg text-sidebar-foreground ${open ? "font-semibold" : ""}`}>
+                      <g.icon className="h-4 w-4 opacity-90" />
+                      <span className="truncate">{g.label}</span>
+                      {!open && tone && <span title="Há avisos neste módulo" className={`ml-auto h-2 w-2 shrink-0 rounded-full ${dotClass(tone)}`} />}
+                      {open ? <ChevronUp className={`${tone ? "" : "ml-auto"} h-4 w-4 opacity-70`} /> : <ChevronDown className={`${!open && tone ? "" : "ml-auto"} h-4 w-4 opacity-70`} />}
+                    </SidebarMenuButton>
+                    {open && (
+                      <SidebarMenu className="mb-1 ml-4 mt-0.5 gap-0.5 border-l border-sidebar-border pl-2">
+                        {g.items.map((i) => pageRow(i, g))}
+                      </SidebarMenu>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
           </>
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton className="h-11" tooltip={profile?.full_name ?? "Usuário"}>
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-[11px] font-semibold">{initials}</span>
-              {!collapsed && (
-                <span className="min-w-0 leading-tight">
-                  <span className="block truncate text-sm font-medium">{profile?.full_name || profile?.email}</span>
-                  <span className="block truncate text-[11px] text-sidebar-foreground/75">{ROLE_LABEL[role]}</span>
-                </span>
-              )}
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side={collapsed ? "right" : "top"} align="start" className="w-56">
-            <DropdownMenuItem onSelect={openMenuSearch}><Search className="h-4 w-4" /> Buscar página <span className="ml-auto text-xs text-muted-foreground">{isMac ? "⌘" : "Ctrl"} K</span></DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setStyle("classic")}><LayoutList className="h-4 w-4" /> Usar menu clássico</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border p-2">{userMenu}</SidebarFooter>
     </Sidebar>
   );
 }

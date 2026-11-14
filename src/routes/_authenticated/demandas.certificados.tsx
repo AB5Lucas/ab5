@@ -164,7 +164,7 @@ function CertificatesPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Certificados" description="Certificados e listas de presença a partir dos treinamentos registrados." />
-      <Tabs defaultValue="gerar">
+      <Tabs pageTabs defaultValue="gerar">
         <TabsList>
           <TabsTrigger value="gerar">Gerar Certificados</TabsTrigger>
           <TabsTrigger value="lista">Lista de Presença</TabsTrigger>

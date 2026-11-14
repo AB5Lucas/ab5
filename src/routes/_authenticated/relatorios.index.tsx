@@ -347,7 +347,7 @@ function Page() {
         <SummaryCard label="Pernoites" value={totals.overnight} />
       </div>
 
-      <Tabs defaultValue="obras">
+      <Tabs pageTabs defaultValue="obras">
         <TabsList>
           <TabsTrigger value="obras">Por obra</TabsTrigger>
           <TabsTrigger value="colaboradores">Por colaborador</TabsTrigger>
