@@ -44,10 +44,10 @@ export const badgeText = (b: MenuBadge) => b.detail || b.title || (b.tone === "r
 export const worstTone = (list: (MenuBadge | undefined)[]) =>
   list.some((b) => b?.tone === "red") ? "red" : list.some((b) => b?.tone === "orange") ? "orange" : null;
 
-export function BadgePill({ b, className = "" }: { b: MenuBadge; className?: string }) {
+export function BadgePill({ b, className = "", small = false }: { b: MenuBadge; className?: string; small?: boolean }) {
   return (
     <span title={badgeText(b)}
-      className={`min-w-3.5 rounded-[4px] px-1 text-center text-[9px] font-semibold leading-[14px] tabular-nums ${b.tone === "red" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground"} ${className}`}>
+      className={`${small ? "min-w-3 rounded-[3px] px-[3px] text-[8px] leading-[12px]" : "min-w-3.5 rounded-[4px] px-1 text-[9px] leading-[14px]"} text-center font-semibold tabular-nums ${b.tone === "red" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground"} ${className}`}>
       {b.label ?? (b.count > 99 ? "99+" : b.count)}
     </span>
   );

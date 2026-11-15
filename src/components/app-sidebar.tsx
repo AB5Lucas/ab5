@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MENU_GROUPS, menuUrlFor, type MenuGroup, type MenuItem } from "@/lib/menu";
 import { useAccess } from "@/hooks/use-access";
-import { useMenuBadges } from "@/hooks/use-nav-badges";
+import { useBillingBadges, useControlBadges, useMenuBadges, type MenuBadge } from "@/hooks/use-nav-badges";
 import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
 import { pageTabsStore, usePageTabs } from "@/lib/page-tabs-store";
 import { companyRole } from "@/lib/company-role";
@@ -32,6 +32,10 @@ export function AppSidebar() {
   const current = menuUrlFor(pathname) ?? pathname;
   const { canAccess, loading } = useAccess();
   const badges = useMenuBadges();
+  // Avisos por subaba: com a página aberta e as subabas no menu, o número sai da página e vai para cada subaba.
+  const billingSub = useBillingBadges();
+  const controlSub = useControlBadges();
+  const subBadges: Record<string, Record<string, MenuBadge | undefined>> = { "/relatorios/sincronizacao": billingSub, "/agendamentos": controlSub };
   const { user, profile, role } = useCurrentUser();
   const { favs, toggle: toggleFav, isFav } = useFavorites(user?.id);
   const [, setStyle] = useMenuStyle();
@@ -66,9 +70,11 @@ export function AppSidebar() {
   const initials = (profile?.full_name || profile?.email || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 
   const pageRow = (item: MenuItem, group: MenuGroup, opts: { icon?: boolean; key?: string } = {}) => {
-    const b = badges[item.url];
     const Icon = item.icon ?? group.icon;
     const active = current === item.url;
+    const showSubs = active && tabs.items.length > 1 && !opts.key; // Fixados não repetem as subabas
+    const perSub = showSubs ? subBadges[item.url] : undefined;
+    const b = perSub && tabs.items.some((t) => perSub[t.value]) ? undefined : badges[item.url];
     return (
       <SidebarMenuItem key={(opts.key ?? "") + item.url}>
         <SidebarMenuButton asChild isActive={active}
@@ -90,12 +96,13 @@ export function AppSidebar() {
             </span>
           </Link>
         </SidebarMenuButton>
-        {active && tabs.items.length > 1 && (
+        {showSubs && (
           <div className="mb-1 ml-3 mt-0.5 grid gap-px border-l border-sidebar-border pl-2">
             {tabs.items.map((t) => (
               <button key={t.value} type="button" onClick={() => { tabs.setValue?.(t.value); closeMobile(); }}
-                className={`truncate rounded-md px-2 py-1 text-left text-[13px] transition-colors hover:bg-sidebar-accent ${tabs.value === t.value ? "font-semibold text-sidebar-foreground" : "text-sidebar-foreground/70"}`}>
-                {t.label}
+                className={`flex items-center gap-2 rounded-md py-1 pl-2 pr-2.5 text-left text-[13px] transition-colors hover:bg-sidebar-accent ${tabs.value === t.value ? "font-semibold text-sidebar-foreground" : "text-sidebar-foreground/70"}`}>
+                <span className="truncate">{t.label}</span>
+                {perSub?.[t.value] && <BadgePill b={perSub[t.value]!} small className="ml-auto" />}
               </button>
             ))}
           </div>
