@@ -24,7 +24,7 @@ function AbsencesPage() {
   const { tab = "folgas" } = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
-    <Tabs value={tab} onValueChange={(v) => navigate({ search: v === "folgas" ? {} : { tab: v as AbsTab }, replace: true })}>
+    <Tabs pageTabs value={tab} onValueChange={(v) => navigate({ search: v === "folgas" ? {} : { tab: v as AbsTab }, replace: true })}>
       <TabsList>
         <TabsTrigger value="folgas">Folgas</TabsTrigger>
         <TabsTrigger value="atestados">Atestados</TabsTrigger>

@@ -43,7 +43,7 @@ export function NotificationsBell() {
               const Icon = i.icon ?? i.group.icon;
               return (
                 <li key={i.url}>
-                  <Link to={i.url} onClick={() => setOpen(false)} className="flex items-start gap-3 px-3 py-2 hover:bg-accent">
+                  <Link to={i.to ?? i.url} onClick={() => setOpen(false)} className="flex items-start gap-3 px-3 py-2 hover:bg-accent">
                     <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${b.tone === "red" ? "bg-destructive/15 text-destructive" : "bg-warning/20 text-orange-600 dark:text-orange-400"}`}>
                       <Icon className="h-4 w-4" />
                     </span>

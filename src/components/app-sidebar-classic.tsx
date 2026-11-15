@@ -87,7 +87,7 @@ export function ClassicSidebar() {
                   return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
-                      <Link to={item.url} className="relative flex items-center gap-2">
+                      <Link to={item.to ?? item.url} className="relative flex items-center gap-2">
                         <group.icon className="h-4 w-4 shrink-0" />
                         {!collapsed && <span>{item.title}</span>}
                         {b && (collapsed ? (

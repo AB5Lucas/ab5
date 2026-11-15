@@ -79,7 +79,7 @@ export function AppSidebar() {
       <SidebarMenuItem key={(opts.key ?? "") + item.url}>
         <SidebarMenuButton asChild isActive={active}
           className="relative h-8 rounded-lg text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold">
-          <Link to={item.url} onClick={closeMobile} className="flex items-center gap-2.5 pr-2">
+          <Link to={item.to ?? item.url} onClick={closeMobile} className="flex items-center gap-2.5 pr-2">
             {active && <span className="absolute inset-y-1.5 -left-2 w-[3px] rounded-r-full bg-sidebar-primary" aria-hidden />}
             {opts.icon && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-sidebar-primary" : "opacity-90"}`} />}
             <span className="truncate">{item.title}</span>
@@ -130,7 +130,7 @@ export function AppSidebar() {
             <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">Administração</DropdownMenuLabel>
             {adminItems.map(({ item, group }) => {
               const Icon = item.icon ?? group.icon;
-              return <DropdownMenuItem key={item.url} asChild><Link to={item.url} onClick={closeMobile}><Icon className="h-4 w-4" /> {item.title}</Link></DropdownMenuItem>;
+              return <DropdownMenuItem key={item.url} asChild><Link to={item.to ?? item.url} onClick={closeMobile}><Icon className="h-4 w-4" /> {item.title}</Link></DropdownMenuItem>;
             })}
             <DropdownMenuSeparator />
           </>
@@ -203,7 +203,7 @@ export function AppSidebar() {
                         {g.items.map((i) => {
                           const b = badges[i.url];
                           return (
-                            <Link key={i.url} to={i.url} onClick={() => setFly(null)}
+                            <Link key={i.url} to={i.to ?? i.url} onClick={() => setFly(null)}
                               className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-sidebar-accent ${current === i.url ? "bg-sidebar-accent font-semibold" : ""}`}>
                               <span className="truncate">{i.title}</span>
                               {b && <BadgePill b={b} className="ml-auto" />}

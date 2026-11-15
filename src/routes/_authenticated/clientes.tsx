@@ -300,7 +300,7 @@ function ClientsPage() {
     <div className="space-y-4">
       <CadastrosTabs active="clientes" />
       <PageHeader
-        title="Cadastros"
+        title="Clientes"
         description="Cadastro de clientes: endereço, cidade e distância utilizada nos serviços."
         actions={
           <div className="flex flex-wrap gap-2">

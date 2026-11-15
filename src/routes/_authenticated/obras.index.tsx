@@ -270,7 +270,7 @@ function WorksPage() {
     <div className="space-y-4">
       <CadastrosTabs active="servicos" />
       <PageHeader
-        title="Cadastros"
+        title="Clientes"
         description="Cadastro de serviços por cliente, com horários de entrada e saída."
         actions={
           <div className="flex flex-wrap gap-2">

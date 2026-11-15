@@ -39,7 +39,7 @@ export function MenuSearch() {
             {favItems.map((i) => {
               const Icon = i.icon ?? i.group.icon;
               return (
-                <CommandItem key={`fav-${i.url}`} value={`favorito ${i.title} ${i.group.label}`} onSelect={() => go(i.url)}>
+                <CommandItem key={`fav-${i.url}`} value={`favorito ${i.title} ${i.group.label}`} onSelect={() => go(i.to ?? i.url)}>
                   <Icon className="h-4 w-4" /> {i.title}
                   <Star className="ml-1 h-3 w-3 fill-current text-warning" />
                   {badges[i.url] && <BadgePill b={badges[i.url]!} className="ml-auto" />}
@@ -53,7 +53,7 @@ export function MenuSearch() {
             {g.items.map((i) => {
               const Icon = i.icon ?? g.icon;
               return (
-                <CommandItem key={i.url} value={`${i.title} ${g.label}`} onSelect={() => go(i.url)}>
+                <CommandItem key={i.url} value={`${i.title} ${g.label}`} onSelect={() => go(i.to ?? i.url)}>
                   <Icon className="h-4 w-4" /> {i.title}
                   {badges[i.url] ? <BadgePill b={badges[i.url]!} className="ml-auto" /> : <CommandShortcut>{g.label}</CommandShortcut>}
                 </CommandItem>

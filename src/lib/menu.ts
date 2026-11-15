@@ -38,7 +38,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-export type MenuItem = { title: string; url: string; icon?: LucideIcon };
+/** url = chave de acesso (Acessos); to = para onde o menu leva, quando diferente (ex.: Clientes abre em /clientes). */
+export type MenuItem = { title: string; url: string; icon?: LucideIcon; to?: string };
 /** userMenu = grupo que fica no menu do usuário (rodapé), fora da lista principal (ex.: Administração). */
 export type MenuGroup = { label: string; icon: typeof Users; items: MenuItem[]; userMenu?: boolean };
 
@@ -89,7 +90,7 @@ const RAW_GROUPS: MenuGroup[] = [
     label: "Serviços",
     icon: Building2,
     items: [
-      { title: "Clientes", url: "/obras", icon: Building2 },
+      { title: "Clientes", url: "/obras", to: "/clientes", icon: Building2 },
       { title: "Compras", url: "/obras/compras", icon: ShoppingCart },
       { title: "Resultados", url: "/obras/resultado", icon: TrendingUp },
       { title: "Fechamento", url: "/fechamentos/financeiro", icon: Calculator },
