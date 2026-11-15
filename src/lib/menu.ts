@@ -67,7 +67,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Segurança",
+    label: "Documentos",
     icon: ShieldCheck,
     items: [
       { title: "Documentação", url: "/agendamentos", icon: FileCheck },
@@ -76,7 +76,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Folha",
+    label: "Recursos Humanos",
     icon: Wallet,
     items: [
       { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto", icon: Clock },
@@ -89,7 +89,7 @@ const RAW_GROUPS: MenuGroup[] = [
     label: "Obras",
     icon: Building2,
     items: [
-      { title: "Cadastros", url: "/obras", icon: Building2 },
+      { title: "Clientes", url: "/obras", icon: Building2 },
       { title: "Compras", url: "/obras/compras", icon: ShoppingCart },
       { title: "Resultados", url: "/obras/resultado", icon: TrendingUp },
       { title: "Fechamento", url: "/fechamentos/financeiro", icon: Calculator },
@@ -97,7 +97,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Faturamento",
+    label: "Financeiro",
     icon: Receipt,
     items: [
       { title: "Pedidos", url: "/fechamentos/suzano", icon: Receipt },
