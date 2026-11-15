@@ -73,18 +73,21 @@ export function AppSidebar() {
       <SidebarMenuItem key={(opts.key ?? "") + item.url}>
         <SidebarMenuButton asChild isActive={active}
           className="relative h-8 rounded-lg text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold">
-          <Link to={item.url} onClick={closeMobile} className="flex items-center gap-2.5">
+          <Link to={item.url} onClick={closeMobile} className="flex items-center gap-2.5 pr-2">
             {active && <span className="absolute inset-y-1.5 -left-2 w-[3px] rounded-r-full bg-sidebar-primary" aria-hidden />}
             {opts.icon && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-sidebar-primary" : "opacity-90"}`} />}
             <span className="truncate">{item.title}</span>
-            {/* Estrela logo depois do nome (aparece ao passar o mouse; fixada fica sempre visível). */}
-            <span role="button" tabIndex={0} aria-label={isFav(item.url) ? "Tirar dos fixados" : "Fixar no topo do menu"} title={isFav(item.url) ? "Tirar dos fixados" : "Fixar no topo do menu"}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFav(item.url); }}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); toggleFav(item.url); } }}
-              className={`-ml-1 shrink-0 rounded p-0.5 transition-opacity hover:bg-sidebar-border/60 focus-visible:opacity-100 ${isFav(item.url) ? "opacity-100" : "opacity-0 group-hover/menu-item:opacity-100"}`}>
-              <Star className={`h-3 w-3 ${isFav(item.url) ? "fill-warning text-warning" : "text-sidebar-foreground/70"}`} />
+            {/* Aviso e estrela alinhados à direita, com margem da borda. */}
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
+              {b && <BadgePill b={b} />}
+              {/* Estrela na direita, depois do aviso (aparece ao passar o mouse; fixada fica sempre visível). */}
+              <span role="button" tabIndex={0} aria-label={isFav(item.url) ? "Tirar dos fixados" : "Fixar no topo do menu"} title={isFav(item.url) ? "Tirar dos fixados" : "Fixar no topo do menu"}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFav(item.url); }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); toggleFav(item.url); } }}
+                className={`shrink-0 rounded p-0.5 transition-opacity hover:bg-sidebar-border/60 focus-visible:opacity-100 ${isFav(item.url) ? "opacity-100" : "opacity-0 group-hover/menu-item:opacity-100"}`}>
+                <Star className={`h-3 w-3 ${isFav(item.url) ? "fill-warning text-warning" : "text-sidebar-foreground/70"}`} />
+              </span>
             </span>
-            {b && <BadgePill b={b} className="ml-auto" />}
           </Link>
         </SidebarMenuButton>
         {active && tabs.items.length > 1 && (
@@ -231,7 +234,7 @@ export function AppSidebar() {
                       {open ? <ChevronUp className={`${tone ? "" : "ml-auto"} h-4 w-4 opacity-70`} /> : <ChevronDown className={`${!open && tone ? "" : "ml-auto"} h-4 w-4 opacity-70`} />}
                     </SidebarMenuButton>
                     {open && (
-                      <SidebarMenu className="mb-1 ml-4 mt-0.5 gap-0.5 border-l border-sidebar-border pl-2">
+                      <SidebarMenu className="mb-1 ml-4 mt-0.5 w-auto gap-0.5 border-l border-sidebar-border pl-2">
                         {g.items.map((i) => pageRow(i, g))}
                       </SidebarMenu>
                     )}

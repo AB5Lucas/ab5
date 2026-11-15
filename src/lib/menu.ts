@@ -67,7 +67,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Documentos e SST",
+    label: "Segurança",
     icon: ShieldCheck,
     items: [
       { title: "Documentação", url: "/agendamentos", icon: FileCheck },
@@ -76,7 +76,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Folha e benefícios",
+    label: "Folha",
     icon: Wallet,
     items: [
       { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto", icon: Clock },
@@ -86,7 +86,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Obras e custos",
+    label: "Obras",
     icon: Building2,
     items: [
       { title: "Cadastros", url: "/obras", icon: Building2 },
