@@ -22,8 +22,8 @@ export function ScheduleAlertsButton({ date }: { date: string }) {
         <Button size="sm" variant="outline" className="gap-1.5" title={pending.length ? `${reds} alto impacto · ${oranges} pequeno impacto` : alerts.length ? "Avisos já vistos" : "Sem avisos para este dia"}>
           <AlertTriangle className={`h-4 w-4 ${tone === "red" ? "text-destructive" : tone === "orange" ? "text-orange-500" : "text-muted-foreground"}`} />
           Avisos
-          {reds > 0 && <span className="rounded-full bg-destructive/15 px-1.5 text-[10px] font-semibold leading-4 text-destructive">{reds}</span>}
-          {oranges > 0 && <span className="rounded-full bg-orange-500/15 px-1.5 text-[10px] font-semibold leading-4 text-orange-600 dark:text-orange-400">{oranges}</span>}
+          {reds > 0 && <span className="rounded-[4px] bg-destructive/15 px-1.5 text-[10px] font-semibold leading-4 text-destructive">{reds}</span>}
+          {oranges > 0 && <span className="rounded-[4px] bg-orange-500/15 px-1.5 text-[10px] font-semibold leading-4 text-orange-600 dark:text-orange-400">{oranges}</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96 p-0">

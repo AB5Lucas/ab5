@@ -2,7 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, ChevronUp, LayoutList, PanelLeftClose, PanelLeftOpen, Search, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
-  Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem, useSidebar,
+  Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
 } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -77,12 +77,16 @@ export function AppSidebar() {
             {active && <span className="absolute inset-y-1.5 -left-2 w-[3px] rounded-r-full bg-sidebar-primary" aria-hidden />}
             {opts.icon && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-sidebar-primary" : "opacity-90"}`} />}
             <span className="truncate">{item.title}</span>
+            {/* Estrela logo depois do nome (aparece ao passar o mouse; fixada fica sempre visível). */}
+            <span role="button" tabIndex={0} aria-label={isFav(item.url) ? "Tirar dos fixados" : "Fixar no topo do menu"} title={isFav(item.url) ? "Tirar dos fixados" : "Fixar no topo do menu"}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFav(item.url); }}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); toggleFav(item.url); } }}
+              className={`-ml-1 shrink-0 rounded p-0.5 transition-opacity hover:bg-sidebar-border/60 focus-visible:opacity-100 ${isFav(item.url) ? "opacity-100" : "opacity-0 group-hover/menu-item:opacity-100"}`}>
+              <Star className={`h-3 w-3 ${isFav(item.url) ? "fill-warning text-warning" : "text-sidebar-foreground/70"}`} />
+            </span>
             {b && <BadgePill b={b} className="ml-auto" />}
           </Link>
         </SidebarMenuButton>
-        <SidebarMenuAction showOnHover onClick={() => toggleFav(item.url)} title={isFav(item.url) ? "Tirar dos fixados" : "Fixar no topo do menu"} aria-label="Fixar">
-          <Star className={`h-3.5 w-3.5 ${isFav(item.url) ? "fill-warning text-warning" : ""}`} />
-        </SidebarMenuAction>
         {active && tabs.items.length > 1 && (
           <div className="mb-1 ml-3 mt-0.5 grid gap-px border-l border-sidebar-border pl-2">
             {tabs.items.map((t) => (

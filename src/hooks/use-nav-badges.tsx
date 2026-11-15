@@ -124,7 +124,7 @@ export function useBillingBadges() {
 export function BadgeDot({ b }: { b?: MenuBadge | undefined }) {
   if (!b) return null;
   return (
-    <span className={`ml-1.5 min-w-4 rounded-full px-1 text-center text-[10px] font-semibold leading-4 tabular-nums ${b.tone === "red" ? "bg-destructive/85 text-destructive-foreground" : "bg-warning/85 text-warning-foreground"}`}>
+    <span className={`ml-1.5 min-w-4 rounded-[4px] px-1 text-center text-[10px] font-semibold leading-4 tabular-nums ${b.tone === "red" ? "bg-destructive/85 text-destructive-foreground" : "bg-warning/85 text-warning-foreground"}`}>
       {b.label ?? (b.count > 99 ? "99+" : b.count)}
     </span>
   );
