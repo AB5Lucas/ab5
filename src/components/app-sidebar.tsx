@@ -8,9 +8,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MENU_GROUPS, menuUrlFor, type MenuGroup, type MenuItem } from "@/lib/menu";
 import { useAccess } from "@/hooks/use-access";
-import { useBillingBadges, useControlBadges, useMenuBadges, type MenuBadge } from "@/hooks/use-nav-badges";
+import { useMenuBadges } from "@/hooks/use-nav-badges";
 import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
-import { pageTabsStore, usePageTabs } from "@/lib/page-tabs-store";
 import { companyRole } from "@/lib/company-role";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,14 +31,9 @@ export function AppSidebar() {
   const current = menuUrlFor(pathname) ?? pathname;
   const { canAccess, loading } = useAccess();
   const badges = useMenuBadges();
-  // Avisos por subaba: com a página aberta e as subabas no menu, o número sai da página e vai para cada subaba.
-  const billingSub = useBillingBadges();
-  const controlSub = useControlBadges();
-  const subBadges: Record<string, Record<string, MenuBadge | undefined>> = { "/relatorios/sincronizacao": billingSub, "/agendamentos": controlSub };
   const { user, profile, role } = useCurrentUser();
   const { favs, toggle: toggleFav, isFav } = useFavorites(user?.id);
   const [, setStyle] = useMenuStyle();
-  const tabs = usePageTabs();
   // Função na empresa (cadastro de Colaboradores, sem nível) no lugar do perfil do sistema; sem casamento, o perfil.
   const people = useQuery({
     queryKey: ["company-role-people"],
@@ -54,11 +48,6 @@ export function AppSidebar() {
   const [openMod, setOpenMod] = useState<string | null | undefined>(undefined);
   const [fly, setFly] = useState<string | null>(null);
   useEffect(() => { setOpenMod(undefined); setFly(null); }, [current]);
-  // Com o menu estendido (fora do celular), as subabas saem do topo da página e ficam no menu.
-  useEffect(() => {
-    pageTabsStore.set({ menuExtended: !isMobile && state === "expanded" });
-    return () => pageTabsStore.set({ menuExtended: false });
-  }, [isMobile, state]);
 
   const all = loading ? [] : MENU_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canAccess(i.url)) })).filter((g) => g.items.length);
   const modules = all.filter((g) => !g.userMenu);
@@ -72,9 +61,7 @@ export function AppSidebar() {
   const pageRow = (item: MenuItem, group: MenuGroup, opts: { icon?: boolean; key?: string } = {}) => {
     const Icon = item.icon ?? group.icon;
     const active = current === item.url;
-    const showSubs = active && tabs.items.length > 1 && !opts.key; // Fixados não repetem as subabas
-    const perSub = showSubs ? subBadges[item.url] : undefined;
-    const b = perSub && tabs.items.some((t) => perSub[t.value]) ? undefined : badges[item.url];
+    const b = badges[item.url];
     return (
       <SidebarMenuItem key={(opts.key ?? "") + item.url}>
         <SidebarMenuButton asChild isActive={active}
@@ -96,17 +83,6 @@ export function AppSidebar() {
             </span>
           </Link>
         </SidebarMenuButton>
-        {showSubs && (
-          <div className="mb-1 ml-3 mt-0.5 grid gap-px border-l border-sidebar-border pl-2">
-            {tabs.items.map((t) => (
-              <button key={t.value} type="button" onClick={() => { tabs.setValue?.(t.value); closeMobile(); }}
-                className={`flex items-center gap-2 rounded-md py-1 pl-2 pr-2.5 text-left text-[13px] transition-colors hover:bg-sidebar-accent ${tabs.value === t.value ? "font-semibold text-sidebar-foreground" : "text-sidebar-foreground/70"}`}>
-                <span className="truncate">{t.label}</span>
-                {perSub?.[t.value] && <BadgePill b={perSub[t.value]!} small className="ml-auto" />}
-              </button>
-            ))}
-          </div>
-        )}
       </SidebarMenuItem>
     );
   };
