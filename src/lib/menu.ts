@@ -86,7 +86,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Obras",
+    label: "Serviços",
     icon: Building2,
     items: [
       { title: "Clientes", url: "/obras", icon: Building2 },
@@ -105,7 +105,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Frota",
+    label: "Veículos",
     icon: Truck,
     items: [
       { title: "Abastecimento", url: "/frota/notas", icon: Fuel },
