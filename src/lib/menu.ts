@@ -76,7 +76,7 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    label: "Recursos Humanos",
+    label: "Remuneração",
     icon: Wallet,
     items: [
       { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto", icon: Clock },
