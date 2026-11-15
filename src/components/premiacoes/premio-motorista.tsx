@@ -132,7 +132,8 @@ export function DriverBonusPage() {
         )
         .gte("schedule_date", start)
         .lt("schedule_date", end)
-        .eq("is_external", false);
+        .eq("is_external", false)
+        .is("external_place", null); // Indústria com local (antigo Externo) não dá prêmio
       if (error) throw error;
       const transport = await loadBuiltTransport(start, end);
 

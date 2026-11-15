@@ -20,8 +20,11 @@ export const RUN_STATUS: Record<string, string> = { completed: "Concluída", com
 const SOURCE: Record<string, string> = { pedidos: "Pedidos", faturamento: "Faturamento" };
 const curMonth = () => new Date().toISOString().slice(0, 7);
 
+/** Atualiza a cada 15 s só enquanto uma sincronização roda; fora disso, a cada 2 min (antes sempre 15 s, tabela inteira). */
+export const syncPoll = (runs: unknown) => (Array.isArray(runs) && runs[0]?.status === "running" ? 15_000 : 120_000);
+
 function useRuns() {
-  return useQuery({ queryKey: ["industry-sync", "runs"], refetchInterval: 15000, queryFn: async () => {
+  return useQuery({ queryKey: ["industry-sync", "runs"], refetchInterval: (q) => syncPoll(q.state.data), queryFn: async () => {
     const { data, error } = await supabase.from("billing_sync_runs").select("*").eq("category", "industria").order("started_at", { ascending: false }).limit(100);
     if (error) throw error; return data ?? [];
   } });
@@ -83,7 +86,8 @@ function Launch({ id, works }: { id: string; works: { id: string; name: string }
 
 export function IndustryBilling() {
   const [search, setSearch] = useState(""); const [state, setState] = useState("all");
-  const inv = useQuery({ queryKey: ["industry-sync", "invoices"], refetchInterval: 15000, queryFn: () => fetchAll<any>((a, b) => supabase.from("industry_invoices").select("*").order("issued_at", { ascending: false }).order("id").range(a, b)) });
+  const qcInv = useQueryClient();
+  const inv = useQuery({ queryKey: ["industry-sync", "invoices"], refetchInterval: () => syncPoll(qcInv.getQueryData(["industry-sync", "runs"])), queryFn: () => fetchAll<any>((a, b) => supabase.from("industry_invoices").select("*").order("issued_at", { ascending: false }).order("id").range(a, b)) });
   const works = useIndustryWorks();
   const all = inv.data ?? [];
   const rows = useMemo(() => all.filter((n: any) => (state === "all" || n.status === state) && `${n.invoice_number} ${n.order_number ?? ""} ${n.client_name}`.toLowerCase().includes(search.toLowerCase())), [all, state, search]);
@@ -103,7 +107,8 @@ export function IndustryBilling() {
 
 export function IndustryOrders() {
   const [search, setSearch] = useState(""); const [month, setMonth] = useState(""); const [state, setState] = useState("all");
-  const orders = useQuery({ queryKey: ["industry-sync", "orders"], refetchInterval: 15000, queryFn: () => fetchAll<any>((a, b) => supabase.from("industry_orders").select("*, works!industry_orders_work_id_fkey(name)").order("order_date", { ascending: false }).order("id").range(a, b)) });
+  const qcOrd = useQueryClient();
+  const orders = useQuery({ queryKey: ["industry-sync", "orders"], refetchInterval: () => syncPoll(qcOrd.getQueryData(["industry-sync", "runs"])), queryFn: () => fetchAll<any>((a, b) => supabase.from("industry_orders").select("*, works!industry_orders_work_id_fkey(name)").order("order_date", { ascending: false }).order("id").range(a, b)) });
   const inv = useQuery({ queryKey: ["industry-sync", "invoices"], queryFn: () => fetchAll<any>((a, b) => supabase.from("industry_invoices").select("*").order("id").range(a, b)) });
   const billed = useMemo(() => { const m = new Map<string, number>(); for (const i of inv.data ?? []) if (i.order_number) m.set(i.order_number, (m.get(i.order_number) ?? 0) + Number(i.amount)); return m; }, [inv.data]);
   const rows = (orders.data ?? []).filter((o: any) => (state === "all" || (state === "pending" ? o.status === "pending" : o.status !== "pending")) && (!month || (o.order_date ?? "").startsWith(month)) && `${o.order_number} ${o.client_name} ${o.works?.name ?? ""}`.toLowerCase().includes(search.toLowerCase()));

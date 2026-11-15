@@ -16,7 +16,6 @@ import { currentMonthRange } from "@/components/date-range-picker";
 /** Aviso do menu: vermelho = exige ação/vencido; laranja = atenção/a vencer; label "!" = alerta de valor. detail = texto do sino e do mouse. */
 export type MenuBadge = { count: number; tone: "red" | "orange"; title?: string; label?: string; detail?: string };
 
-const WARN_DAYS = 30;
 
 /** Contadores discretos do menu lateral: vencidos (vermelho) ou a vencer (laranja) e pendências de sincronização. */
 function useBadgeData() {
@@ -38,69 +37,32 @@ function useBadgeData() {
     staleTime: 2 * 60_000,
     queryFn: async () => {
       const today = todayISO();
-      const warn = addDays(today, WARN_DAYS);
       const safe = async <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
       const when = <T,>(ok: boolean, f: () => Promise<T[]>) => (ok ? safe(f()) : Promise.resolve([] as T[]));
       // Saldo do posto como na aba Abastecimento ao abrir (período = mês atual).
       const month = currentMonthRange();
-      const [colabs, asos, trns, ints, appts, conf, purchases, orders, invoices, notes, epis, fleetOpen, fleetNotes] = await Promise.all([
-        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("collaborators").select("id").eq("status", "active").range(a, b))),
-        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("asos").select("collaborator_id, expires_at").range(a, b))),
-        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at").range(a, b))),
-        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("client_integrations").select("collaborator_id, client_id, expires_at, documentation").range(a, b))),
-        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, training_id, client_id, type, scheduled_date").eq("status", "agendado").range(a, b))),
-        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("conference_items").select("id, collaborator_id, training_id, client_id, type").neq("status", "concluido").range(a, b))),
-        when(can.purchases, () => fetchAll<any>((a, b) => supabase.from("purchase_cc_lines").select("id").eq("status", "pending").range(a, b))),
-        when(can.orders, () => fetchAll<any>((a, b) => supabase.from("industry_orders").select("id").eq("status", "pending").range(a, b))),
-        when(can.billing, () => fetchAll<any>((a, b) => supabase.from("industry_invoices").select("id").eq("status", "pending").range(a, b))),
-        when(can.billing, () => fetchAll<any>((a, b) => supabase.from("billing_sync_notes").select("id").not("status", "in", '("posted","cancelled")').range(a, b))),
-        when(can.docs, () => fetchAll<any>((a, b) => supabase.from("epi_sheets").select("collaborator_id, expires_at, archived").range(a, b))),
+      type Kind = { expired: number; expiring: number };
+      type Counts = { byKind: Record<string, Kind>; conference: Kind; purchases: number; orders: number; billingInd: number; billingSrv: number };
+      const zero = { expired: 0, expiring: 0 };
+      const empty: Counts = { byKind: { agendamentos: zero, aso: zero, int: zero, trn: zero, epi: zero }, conference: zero, purchases: 0, orders: 0, billingInd: 0, billingSrv: 0 };
+      // Contagens de Documentação, Conferência, Compras, Pedidos e Faturamento vêm prontas do banco
+      // (menu_badge_counts, com a RLS do usuário); antes o navegador baixava as tabelas inteiras.
+      const [counts, fleetOpen, fleetNotes] = await Promise.all([
+        can.docs || can.purchases || can.orders || can.billing
+          ? supabase.rpc("menu_badge_counts" as never, { p_today: today, p_docs: can.docs, p_purchases: can.purchases, p_orders: can.orders, p_billing: can.billing } as never)
+            .then((r: { data: unknown; error: unknown }) => (r.error ? empty : (r.data as Counts) ?? empty), () => empty)
+          : Promise.resolve(empty),
         when(can.fleet, () => fetchAll<any>((a, b) => supabase.from("fleet_invoices").select("total").eq("paid", false).range(a, b))),
         when(can.fleet, () => fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("issued_at, total, approved_at, allocation, cc_split, cc_fix").gte("issued_at", addDays(month.from, -1)).lte("issued_at", `${addDays(month.to, 1)}T23:59:59`).range(a, b))),
       ]);
       const fleetPeriod = fleetNotes.filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= month.from && d <= month.to; }).reduce((s, n) => s + nonTicketTotal(n), 0);
       const fleetSaldo = fleetBalance(fleetOpen.reduce((s, i) => s + Number(i.total ?? 0), 0), fleetPeriod);
-      const confIds = new Set(conf.map((c) => c.id));
-      const checks = await when(can.docs && conf.length > 0, () => fetchAll<any>((a, b) => supabase.from("conference_checks").select("item_id, next_check_date").eq("approved", false).range(a, b)));
-      const nextByItem = new Map<string, string>();
-      for (const c of checks) if (c.next_check_date && confIds.has(c.item_id)) { const cur = nextByItem.get(c.item_id); if (!cur || c.next_check_date < cur) nextByItem.set(c.item_id, c.next_check_date); }
-      const conference = { expired: 0, expiring: 0 };
-      for (const d of nextByItem.values()) { if (d < today) conference.expired++; else if (d === today) conference.expiring++; }
-      const active = new Set(colabs.map((c) => c.id));
-      const kindOf = (t: string) => { const s = String(t).toLowerCase(); return s.includes("aso") ? "aso" : s.startsWith("trein") ? "trn" : s.startsWith("integ") ? "int" : ""; };
-      const covered = new Set<string>();
-      for (const a of [...appts, ...conf]) {
-        const k = kindOf(a.type); if (!k) continue;
-        covered.add(`${k}|${a.collaborator_id}`);
-        if (a.training_id) covered.add(`${k}|${a.collaborator_id}|${a.training_id}`);
-        if (a.client_id) covered.add(`${k}|${a.collaborator_id}|${a.client_id}`);
-      }
-      // Mantém apenas o registro mais recente por colaborador/item.
-      const latest = new Map<string, string>();
-      const put = (key: string, exp: string | null) => { if (!exp) return; const cur = latest.get(key); if (!cur || exp > cur) latest.set(key, exp); };
-      asos.forEach((r) => active.has(r.collaborator_id) && put(`aso|${r.collaborator_id}`, r.expires_at));
-      trns.forEach((r) => active.has(r.collaborator_id) && put(`trn|${r.collaborator_id}|${r.training_id}`, r.expires_at));
-      ints.forEach((r) => active.has(r.collaborator_id) && !r.documentation && put(`int|${r.collaborator_id}|${r.client_id}`, r.expires_at));
-      const byKind: Record<string, { expired: number; expiring: number }> = {
-        agendamentos: { expired: appts.filter((a) => a.scheduled_date < today).length, expiring: 0 },
-        aso: { expired: 0, expiring: 0 }, int: { expired: 0, expiring: 0 }, trn: { expired: 0, expiring: 0 }, epi: { expired: 0, expiring: 0 },
-      };
-      for (const [key, exp] of latest) {
-        const [k, cid] = key.split("|");
-        if (covered.has(key) || covered.has(`${k}|${cid}`)) continue;
-        if (exp < today) byKind[k!]!.expired++; else if (exp <= warn) byKind[k!]!.expiring++;
-      }
-      // Fichas de EPI: todo ativo deve ter; sem ficha conta como vencida; arquivada não sinaliza.
-      const epiBy = new Map(epis.map((e) => [e.collaborator_id, e]));
-      for (const id of active) {
-        const e = epiBy.get(id);
-        if (e?.archived) continue;
-        if (!e?.expires_at || e.expires_at < today) byKind["epi"]!.expired++; else if (e.expires_at <= warn) byKind["epi"]!.expiring++;
-      }
+      const byKind = counts.byKind;
       const vals = Object.values(byKind);
-      const expired = vals.reduce((a, v) => a + v.expired, 0);
-      const expiring = vals.reduce((a, v) => a + v.expiring, 0);
-      return { fleetSaldo, conference, byKind, expired, expiring, purchases: purchases.length, orders: orders.length, billing: invoices.length + notes.length, billingInd: invoices.length, billingSrv: notes.length };
+      const expired = vals.reduce((a, v) => a + Number(v.expired), 0);
+      const expiring = vals.reduce((a, v) => a + Number(v.expiring), 0);
+      const { conference, purchases, orders, billingInd, billingSrv } = counts;
+      return { fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
     },
   });
 }

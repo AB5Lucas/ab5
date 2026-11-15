@@ -1,3 +1,4 @@
+import { syncPoll } from "@/components/industry-billing";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -47,8 +48,8 @@ function ServicesBilling() {
   const [start,setStart]=useState(BILLING_START);const [end,setEnd]=useState("");const [search,setSearch]=useState("");const [client,setClient]=useState("all");const [state,setState]=useState("all");const [method,setMethod]=useState("all");
   const [sort,setSort]=useState("date-desc");const [page,setPage]=useState(0);const [detail,setDetail]=useState<Note|null>(null);const [replacing,setReplacing]=useState<Note|null>(null);const [tolerance,setTolerance]=useState("");
   const refresh=async()=>{await Promise.all([qc.invalidateQueries({queryKey:["billing-sync"]}),qc.invalidateQueries({queryKey:["work-result"]}),qc.invalidateQueries({queryKey:["fin-active"]}),qc.invalidateQueries({queryKey:["orders-all-v3"]})]);};
-  const notes=useQuery({queryKey:["billing-sync","notes"],queryFn:()=>fetchAll<Note>((a,b)=>supabase.from("billing_sync_notes").select("*").order("last_attempt_at",{ascending:false}).order("id").range(a,b)),refetchInterval:15000});
-  const runs=useQuery({queryKey:["billing-sync","runs"],queryFn:async()=>{const {data,error}=await supabase.from("billing_sync_runs").select("*").eq("category","servicos").order("started_at",{ascending:false}).limit(100);if(error)throw error;return data??[];},refetchInterval:15000});
+  const notes=useQuery({queryKey:["billing-sync","notes"],queryFn:()=>fetchAll<Note>((a,b)=>supabase.from("billing_sync_notes").select("*").order("last_attempt_at",{ascending:false}).order("id").range(a,b)),refetchInterval:()=>syncPoll(qc.getQueryData(["billing-sync","runs"]))});
+  const runs=useQuery({queryKey:["billing-sync","runs"],queryFn:async()=>{const {data,error}=await supabase.from("billing_sync_runs").select("*").eq("category","servicos").order("started_at",{ascending:false}).limit(100);if(error)throw error;return data??[];},refetchInterval:(q)=>syncPoll(q.state.data)});
   const settings=useQuery({queryKey:["billing-sync","settings"],queryFn:async()=>{const {data,error}=await supabase.from("billing_sync_settings").select("*").eq("id",true).maybeSingle();if(error)throw error;return data;}});
   const history=useQuery({queryKey:["billing-sync","history",detail?.id],enabled:!!detail,queryFn:async()=>{if(!detail)return [];return fetchAll((a,b)=>supabase.from("billing_sync_history").select("*").eq("note_id",detail.id).order("happened_at",{ascending:false}).range(a,b));}});
   const execute=useMutation({mutationFn:()=>sync(),onSuccess:async result=>{toast.success(result.status==="running"?"Já existe uma sincronização em andamento":"Sincronização concluída");await refresh();},onError:async(e:Error)=>{toast.error(e.message);await refresh();}});

@@ -161,16 +161,27 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           : Promise.resolve([] as any[]),
         fetchAll<any>((a, b) => supabase.from("rdos").select("work_id, report_date").in("work_id", [...new Set([...workIds, ...sibIds])]).range(a, b)),
         w.client_id ? supabase.from("result_support_allocations").select("collaborator_id").eq("client_id", w.client_id) : Promise.resolve({ data: [] }),
-        shared ? Promise.resolve(shared.allRdoWorkforce) : fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date").order("id").range(a, b)),
+        shared ? Promise.resolve(shared.allRdoWorkforce) : Promise.resolve(null as any[] | null),
         // Integração lançada num serviço (aba Serviços): esse serviço arca com o dia todo; sem linha = rateio.
         w.client_id
           ? fetchAll<any>((a, b) => supabase.from("integration_service_choices").select("collaborator_id, schedule_date, work_id").eq("client_id", w.client_id!).order("schedule_date").order("collaborator_id").range(a, b))
           : Promise.resolve([] as any[]),
       ]);
+      // RDO das mesmas pessoas em outros clientes (dia dividido): sem o lote do Financeiro, lê só quem aparece neste
+      // cliente, em vez da tabela rdo_workforce inteira.
+      const otherRdo = allRdoWorkforce ?? await (async () => {
+        const ids = [...new Set([...allocs, ...rdoWf, ...sibAllocs, ...sibRdo].map((r: any) => r.collaborator_id).filter(Boolean))] as string[];
+        const out: any[] = [];
+        for (let i = 0; i < ids.length; i += 150) {
+          const part = ids.slice(i, i + 150);
+          out.push(...await fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date").in("collaborator_id", part).order("id").range(a, b)));
+        }
+        return out;
+      })();
       const supportResult = supportRows as { data: { collaborator_id: string }[] | null; error?: unknown };
       if (supportResult.error) throw supportResult.error;
       return {
-        clientRdos, otherClientRdos: ((own) => allRdoWorkforce.filter((r: any) => !own.has(r.work_id)))(new Set<string>([...workIds, ...sibIds])), supportIds: (supportResult.data ?? []).map((r) => r.collaborator_id),
+        clientRdos, otherClientRdos: ((own) => otherRdo.filter((r: any) => !own.has(r.work_id)))(new Set<string>([...workIds, ...sibIds])), supportIds: (supportResult.data ?? []).map((r) => r.collaborator_id),
         allocs,
         sibAllocs,
         sibRdo,

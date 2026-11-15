@@ -173,7 +173,8 @@ function ClientsPage() {
             .eq("client_id", editing.id)
             .eq("is_external", false)
             .eq("is_maintenance", false)
-            .eq("is_suzano_local", false);
+            .eq("is_suzano_local", false)
+            .is("external_place", null); // Indústria com local mantém os 100 km fixos
           queryClient.invalidateQueries({ queryKey: ["vehicle-schedules"] });
           queryClient.invalidateQueries({ queryKey: ["km-report"] });
         }

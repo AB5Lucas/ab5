@@ -170,7 +170,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
   // Prêmio Motorista: 1 por dia dirigido (faixa pela km do dia), somado ao VT
   const [{ data: vsch }, { data: dbr }] = await Promise.all([
     supabase.from("vehicle_schedules").select("driver_id, client_id, driver_bonus, schedule_date, km, collaborators(full_name, registration_number, contract_type)")
-      .gte("schedule_date", start).lt("schedule_date", end).eq("is_external", false),
+      .gte("schedule_date", start).lt("schedule_date", end).eq("is_external", false).is("external_place", null), // Indústria com local = sem prêmio
     supabase.from("driver_bonus_rules").select("*").eq("active", true),
   ]);
   const dDays = new Map<string, { c: any; days: Map<string, number> }>();

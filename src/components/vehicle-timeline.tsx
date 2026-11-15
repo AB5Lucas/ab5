@@ -325,6 +325,10 @@ export function VehicleTimeline() {
   const byWorkVehicle = (vehicleId: string) =>
     !!(vehicles.data ?? []).find((v: any) => v.id === vehicleId)?.assign_by_work;
 
+  // Indústria com local escrito (antigo "Externo"): 100 km fixos no dia e sem prêmio de motorista.
+  const industryIds = useMemo(() => new Set((clients.data ?? []).filter((c) => /ind[uú]stria/i.test(c.name ?? "")).map((c) => c.id)), [clients.data]);
+  const isIndustryClient = (id: string | null | undefined) => !!id && industryIds.has(id);
+
   const clientKm = useMemo(() => {
     const map = new Map<string, number>();
     (clients.data ?? []).forEach((c) => {
@@ -443,6 +447,7 @@ export function VehicleTimeline() {
     const workId = f.work_id ?? null;
     if (workId) f = { ...f, client_id: workById.get(workId)?.client_id ?? f.client_id };
     const special = f.is_external || f.is_maintenance || !!f.is_suzano_local;
+    const industryPlace = !special && isIndustryClient(f.client_id) ? (f.external_place ?? "").trim() : "";
     const pairs = (f.extra_client_ids ?? [])
           .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "" }))
           .filter((p) => p.c && p.c !== NONE);
@@ -454,15 +459,15 @@ export function VehicleTimeline() {
       client_id: special ? null : f.client_id,
       is_external: f.is_external,
       is_maintenance: f.is_maintenance,
-      driver_bonus: f.is_external || f.is_maintenance ? false : f.driver_bonus,
+      driver_bonus: f.is_external || f.is_maintenance || industryPlace ? false : f.driver_bonus,
       trips: Math.max(1, Math.floor(Number(f.trips ?? 1)) || 1),
       is_suzano_local: !!f.is_suzano_local,
-      km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : f.is_suzano_local ? KM_SUZANO_LOCAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
+      km: f.is_maintenance ? 0 : f.is_external || industryPlace ? KM_EXTERNAL : f.is_suzano_local ? KM_SUZANO_LOCAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
       extra_client_ids: extras,
       extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
       extra_km: extras.reduce((s, id) => s + extraKm(id), 0),
       work_id: special ? null : workId,
-      external_place: f.is_external ? (f.external_place ?? "").trim() || null : null,
+      external_place: f.is_external ? (f.external_place ?? "").trim() || null : industryPlace || null,
     };
   }
 
@@ -496,7 +501,7 @@ export function VehicleTimeline() {
   function saveCell() {
     if (!cell) return;
     if (form.client_id === NONE) {
-      toast.error("Selecione a obra/cliente, EXTERNO ou MANUTENÇÃO.");
+      toast.error("Selecione a obra/cliente ou MANUTENÇÃO.");
       return;
     }
     const isExternal = form.client_id === EXTERNAL_KEY;
@@ -877,6 +882,8 @@ export function VehicleTimeline() {
                                   ? (row.external_place || "EXTERNO").toUpperCase()
                                   : row.is_suzano_local
                                     ? "SUZANO LOCAL"
+                                  : row.external_place && isIndustryClient(row.client_id)
+                                    ? `${clientName.get(row.client_id ?? "") ?? "Indústria"} · ${row.external_place}`.toUpperCase()
                                   : clientName.get(row.client_id ?? "") ?? "—"}
                               {(row.extra_client_ids ?? []).length > 0 && (
                                 <span className="font-semibold text-primary"> +{row.extra_client_ids!.length}</span>
@@ -954,7 +961,6 @@ export function VehicleTimeline() {
                 <SelectTrigger><SelectValue placeholder={byWork ? "Selecione o cliente" : "Selecione a obra"} /></SelectTrigger>
                 <SelectContent>
                   {clientOptions()}
-                  <SelectItem value={EXTERNAL_KEY}>EXTERNO</SelectItem>
                   <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
                 </SelectContent>
               </Select>
@@ -985,12 +991,17 @@ export function VehicleTimeline() {
                     ? `Suzano Local: ${KM_SUZANO_LOCAL} km de ida por viagem (${KM_SUZANO_LOCAL * 2} km ida e volta).`
                   : form.client_id === EXTERNAL_KEY
                     ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
+                  : isIndustryClient(truckClient) && form.external_place.trim()
+                    ? `Indústria com local: ${KM_EXTERNAL} km no dia, sem prêmio de motorista. O combustível vai para o CC da Indústria.`
                     : form.client_id && form.client_id !== NONE
                       ? `${clientKm.get(form.client_id.startsWith(WORK_PREFIX) ? workById.get(form.client_id.slice(WORK_PREFIX.length))?.client_id ?? "" : form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
                       : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
-              {form.client_id === EXTERNAL_KEY && (
-                <Input placeholder="Local (opcional)" value={form.external_place} onChange={(e) => setForm((f) => ({ ...f, external_place: e.target.value }))} />
+              {(form.client_id === EXTERNAL_KEY || isIndustryClient(truckClient)) && (
+                <div className="space-y-1">
+                  <Label htmlFor="vehicle-place">Local (viagem fora da Indústria)</Label>
+                  <Input id="vehicle-place" placeholder="Ex.: Campinas, São Paulo, Bahia" value={form.external_place} onChange={(e) => setForm((f) => ({ ...f, external_place: e.target.value }))} />
+                </div>
               )}
             </div>
             <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
@@ -1036,8 +1047,7 @@ export function VehicleTimeline() {
                       <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
                       <SelectContent>
                         {clientOptions()}
-                        <SelectItem value={EXTERNAL_KEY}>EXTERNO</SelectItem>
-                        <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
+                              <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
                       </SelectContent>
                     </Select>
                     <span className="w-14 text-right text-xs text-muted-foreground">
@@ -1084,8 +1094,8 @@ export function VehicleTimeline() {
                 <p className="text-xs text-muted-foreground">Verde = recebe · Cinza = não recebe</p>
               </div>
               <Switch
-                checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY && form.client_id !== MAINTENANCE_KEY}
-                disabled={form.client_id === EXTERNAL_KEY || form.client_id === MAINTENANCE_KEY}
+                checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY && form.client_id !== MAINTENANCE_KEY && !(isIndustryClient(truckClient) && form.external_place.trim())}
+                disabled={form.client_id === EXTERNAL_KEY || form.client_id === MAINTENANCE_KEY || (isIndustryClient(truckClient) && !!form.external_place.trim())}
                 onCheckedChange={(v) => setForm((f) => ({ ...f, driver_bonus: v }))}
               />
             </div>

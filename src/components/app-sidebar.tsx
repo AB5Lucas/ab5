@@ -135,7 +135,7 @@ export function AppSidebar() {
   );
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="overflow-x-hidden">
       <SidebarHeader className={`gap-3 border-b border-sidebar-border py-4 ${collapsed ? "items-center px-1" : "px-3"}`}>
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary font-display text-xs font-bold tracking-tight text-sidebar-primary-foreground">AB5</span>
@@ -164,7 +164,7 @@ export function AppSidebar() {
         )}
       </SidebarHeader>
 
-      <SidebarContent className="gap-0 px-2 py-2">
+      <SidebarContent className="gap-0 overflow-x-hidden px-2 py-2">
         {collapsed ? (
           <SidebarMenu className="gap-1">
             {modules.map((g) => {

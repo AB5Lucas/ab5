@@ -694,6 +694,13 @@
       "when": 1794900000000,
       "tag": "0098_fleet_invoices_free_drivers",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1795000000000,
+      "tag": "0099_industry_trips_badges_indexes",
+      "breakpoints": true
     }
   ]
 }
