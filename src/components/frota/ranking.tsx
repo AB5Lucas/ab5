@@ -13,7 +13,7 @@ const brDate = (d: string | null) => (d ? d.split("-").reverse().join("/") : "â€
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 const scoreTone = (s: number) => (s >= 90 ? "bg-emerald-600" : s >= 70 ? "bg-amber-500" : "bg-destructive");
 
-function Kpi({ label, value, tone }: { label: string; value: string; tone?: "bad" }) {
+function Kpi({ label, value, tone }: { label: string; value: string; tone?: "bad" | undefined }) {
   return (
     <div className="panel p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
