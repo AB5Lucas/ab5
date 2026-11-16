@@ -45,6 +45,7 @@ import { useInConference, useScheduled } from "@/hooks/use-scheduled";
 import { FollowUpFilter, followUpApplies, matchesFollowUp, type FollowUp } from "@/components/controles/follow-up-filter";
 import { createNameMatcher, emptyToNull, normText, parseDate } from "@/lib/import-helpers";
 import { addDays, expiryFrom, formatDateBR, todayISO, INTEGRATION_WARN_DAYS } from "@/lib/scheduling";
+import { pendingFirst } from "@/lib/pending-first";
 
 
 type Row = {
@@ -195,7 +196,7 @@ export function IntegrationsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const qDigits = onlyDigits(search);
-    return (integrations.data ?? []).filter((r) => {
+    return pendingFirst((integrations.data ?? []).filter((r) => {
       const p = personById.get(r.collaborator_id);
       if (!p) return false;
       const clientName = clientById.get(r.client_id) ?? "";
@@ -211,7 +212,7 @@ export function IntegrationsPage() {
         if (!hit) return false;
       }
       return true;
-    });
+    }), (r) => statusOf(r.expires_at, today, r.documentation), (r) => r.expires_at);
   }, [integrations.data, search, clientFilter, statusFilter, followUp, scheduled, inConf, personById, clientById, positionById, today]);
 
   // "Não possuem": colaboradores ativos sem integração no cliente filtrado (ou sem nenhuma).

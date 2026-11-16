@@ -38,6 +38,7 @@ const RECORD_COLUMNS: ImportColumn[] = [
 ];
 
 import { expiryFrom, formatDateBR } from "@/lib/scheduling";
+import { pendingFirst } from "@/lib/pending-first";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -274,7 +275,7 @@ export function TrainingsPage() {
   );
   const [batchFor, setBatchFor] = useState<{ personId: string; anchor: string; items: { training_id: string; expires_at: string | null }[] } | null>(null);
 
-  const filtered = (records.data ?? []).filter((r) => {
+  const filtered = pendingFirst((records.data ?? []).filter((r) => {
     if (!nameById.has(r.collaborator_id)) return false;
     if (filter !== "all" && statusOf(r.expires_at) !== filter) return false;
     if (followUpApplies(filter) && !matchesFollowUp(followUp, `${r.collaborator_id}|${r.training_id}`, scheduled, inConf)) return false;
@@ -285,7 +286,7 @@ export function TrainingsPage() {
       if (!trainingIds.includes(r.training_id)) return false;
     }
     return true;
-  });
+  }), (r) => statusOf(r.expires_at), (r) => r.expires_at);
 
   /** "Não possuem": colaboradores ativos sem os treinamentos filtrados (ou sem nenhum). */
   const missing = useMemo(() => {

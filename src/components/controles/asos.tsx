@@ -45,6 +45,7 @@ import { useInConference, useScheduled } from "@/hooks/use-scheduled";
 import { FollowUpFilter, followUpApplies, matchesFollowUp, type FollowUp } from "@/components/controles/follow-up-filter";
 import { emptyToNull, normText, parseDate } from "@/lib/import-helpers";
 import { asoStatusOf, expiryFrom, formatDateBR, todayISO, ASO_LABEL, type AsoStatus } from "@/lib/scheduling";
+import { pendingFirst } from "@/lib/pending-first";
 
 
 type Row = {
@@ -151,7 +152,7 @@ export function AsosPage() {
 
   const filtered = useMemo(() => {
     const q = normText(search);
-    return (asos.data ?? []).filter((r) => {
+    return pendingFirst((asos.data ?? []).filter((r) => {
       const p = personById.get(r.collaborator_id);
       if (!p) return false;
       const status = asoStatusOf(r.expires_at, today);
@@ -163,7 +164,7 @@ export function AsosPage() {
         if (!hit) return false;
       }
       return true;
-    });
+    }), (r) => asoStatusOf(r.expires_at, today), (r) => r.expires_at);
   }, [asos.data, search, statusFilter, followUp, scheduled, inConf, personById, today]);
 
   const summary = useMemo(() => {
