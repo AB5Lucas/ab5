@@ -708,6 +708,13 @@
       "when": 1795100000000,
       "tag": "0100_epi_badge_hidden_until_sheets",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1795200000000,
+      "tag": "0101_vehicle_extra_places",
+      "breakpoints": true
     }
   ]
 }

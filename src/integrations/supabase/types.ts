@@ -4795,6 +4795,7 @@ export type Database = {
           extra_client_ids: string[]
           extra_driver_ids: string[]
           extra_km: number
+          extra_places: string[]
           id: string
           is_external: boolean
           is_maintenance: boolean
@@ -4816,6 +4817,7 @@ export type Database = {
           extra_client_ids?: string[]
           extra_driver_ids?: string[]
           extra_km?: number
+          extra_places?: string[]
           id?: string
           is_external?: boolean
           is_maintenance?: boolean
@@ -4837,6 +4839,7 @@ export type Database = {
           extra_client_ids?: string[]
           extra_driver_ids?: string[]
           extra_km?: number
+          extra_places?: string[]
           id?: string
           is_external?: boolean
           is_maintenance?: boolean

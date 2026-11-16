@@ -49,6 +49,8 @@ export type VehicleScheduleRow = {
   km: number;
   extra_client_ids?: string[];
   extra_driver_ids?: string[];
+  /** Local digitado por obra adicional (Indústria = viagem fora); mesma posição de extra_client_ids. */
+  extra_places?: string[];
   extra_km?: number;
   trips?: number;
   is_suzano_local?: boolean;
@@ -108,6 +110,7 @@ type CellForm = {
   repeat_until: string;
   extras: string[];
   extraDrivers: string[];
+  extraPlaces: string[];
   trips: string;
   external_place: string;
 };
@@ -124,7 +127,7 @@ export function VehicleTimeline() {
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [driverSearch, setDriverSearch] = useState("");
   const [cell, setCell] = useState<{ vehicleId: string; date: string } | null>(null);
-  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], trips: "1", external_place: "" });
+  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], extraPlaces: [], trips: "1", external_place: "" });
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
@@ -282,7 +285,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_km, trips, is_suzano_local, work_id, external_place")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_km, trips, is_suzano_local, work_id, external_place")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -407,7 +410,9 @@ export function VehicleTimeline() {
     return clientKm.get(id) ?? 0;
   }
 
-  function extraName(id: string) {
+  function extraName(id: string, place?: string | null) {
+    // Indústria com local digitado (viagem fora): aparece só o local, como era o Externo.
+    if (place && isIndustryClient(id)) return place.toUpperCase();
     if (id === EXTERNAL_KEY) return "EXTERNO";
     if (id === MAINTENANCE_KEY) return "MANUTENÇÃO";
     if (id === SUZANO_LOCAL_KEY) return "SUZANO LOCAL";
@@ -438,6 +443,7 @@ export function VehicleTimeline() {
       driver_bonus: boolean;
       extra_client_ids?: string[] | undefined;
       extra_driver_ids?: string[] | undefined;
+      extra_places?: string[] | undefined;
       trips?: number | undefined;
       is_suzano_local?: boolean | undefined;
       work_id?: string | null | undefined;
@@ -449,7 +455,7 @@ export function VehicleTimeline() {
     const special = f.is_external || f.is_maintenance || !!f.is_suzano_local;
     const industryPlace = !special && isIndustryClient(f.client_id) ? (f.external_place ?? "").trim() : "";
     const pairs = (f.extra_client_ids ?? [])
-          .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "" }))
+          .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "", place: isIndustryClient(c) ? (f.extra_places?.[i] ?? "").trim() : "" }))
           .filter((p) => p.c && p.c !== NONE);
     const extras = pairs.map((p) => p.c);
     return {
@@ -465,7 +471,9 @@ export function VehicleTimeline() {
       km: f.is_maintenance ? 0 : f.is_external || industryPlace ? KM_EXTERNAL : f.is_suzano_local ? KM_SUZANO_LOCAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
       extra_client_ids: extras,
       extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
-      extra_km: extras.reduce((s, id) => s + extraKm(id), 0),
+      extra_places: pairs.map((p) => p.place),
+      // Indústria com local (viagem fora) conta 100 km fixos, como o antigo Externo.
+      extra_km: pairs.reduce((s, p) => s + (p.place ? KM_EXTERNAL : extraKm(p.c)), 0),
       work_id: special ? null : workId,
       external_place: f.is_external ? (f.external_place ?? "").trim() || null : industryPlace || null,
     };
@@ -491,6 +499,7 @@ export function VehicleTimeline() {
       repeat_until: "",
       extras: [...(current?.extra_client_ids ?? [])],
       extraDrivers: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_driver_ids?.[i] || NONE),
+      extraPlaces: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_places?.[i] ?? ""),
       trips: String(current?.trips ?? 1),
       external_place: current?.external_place ?? "",
     });
@@ -519,6 +528,7 @@ export function VehicleTimeline() {
       driver_bonus: form.driver_bonus,
       extra_client_ids: form.extras,
       extra_driver_ids: form.extraDrivers,
+      extra_places: form.extraPlaces,
       external_place: form.external_place,
     };
     const targets: string[] = [cell.date];
@@ -546,6 +556,7 @@ export function VehicleTimeline() {
           driver_bonus: src.driver_bonus,
           extra_client_ids: src.extra_client_ids,
           extra_driver_ids: src.extra_driver_ids,
+          extra_places: src.extra_places,
           trips: src.trips,
           is_suzano_local: src.is_suzano_local,
           work_id: src.work_id,
@@ -581,6 +592,7 @@ export function VehicleTimeline() {
             driver_bonus: s.driver_bonus,
             extra_client_ids: s.extra_client_ids,
             extra_driver_ids: s.extra_driver_ids,
+            extra_places: s.extra_places,
             trips: s.trips,
             is_suzano_local: s.is_suzano_local,
             work_id: s.work_id,
@@ -871,7 +883,7 @@ export function VehicleTimeline() {
                               className="truncate text-[10px] uppercase text-muted-foreground"
                               title={
                                 (row.extra_client_ids ?? []).length
-                                  ? `+ ${(row.extra_client_ids ?? []).map((id, i) => { const dr = row.extra_driver_ids?.[i]; return `${extraName(id)}${dr ? ` (${driverName.get(dr) ?? "—"})` : ""}`; }).join(", ")}`
+                                  ? `+ ${(row.extra_client_ids ?? []).map((id, i) => { const dr = row.extra_driver_ids?.[i]; return `${extraName(id, row.extra_places?.[i])}${dr ? ` (${driverName.get(dr) ?? "—"})` : ""}`; }).join(", ")}`
                                   : undefined
                               }
                             >
@@ -883,7 +895,7 @@ export function VehicleTimeline() {
                                   : row.is_suzano_local
                                     ? "SUZANO LOCAL"
                                   : row.external_place && isIndustryClient(row.client_id)
-                                    ? `${clientName.get(row.client_id ?? "") ?? "Indústria"} · ${row.external_place}`.toUpperCase()
+                                    ? row.external_place.toUpperCase()
                                   : clientName.get(row.client_id ?? "") ?? "—"}
                               {(row.extra_client_ids ?? []).length > 0 && (
                                 <span className="font-semibold text-primary"> +{row.extra_client_ids!.length}</span>
@@ -1027,7 +1039,7 @@ export function VehicleTimeline() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setForm((f) => ({ ...f, extras: [...f.extras, NONE], extraDrivers: [...f.extraDrivers, f.driver_id] }))}
+                    onClick={() => setForm((f) => ({ ...f, extras: [...f.extras, NONE], extraDrivers: [...f.extraDrivers, f.driver_id], extraPlaces: [...f.extraPlaces, ""] }))}
                   >
                     <Plus className="h-4 w-4" /> Adicionar obra
                   </Button>
@@ -1051,17 +1063,21 @@ export function VehicleTimeline() {
                       </SelectContent>
                     </Select>
                     <span className="w-14 text-right text-xs text-muted-foreground">
-                      {cid !== NONE ? `${extraKm(cid)} km` : ""}
+                      {cid !== NONE ? `${isIndustryClient(cid) && (form.extraPlaces[i] ?? "").trim() ? KM_EXTERNAL : extraKm(cid)} km` : ""}
                     </span>
                     <Button
                       variant="ghost"
                       size="icon"
                       aria-label="Remover obra adicional"
-                      onClick={() => setForm((f) => ({ ...f, extras: f.extras.filter((_, j) => j !== i), extraDrivers: f.extraDrivers.filter((_, j) => j !== i) }))}
+                      onClick={() => setForm((f) => ({ ...f, extras: f.extras.filter((_, j) => j !== i), extraDrivers: f.extraDrivers.filter((_, j) => j !== i), extraPlaces: f.extraPlaces.filter((_, j) => j !== i) }))}
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
+                  {isIndustryClient(cid) && (
+                    <Input placeholder="Local (viagem fora da Indústria)" aria-label="Local da obra adicional" value={form.extraPlaces[i] ?? ""}
+                      onChange={(e) => setForm((f) => { const pl = [...f.extraPlaces]; pl[i] = e.target.value; return { ...f, extraPlaces: pl }; })} />
+                  )}
                   <Select
                     value={form.extraDrivers[i] ?? NONE}
                     onValueChange={(v) =>
