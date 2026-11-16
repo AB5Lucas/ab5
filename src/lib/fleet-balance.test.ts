@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { balanceBadgeTone, balanceTone, fleetBalance } from "./fleet-balance";
 
 describe("fleet balance", () => {
-  it("40k menos faturas em aberto menos o período", () => {
-    expect(fleetBalance(12000.5, 25000.25)).toBe(2999.25);
+  it("50k menos faturas em aberto menos o período", () => {
+    expect(fleetBalance(12000.5, 35000.25)).toBe(2999.25);
   });
   it("cores do número e do aviso", () => {
     expect(balanceTone(3000)).toBe("warn");

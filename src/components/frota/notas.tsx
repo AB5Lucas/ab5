@@ -24,7 +24,7 @@ import { FleetRelease, useCnhPeople, useFleetRelease } from "./liberacao";
 import { FleetFiscal } from "./fiscal";
 import { FleetFiscalCc } from "./fiscal-cc";
 import { useFuelRows, useOpenInvoicesTotal, type Note, type Row } from "./use-fuel-rows";
-import { balanceTone, fleetBalance } from "@/lib/fleet-balance";
+import { balanceTone, fleetBalance, FLEET_CREDIT } from "@/lib/fleet-balance";
 import { nonTicketTotal } from "@/lib/fleet-fiscal";
 import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 import { currentMonthRange, DateRangePicker, monthsInRange, type DayRange } from "@/components/date-range-picker";
@@ -205,7 +205,7 @@ function FuelNotes() {
         </button>
         <Kpi label="Aguardando aprovação" value={String(count("pendente"))} />
         <Kpi label="Saldo" value={brl(balance)} tone={balanceTone(balance)}
-          title={`R$ 40.000 − faturas em aberto (${brl(openInvoices.data ?? 0)}) − total do período (${brl(periodTotal)})`} />
+          title={`${brl(FLEET_CREDIT)} − faturas em aberto (${brl(openInvoices.data ?? 0)}) − total do período (${brl(periodTotal)})`} />
         <Kpi label="Total do período" value={brl(periodTotal)} />
       </div>
 

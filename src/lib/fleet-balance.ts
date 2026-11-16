@@ -1,8 +1,8 @@
 /**
- * Saldo do posto (Frota › Abastecimento): limite fixo de R$ 40.000 menos as faturas em aberto (Pago? = NÃO)
+ * Saldo do posto (Frota › Abastecimento): limite fixo de R$ 50.000 menos as faturas em aberto (Pago? = NÃO)
  * e menos o total abastecido no período.
  */
-export const FLEET_CREDIT = 40000;
+export const FLEET_CREDIT = 50000;
 export const BALANCE_WARN = 3000;
 export const BALANCE_DANGER = 1000;
 
