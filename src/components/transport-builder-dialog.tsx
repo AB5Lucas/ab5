@@ -231,7 +231,7 @@ export function TransportBuilderDialog({
         </DialogHeader>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" disabled={copyPrev.isPending} onClick={() => copyPrev.mutate()}>
-            <Copy className="h-4 w-4" /> Copiar dia anterior
+            <Copy className="h-4 w-4" /> Dia anterior
           </Button>
           <Button
             size="sm"

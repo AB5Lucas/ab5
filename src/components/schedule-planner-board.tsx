@@ -1733,7 +1733,7 @@ export function SchedulePlannerBoard({
           </DropdownMenu>
           {editable && (
             <Button size="sm" variant="outline" onClick={openCopyPrevious} disabled={copyPrevious.isPending}>
-              <Copy className="h-4 w-4" /> Copiar dia anterior
+              <Copy className="h-4 w-4" /> Dia anterior
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => setOpenFolgas(true)}>

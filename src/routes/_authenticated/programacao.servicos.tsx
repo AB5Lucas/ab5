@@ -624,7 +624,7 @@ function ServicesPage() {
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="outline" disabled={!clientId || copy.isPending}>
-              <Copy className="h-4 w-4" /> Copiar dia anterior
+              <Copy className="h-4 w-4" /> Dia anterior
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>

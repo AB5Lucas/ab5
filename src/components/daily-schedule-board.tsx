@@ -401,7 +401,7 @@ export function DailyScheduleBoard({
                 <Users className="h-4 w-4" /> Equipes base
               </Button>
               <Button size="sm" variant="outline" onClick={() => copyPrevious.mutate()} disabled={copyPrevious.isPending}>
-                <Copy className="h-4 w-4" /> Copiar dia anterior
+                <Copy className="h-4 w-4" /> Dia anterior
               </Button>
               <Button
                 size="sm"
@@ -436,7 +436,7 @@ export function DailyScheduleBoard({
 
       {!schedule.isLoading && rows.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Nenhuma alocação nesta data. Use "Equipes base" ou "Copiar dia anterior" para começar.
+          Nenhuma alocação nesta data. Use "Equipes base" ou "Dia anterior" para começar.
         </p>
       )}
 
