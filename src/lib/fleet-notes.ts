@@ -213,7 +213,8 @@ export function closestPlate(raw: string | null | undefined, preferred: string[]
 const NAME_STOP = new Set(["DA", "DE", "DO", "DAS", "DOS", "E"]);
 const nameTokens = (s: string) => plain(s).replace(/[^A-Z ]/g, " ").split(/\s+/).filter((t) => t && !NAME_STOP.has(t));
 const tokenHit = (w: string, words: string[]) =>
-  words.some((x) => x === w || (w.length === 1 && x.startsWith(w)) || (w.length >= 4 && x.length >= 4 && lev(w, x) <= 1));
+  // 1 letra errada; em palavra longa (7+ letras), até 2 (ex.: Gosalves → Goncalves).
+  words.some((x) => x === w || (w.length === 1 && x.startsWith(w)) || (w.length >= 4 && x.length >= 4 && lev(w, x) <= (w.length >= 7 && x.length >= 7 ? 2 : 1)));
 
 /**
  * Nome escrito na nota → nome completo cadastrado. O primeiro nome tem que bater (aceita 1 letra errada) e as outras
@@ -221,6 +222,9 @@ const tokenHit = (w: string, words: string[]) =>
  * colaborador combinar; `preferred` (motoristas liberados no posto) é procurada antes de `all`. Só o primeiro nome
  * escrito casa apenas se for o único motorista liberado com esse primeiro nome.
  */
+/** Chave do nome sem acento, caixa e espaços repetidos (para juntar "Andre Jesus" e "André Jesus"). */
+export const nameKey = (s: string) => plain(s).replace(/[^A-Z ]/g, " ").replace(/\s+/g, " ").trim();
+
 export function matchDriverName(written: string | null | undefined, preferred: string[], all: string[] = []): string | null {
   const ws = nameTokens(written ?? "");
   if (!ws.length) return null;

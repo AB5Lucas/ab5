@@ -258,3 +258,10 @@ describe("rateio com Suzano Local", () => {
     expect(r.parts.map((p) => [p.client, p.cc, p.value])).toEqual([["SUZANO", "2030999", 50], ["MARS MM", "2040999", 50]]);
   });
 });
+
+import { matchDriverName as _mdn } from "./fleet-notes";
+describe("nome do motorista com 2 letras erradas em sobrenome longo", () => {
+  it("Gosalves → Goncalves", () => {
+    expect(_mdn("Guilherme Gosalves da Silva", [], ["Guilherme Goncalves da Silva", "Guilherme Fernando de Oliveira"])).toBe("Guilherme Goncalves da Silva");
+  });
+});

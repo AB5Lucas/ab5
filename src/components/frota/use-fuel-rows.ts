@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate, registeredPlate } from "@/lib/fleet-costs";
-import { closestPlate, fixedRateio, fuelRateio, isoDay, withDateFix, matchDriverName, plateRuleSplit, titleCase, type CcSplitItem, noteStatus, otherPlates, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
+import { closestPlate, fixedRateio, fuelRateio, isoDay, withDateFix, matchDriverName, nameKey, plateRuleSplit, titleCase, type CcSplitItem, noteStatus, otherPlates, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { monthsInRange, type DayRange } from "@/components/date-range-picker";
 import { useCnhPeople, useFleetRelease } from "./liberacao";
 import type { Tables } from "@/integrations/supabase/types";
@@ -32,7 +32,7 @@ export function useFuelRows(range: DayRange) {
   const release = useFleetRelease();
   const schedules = useQuery({
     queryKey: ["fleet-rateio-schedules", lookback, end],
-    queryFn: () => fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date, client_id, extra_client_ids, is_maintenance, km, trips, extra_km, work_id, is_suzano_local")
+    queryFn: () => fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date, client_id, extra_client_ids, is_maintenance, km, trips, extra_km, work_id, is_suzano_local, driver_id, extra_driver_ids")
       .gte("schedule_date", lookback).lte("schedule_date", end).order("schedule_date").range(a, b)),
   });
   const clients = useQuery({ queryKey: ["fleet-rateio-clients"], queryFn: async () => ((await supabase.from("clients").select("id, name, cc_prefix")).data ?? []) as RateioClient[] });
@@ -68,8 +68,30 @@ export function useFuelRows(range: DayRange) {
       if (!plateCache.has(k)) plateCache.set(k, closestPlate(n.plate, releasedOn(day).plates, allPlates));
       return plateCache.get(k)!;
     };
-    const driverOf = (n: Note) => {
-      const name = n.driver_fix ?? matchDriverName(n.driver, releasedOn(isoDay(n.issued_at)).names, cnhNames) ?? n.driver;
+    // Motoristas do veículo na Transporte no dia do abastecimento ou no anterior (para nome curto, ex.: "Celino").
+    const cnhName = new Map((cnh.data ?? []).map((c) => [c.id, c.full_name]));
+    const schedByVehicleDay = new Map<string, string[]>();
+    for (const s of (schedules.data ?? []) as { vehicle_id: string; schedule_date: string; driver_id?: string | null; extra_driver_ids?: string[] | null }[]) {
+      const k = `${s.vehicle_id}|${s.schedule_date}`;
+      const ids = [s.driver_id, ...(s.extra_driver_ids ?? [])].filter((x): x is string => !!x);
+      schedByVehicleDay.set(k, [...(schedByVehicleDay.get(k) ?? []), ...ids.map((id) => cnhName.get(id)).filter((x): x is string => !!x)]);
+    }
+    // Nome sem casamento: a mesma grafia sem acento vira uma só (prefere a que tem acento).
+    const rawByKey = new Map<string, string>();
+    for (const n of all) {
+      const w = (n.driver_fix ?? n.driver ?? "").trim();
+      if (!w) continue;
+      const k = nameKey(w), cur = rawByKey.get(k);
+      if (!cur || (!/[^\x00-\x7F]/.test(cur) && /[^\x00-\x7F]/.test(w))) rawByKey.set(k, w);
+    }
+    const driverOf = (n: Note, vehicleId?: string | null) => {
+      const day = isoDay(n.issued_at);
+      let name = n.driver_fix ?? matchDriverName(n.driver, releasedOn(day).names, cnhNames);
+      if (!name && n.driver && vehicleId && day) {
+        const onVehicle = [...(schedByVehicleDay.get(`${vehicleId}|${day}`) ?? []), ...(schedByVehicleDay.get(`${vehicleId}|${addDays(day, -1)}`) ?? [])];
+        name = matchDriverName(n.driver, onVehicle);
+      }
+      if (!name && n.driver) name = rawByKey.get(nameKey(n.driver)) ?? n.driver;
       return name ? titleCase(name) : null;
     };
     // Placa mostrada como cadastrada na Liberação/Veículos (o casamento continua pela forma Mercosul).
@@ -103,7 +125,7 @@ export function useFuelRows(range: DayRange) {
         ...(n.plate_fix ? [] : otherPlates(n.info, normalizePlate(n.plate ?? "") || p).filter((o) => o !== p).map((o) => `outra placa no texto da nota: ${o}`)),
         ...(kmShown != null && prevKm != null && Number(kmShown) < Number(prevKm) ? [`km menor que o abastecimento anterior (${Number(prevKm).toLocaleString("pt-BR")})`] : []),
       ];
-      return { ...n, day, xmlDay: xmlDayOf.get(n.id) ?? day, plateShown: registeredPlate(p, registered), kmShown, driverShown: driverOf(n), vehicleLabel: v ? (v.model ?? v.plate) : p ? release.freeVehicleLabel.get(p) ?? null : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
+      return { ...n, day, xmlDay: xmlDayOf.get(n.id) ?? day, plateShown: registeredPlate(p, registered), kmShown, driverShown: driverOf(n, v?.id), vehicleLabel: v ? (v.model ?? v.plate) : p ? release.freeVehicleLabel.get(p) ?? null : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
     });
   }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, start, end, cnh.data, release.drivers, release.vehicles]);
   const loading = notes.isLoading || schedules.isLoading || vehicles.isLoading;
