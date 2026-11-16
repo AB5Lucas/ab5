@@ -1288,84 +1288,6 @@ export type Database = {
         }
         Relationships: []
       }
-      client_onboarding_docs: {
-        Row: {
-          approved: boolean
-          approved_at: string | null
-          approved_by: string | null
-          created_at: string
-          id: string
-          kind: string
-          label: string | null
-          onboarding_id: string
-          training_id: string | null
-        }
-        Insert: {
-          approved?: boolean
-          approved_at?: string | null
-          approved_by?: string | null
-          created_at?: string
-          id?: string
-          kind: string
-          label?: string | null
-          onboarding_id: string
-          training_id?: string | null
-        }
-        Update: {
-          approved?: boolean
-          approved_at?: string | null
-          approved_by?: string | null
-          created_at?: string
-          id?: string
-          kind?: string
-          label?: string | null
-          onboarding_id?: string
-          training_id?: string | null
-        }
-        Relationships: []
-      }
-      client_onboardings: {
-        Row: {
-          client_id: string
-          collaborator_id: string
-          completed_at: string | null
-          completed_by: string | null
-          created_at: string
-          created_by: string | null
-          id: string
-          next_check_date: string | null
-          notes: string | null
-          sent_at: string | null
-          status: string
-        }
-        Insert: {
-          client_id: string
-          collaborator_id: string
-          completed_at?: string | null
-          completed_by?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          next_check_date?: string | null
-          notes?: string | null
-          sent_at?: string | null
-          status?: string
-        }
-        Update: {
-          client_id?: string
-          collaborator_id?: string
-          completed_at?: string | null
-          completed_by?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          next_check_date?: string | null
-          notes?: string | null
-          sent_at?: string | null
-          status?: string
-        }
-        Relationships: []
-      }
       client_integrations: {
         Row: {
           client_id: string
@@ -1410,6 +1332,114 @@ export type Database = {
           },
           {
             foreignKeyName: "client_integrations_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_onboarding_docs: {
+        Row: {
+          approved: boolean
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          id: string
+          kind: string
+          label: string | null
+          onboarding_id: string
+          training_id: string | null
+        }
+        Insert: {
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          label?: string | null
+          onboarding_id: string
+          training_id?: string | null
+        }
+        Update: {
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          onboarding_id?: string
+          training_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_onboarding_docs_onboarding_id_fkey"
+            columns: ["onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "client_onboardings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_onboarding_docs_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_onboardings: {
+        Row: {
+          client_id: string
+          collaborator_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          next_check_date: string | null
+          notes: string | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          client_id: string
+          collaborator_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          next_check_date?: string | null
+          notes?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          client_id?: string
+          collaborator_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          next_check_date?: string | null
+          notes?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_onboardings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_onboardings_collaborator_id_fkey"
             columns: ["collaborator_id"]
             isOneToOne: false
             referencedRelation: "collaborators"
@@ -1626,9 +1656,9 @@ export type Database = {
           id: string
           is_driver: boolean
           no_overtime_premium: boolean
+          notes: string | null
           notice_end: string | null
           notice_start: string | null
-          notes: string | null
           phone: string | null
           photo_url: string | null
           position_id: string | null
@@ -1659,9 +1689,9 @@ export type Database = {
           id?: string
           is_driver?: boolean
           no_overtime_premium?: boolean
+          notes?: string | null
           notice_end?: string | null
           notice_start?: string | null
-          notes?: string | null
           phone?: string | null
           photo_url?: string | null
           position_id?: string | null
@@ -1692,9 +1722,9 @@ export type Database = {
           id?: string
           is_driver?: boolean
           no_overtime_premium?: boolean
+          notes?: string | null
           notice_end?: string | null
           notice_start?: string | null
-          notes?: string | null
           phone?: string | null
           photo_url?: string | null
           position_id?: string | null
@@ -3130,7 +3160,15 @@ export type Database = {
           lodging?: string
           start_date?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lodging_stays_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       medical_leaves: {
         Row: {
@@ -4948,8 +4986,8 @@ export type Database = {
           is_maintenance: boolean
           is_suzano_local: boolean
           km: number
-          place_toll: number | null
           notes: string | null
+          place_toll: number | null
           schedule_date: string
           trips: number
           updated_at: string
@@ -4971,8 +5009,8 @@ export type Database = {
           is_maintenance?: boolean
           is_suzano_local?: boolean
           km?: number
-          place_toll?: number | null
           notes?: string | null
+          place_toll?: number | null
           schedule_date: string
           trips?: number
           updated_at?: string
@@ -4994,8 +5032,8 @@ export type Database = {
           is_maintenance?: boolean
           is_suzano_local?: boolean
           km?: number
-          place_toll?: number | null
           notes?: string | null
+          place_toll?: number | null
           schedule_date?: string
           trips?: number
           updated_at?: string
@@ -5788,6 +5826,16 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_cliente: { Args: never; Returns: boolean }
       is_hiring_rh: { Args: never; Returns: boolean }
+      menu_badge_counts: {
+        Args: {
+          p_billing: boolean
+          p_docs: boolean
+          p_orders: boolean
+          p_purchases: boolean
+          p_today: string
+        }
+        Returns: Json
+      }
       move_allocation_service: {
         Args: { _alloc_id: string; _work_id: string }
         Returns: undefined
