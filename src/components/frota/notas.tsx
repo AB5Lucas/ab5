@@ -232,7 +232,7 @@ function FuelNotes() {
               const parts = r.rateio?.parts ?? [];
               return (
                 <TableRow key={r.id} className="align-top">
-                  <TableCell className="whitespace-nowrap">{brDate(r.day)}</TableCell>
+                  <TableCell className="whitespace-nowrap" title={r.issued_on_fix ? `Data corrigida; no XML: ${brDate(r.xmlDay)}` : undefined}>{brDate(r.day)}{r.issued_on_fix ? " *" : ""}</TableCell>
                   <TableCell className="whitespace-nowrap">{r.nf_number ?? "—"}{r.itemCount > 1 && <div className="text-muted-foreground" title="Mesmo XML, outro combustível">item {r.item_no} de {r.itemCount}</div>}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {r.plateShown ?? <span className="text-destructive">sem placa</span>}{r.plate_fix ? " *" : ""}
@@ -408,7 +408,8 @@ type SplitLine = { account: string; pct: string };
 const pctNum = (s: string) => Number(String(s).replace(",", "."));
 
 function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tables<"fleet_item_accounts">[]; onClose: () => void }) {
-  const [form, setForm] = useState({ plate: "", km: "", notes: "" });
+  const cnh = useCnhPeople();
+  const [form, setForm] = useState({ plate: "", km: "", notes: "", driver: "", day: "" });
   // Vazio = automático (rateio pela Transporte ou regra da placa); com linhas = CCs à mão, cada um com a sua %.
   const [split, setSplit] = useState<SplitLine[]>([]);
   useEffect(() => {
@@ -417,7 +418,7 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
     const saved = (Array.isArray(row.cc_split) ? row.cc_split : []) as unknown as CcSplitItem[];
     const lines = saved.length ? saved.map((s) => ({ account: findId(s.cc_code, s.label), pct: String(s.pct) }))
       : row.cc_fix ? [{ account: findId(row.cc_fix, row.cc_label_fix), pct: "100" }] : [];
-    setForm({ plate: row.plate_fix ?? "", km: row.km_fix == null ? "" : String(row.km_fix), notes: row.notes ?? "" });
+    setForm({ plate: row.plate_fix ?? "", km: row.km_fix == null ? "" : String(row.km_fix), notes: row.notes ?? "", driver: row.driver_fix ?? "", day: row.issued_on_fix ?? row.xmlDay ?? "" });
     setSplit(lines);
   }, [row?.id]);
   const m = useNoteUpdate(() => { toast.success("Abastecimento atualizado."); onClose(); });
@@ -451,7 +452,19 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
           <div className="space-y-1"><Label htmlFor="fix-plate">Placa</Label><Input id="fix-plate" placeholder={row.plateShown ?? row.plate ?? ""} value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })} /></div>
           <div className="space-y-1"><Label htmlFor="fix-km">Km</Label><Input id="fix-km" inputMode="decimal" placeholder={row.km == null ? "" : String(row.km)} value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} /></div>
         </div>
-        <p className="text-xs text-muted-foreground">Motorista: {row.driverShown ?? "não identificado"}{row.driver && row.driverShown !== titleCase(row.driver) ? ` (na nota: ${row.driver})` : ""}. O nome vem da aba Liberação; para corrigir, libere o motorista lá.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="fix-driver">Motorista</Label>
+            <Input id="fix-driver" list="fix-driver-names" placeholder={row.driverShown ?? row.driver ?? "não identificado"} value={form.driver} onChange={(e) => setForm({ ...form, driver: e.target.value })} />
+            <datalist id="fix-driver-names">{(cnh.data ?? []).map((c) => <option key={c.id} value={titleCase(c.full_name)} />)}</datalist>
+            {row.driver && <p className="text-[11px] text-muted-foreground">Na nota: {row.driver}. Em branco = casado pela Liberação.</p>}
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="fix-day">Data do abastecimento</Label>
+            <Input id="fix-day" type="date" value={form.day} onChange={(e) => setForm({ ...form, day: e.target.value })} />
+            {row.xmlDay && <p className="text-[11px] text-muted-foreground">No XML: {brDate(row.xmlDay)}.</p>}
+          </div>
+        </div>
         <div className="space-y-2">
           <Label className="block">Centros de custo</Label>
           {!split.length ? (
@@ -492,10 +505,18 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
         <div className="space-y-1"><Label htmlFor="fix-notes">Observações</Label><Textarea id="fix-notes" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button disabled={m.isPending || !!splitError || (km != null && !Number.isFinite(km))} onClick={() => m.mutate({ id: row.id, patch: {
-            plate_fix: form.plate.trim() ? normalizePlate(form.plate) : null, km_fix: km, notes: form.notes.trim() || null,
-            cc_split: (toSave.length ? toSave : null) as never, cc_fix: null, item_account_fix: null, cc_label_fix: null,
-          } })}>Salvar</Button>
+          <Button disabled={m.isPending || !!splitError || (km != null && !Number.isFinite(km))} onClick={async () => {
+            // Motorista e data são do abastecimento todo: valem para os outros itens do mesmo XML ainda não aprovados.
+            const shared = { driver_fix: form.driver.trim() || null, issued_on_fix: form.day && form.day !== row.xmlDay ? form.day : null };
+            if (row.itemCount > 1) {
+              const { error } = await supabase.from("fleet_fuel_notes").update(shared).eq("access_key", row.access_key).is("approved_at", null);
+              if (error) { toast.error(error.message); return; }
+            }
+            m.mutate({ id: row.id, patch: {
+              plate_fix: form.plate.trim() ? normalizePlate(form.plate) : null, km_fix: km, notes: form.notes.trim() || null, ...shared,
+              cc_split: (toSave.length ? toSave : null) as never, cc_fix: null, item_account_fix: null, cc_label_fix: null,
+            } });
+          }}>Salvar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

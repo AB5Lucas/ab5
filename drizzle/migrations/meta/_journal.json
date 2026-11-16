@@ -757,6 +757,13 @@
       "when": 1795400004000,
       "tag": "0107_drop_stale_passengers",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1795400005000,
+      "tag": "0108_fuel_date_fix",
+      "breakpoints": true
     }
   ]
 }

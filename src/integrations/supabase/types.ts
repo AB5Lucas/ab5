@@ -2309,6 +2309,7 @@ export type Database = {
           id: string
           info: string | null
           issued_at: string | null
+          issued_on_fix: string | null
           issuer: string | null
           item_account_fix: string | null
           item_no: number
@@ -2342,6 +2343,7 @@ export type Database = {
           id?: string
           info?: string | null
           issued_at?: string | null
+          issued_on_fix?: string | null
           issuer?: string | null
           item_account_fix?: string | null
           item_no?: number
@@ -2375,6 +2377,7 @@ export type Database = {
           id?: string
           info?: string | null
           issued_at?: string | null
+          issued_on_fix?: string | null
           issuer?: string | null
           item_account_fix?: string | null
           item_no?: number

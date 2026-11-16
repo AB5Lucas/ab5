@@ -3,13 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate, registeredPlate } from "@/lib/fleet-costs";
-import { closestPlate, fixedRateio, fuelRateio, isoDay, matchDriverName, plateRuleSplit, titleCase, type CcSplitItem, noteStatus, otherPlates, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
+import { closestPlate, fixedRateio, fuelRateio, isoDay, withDateFix, matchDriverName, plateRuleSplit, titleCase, type CcSplitItem, noteStatus, otherPlates, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { monthsInRange, type DayRange } from "@/components/date-range-picker";
 import { useCnhPeople, useFleetRelease } from "./liberacao";
 import type { Tables } from "@/integrations/supabase/types";
 
 export type Note = Tables<"fleet_fuel_notes">;
-export type Row = Note & { itemCount: number; day: string | null; plateShown: string | null; kmShown: number | null; driverShown: string | null; vehicleLabel: string | null; rateio: Rateio | null; status: ReturnType<typeof noteStatus>; warnings: string[] };
+export type Row = Note & { itemCount: number; day: string | null; xmlDay: string | null; plateShown: string | null; kmShown: number | null; driverShown: string | null; vehicleLabel: string | null; rateio: Rateio | null; status: ReturnType<typeof noteStatus>; warnings: string[] };
 
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
@@ -24,7 +24,7 @@ export function useFuelRows(range: DayRange) {
   const notes = useQuery({
     queryKey: ["fleet-fuel-notes", start, end],
     queryFn: () => fetchAll<Note>((a, b) => supabase.from("fleet_fuel_notes").select("*")
-      .or(`ref_month.in.(${months.join(",")}),and(issued_at.gte.${lookback},issued_at.lte.${end}T23:59:59)`).order("issued_at").range(a, b)),
+      .or(`ref_month.in.(${months.join(",")}),and(issued_at.gte.${lookback},issued_at.lte.${end}T23:59:59),and(issued_on_fix.gte.${lookback},issued_on_fix.lte.${end})`).order("issued_at").range(a, b)),
   });
   const docs = useQuery({ queryKey: ["fleet-note-docs", months.join(",")], queryFn: async () => (await supabase.from("fleet_note_docs").select("ref_month, file_name, item_id, read_nf, read_plate, read_total, read_error").in("ref_month", months).order("file_name")).data ?? [] });
   const vehicles = useQuery({ queryKey: ["fleet-vehicles-basic"], queryFn: async () => (await supabase.from("vehicles").select("id, plate, model").order("plate")).data ?? [] });
@@ -41,7 +41,8 @@ export function useFuelRows(range: DayRange) {
   const people = useQuery({ queryKey: ["users-names"], queryFn: async () => new Map(((await supabase.from("users_profiles").select("id, full_name")).data ?? []).map((u) => [u.id, u.full_name])) });
 
   const rows = useMemo<Row[]>(() => {
-    const all = notes.data ?? [];
+    const xmlDayOf = new Map((notes.data ?? []).map((n) => [n.id, isoDay(n.issued_at)]));
+    const all = (notes.data ?? []).map(withDateFix);
     // Placa e motorista da nota → cadastrados: primeiro entre os liberados no posto na data da nota (aba Liberação:
     // ativo e entre a data de liberação e a de exclusão), depois todos. O nome aparece como o cadastrado, com
     // maiúscula só na primeira letra de cada nome.
@@ -102,7 +103,7 @@ export function useFuelRows(range: DayRange) {
         ...(n.plate_fix ? [] : otherPlates(n.info, normalizePlate(n.plate ?? "") || p).filter((o) => o !== p).map((o) => `outra placa no texto da nota: ${o}`)),
         ...(kmShown != null && prevKm != null && Number(kmShown) < Number(prevKm) ? [`km menor que o abastecimento anterior (${Number(prevKm).toLocaleString("pt-BR")})`] : []),
       ];
-      return { ...n, day, plateShown: registeredPlate(p, registered), kmShown, driverShown: driverOf(n), vehicleLabel: v ? (v.model ?? v.plate) : p ? release.freeVehicleLabel.get(p) ?? null : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
+      return { ...n, day, xmlDay: xmlDayOf.get(n.id) ?? day, plateShown: registeredPlate(p, registered), kmShown, driverShown: driverOf(n), vehicleLabel: v ? (v.model ?? v.plate) : p ? release.freeVehicleLabel.get(p) ?? null : null, rateio, status: noteStatus(n), warnings, itemCount: items.get(n.access_key) ?? 1 };
     });
   }, [notes.data, vehicles.data, clients.data, works.data, accounts.data, schedules.data, start, end, cnh.data, release.drivers, release.vehicles]);
   const loading = notes.isLoading || schedules.isLoading || vehicles.isLoading;

@@ -9,7 +9,7 @@ import { useSeenAlerts } from "@/hooks/use-seen-alerts";
 import { worstAlertTone } from "@/lib/schedule-alerts";
 import { hiringBadge } from "@/lib/hiring-badge";
 import { balanceBadgeTone, fleetBalance } from "@/lib/fleet-balance";
-import { isoDay } from "@/lib/fleet-notes";
+import { isoDay, withDateFix } from "@/lib/fleet-notes";
 import { nonTicketTotal } from "@/lib/fleet-fiscal";
 import { currentMonthRange } from "@/components/date-range-picker";
 
@@ -53,7 +53,7 @@ function useBadgeData() {
             .then((r: { data: unknown; error: unknown }) => (r.error ? empty : (r.data as Counts) ?? empty), () => empty)
           : Promise.resolve(empty),
         when(can.fleet, () => fetchAll<any>((a, b) => supabase.from("fleet_invoices").select("total").eq("paid", false).range(a, b))),
-        when(can.fleet, () => fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("issued_at, total, approved_at, allocation, cc_split, cc_fix").gte("issued_at", addDays(month.from, -1)).lte("issued_at", `${addDays(month.to, 1)}T23:59:59`).range(a, b))),
+        when(can.fleet, () => fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("issued_at, issued_on_fix, total, approved_at, allocation, cc_split, cc_fix").or(`and(issued_at.gte.${addDays(month.from, -1)},issued_at.lte.${addDays(month.to, 1)}T23:59:59),and(issued_on_fix.gte.${month.from},issued_on_fix.lte.${month.to})`).range(a, b)).then((r) => r.map(withDateFix))),
       ]);
       const fleetPeriod = fleetNotes.filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= month.from && d <= month.to; }).reduce((s, n) => s + nonTicketTotal(n), 0);
       const fleetSaldo = fleetBalance(fleetOpen.reduce((s, i) => s + Number(i.total ?? 0), 0), fleetPeriod);

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate, registeredPlate } from "@/lib/fleet-costs";
-import { closestPlate, driverRanking, isoDay, matchDriverName, titleCase, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
+import { closestPlate, driverRanking, isoDay, withDateFix, matchDriverName, titleCase, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
 import { useCnhPeople, useFleetRelease } from "./liberacao";
 import { currentMonthRange, DateRangePicker, type DayRange } from "@/components/date-range-picker";
 
@@ -30,9 +30,10 @@ export function DriverRanking() {
 
   const notes = useQuery({
     queryKey: ["fleet-ranking-notes", range.from, range.to],
-    queryFn: () => fetchAll<RankingNote & { access_key: string; item_no: number }>((a, b) => supabase.from("fleet_fuel_notes")
-      .select("id, access_key, item_no, nf_number, issued_at, plate, plate_fix, driver, driver_fix, total, note_file")
-      .gte("issued_at", `${range.from}T00:00:00-03:00`).lte("issued_at", `${range.to}T23:59:59-03:00`).order("issued_at").range(a, b)),
+    queryFn: () => fetchAll<RankingNote & { access_key: string; item_no: number; issued_on_fix: string | null }>((a, b) => supabase.from("fleet_fuel_notes")
+      .select("id, access_key, item_no, nf_number, issued_at, issued_on_fix, plate, plate_fix, driver, driver_fix, total, note_file")
+      .or(`and(issued_at.gte.${range.from}T00:00:00-03:00,issued_at.lte.${range.to}T23:59:59-03:00),and(issued_on_fix.gte.${range.from},issued_on_fix.lte.${range.to})`).order("issued_at").range(a, b))
+      .then((rows) => rows.map(withDateFix).filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= range.from && d <= range.to; })),
   });
   const schedules = useQuery({
     queryKey: ["fleet-ranking-schedules", range.from, range.to],

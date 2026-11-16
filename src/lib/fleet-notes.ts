@@ -249,6 +249,10 @@ export type RateioPart = { client_id: string; client: string; days: number; km?:
 export type Rateio = { from: string; to: string; fallback: boolean; basis?: "km" | "dias"; parts: RateioPart[] };
 
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+/** Data do abastecimento corrigida no Editar (issued_on_fix) vale no lugar da data do XML em todos os cálculos. */
+export const withDateFix = <T extends { issued_at: string | null; issued_on_fix?: string | null }>(n: T): T =>
+  n.issued_on_fix ? { ...n, issued_at: `${n.issued_on_fix}T12:00:00-03:00` } : n;
+
 export const isoDay = (ts: string | null) => {
   if (!ts) return null;
   const d = new Date(ts);
