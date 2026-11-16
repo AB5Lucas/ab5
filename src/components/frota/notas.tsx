@@ -109,7 +109,7 @@ function FuelNotes() {
 
   const plates = [...new Set(rows.map((r) => r.plateShown).filter((p): p is string => !!p))].sort();
   const shown = rows.filter((r) => (plate === "all" || r.plateShown === plate) && (
-    filter === "todas" ? true : filter === "pendentes" ? r.status !== "aprovada" : filter === "sem-nota" ? r.status === "sem-nota" : filter === "aguardando" ? r.status === "pendente" : r.status === "aprovada"));
+    filter === "todas" ? true : filter === "pendentes" ? r.status !== "aprovada" : filter === "sem-nota" ? !r.note_file : filter === "aguardando" ? r.status === "pendente" : r.status === "aprovada"));
   // Filtros e ordenação por coluna, como no Excel (em cima dos filtros de Situação e Placa).
   const [colFilters, setColFilters] = useState<ColumnFilters>({});
   const [colSort, setColSort] = useState<ColumnSort>(null);
@@ -135,6 +135,7 @@ function FuelNotes() {
   const colFiltered = Object.keys(colFilters).length > 0;
   // Quadros contam XML (chave de acesso), como o "XML no período": XML com dois combustíveis conta uma vez.
   const count = (s: Row["status"]) => new Set(rows.filter((r) => r.status === s).map((r) => r.access_key)).size;
+  const noNote = new Set(rows.filter((r) => !r.note_file).map((r) => r.access_key)).size;
   // Fotos ligadas a algum XML do mês (não só aos do período), por mês + arquivo.
   const usedDocs = new Set((notes.data ?? []).filter((n) => n.note_file).map((n) => `${n.ref_month}|${n.note_file}`));
   const freeDocs = (docs.data ?? []).filter((d) => !usedDocs.has(`${d.ref_month}|${d.file_name}`) && d.ref_month === attach?.ref_month);
@@ -197,7 +198,8 @@ function FuelNotes() {
         {/* XML com dois combustíveis vira duas linhas: o quadro conta os arquivos (chaves), não as linhas. */}
         <Kpi label="XML no período" value={String(new Set(rows.map((r) => r.access_key)).size)}
           title={rows.length !== new Set(rows.map((r) => r.access_key)).size ? `${rows.length} abastecimentos: XML com dois combustíveis viram duas linhas.` : undefined} />
-        <Kpi label="Sem nota" value={String(count("sem-nota"))} tone={count("sem-nota") ? "bad" : undefined} />
+        {/* Sem nota = sem foto ligada, aprovado ou não. */}
+        <Kpi label="Sem nota" value={String(noNote)} tone={noNote ? "bad" : undefined} />
         <button type="button" className="text-left" onClick={() => setShowOrphans(true)} disabled={!orphanDocs.length} title={orphanDocs.length ? "Ver os cupons" : undefined}>
           <Kpi label="Cupons sem XML" value={String(orphanDocs.length)} tone={orphanDocs.length ? "bad" : undefined} />
         </button>
