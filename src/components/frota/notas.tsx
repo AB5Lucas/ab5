@@ -643,7 +643,18 @@ function ItemAccounts() {
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">O item conta de cada parte do rateio vem do centro de custo dela. Quando o mesmo centro de custo aparece em mais de uma linha (ex.: 1001999 Indústria e Pátio), vale a linha cujo rateio tem o nome do cliente. Um CC de 4 dígitos vale para todos os CC do cliente.</p>
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1"><Label htmlFor="eq-desc">Rateio</Label><Input id="eq-desc" className="w-64" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+        {/* Rateio = cliente cadastrado (lista); um valor antigo fora da lista (ex.: TICKET) continua aparecendo para editar. */}
+        <div className="space-y-1">
+          <Label htmlFor="eq-desc">Rateio</Label>
+          <Select value={form.description} onValueChange={(v) => setForm({ ...form, description: v })}>
+            <SelectTrigger id="eq-desc" className="w-64"><SelectValue placeholder="Escolha o cliente" /></SelectTrigger>
+            <SelectContent className="max-h-80">
+              {[...new Set([...(clients.data ?? []).map((c) => c.name), ...(form.description ? [form.description] : [])])]
+                .sort((a, b) => a.localeCompare(b, "pt-BR"))
+                .map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-1"><Label htmlFor="eq-cc">Centro de custo</Label><Input id="eq-cc" className="w-40" value={form.cc} onChange={(e) => setForm({ ...form, cc: e.target.value })} /></div>
         <div className="space-y-1"><Label htmlFor="eq-item">Item conta</Label><Input id="eq-item" className="w-32" value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} /></div>
         <Button onClick={() => save.mutate()} disabled={save.isPending}>{form.id ? "Salvar" : "Adicionar"}</Button>
