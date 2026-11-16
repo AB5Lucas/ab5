@@ -94,6 +94,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      // O sistema é em português: sem isso o Chrome achava que era inglês e o tradutor automático alterava o texto
+      // da página por baixo do React, quebrando telas ("This page didn't load"), sobretudo no Chrome.
+      { name: "google", content: "notranslate" },
       { title: "Programação Operacional Integrada" },
       {
         name: "description",
@@ -123,7 +126,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR" translate="no">
       <head>
         <HeadContent />
       </head>
