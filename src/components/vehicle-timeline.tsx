@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { IndustryCustomerSelect, industryKmOneWay, industryToll, useIndustryCustomers } from "@/components/industry-customer-select";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -332,6 +333,7 @@ export function VehicleTimeline() {
   const industryIds = useMemo(() => new Set((clients.data ?? []).filter((c) => /ind[uú]stria/i.test(c.name ?? "")).map((c) => c.id)), [clients.data]);
   const isIndustryClient = (id: string | null | undefined) => !!id && industryIds.has(id);
 
+  const industryCustomers = useIndustryCustomers();
   const clientKm = useMemo(() => {
     const map = new Map<string, number>();
     (clients.data ?? []).forEach((c) => {
@@ -403,6 +405,10 @@ export function VehicleTimeline() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Local da Indústria: km de ida do cadastro de clientes Indústria; sem km preenchido, os 100 km de antes.
+  const placeKmOneWay = (place: string) => industryKmOneWay(industryCustomers.data, place) ?? KM_EXTERNAL;
+  const placeExtraKm = (place: string) => { const k = industryKmOneWay(industryCustomers.data, place); return k != null ? k * 2 : KM_EXTERNAL; };
+
   function extraKm(id: string) {
     if (id === EXTERNAL_KEY) return KM_EXTERNAL;
     if (id === MAINTENANCE_KEY) return 0;
@@ -468,14 +474,16 @@ export function VehicleTimeline() {
       driver_bonus: f.is_external || f.is_maintenance || industryPlace ? false : f.driver_bonus,
       trips: Math.max(1, Math.floor(Number(f.trips ?? 1)) || 1),
       is_suzano_local: !!f.is_suzano_local,
-      km: f.is_maintenance ? 0 : f.is_external || industryPlace ? KM_EXTERNAL : f.is_suzano_local ? KM_SUZANO_LOCAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
+      km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : industryPlace ? placeKmOneWay(industryPlace) : f.is_suzano_local ? KM_SUZANO_LOCAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
       extra_client_ids: extras,
       extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
       extra_places: pairs.map((p) => p.place),
-      // Indústria com local (viagem fora) conta 100 km fixos, como o antigo Externo.
-      extra_km: pairs.reduce((s, p) => s + (p.place ? KM_EXTERNAL : extraKm(p.c)), 0),
+      // Indústria com local: km de ida do cliente Indústria × 2; sem km cadastrado, 100 km como antes.
+      extra_km: pairs.reduce((s, p) => s + (p.place ? placeExtraKm(p.place) : extraKm(p.c)), 0),
       work_id: special ? null : workId,
       external_place: f.is_external ? (f.external_place ?? "").trim() || null : industryPlace || null,
+      // Pedágio (ida) do local Indústria cadastrado; substitui o do cliente nos custos. Sem cadastro, segue o do cliente.
+      place_toll: industryPlace ? industryToll(industryCustomers.data, industryPlace) : null,
     };
   }
 
@@ -1004,15 +1012,17 @@ export function VehicleTimeline() {
                   : form.client_id === EXTERNAL_KEY
                     ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
                   : isIndustryClient(truckClient) && form.external_place.trim()
-                    ? `Indústria com local: ${KM_EXTERNAL} km no dia, sem prêmio de motorista. O combustível vai para o CC da Indústria.`
+                    ? `Indústria com local: ${industryKmOneWay(industryCustomers.data, form.external_place) != null ? `${placeKmOneWay(form.external_place)} km de ida (× 2)` : `${KM_EXTERNAL} km (local sem km cadastrado)`}, sem prêmio de motorista. O combustível vai para o CC da Indústria.`
                     : form.client_id && form.client_id !== NONE
                       ? `${clientKm.get(form.client_id.startsWith(WORK_PREFIX) ? workById.get(form.client_id.slice(WORK_PREFIX.length))?.client_id ?? "" : form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
                       : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
               {(form.client_id === EXTERNAL_KEY || isIndustryClient(truckClient)) && (
                 <div className="space-y-1">
-                  <Label htmlFor="vehicle-place">Local (viagem fora da Indústria)</Label>
-                  <Input id="vehicle-place" placeholder="Ex.: Campinas, São Paulo, Bahia" value={form.external_place} onChange={(e) => setForm((f) => ({ ...f, external_place: e.target.value }))} />
+                  <Label htmlFor="vehicle-place">Local</Label>
+                  {byWork && form.client_id !== EXTERNAL_KEY
+                    ? <IndustryCustomerSelect value={form.external_place} onChange={(name) => setForm((f) => ({ ...f, external_place: name }))} />
+                    : <Input id="vehicle-place" placeholder="Ex.: Campinas, São Paulo, Bahia" value={form.external_place} onChange={(e) => setForm((f) => ({ ...f, external_place: e.target.value }))} />}
                 </div>
               )}
             </div>
@@ -1063,7 +1073,7 @@ export function VehicleTimeline() {
                       </SelectContent>
                     </Select>
                     <span className="w-14 text-right text-xs text-muted-foreground">
-                      {cid !== NONE ? `${isIndustryClient(cid) && (form.extraPlaces[i] ?? "").trim() ? KM_EXTERNAL : extraKm(cid)} km` : ""}
+                      {cid !== NONE ? `${isIndustryClient(cid) && (form.extraPlaces[i] ?? "").trim() ? placeExtraKm((form.extraPlaces[i] ?? "").trim()) : extraKm(cid)} km` : ""}
                     </span>
                     <Button
                       variant="ghost"
@@ -1075,8 +1085,11 @@ export function VehicleTimeline() {
                     </Button>
                   </div>
                   {isIndustryClient(cid) && (
-                    <Input placeholder="Local (viagem fora da Indústria)" aria-label="Local da obra adicional" value={form.extraPlaces[i] ?? ""}
-                      onChange={(e) => setForm((f) => { const pl = [...f.extraPlaces]; pl[i] = e.target.value; return { ...f, extraPlaces: pl }; })} />
+                    byWork
+                      ? <IndustryCustomerSelect ariaLabel="Local da obra adicional" value={form.extraPlaces[i] ?? ""}
+                          onChange={(name) => setForm((f) => { const pl = [...f.extraPlaces]; pl[i] = name; return { ...f, extraPlaces: pl }; })} />
+                      : <Input placeholder="Local" aria-label="Local da obra adicional" value={form.extraPlaces[i] ?? ""}
+                          onChange={(e) => setForm((f) => { const pl = [...f.extraPlaces]; pl[i] = e.target.value; return { ...f, extraPlaces: pl }; })} />
                   )}
                   <Select
                     value={form.extraDrivers[i] ?? NONE}

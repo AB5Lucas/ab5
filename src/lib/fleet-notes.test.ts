@@ -229,3 +229,20 @@ describe("rateio no mesmo dia", () => {
     expect(r.parts.map((p) => p.client)).toEqual(["B"]);
   });
 });
+
+describe("rateio com serviço escolhido no caminhão", () => {
+  it("Indústria com serviço vai para o CC do serviço, não para o 999", () => {
+    const clients = new Map([["i", { id: "i", name: "INDUSTRIA", cc_prefix: "1001" }]]);
+    const works = [
+      { id: "ppo", client_id: "i", cc_suffix: "001", active: true, name: "PPO" },
+      { id: "pliq", client_id: "i", cc_suffix: "004", active: true, name: "Pliq" },
+    ];
+    const schedules = [
+      { vehicle_id: "t", schedule_date: "2026-11-10", client_id: "i", work_id: "ppo", km: 30, trips: 1 },
+      { vehicle_id: "t", schedule_date: "2026-11-11", client_id: "i", work_id: "pliq", km: 10, trips: 1 },
+      { vehicle_id: "t", schedule_date: "2026-11-12", client_id: "i", km: 10, trips: 1 },
+    ];
+    const r = _fuelRateio({ vehicleId: "t", day: "2026-11-12", prevDay: "2026-11-09", total: 100, schedules, clients, works, accounts: [] });
+    expect(r.parts.map((p) => [p.client, p.cc, p.value])).toEqual([["INDUSTRIA · PPO", "1001001", 60], ["INDUSTRIA · Pliq", "1001004", 20], ["INDUSTRIA", "1001999", 20]]);
+  });
+});

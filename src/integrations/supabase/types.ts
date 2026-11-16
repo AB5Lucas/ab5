@@ -2802,6 +2802,39 @@ export type Database = {
         }
         Relationships: []
       }
+      industry_customers: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          has_toll: boolean
+          id: string
+          km_one_way: number | null
+          name: string
+          toll_amount: number | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          has_toll?: boolean
+          id?: string
+          km_one_way?: number | null
+          name: string
+          toll_amount?: number | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          has_toll?: boolean
+          id?: string
+          km_one_way?: number | null
+          name?: string
+          toll_amount?: number | null
+        }
+        Relationships: []
+      }
       industry_invoices: {
         Row: {
           amount: number
@@ -4837,6 +4870,7 @@ export type Database = {
           is_maintenance: boolean
           is_suzano_local: boolean
           km: number
+          place_toll: number | null
           notes: string | null
           schedule_date: string
           trips: number
@@ -4859,6 +4893,7 @@ export type Database = {
           is_maintenance?: boolean
           is_suzano_local?: boolean
           km?: number
+          place_toll?: number | null
           notes?: string | null
           schedule_date: string
           trips?: number
@@ -4881,6 +4916,7 @@ export type Database = {
           is_maintenance?: boolean
           is_suzano_local?: boolean
           km?: number
+          place_toll?: number | null
           notes?: string | null
           schedule_date?: string
           trips?: number

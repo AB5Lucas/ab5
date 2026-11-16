@@ -69,11 +69,16 @@ export function parseFuel(rows: unknown[][]): FleetExpenseRow[] {
 }
 
 /** Programação de um veículo no dia, como vem de vehicle_schedules. */
-export type ScheduleKm = { km: number | null; trips: number | null; extra_km: number | null; is_suzano_local?: boolean | null; clients?: { has_toll: boolean | null; toll_amount: number | null } | null };
+export type ScheduleKm = { km: number | null; trips: number | null; extra_km: number | null; is_suzano_local?: boolean | null; place_toll?: number | null; clients?: { has_toll: boolean | null; toll_amount: number | null } | null };
 /** Km rodados no dia: ida e volta por viagem, mais o km extra. */
 export const dayKm = (s: ScheduleKm) => Number(s.km ?? 0) * 2 * Math.max(1, Number(s.trips ?? 1)) + Number(s.extra_km ?? 0);
 /** Pedágio do dia, como já calculado no sistema (ida e volta por viagem; Suzano Local não paga). */
-export const dayToll = (s: ScheduleKm) => (s.clients?.has_toll && !s.is_suzano_local ? Number(s.clients.toll_amount ?? 0) * 2 * Math.max(1, Number(s.trips ?? 1)) : 0);
+export const dayToll = (s: ScheduleKm) => {
+  if (s.is_suzano_local) return 0;
+  // Local Indústria do caminhão com pedágio próprio (vehicle_schedules.place_toll) substitui o do cliente.
+  const oneWay = s.place_toll != null ? Number(s.place_toll) : s.clients?.has_toll ? Number(s.clients.toll_amount ?? 0) : 0;
+  return oneWay * 2 * Math.max(1, Number(s.trips ?? 1));
+};
 
 export type VehicleMonth = { km: number; kmCost: number; budget: number; toll: number; fuel: number; maintenance: number; rent: number; real: number; diff: number };
 const r2 = (v: number) => Math.round(v * 100) / 100;

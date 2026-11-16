@@ -57,7 +57,7 @@ export function FleetMaintenancePage() {
   const schedules = useQuery({
     queryKey: ["fleet-schedules", from, to],
     queryFn: () => fetchAll<any>((a, b) => supabase.from("vehicle_schedules")
-      .select("vehicle_id, schedule_date, km, trips, extra_km, is_suzano_local, is_maintenance, clients(has_toll, toll_amount)")
+      .select("vehicle_id, schedule_date, km, trips, extra_km, is_suzano_local, is_maintenance, place_toll, clients(has_toll, toll_amount)")
       .gte("schedule_date", from).lte("schedule_date", to).order("id").range(a, b)),
   });
   const expenses = useQuery({

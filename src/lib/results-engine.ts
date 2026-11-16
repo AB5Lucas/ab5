@@ -115,7 +115,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         w.client_id ? supabase.from("works").select("id, monthly_enabled, night_shift").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
-              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, vehicles(km_rate, plate, assign_by_work), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).range(a, b),
+              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, place_toll, vehicles(km_rate, plate, assign_by_work), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
@@ -484,7 +484,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       if (unsplit(v.schedule_date)) continue;
       const trips = Number(v.trips ?? 1);
       const kmCost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? KM_RATE);
-      const t = v.is_suzano_local ? 0 : toll * 2 * trips;
+      const t = v.is_suzano_local ? 0 : (v.place_toll != null ? Number(v.place_toll) : toll) * 2 * trips;
       const byHours = !v.work_id && !!v.vehicles?.assign_by_work && (dayHoursTotal.get(v.schedule_date) ?? 0) > 0;
       const total = byHours ? dayHoursTotal.get(v.schedule_date)! : dayTotal.get(v.schedule_date) ?? 0;
       const mine = byHours ? dayHoursMine.get(v.schedule_date) ?? 0 : dayMine.get(v.schedule_date) ?? 0;

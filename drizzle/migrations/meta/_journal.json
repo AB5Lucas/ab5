@@ -729,6 +729,13 @@
       "when": 1795400000000,
       "tag": "0103_collaborator_notice",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1795400001000,
+      "tag": "0104_industry_customers",
+      "breakpoints": true
     }
   ]
 }

@@ -241,9 +241,9 @@ export function matchDriverName(written: string | null | undefined, preferred: s
 
 // ---------- Rateio, centro de custo e item conta ----------
 export type RateioClient = { id: string; name: string; cc_prefix: string | null };
-export type RateioWork = { id: string; client_id: string | null; cc_suffix: string | null; active: boolean };
+export type RateioWork = { id: string; client_id: string | null; cc_suffix: string | null; active: boolean; name?: string | null };
 export type ItemAccount = { cc_code: string; item_account: string; description?: string | null };
-export type RateioSchedule = { vehicle_id: string; schedule_date: string; client_id: string | null; extra_client_ids?: string[] | null; is_maintenance?: boolean | null; km?: number | null; trips?: number | null; extra_km?: number | null };
+export type RateioSchedule = { vehicle_id: string; schedule_date: string; client_id: string | null; extra_client_ids?: string[] | null; is_maintenance?: boolean | null; km?: number | null; trips?: number | null; extra_km?: number | null; work_id?: string | null };
 export type RateioPart = { client_id: string; client: string; days: number; km?: number; pct: number; value: number; cc: string | null; cc_rule: string; item_account: string | null };
 /** basis: "km" = pelo km rodado em cada cliente; "dias" = sem km lançado, pelos dias (rateios antigos não têm). */
 export type Rateio = { from: string; to: string; fallback: boolean; basis?: "km" | "dias"; parts: RateioPart[] };
@@ -315,11 +315,14 @@ export function fuelRateio(opts: {
   }
   // Peso = km rodados em cada cliente no período: km da programação × 2 × viagens para o cliente principal e o
   // km extra dividido entre os clientes extras do dia. Sem km lançado no período, cai para os dias (como antes).
+  // Caminhão com serviço escolhido na Transporte (ex.: Indústria › PPO): a parte do cliente principal vai para o
+  // CC daquele serviço (chave cliente#serviço), não para o almoxarifado do cliente.
+  const mainKey = (s: RateioSchedule) => (s.client_id && s.work_id ? `${s.client_id}#${s.work_id}` : s.client_id);
   const kmWeight = new Map<string, number>();
   for (const s of days) {
     const main = s.client_id ? Number(s.km ?? 0) * 2 * Math.max(1, Number(s.trips ?? 1)) : 0;
     const extras = [...new Set((s.extra_client_ids ?? []).filter((c) => c && c !== s.client_id))];
-    if (s.client_id && main > 0) kmWeight.set(s.client_id, (kmWeight.get(s.client_id) ?? 0) + main);
+    if (s.client_id && main > 0) kmWeight.set(mainKey(s)!, (kmWeight.get(mainKey(s)!) ?? 0) + main);
     const extraKm = Number(s.extra_km ?? 0);
     if (extras.length && extraKm > 0) for (const c of extras) kmWeight.set(c, (kmWeight.get(c) ?? 0) + extraKm / extras.length);
   }
@@ -330,7 +333,7 @@ export function fuelRateio(opts: {
     const byDate = new Map<string, RateioSchedule[]>();
     for (const s of days) byDate.set(s.schedule_date, [...(byDate.get(s.schedule_date) ?? []), s]);
     for (const list of byDate.values()) {
-      const cs = [...new Set(list.flatMap(clientsOf))];
+      const cs = [...new Set(list.flatMap((s) => [mainKey(s), ...(s.extra_client_ids ?? [])].filter((c): c is string => !!c)))];
       for (const c of cs) weight.set(c, (weight.get(c) ?? 0) + 1 / cs.length);
     }
   }
@@ -340,8 +343,13 @@ export function fuelRateio(opts: {
   const parts = [...weight.entries()].sort((a, b) => b[1] - a[1]).map(([id, w], i, all) => {
     const cents = i === all.length - 1 ? totalCents - given : Math.round((totalCents * w) / sum);
     given += cents;
-    const client = opts.clients.get(id);
-    let { cc, rule } = clientCc(client, opts.works, opts.accounts);
+    const [clientId, workId] = id.split("#") as [string, string | undefined];
+    const client = opts.clients.get(clientId);
+    const work = workId ? opts.works.find((w) => w.id === workId) : undefined;
+    const prefix = (client?.cc_prefix ?? "").trim(), suffix = (work?.cc_suffix ?? "").trim();
+    let { cc, rule } = work && prefix && suffix
+      ? { cc: `${prefix}${suffix}`, rule: "serviço escolhido na Transporte" }
+      : clientCc(client, opts.works, opts.accounts);
     let item = itemAccountFor(cc, opts.accounts, client?.name);
     // O CC calculado não está na tabela Item Conta para este cliente, mas o rateio tem uma linha com o nome dele
     // (ex.: ADM → linha "ADM" no CC 2000 da Diretoria): vale a linha da tabela.
@@ -350,7 +358,7 @@ export function fuelRateio(opts: {
       if (byName.length === 1) { cc = byName[0]!.cc_code.trim(); item = byName[0]!.item_account; rule = "pelo nome do rateio na tabela Item Conta"; }
     }
     return {
-      client_id: id, client: client?.name ?? "Cliente", days: byKm ? 0 : Math.round(w * 100) / 100, km: byKm ? Math.round(w) : undefined,
+      client_id: id, client: `${client?.name ?? "Cliente"}${work?.name ? ` · ${work.name}` : ""}`, days: byKm ? 0 : Math.round(w * 100) / 100, km: byKm ? Math.round(w) : undefined,
       pct: Math.round((w / sum) * 10000) / 100, value: cents / 100, cc, cc_rule: rule, item_account: item,
     };
   });

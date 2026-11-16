@@ -32,11 +32,11 @@ export function useFuelRows(range: DayRange) {
   const release = useFleetRelease();
   const schedules = useQuery({
     queryKey: ["fleet-rateio-schedules", lookback, end],
-    queryFn: () => fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date, client_id, extra_client_ids, is_maintenance, km, trips, extra_km")
+    queryFn: () => fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date, client_id, extra_client_ids, is_maintenance, km, trips, extra_km, work_id")
       .gte("schedule_date", lookback).lte("schedule_date", end).order("schedule_date").range(a, b)),
   });
   const clients = useQuery({ queryKey: ["fleet-rateio-clients"], queryFn: async () => ((await supabase.from("clients").select("id, name, cc_prefix")).data ?? []) as RateioClient[] });
-  const works = useQuery({ queryKey: ["fleet-rateio-works"], queryFn: async () => ((await supabase.from("works").select("id, client_id, cc_suffix, active")).data ?? []) as RateioWork[] });
+  const works = useQuery({ queryKey: ["fleet-rateio-works"], queryFn: async () => ((await supabase.from("works").select("id, client_id, cc_suffix, active, name")).data ?? []) as RateioWork[] });
   const accounts = useQuery({ queryKey: ["fleet-item-accounts"], queryFn: async () => ((await supabase.from("fleet_item_accounts").select("*").order("cc_code")).data ?? []) as Tables<"fleet_item_accounts">[] });
   const people = useQuery({ queryKey: ["users-names"], queryFn: async () => new Map(((await supabase.from("users_profiles").select("id, full_name")).data ?? []).map((u) => [u.id, u.full_name])) });
 
