@@ -1288,6 +1288,84 @@ export type Database = {
         }
         Relationships: []
       }
+      client_onboarding_docs: {
+        Row: {
+          approved: boolean
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          id: string
+          kind: string
+          label: string | null
+          onboarding_id: string
+          training_id: string | null
+        }
+        Insert: {
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          label?: string | null
+          onboarding_id: string
+          training_id?: string | null
+        }
+        Update: {
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          onboarding_id?: string
+          training_id?: string | null
+        }
+        Relationships: []
+      }
+      client_onboardings: {
+        Row: {
+          client_id: string
+          collaborator_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          next_check_date: string | null
+          notes: string | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          client_id: string
+          collaborator_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          next_check_date?: string | null
+          notes?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          client_id?: string
+          collaborator_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          next_check_date?: string | null
+          notes?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       client_integrations: {
         Row: {
           client_id: string

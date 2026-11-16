@@ -736,6 +736,13 @@
       "when": 1795400001000,
       "tag": "0104_industry_customers",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1795400002000,
+      "tag": "0105_client_onboarding",
+      "breakpoints": true
     }
   ]
 }
