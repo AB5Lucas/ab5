@@ -37,6 +37,8 @@ export const SUZANO_LOCAL_KEY = "__suzano_local__";
 export const KM_SUZANO_LOCAL = 6;
 export const KM_WORK = 50;
 export const KM_EXTERNAL = 100;
+/** A logística por clientes Indústria (km de ida e pedágio do cadastro) vale a partir desta data. */
+export const LOGISTICS_START = "2026-10-26";
 
 export type VehicleScheduleRow = {
   id: string;
@@ -717,6 +719,38 @@ export function VehicleTimeline() {
       .filter((r) => r.people > 0 || r.vehicles > 0);
     return rows.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [clients.data, needs.data, capacityOf]);
+
+  // Clientes Indústria valem desde LOGISTICS_START: os dias com local já lançados são recalculados (km, km extra e
+  // pedágio) sempre que o cadastro muda; só grava o que ficou diferente. Locais sem cadastro seguem com 100 km.
+  const placesSig = (industryCustomers.data ?? []).map((c) => `${c.name}|${c.km_one_way}|${c.has_toll}|${c.toll_amount}`).join(";");
+  const placesDone = useRef("");
+  useEffect(() => {
+    if (!canWrite || !industryCustomers.data?.length || !clients.data || !worksQ.data || placesDone.current === placesSig) return;
+    placesDone.current = placesSig;
+    void (async () => {
+      const { data, error } = await supabase.from("vehicle_schedules")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_km, trips, is_suzano_local, work_id, external_place, place_toll")
+        .gte("schedule_date", LOGISTICS_START).or("external_place.not.is.null,extra_places.neq.{}");
+      if (error || !data) return;
+      let changed = 0;
+      for (const s of data as (VehicleScheduleRow & { place_toll: number | null })[]) {
+        if (s.is_external) continue;
+        // Só mexe nos dias com algum local cadastrado; o resto fica como foi lançado.
+        if (![s.external_place, ...(s.extra_places ?? [])].some((p) => p && industryKmOneWay(industryCustomers.data, p) != null || (p && industryToll(industryCustomers.data, p) != null))) continue;
+        const b = buildRow(s.vehicle_id, s.schedule_date, { ...s, trips: s.trips ?? 1 });
+        const same = (x: number | null | undefined, y: number | null | undefined) => (x == null && y == null) || Number(x) === Number(y);
+        if (same(b.km, s.km) && same(b.extra_km, s.extra_km) && same(b.place_toll, s.place_toll)) continue;
+        const { error: e } = await supabase.from("vehicle_schedules").update({ km: b.km, extra_km: b.extra_km, place_toll: b.place_toll }).eq("id", s.id);
+        if (!e) changed++;
+      }
+      if (changed) {
+        queryClient.invalidateQueries({ queryKey: ["vehicle-schedules"] });
+        queryClient.invalidateQueries({ queryKey: ["km-report"] });
+        toast.success(`Km/pedágio de ${changed} dia(s) desde ${LOGISTICS_START.split("-").reverse().join("/")} atualizados pelo cadastro de clientes Indústria`);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canWrite, placesSig, clients.data, worksQ.data]);
 
   // Caminhão (atribuído por serviço): cliente escolhido, vindo do serviço quando há um.
   const byWork = !!cell && byWorkVehicle(cell.vehicleId);
