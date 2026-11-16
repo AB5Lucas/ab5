@@ -301,7 +301,9 @@ export function fuelRateio(opts: {
   vehicleId: string | null; day: string; prevDay: string | null; total: number;
   schedules: RateioSchedule[]; clients: Map<string, RateioClient>; works: RateioWork[]; accounts: ItemAccount[];
 }): Rateio {
-  const from = opts.prevDay && opts.prevDay < opts.day ? addDays(opts.prevDay, 1) : addDays(opts.day, -29);
+  // Desde o abastecimento anterior da mesma placa: dia seguinte a ele; se foi no mesmo dia, só o próprio dia
+  // (antes caía nos últimos 30 dias). Sem abastecimento anterior, os últimos 30 dias.
+  const from = opts.prevDay ? (opts.prevDay < opts.day ? addDays(opts.prevDay, 1) : opts.day) : addDays(opts.day, -29);
   const own = opts.vehicleId ? opts.schedules.filter((s) => s.vehicle_id === opts.vehicleId && !s.is_maintenance) : [];
   const clientsOf = (s: RateioSchedule) => [...new Set([s.client_id, ...(s.extra_client_ids ?? [])].filter((c): c is string => !!c))];
   let days = own.filter((s) => s.schedule_date >= from && s.schedule_date <= opts.day && clientsOf(s).length);

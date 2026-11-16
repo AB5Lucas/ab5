@@ -215,3 +215,17 @@ describe("rateio pelo km", () => {
     expect(r.parts.map((p) => [p.client, p.km, p.value])).toEqual([["Suzano", 220, 220], ["Mars", 20, 20]]);
   });
 });
+
+import { fuelRateio as _fuelRateio } from "./fleet-notes";
+describe("rateio no mesmo dia", () => {
+  it("abastecimento anterior no mesmo dia usa só o dia, não os últimos 30", () => {
+    const schedules = [
+      { vehicle_id: "v", schedule_date: "2026-10-20", client_id: "a", km: 50, trips: 1 },
+      { vehicle_id: "v", schedule_date: "2026-11-12", client_id: "b", km: 10, trips: 1 },
+    ];
+    const clients = new Map([["a", { id: "a", name: "A", cc_prefix: "2001" }], ["b", { id: "b", name: "B", cc_prefix: "2002" }]]);
+    const r = _fuelRateio({ vehicleId: "v", day: "2026-11-12", prevDay: "2026-11-12", total: 100, schedules, clients, works: [], accounts: [] });
+    expect(r.from).toBe("2026-11-12");
+    expect(r.parts.map((p) => p.client)).toEqual(["B"]);
+  });
+});
