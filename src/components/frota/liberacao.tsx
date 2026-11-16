@@ -59,9 +59,11 @@ export function useFleetRelease() {
 }
 
 /** Lista com busca; o que for digitado e não estiver na lista pode ser incluído assim mesmo (onFree). */
-function AddPicker({ label, placeholder, options, onPick, onFree, freeLabel, disabled }: {
+function AddPicker({ label, placeholder, options, onPick, onFree, freeLabel, disabled, value }: {
   label: string; placeholder: string; options: { id: string; text: string; hint?: string }[];
   onPick: (id: string) => void; onFree: (text: string) => void; freeLabel: (text: string) => string; disabled?: boolean;
+  /** Dentro do formulário: mostra o escolhido no lugar do botão (+). */
+  value?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -69,7 +71,9 @@ function AddPicker({ label, placeholder, options, onPick, onFree, freeLabel, dis
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setQ(""); }}>
       <PopoverTrigger asChild>
-        <Button size="sm" disabled={disabled}><Plus className="h-4 w-4" /> {label}</Button>
+        {value !== undefined
+          ? <Button variant="outline" className="w-full justify-start font-normal" disabled={disabled}>{value || <span className="text-muted-foreground">{placeholder}</span>}</Button>
+          : <Button size="sm" disabled={disabled}><Plus className="h-4 w-4" /> {label}</Button>}
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
         <Command>
@@ -99,7 +103,7 @@ function AddPicker({ label, placeholder, options, onPick, onFree, freeLabel, dis
 }
 
 type Kind = "driver" | "vehicle";
-type AddOp = { kind: Kind; action: "add"; ref?: string; name?: string; plate?: string };
+type AddOp = { kind: Kind; action: "add"; ref?: string; name?: string; plate?: string; released_at?: string | null; removed_at?: string | null; active?: boolean };
 type RowOp = { kind: Kind; action: "delete" | "update"; id: string; patch?: Record<string, unknown> };
 const TABLE = { driver: "fleet_release_drivers", vehicle: "fleet_release_vehicles" } as const;
 
@@ -113,7 +117,7 @@ function useReleaseWrite(onDone?: () => void) {
         const row = op.kind === "driver"
           ? op.ref ? { collaborator_id: op.ref } : { name: titleCase(op.name!.trim()) }
           : op.ref ? { vehicle_id: op.ref } : { plate: normalizePlate(op.plate!), label: op.name?.trim() || null };
-        res = await t.insert({ ...row, released_at: today(), active: true } as never);
+        res = await t.insert({ ...row, released_at: op.released_at === undefined ? today() : op.released_at, removed_at: op.removed_at ?? null, active: op.active ?? true } as never);
       } else if (op.action === "delete") res = await t.delete().eq("id", op.id);
       else res = await t.update(op.patch as never).eq("id", op.id);
       if (res.error) throw new Error(/duplicate|unique/i.test(res.error.message) ? "Já está na lista de liberação." : res.error.message);
@@ -202,6 +206,98 @@ function EditRelease({ target, onClose }: { target: EditTarget | null; onClose: 
   );
 }
 
+type PickOption = { id: string; text: string; hint?: string };
+type AddTarget = { kind: Kind; options: PickOption[] };
+
+/** Incluir motorista ou placa: mesmo formulário do Editar, com a escolha de quem (ou qual placa) no topo. */
+function AddRelease({ target, onClose }: { target: AddTarget | null; onClose: () => void }) {
+  const [sel, setSel] = useState<{ ref: string | null; text: string }>({ ref: null, text: "" });
+  const [form, setForm] = useState({ released_at: today(), removed_at: "", active: true, name: "", plate: "" });
+  useEffect(() => {
+    if (target) { setSel({ ref: null, text: "" }); setForm({ released_at: today(), removed_at: "", active: true, name: "", plate: "" }); }
+  }, [target?.kind]);
+  const m = useReleaseWrite(onClose);
+  if (!target) return null;
+  const isVehicle = target.kind === "vehicle";
+  const free = !sel.ref && !!sel.text;
+  const error = !sel.ref && !sel.text ? (isVehicle ? "Escolha a placa." : "Escolha o motorista.")
+    : form.released_at && form.removed_at && form.removed_at < form.released_at ? "A data de exclusão não pode ser antes da data de liberação."
+    : free && !isVehicle && !form.name.trim() ? "Informe o nome."
+    : free && isVehicle && !normalizePlate(form.plate) ? "Informe a placa." : null;
+  const pickFree = (text: string) => {
+    setSel({ ref: null, text: isVehicle ? `${normalizePlate(text) || text.toUpperCase()} (fora do cadastro)` : `${titleCase(text)} (fora do cadastro)` });
+    setForm((f) => (isVehicle ? { ...f, plate: text.toUpperCase(), name: "" } : { ...f, name: titleCase(text) }));
+  };
+  const save = () => m.mutate({
+    kind: target.kind, action: "add",
+    ...(sel.ref ? { ref: sel.ref } : isVehicle ? { plate: form.plate, name: form.name } : { name: form.name }),
+    released_at: form.released_at || null, removed_at: form.removed_at || null, active: form.active,
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{isVehicle ? "Incluir placa" : "Incluir motorista"}</DialogTitle>
+          <DialogDescription>{isVehicle ? "Placa liberada para abastecer no posto." : "Motorista liberado para abastecer no posto."}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="block">{isVehicle ? "Placa" : "Motorista"}</Label>
+            <AddPicker label={isVehicle ? "Placa" : "Motorista"} placeholder={isVehicle ? "Placa ou veículo" : "Nome do motorista"} value={sel.text}
+              options={target.options}
+              onPick={(id) => setSel({ ref: id, text: target.options.find((o) => o.id === id)?.text ?? "" })}
+              onFree={pickFree}
+              freeLabel={(text) => (isVehicle ? `Incluir a placa ${normalizePlate(text) || text.toUpperCase()}` : `Incluir "${titleCase(text)}"`)} />
+          </div>
+          {free && !isVehicle && (
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="add-name">Nome</Label>
+              <Input id="add-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+          )}
+          {free && isVehicle && (
+            <>
+              <div className="space-y-1">
+                <Label htmlFor="add-plate">Placa</Label>
+                <Input id="add-plate" value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-label">Nome do veículo</Label>
+                <Input id="add-label" value={form.name} placeholder="Ex.: Strada (terceiro)" onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+            </>
+          )}
+          <div className="space-y-1">
+            <Label htmlFor="add-from">Data de liberação</Label>
+            <Input id="add-from" type="date" value={form.released_at} onChange={(e) => setForm({ ...form, released_at: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="add-to">Data de exclusão</Label>
+            <Input id="add-to" type="date" value={form.removed_at}
+              onChange={(e) => setForm({ ...form, removed_at: e.target.value, active: e.target.value && !form.removed_at ? false : form.active })} />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label>Situação</Label>
+            <Select value={form.active ? "ativo" : "inativo"} onValueChange={(v) => setForm({ ...form, active: v === "ativo" })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ativo">Ativo</SelectItem>
+                <SelectItem value="inativo">Inativo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">Vale para as notas com data entre a liberação e a exclusão, enquanto estiver ativo. Inativo não entra na conferência das notas.</p>
+        {error && sel.text !== "" && <p className="text-xs text-destructive">{error}</p>}
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button disabled={m.isPending || !!error} onClick={save}>Incluir</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /** Placa digitada fora do cadastro: pede o nome do veículo antes de incluir. */
 function FreeVehicleDialog({ plate, onClose }: { plate: string | null; onClose: () => void }) {
   const [form, setForm] = useState({ plate: "", name: "" });
@@ -258,6 +354,7 @@ export function FleetRelease() {
   const m = useReleaseWrite();
   const [edit, setEdit] = useState<EditTarget | null>(null);
   const [freePlate, setFreePlate] = useState<string | null>(null);
+  const [adding, setAdding] = useState<AddTarget | null>(null);
 
   const personById = new Map((people.data ?? []).map((p) => [p.id, p]));
   const vehicleById = new Map((vehicles.data ?? []).map((v) => [v.id, v]));
@@ -321,13 +418,13 @@ export function FleetRelease() {
             <Label className="block">Motoristas liberados</Label>
             <p className="text-xs text-muted-foreground">{listedDrivers.filter((e) => e.active).length} ativo(s) · {people.data?.length ?? 0} com CNH cadastrada</p>
           </div>
-          <AddPicker label="Motorista" placeholder="Nome do motorista" disabled={m.isPending}
-            options={(people.data ?? []).filter((p) => !takenDrivers.has(p.id)).map((p) => ({
-              id: p.id, text: titleCase(p.full_name), hint: [p.status === "inactive" ? "inativo" : null, expired(p.driver_license_expiry) ? "CNH vencida" : null].filter(Boolean).join(" · ") || undefined,
-            }))}
-            onPick={(id) => m.mutate({ kind: "driver", action: "add", ref: id })}
-            onFree={(text) => m.mutate({ kind: "driver", action: "add", name: text })}
-            freeLabel={(text) => `Incluir "${titleCase(text)}"`} />
+          <Button size="sm" disabled={m.isPending} onClick={() => setAdding({
+            kind: "driver",
+            options: (people.data ?? []).filter((p) => !takenDrivers.has(p.id)).map((p) => {
+              const hint = [p.status === "inactive" ? "inativo" : null, expired(p.driver_license_expiry) ? "CNH vencida" : null].filter(Boolean).join(" · ");
+              return hint ? { id: p.id, text: titleCase(p.full_name), hint } : { id: p.id, text: titleCase(p.full_name) };
+            }),
+          })}><Plus className="h-4 w-4" /> Motorista</Button>
         </div>
         <div className="overflow-x-auto">
           <Table className="text-sm">
@@ -363,11 +460,13 @@ export function FleetRelease() {
             <Label className="block">Placas liberadas</Label>
             <p className="text-xs text-muted-foreground">{listedVehicles.filter((e) => e.active).length} ativa(s) · {vehicles.data?.length ?? 0} veículos cadastrados</p>
           </div>
-          <AddPicker label="Placa" placeholder="Placa ou veículo" disabled={m.isPending}
-            options={(vehicles.data ?? []).filter((v) => !takenVehicles.has(v.id)).map((v) => ({ id: v.id, text: v.model ? `${v.plate} - ${v.model}` : v.plate, hint: v.status === "inactive" ? "inativo" : undefined }))}
-            onPick={(id) => m.mutate({ kind: "vehicle", action: "add", ref: id })}
-            onFree={(text) => setFreePlate(text)}
-            freeLabel={(text) => `Incluir a placa ${normalizePlate(text) || text.toUpperCase()}`} />
+          <Button size="sm" disabled={m.isPending} onClick={() => setAdding({
+            kind: "vehicle",
+            options: (vehicles.data ?? []).filter((v) => !takenVehicles.has(v.id)).map((v) => {
+              const text = v.model ? `${v.plate} - ${v.model}` : v.plate;
+              return v.status === "inactive" ? { id: v.id, text, hint: "inativo" } : { id: v.id, text };
+            }),
+          })}><Plus className="h-4 w-4" /> Placa</Button>
         </div>
         <div className="overflow-x-auto">
           <Table className="text-sm">
@@ -395,6 +494,7 @@ export function FleetRelease() {
         </div>
       </section>
       <EditRelease target={edit} onClose={() => setEdit(null)} />
+      <AddRelease target={adding} onClose={() => setAdding(null)} />
       <FreeVehicleDialog plate={freePlate} onClose={() => setFreePlate(null)} />
     </div>
   );
