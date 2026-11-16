@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate, registeredPlate } from "@/lib/fleet-costs";
-import { closestPlate, driverRanking, isoDay, withDateFix, matchDriverName, titleCase, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
+import { canonicalDriver, closestPlate, driverRanking, isoDay, withDateFix, matchDriverName, titleCase, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
 import { useCnhPeople, useFleetRelease } from "./liberacao";
 import { currentMonthRange, DateRangePicker, type DayRange } from "@/components/date-range-picker";
 
@@ -56,7 +56,7 @@ export function DriverRanking() {
       return {
         ...n,
         plate_fix: n.plate_fix ?? closestPlate(n.plate, [...(vehicles.data ?? []).filter((v) => vIds.has(v.id)).map((v) => v.plate), ...release.freePlatesOn(day)], allPlates),
-        driver_fix: n.driver_fix ?? matchDriverName(n.driver, [...(cnh.data ?? []).filter((c) => dIds.has(c.id)).map((c) => c.full_name), ...release.freeNamesOn(day)], cnhNames),
+        driver_fix: canonicalDriver(n.driver_fix ?? matchDriverName(n.driver, [...(cnh.data ?? []).filter((c) => dIds.has(c.id)).map((c) => c.full_name), ...release.freeNamesOn(day)], cnhNames), cnhNames),
       };
     });
   }, [notes.data, vehicles.data, cnh.data, release.drivers, release.vehicles]);

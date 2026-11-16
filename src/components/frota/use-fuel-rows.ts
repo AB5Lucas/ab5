@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate, registeredPlate } from "@/lib/fleet-costs";
-import { closestPlate, fixedRateio, fuelRateio, isoDay, withDateFix, matchDriverName, nameKey, plateRuleSplit, titleCase, type CcSplitItem, noteStatus, otherPlates, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
+import { canonicalDriver, closestPlate, fixedRateio, fuelRateio, isoDay, withDateFix, matchDriverName, nameKey, plateRuleSplit, titleCase, type CcSplitItem, noteStatus, otherPlates, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { monthsInRange, type DayRange } from "@/components/date-range-picker";
 import { useCnhPeople, useFleetRelease } from "./liberacao";
 import type { Tables } from "@/integrations/supabase/types";
@@ -92,6 +92,8 @@ export function useFuelRows(range: DayRange) {
         name = matchDriverName(n.driver, onVehicle);
       }
       if (!name && n.driver) name = rawByKey.get(nameKey(n.driver)) ?? n.driver;
+      // Nome livre da Liberação ou sem casamento: escrito como no cadastro quando um só colaborador combina.
+      name = canonicalDriver(name, cnhNames);
       return name ? titleCase(name) : null;
     };
     // Placa mostrada como cadastrada na Liberação/Veículos (o casamento continua pela forma Mercosul).

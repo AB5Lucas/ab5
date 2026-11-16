@@ -225,6 +225,9 @@ const tokenHit = (w: string, words: string[]) =>
 /** Chave do nome sem acento, caixa e espaços repetidos (para juntar "Andre Jesus" e "André Jesus"). */
 export const nameKey = (s: string) => plain(s).replace(/[^A-Z ]/g, " ").replace(/\s+/g, " ").trim();
 
+/** Nome já casado (ex.: um nome digitado na Liberação) → como está no cadastro, se um só colaborador combinar. */
+export const canonicalDriver = (name: string | null, cadastro: string[]) => (name ? matchDriverName(name, [], cadastro) ?? name : null);
+
 export function matchDriverName(written: string | null | undefined, preferred: string[], all: string[] = []): string | null {
   const ws = nameTokens(written ?? "");
   if (!ws.length) return null;
@@ -232,10 +235,13 @@ export function matchDriverName(written: string | null | undefined, preferred: s
     const names = [...new Set(list)];
     const hits = names.filter((full) => {
       const words = nameTokens(full);
-      if (!words.length || !tokenHit(ws[0]!, [words[0]!])) return false;
-      if (ws.length === 1) return i === 0;
+      if (!words.length) return false;
       const rest = ws.slice(1);
       const missing = rest.filter((w) => !tokenHit(w, words.slice(1))).length;
+      // Primeiro nome com 1 letra errada; com 2 (ex.: "Maciop" → Marcio) só se as outras 2+ palavras baterem todas.
+      const firstOk = tokenHit(ws[0]!, [words[0]!]) || (rest.length >= 2 && missing === 0 && ws[0]!.length >= 4 && lev(ws[0]!, words[0]!) <= 2);
+      if (!firstOk) return false;
+      if (ws.length === 1) return i === 0;
       return missing === 0 || (rest.length >= 3 && missing === 1);
     });
     if (hits.length === 1) return hits[0]!;
