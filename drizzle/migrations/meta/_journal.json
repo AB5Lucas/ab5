@@ -750,6 +750,13 @@
       "when": 1795400003000,
       "tag": "0106_truck_by_work",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1795400004000,
+      "tag": "0107_drop_stale_passengers",
+      "breakpoints": true
     }
   ]
 }

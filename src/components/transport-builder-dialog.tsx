@@ -66,12 +66,15 @@ export function TransportBuilderDialog({
   }, [drivers, people]);
 
   const driverIds = new Set(cars.map((c) => c.driver_id).filter(Boolean) as string[]);
-  const placed = new Map(passengers.map((p) => [p.collaborator_id, p.vehicle_schedule_id ?? OWN]));
+  // Passageiro de um carro que deixou de atender este cliente (trocado na Transporte) volta para a lista.
+  const carIds = new Set(cars.map((c) => c.id));
+  const live = passengers.filter((p) => !p.vehicle_schedule_id || carIds.has(p.vehicle_schedule_id));
+  const placed = new Map(live.map((p) => [p.collaborator_id, p.vehicle_schedule_id ?? OWN]));
   const pool = people
     .filter((p) => !placed.has(p.collaborator_id) && !driverIds.has(p.collaborator_id))
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   const inBox = (key: string) =>
-    passengers
+    live
       .filter((p) => (p.vehicle_schedule_id ?? OWN) === key && !driverIds.has(p.collaborator_id))
       .map((p) => ({ collaborator_id: p.collaborator_id, name: nameOf.get(p.collaborator_id) ?? "—" }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
