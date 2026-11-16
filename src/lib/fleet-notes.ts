@@ -212,9 +212,17 @@ export function closestPlate(raw: string | null | undefined, preferred: string[]
 
 const NAME_STOP = new Set(["DA", "DE", "DO", "DAS", "DOS", "E"]);
 const nameTokens = (s: string) => plain(s).replace(/[^A-Z ]/g, " ").split(/\s+/).filter((t) => t && !NAME_STOP.has(t));
+/** Forma "falada" do nome: sem H, Y = I, W = V, K = C, PH = F, sem letra dobrada (Sihdney → SIDNEI, Sidney → SIDNEI). */
+const phon = (t: string) => t.replace(/PH/g, "F").replace(/H/g, "").replace(/Y/g, "I").replace(/W/g, "V").replace(/K/g, "C").replace(/(.)\1+/g, "$1");
 const tokenHit = (w: string, words: string[]) =>
-  // 1 letra errada; em palavra longa (7+ letras), até 2 (ex.: Gosalves → Goncalves).
-  words.some((x) => x === w || (w.length === 1 && x.startsWith(w)) || (w.length >= 4 && x.length >= 4 && lev(w, x) <= (w.length >= 7 && x.length >= 7 ? 2 : 1)));
+  // 1 letra errada; em palavra longa (7+ letras), até 2 (ex.: Gosalves → Goncalves). Compara também a forma falada
+  // (Sidiney, Sideney, Sinei, Sidnei → Sihdnei).
+  words.some((x) => {
+    if (x === w || (w.length === 1 && x.startsWith(w))) return true;
+    if (w.length < 4 || x.length < 4) return false;
+    const max = w.length >= 7 && x.length >= 7 ? 2 : 1;
+    return lev(w, x) <= max || lev(phon(w), phon(x)) <= max;
+  });
 
 /**
  * Nome escrito na nota → nome completo cadastrado. O primeiro nome tem que bater (aceita 1 letra errada) e as outras
