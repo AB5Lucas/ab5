@@ -145,12 +145,13 @@ function ServicesPage() {
         supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date),
         supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date),
         supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
-        supabase.from("appointments").select("collaborator_id").in("type", ["treinamento", "integracao"]).eq("scheduled_date", date).neq("status", "cancelado"),
+        // ASO, treinamento ou integração no dia (como na Programação): a pessoa sai dos serviços.
+        supabase.from("appointments").select("collaborator_id").eq("scheduled_date", date).in("status", ["agendado", "realizado"]),
         sched
           ? supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).or("box_key.eq.treinamento,box_key.like.integracao:%")
           : Promise.resolve({ data: [] as { collaborator_id: string }[] }),
       ]);
-      // Escalado para treinamento no dia: sai da aba Serviços
+      // Com agendamento (ASO, treinamento, integração) no dia: sai da aba Serviços
       const training = new Set<string>([
         ...(trApp ?? []).map((t) => t.collaborator_id),
         ...(trBox ?? []).map((t) => t.collaborator_id),

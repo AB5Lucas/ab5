@@ -41,7 +41,7 @@ export function useServiceDistribution(selectedDate?: string) {
         fetchAll<{ collaborator_id: string; date: string; end_date: string | null }>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", end).or(`end_date.gte.${start},and(end_date.is.null,date.gte.${start})`).order("id").range(a, b)),
         fetchAll<{ collaborator_id: string; start_date: string; end_date: string }>((a, b) => supabase.from("vacations").select("collaborator_id, start_date, end_date").lte("start_date", end).gte("end_date", start).order("id").range(a, b)),
         fetchAll<{ collaborator_id: string; start_date: string; end_date: string }>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").lte("start_date", end).gte("end_date", start).order("id").range(a, b)),
-        fetchAll<{ collaborator_id: string; scheduled_date: string }>((a, b) => supabase.from("appointments").select("collaborator_id, scheduled_date").in("type", ["treinamento", "integracao"]).gte("scheduled_date", start).lte("scheduled_date", end).neq("status", "cancelado").order("id").range(a, b)),
+        fetchAll<{ collaborator_id: string; scheduled_date: string }>((a, b) => supabase.from("appointments").select("collaborator_id, scheduled_date").gte("scheduled_date", start).lte("scheduled_date", end).in("status", ["agendado", "realizado"]).order("id").range(a, b)),
         fetchAll<{ collaborator_id: string; schedule_id: string }>((a, b) => supabase.from("daily_status_entries").select("collaborator_id, schedule_id").in("schedule_id", ids).or("box_key.eq.treinamento,box_key.like.integracao:%").order("id").range(a, b)),
       ]);
       const days = schedules.map((s) => {
