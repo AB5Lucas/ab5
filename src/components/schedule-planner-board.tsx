@@ -1256,6 +1256,9 @@ export function SchedulePlannerBoard({
       const targetRows = rows.filter((r) => r.work_id === workId && r.collaborator_id !== collaboratorId);
       const sort = beforeSort ?? (targetRows.length ? Math.max(...targetRows.map((r) => r.sort_order)) + 1 : 0);
 
+      // Ao mudar de obra, VT e prêmio viagem voltam à regra da obra nova (as exceções marcadas na obra antiga saem).
+      const resetIfMoved = (fromWork: string | null | undefined) =>
+        fromWork && fromWork !== workId ? { vt_override: null, travel_bonus_override: null } : {};
       if (allocationId) {
         const { error } = await supabase
           .from("daily_allocations")
@@ -1263,6 +1266,7 @@ export function SchedulePlannerBoard({
             work_id: workId,
             sort_order: sort,
             has_pending_requirement: issues.length > 0,
+            ...resetIfMoved(rows.find((r) => r.id === allocationId)?.work_id),
           })
           .eq("id", allocationId);
         if (error) throw error;
@@ -1271,7 +1275,7 @@ export function SchedulePlannerBoard({
         if (existing) {
           const { error } = await supabase
             .from("daily_allocations")
-            .update({ work_id: workId, sort_order: sort, has_pending_requirement: issues.length > 0 })
+            .update({ work_id: workId, sort_order: sort, has_pending_requirement: issues.length > 0, ...resetIfMoved(existing.work_id) })
             .eq("id", existing.id);
           if (error) throw error;
         } else {
