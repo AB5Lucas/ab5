@@ -978,6 +978,17 @@ export function SchedulePlannerBoard({
     people.forEach((p) => m.set(p.id, p));
     return m;
   }, [people]);
+  // Aviso prévio (cadastro do colaborador): degradê vermelho discreto da esquerda para a direita a partir do início;
+  // depois do fim não pode ser escalado em obras.
+  const noticeOf = (id: string) => {
+    const p = personById.get(id) as { notice_start?: string | null; notice_end?: string | null } | undefined;
+    return p?.notice_start && p.notice_start <= date ? { start: p.notice_start, end: p.notice_end ?? null } : null;
+  };
+  const noticeClass = (id: string) => (noticeOf(id) ? "bg-gradient-to-r from-destructive/15 via-destructive/[0.04] to-transparent" : "");
+  const noticeTitle = (id: string) => {
+    const n = noticeOf(id);
+    return n ? `Aviso prévio de ${formatDateBR(n.start)}${n.end ? ` a ${formatDateBR(n.end)}` : ""}` : undefined;
+  };
 
   const copyPeopleCpf = (ids: string[]) => {
     const uniq = Array.from(new Set(ids));
@@ -1060,6 +1071,10 @@ export function SchedulePlannerBoard({
       if (current) return base({ level: "busy", reasons: [`Alocado em ${currentLabel()}`] });
       return base({ level: "ok" });
     }
+
+    const notice = noticeOf(collaboratorId);
+    if (notice?.end && date > notice.end)
+      return base({ level: "block", hardBlock: true, reasons: [`Aviso prévio terminou em ${formatDateBR(notice.end)}`] });
 
     const work = works.find((x) => x.id === workId);
     const clientName = work?.clients?.name ?? "cliente";
@@ -1424,6 +1439,7 @@ export function SchedulePlannerBoard({
         .filter((r) => !appointmentByCollaborator.has(r.collaborator_id))
         .filter((r) => !workRequiresIntegration(c as ScheduleContext, r.work_id) || checkAso(c as ScheduleContext, r.collaborator_id, date, r.work_id).status !== "expired")
         .filter((r) => !existing.has(r.collaborator_id))
+        .filter((r) => { const n = noticeOf(r.collaborator_id); return !(n?.end && date > n.end); })
         .map((r, i) => ({
           schedule_id: id,
           work_id: r.work_id,
@@ -1946,7 +1962,8 @@ export function SchedulePlannerBoard({
                           const same = payload.allocationId ? rows.find((x) => x.id === payload.allocationId) : allocByCollaborator.get(payload.collaboratorId);
                           drop.mutate({ ...payload, workId: same && ids.has(same.work_id) ? same.work_id : r.work_id, beforeSort: r.sort_order - 0.5 });
                         }}
-                        className="flex items-center gap-1.5 px-2 py-1 text-xs"
+                        title={noticeTitle(r.collaborator_id)}
+                        className={cn("flex items-center gap-1.5 px-2 py-1 text-xs", noticeClass(r.collaborator_id))}
                       >
                         {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
                         <div className="min-w-0 flex-1">
@@ -2254,7 +2271,8 @@ export function SchedulePlannerBoard({
                         onDragEnd={() => setDragging(null)}
                         onDragOver={handleOver}
                         onDrop={handleDrop}
-                        className="flex items-center gap-1.5 px-2 py-1 text-xs"
+                        title={noticeTitle(entry.collaborator_id)}
+                        className={cn("flex items-center gap-1.5 px-2 py-1 text-xs", noticeClass(entry.collaborator_id))}
                       >
                         {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
                         <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setOpenEntry((s) => (s === entry.id ? null : entry.id))}>
@@ -2410,9 +2428,11 @@ export function SchedulePlannerBoard({
                   draggable={canDrag}
                   onDragStart={(e) => startDrag(e, { collaboratorId: p.id, allocationId: alloc?.id ?? null })}
                   onDragEnd={() => setDragging(null)}
+                  title={noticeTitle(p.id)}
                   className={cn(
                     "text-xs",
                     canDrag ? "cursor-grab active:cursor-grabbing hover:bg-secondary" : "opacity-70",
+                    noticeClass(p.id),
                   )}
                 >
                   <button

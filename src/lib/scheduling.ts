@@ -48,6 +48,9 @@ export type Collaborator = {
   driver_license_category: string | null;
   driver_license_expiry: string | null;
   contract_type: string | null;
+  /** Aviso prévio (RH): início e fim; depois do fim não pode ser escalado em obras. */
+  notice_start?: string | null;
+  notice_end?: string | null;
 };
 
 export type Requirement = {
@@ -135,7 +138,7 @@ export async function fetchScheduleContext(date: string) {
     supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, active, clients(name, city, distance_km, requires_integration, needs_transport_voucher)").order("name"),
     supabase
       .from("collaborators")
-      .select("id, full_name, cpf, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type")
+      .select("id, full_name, cpf, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type, notice_start, notice_end")
       .order("full_name"),
     supabase.from("positions").select("id, name").order("name"),
     supabase.from("vehicles").select("id, plate, model, passenger_capacity, status").order("plate"),

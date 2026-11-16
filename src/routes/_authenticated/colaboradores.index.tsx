@@ -152,6 +152,9 @@ type FormState = {
   status: "active" | "inactive";
   is_driver: boolean;
   vt_enabled: boolean;
+  notice: boolean;
+  notice_start: string;
+  notice_end: string;
   driver_license_category: string;
   driver_license_expiry: string;
   salary: string;
@@ -176,6 +179,9 @@ const emptyForm: FormState = {
   status: "active",
   is_driver: false,
   vt_enabled: true,
+  notice: false,
+  notice_start: "",
+  notice_end: "",
   driver_license_category: "",
   driver_license_expiry: "",
   salary: "",
@@ -201,6 +207,9 @@ function toForm(c: Collaborator): FormState {
     status: c.status,
     is_driver: c.is_driver,
     vt_enabled: (c as { vt_enabled?: boolean | null }).vt_enabled !== false,
+    notice: !!c.notice_start,
+    notice_start: c.notice_start ?? "",
+    notice_end: c.notice_end ?? "",
     driver_license_category: c.driver_license_category ?? "",
     driver_license_expiry: c.driver_license_expiry ?? "",
     salary: c.salary == null ? "" : Number(c.salary).toFixed(2).replace(".", ","),
@@ -295,6 +304,8 @@ function CollaboratorsPage() {
     mutationFn: async () => {
       const parsed = schema.safeParse(form);
       if (!parsed.success) throw new Error(parsed.error.issues[0]!.message);
+      if (form.notice && (!form.notice_start || !form.notice_end)) throw new Error("Informe o início e o fim do aviso prévio.");
+      if (form.notice && form.notice_end < form.notice_start) throw new Error("O fim do aviso prévio não pode ser antes do início.");
       const payload = {
         registration_number: form.registration_number.trim(),
         full_name: form.full_name.trim(),
@@ -314,6 +325,8 @@ function CollaboratorsPage() {
         status: form.status,
         is_driver: form.is_driver,
         vt_enabled: form.vt_enabled,
+        notice_start: form.notice ? nn(form.notice_start) : null,
+        notice_end: form.notice ? nn(form.notice_end) : null,
         driver_license_category: form.is_driver ? nn(form.driver_license_category) : null,
         driver_license_expiry: form.is_driver ? nn(form.driver_license_expiry) : null,
         notes: nn(form.notes),
@@ -675,7 +688,25 @@ function CollaboratorsPage() {
                 <Switch id="vt_enabled" checked={form.vt_enabled} onCheckedChange={(v) => set("vt_enabled", v)} />
                 <Label htmlFor="vt_enabled">Vale Transporte</Label>
               </div>
+              <div className="flex items-center gap-3">
+                <Switch id="notice" checked={form.notice} onCheckedChange={(v) => set("notice", v)} />
+                <Label htmlFor="notice">Aviso prévio</Label>
+              </div>
             </div>
+
+            {form.notice && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="notice_start">Início do aviso prévio</Label>
+                  <Input id="notice_start" type="date" value={form.notice_start} onChange={(e) => set("notice_start", e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notice_end">Fim do aviso prévio</Label>
+                  <Input id="notice_end" type="date" value={form.notice_end} min={form.notice_start || undefined} onChange={(e) => set("notice_end", e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Depois do fim não pode mais ser escalado em obras. A inativação continua manual, após o fechamento do RH.</p>
+                </div>
+              </>
+            )}
 
             {form.is_driver && (
               <>

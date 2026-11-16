@@ -1548,6 +1548,8 @@ export type Database = {
           id: string
           is_driver: boolean
           no_overtime_premium: boolean
+          notice_end: string | null
+          notice_start: string | null
           notes: string | null
           phone: string | null
           photo_url: string | null
@@ -1579,6 +1581,8 @@ export type Database = {
           id?: string
           is_driver?: boolean
           no_overtime_premium?: boolean
+          notice_end?: string | null
+          notice_start?: string | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
@@ -1610,6 +1614,8 @@ export type Database = {
           id?: string
           is_driver?: boolean
           no_overtime_premium?: boolean
+          notice_end?: string | null
+          notice_start?: string | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
