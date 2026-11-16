@@ -125,8 +125,8 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
           supabase.from("days_off").select("collaborator_id, date, end_date").in("collaborator_id", ids).lte("date", date),
           supabase.from("vacations").select("collaborator_id").in("collaborator_id", ids).lte("start_date", date).gte("end_date", date).neq("status", "cancelled"),
           supabase.from("medical_leaves").select("collaborator_id").in("collaborator_id", ids).lte("start_date", date).gte("end_date", date),
-          // Escalado para integração/treinamento no dia: sai do RDO da obra
-          supabase.from("appointments").select("collaborator_id").in("collaborator_id", ids).in("type", ["integracao", "treinamento"]).eq("scheduled_date", date).neq("status", "cancelado"),
+          // Com ASO, integração ou treinamento agendado no dia: sai do RDO da obra (como na Programação)
+          supabase.from("appointments").select("collaborator_id").in("collaborator_id", ids).eq("scheduled_date", date).in("status", ["agendado", "realizado"]),
           supabase.from("daily_status_entries").select("collaborator_id, box_key").eq("schedule_id", s.id).in("collaborator_id", ids),
         ]);
         for (const o of off.data ?? []) if ((o.end_date ?? o.date) >= date) blocked.add(o.collaborator_id);
