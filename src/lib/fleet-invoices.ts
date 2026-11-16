@@ -14,7 +14,7 @@ const latin1 = (bytes: Uint8Array) => { let s = ""; for (let i = 0; i < bytes.le
 
 async function inflate(bytes: Uint8Array): Promise<Uint8Array> {
   const ds = new DecompressionStream("deflate");
-  const out = new Response(new Blob([bytes]).stream().pipeThrough(ds));
+  const out = new Response(new Blob([bytes as Uint8Array<ArrayBuffer>]).stream().pipeThrough(ds));
   return new Uint8Array(await out.arrayBuffer());
 }
 

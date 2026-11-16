@@ -222,7 +222,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
 }
 
 /** fromDate/toDate (AAAA-MM-DD): período por dias da aba Resultados. Sem eles o cálculo é por mês inteiro, como sempre. */
-export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[]; selectedMonths?: readonly string[]; accumulated?: boolean; fromDate?: string; toDate?: string };
+export type BaseOpts = { isAll: boolean; workIds: string[]; holidays: string[]; allWorks: any[]; selectedMonths?: readonly string[]; accumulated?: boolean; fromDate?: string | undefined; toDate?: string | undefined };
 
 /** Contrato: work_id → último dia do mês do último faturamento (custos depois disso não entram). */
 export function contractCutoffs(work: any, entries: any[], isAll: boolean, allWorks?: any[]) {

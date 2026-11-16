@@ -244,7 +244,7 @@ export type RateioClient = { id: string; name: string; cc_prefix: string | null 
 export type RateioWork = { id: string; client_id: string | null; cc_suffix: string | null; active: boolean; name?: string | null };
 export type ItemAccount = { cc_code: string; item_account: string; description?: string | null };
 export type RateioSchedule = { vehicle_id: string; schedule_date: string; client_id: string | null; extra_client_ids?: string[] | null; is_maintenance?: boolean | null; km?: number | null; trips?: number | null; extra_km?: number | null; work_id?: string | null };
-export type RateioPart = { client_id: string; client: string; days: number; km?: number; pct: number; value: number; cc: string | null; cc_rule: string; item_account: string | null };
+export type RateioPart = { client_id: string; client: string; days: number; km?: number | undefined; pct: number; value: number; cc: string | null; cc_rule: string; item_account: string | null };
 /** basis: "km" = pelo km rodado em cada cliente; "dias" = sem km lançado, pelos dias (rateios antigos não têm). */
 export type Rateio = { from: string; to: string; fallback: boolean; basis?: "km" | "dias"; parts: RateioPart[] };
 
