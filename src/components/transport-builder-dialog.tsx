@@ -68,7 +68,9 @@ export function TransportBuilderDialog({
   const driverIds = new Set(cars.map((c) => c.driver_id).filter(Boolean) as string[]);
   // Passageiro de um carro que deixou de atender este cliente (trocado na Transporte) volta para a lista.
   const carIds = new Set(cars.map((c) => c.id));
-  const live = passengers.filter((p) => !p.vehicle_schedule_id || carIds.has(p.vehicle_schedule_id));
+  // e quem saiu do cliente na Programação (não está mais na lista do dia) não aparece como "—" no carro.
+  const inDay = new Set(people.map((p) => p.collaborator_id));
+  const live = passengers.filter((p) => (!p.vehicle_schedule_id || carIds.has(p.vehicle_schedule_id)) && inDay.has(p.collaborator_id));
   const placed = new Map(live.map((p) => [p.collaborator_id, p.vehicle_schedule_id ?? OWN]));
   const pool = people
     .filter((p) => !placed.has(p.collaborator_id) && !driverIds.has(p.collaborator_id))
