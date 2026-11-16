@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { normalizePlate } from "@/lib/fleet-costs";
 import { titleCase } from "@/lib/fleet-notes";
+import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const brDate = (d: string | null) => (d ? d.split("-").reverse().join("/") : "—");
@@ -234,6 +235,12 @@ function FreeVehicleDialog({ plate, onClose }: { plate: string | null; onClose: 
   );
 }
 
+/** Situação em texto (a mesma da etiqueta), para o filtro da coluna. */
+const statusText = (entry: ReleaseEntry) => {
+  const on = releasedOn(entry, today());
+  return entry.active && !on ? (entry.removed_at && entry.removed_at < today() ? "Ativo (excluído)" : "Ativo (a partir da data)") : entry.active ? "Ativo" : "Inativo";
+};
+
 function StatusBadge({ entry }: { entry: ReleaseEntry }) {
   const on = releasedOn(entry, today());
   return entry.active && !on
@@ -267,6 +274,32 @@ export function FleetRelease() {
   const expired = (d: string | null) => !!d && d < today();
   const loading = release.isLoading;
 
+  // Filtro e ordenação por coluna, como no Excel (igual à aba Abastecimentos).
+  const [dFilters, setDFilters] = useState<ColumnFilters>({});
+  const [dSort, setDSort] = useState<ColumnSort>(null);
+  const [vFilters, setVFilters] = useState<ColumnFilters>({});
+  const [vSort, setVSort] = useState<ColumnSort>(null);
+  const cnhText = (e: ReleaseEntry) => {
+    const p = e.ref ? personById.get(e.ref) : undefined;
+    return p ? `${p.driver_license_category ?? "—"}${p.driver_license_expiry ? ` · ${brDate(p.driver_license_expiry)}` : ""}${expired(p.driver_license_expiry) ? " vencida" : ""}` : "—";
+  };
+  const driverCols: ColumnDef<ReleaseEntry>[] = [
+    { key: "nome", label: "Nome", values: (e) => [driverName(e)], sort: (e) => driverName(e) },
+    { key: "cnh", label: "CNH", values: (e) => [cnhText(e)], sort: (e) => (e.ref ? personById.get(e.ref)?.driver_license_expiry ?? null : null) },
+    { key: "liberacao", label: "Data de liberação", values: (e) => [brDate(e.released_at)], sort: (e) => e.released_at },
+    { key: "exclusao", label: "Data de exclusão", values: (e) => [brDate(e.removed_at)], sort: (e) => e.removed_at },
+    { key: "situacao", label: "Situação", values: (e) => [statusText(e)] },
+  ];
+  const vehicleCols: ColumnDef<ReleaseEntry>[] = [
+    { key: "placa", label: "Placa", values: (e) => [vehicleText(e).plate], sort: (e) => vehicleText(e).plate },
+    { key: "veiculo", label: "Veículo", values: (e) => [vehicleText(e).model ?? "—"], sort: (e) => vehicleText(e).model ?? "" },
+    { key: "liberacao", label: "Data de liberação", values: (e) => [brDate(e.released_at)], sort: (e) => e.released_at },
+    { key: "exclusao", label: "Data de exclusão", values: (e) => [brDate(e.removed_at)], sort: (e) => e.removed_at },
+    { key: "situacao", label: "Situação", values: (e) => [statusText(e)] },
+  ];
+  const shownDrivers = applyColumnFilters(listedDrivers, driverCols, dFilters, dSort);
+  const shownVehicles = applyColumnFilters(listedVehicles, vehicleCols, vFilters, vSort);
+
   const actions = (kind: Kind, entry: ReleaseEntry, title: string) => (
     <div className="flex justify-end">
       <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Editar ${title}`} onClick={() => setEdit({ kind, entry, title, free: !entry.ref })}><Pencil className="h-4 w-4" /></Button>
@@ -298,9 +331,12 @@ export function FleetRelease() {
         </div>
         <div className="overflow-x-auto">
           <Table className="text-sm">
-            <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>CNH</TableHead><TableHead>Data de liberação</TableHead><TableHead>Data de exclusão</TableHead><TableHead>Situação</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
+            <TableHeader><TableRow>
+              {driverCols.map((c) => <FilterHead key={c.key} column={c} rows={rowsForColumn(listedDrivers, driverCols, dFilters, c.key)} filters={dFilters} setFilters={setDFilters} sort={dSort} setSort={setDSort} />)}
+              <TableHead className="w-20" />
+            </TableRow></TableHeader>
             <TableBody>
-              {listedDrivers.length ? listedDrivers.map((e) => {
+              {shownDrivers.length ? shownDrivers.map((e) => {
                 const p = e.ref ? personById.get(e.ref) : undefined;
                 const name = driverName(e);
                 return (
@@ -315,7 +351,7 @@ export function FleetRelease() {
                     <TableCell>{actions("driver", e, name)}</TableCell>
                   </TableRow>
                 );
-              }) : <TableRow><TableCell colSpan={6} className="text-muted-foreground">{people.isLoading || loading ? "Carregando..." : "Nenhum motorista liberado."}</TableCell></TableRow>}
+              }) : <TableRow><TableCell colSpan={6} className="text-muted-foreground">{people.isLoading || loading ? "Carregando..." : listedDrivers.length ? "Nenhum motorista com esses filtros." : "Nenhum motorista liberado."}</TableCell></TableRow>}
             </TableBody>
           </Table>
         </div>
@@ -335,9 +371,12 @@ export function FleetRelease() {
         </div>
         <div className="overflow-x-auto">
           <Table className="text-sm">
-            <TableHeader><TableRow><TableHead>Placa</TableHead><TableHead>Veículo</TableHead><TableHead>Data de liberação</TableHead><TableHead>Data de exclusão</TableHead><TableHead>Situação</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
+            <TableHeader><TableRow>
+              {vehicleCols.map((c) => <FilterHead key={c.key} column={c} rows={rowsForColumn(listedVehicles, vehicleCols, vFilters, c.key)} filters={vFilters} setFilters={setVFilters} sort={vSort} setSort={setVSort} />)}
+              <TableHead className="w-20" />
+            </TableRow></TableHeader>
             <TableBody>
-              {listedVehicles.length ? listedVehicles.map((e) => {
+              {shownVehicles.length ? shownVehicles.map((e) => {
                 const v = e.ref ? vehicleById.get(e.ref) : undefined;
                 const t = vehicleText(e);
                 return (
@@ -350,7 +389,7 @@ export function FleetRelease() {
                     <TableCell>{actions("vehicle", e, t.model ? `${t.plate} - ${t.model}` : t.plate)}</TableCell>
                   </TableRow>
                 );
-              }) : <TableRow><TableCell colSpan={6} className="text-muted-foreground">{vehicles.isLoading || loading ? "Carregando..." : "Nenhuma placa liberada."}</TableCell></TableRow>}
+              }) : <TableRow><TableCell colSpan={6} className="text-muted-foreground">{vehicles.isLoading || loading ? "Carregando..." : listedVehicles.length ? "Nenhuma placa com esses filtros." : "Nenhuma placa liberada."}</TableCell></TableRow>}
             </TableBody>
           </Table>
         </div>
