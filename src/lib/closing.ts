@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { loadBuiltTransport, vtFor, driverBonusFor, workVtDefault } from "@/lib/transport-rules";
+import { effectiveCity, lodgingBlocksBenefits, lodgingIndex, type LodgingStay } from "@/lib/lodging";
 
 /** Fechamento: competência = dia 26 do mês anterior até 25 do mês selecionado. */
 export function periodOf(month: string) {
@@ -72,6 +73,9 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
   ]);
   const { data: cityDist } = await supabase.from("city_distances").select("city_a, city_b, km");
   const distFor = buildDistanceLookup(cityDist ?? []);
+  // Alojamentos no mês (Americana: sem VT/prêmio na Suzano; Mogi Guaçu: como morador de Mogi Guaçu).
+  const { data: staysR } = await supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").lt("start_date", end).or(`end_date.is.null,end_date.gte.${start}`);
+  const lodgingAt = lodgingIndex((staysR ?? []) as LodgingStay[]);
   const transport = await loadBuiltTransport(start, end);
   const { data: trW } = ids.length ? await supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("schedule_id", ids) : { data: [] as any[] };
   const travelWork = new Map((trW ?? []).map((v: any) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
@@ -134,11 +138,14 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     r.meals++;
     if (a.driver) r.driver = true;
     const cc = a.collaborators;
-    const base = cc?.vt_enabled === false ? false : (workVtDefault(vtWork.get(`${a.schedule_id}|${a.work_id}`), a.works?.clients?.needs_transport_voucher) || (cc?.city ?? "").toLowerCase().includes("pouso alegre"));
+    const lodging = lodgingAt(a.collaborator_id, date);
+    const blocked = lodgingBlocksBenefits(lodging, a.works?.clients?.name);
+    const homeCity = effectiveCity(cc?.city, lodging);
+    const base = cc?.vt_enabled === false || blocked ? false : (workVtDefault(vtWork.get(`${a.schedule_id}|${a.work_id}`), a.works?.clients?.needs_transport_voucher) || (homeCity ?? "").toLowerCase().includes("pouso alegre"));
     const pays = vtFor(transport, a.works?.client_id, date, a.collaborator_id, !!(a.vt_override ?? base));
     r.vtRows.push({ date, work, pays: !!pays, value: pays ? perDay(a.driver, 1) : 0 });
-    const dist = distFor(cc?.city, a.works?.clients?.city ?? a.works?.city, Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0));
-    const travelOn = a.travel_bonus_override ?? ((travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? prizeFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)) > 0));
+    const dist = distFor(homeCity, a.works?.clients?.city ?? a.works?.city, Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0));
+    const travelOn = a.travel_bonus_override ?? (blocked ? false : (travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? prizeFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)) > 0));
     const prize = travelOn && !a.overnight ? prizeFor(dist) : 0;
     if (prize > 0) r.prizeRows.push({ date, vehicle: a.vehicles?.plate ?? "—", work, distance: dist, value: prize });
     if (a.overnight) r.prizeRows.push({ date, vehicle: "—", work: `Pernoite - ${work}`, distance: 0, value: OVERNIGHT_PRIZE });

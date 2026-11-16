@@ -7,6 +7,7 @@ import { resplitClient } from "@/lib/resplit";
 import { laborCost, nightHours, ENCARGOS } from "@/lib/labor-cost";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { workVtDefault } from "@/lib/transport-rules";
+import { effectiveCity, lodgingBlocksBenefits, lodgingIndex, type LodgingStay } from "@/lib/lodging";
 
 /** Motor de cálculo de Resultados — usado pela página Resultados e pelo Financeiro (mesma lógica). */
 export const TAX_RATE = 0.1867;
@@ -69,7 +70,7 @@ const RESPLIT_AT = new Map<string, number>();
 
 /** Query-scoped shared inputs: no singleton cache across users or requests. */
 export async function loadResultShared() {
-  const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations] = await Promise.all([
+  const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations, lodgingStays] = await Promise.all([
     fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
     fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("schedule_id, collaborator_id, daily_schedules(schedule_date)").in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b)),
     fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
@@ -80,9 +81,10 @@ export async function loadResultShared() {
     fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date").order("id").range(a, b)),
     fetchAll<any>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").order("id").range(a, b)),
     fetchAll<any>((a, b) => supabase.from("vacations").select("collaborator_id, start_date, end_date").order("id").range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").order("id").range(a, b)).catch(() => [] as any[]),
   ]);
   for (const result of [vtRules, dbRules, tbRules, cityDist]) if (result.error) throw result.error;
-  return { people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations };
+  return { people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations, lodgingStays };
 }
 
 export function sliceResultRaw(raw: any, workId: string) {
@@ -178,6 +180,8 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         }
         return out;
       })();
+      // Alojamentos (regras de VT e prêmio viagem: lib/lodging.ts).
+      const lodgingStays = shared ? shared.lodgingStays : await fetchAll<any>((a, b) => supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").order("id").range(a, b)).catch(() => [] as any[]);
       const supportResult = supportRows as { data: { collaborator_id: string }[] | null; error?: unknown };
       if (supportResult.error) throw supportResult.error;
       return {
@@ -209,6 +213,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         leaves,
         daysOff,
         vacations,
+        lodgingStays,
         vtRules: vtRules.data ?? [],
         dbRules: dbRules.data ?? [],
         tbRules: tbRules.data ?? [],
@@ -490,6 +495,10 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     }
     // VT dos colaboradores escalados neste serviço entra no transporte da obra
     const person = new Map<string, any>(d.people.map((p: any) => [p.id, p]));
+    // Alojados: Americana na Suzano = sem VT e sem prêmio; senão VT/prêmio pela cidade do alojamento.
+    const lodgingAt = lodgingIndex((d.lodgingStays ?? []) as LodgingStay[]);
+    const lodgingBlocked = (id: string, date: string) => lodgingBlocksBenefits(lodgingAt(id, date), d.client?.name);
+    const homeCityOf = (id: string, date: string) => effectiveCity(person.get(id)?.city, lodgingAt(id, date));
     // Marcação de VT vale para o cliente no dia (qualquer serviço do cliente marcado)
     const workVt = new Map<string, boolean>();
     for (const r of (d.workVt ?? []) as any[]) workVt.set(r.schedule_id, !!workVt.get(r.schedule_id) || r.pays_vt);
@@ -507,8 +516,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       if (!date || absent(a.collaborator_id, date) || (!rdoKey.has(`${a.collaborator_id}|${date}`) && hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0) || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
       if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
-      const pouso = String(p?.city ?? "").toLowerCase().includes("pouso alegre");
-      const base = p?.vt_enabled === false ? false : workVtDefault(workVt.get(a.schedule_id), d.client?.needs_transport_voucher) || pouso;
+      const pouso = String(homeCityOf(a.collaborator_id, date) ?? "").toLowerCase().includes("pouso alegre");
+      const base = p?.vt_enabled === false || lodgingBlocked(a.collaborator_id, date) ? false : workVtDefault(workVt.get(a.schedule_id), d.client?.needs_transport_voucher) || pouso;
       if (!(a.vt_override ?? base)) continue;
       const cost = vtDay(!!a.driver) * fraction(a, date);
       if (!cost) continue;
@@ -576,9 +585,10 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         if (!shareF) continue;
         const mo = hours * (rate.get(id) ?? 0) * enc(id) * shareF;
         const p = person.get(id);
-        const vt = !paysVt || p?.vt_enabled === false ? 0 : vtCost * shareF;
-        const dist = distF(p?.city, d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
-        const tb = p?.travel_bonus_enabled === false ? 0
+        const blockedL = lodgingBlocked(id, date);
+        const vt = !paysVt || p?.vt_enabled === false || blockedL ? 0 : vtCost * shareF;
+        const dist = distF(homeCityOf(id, date), d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
+        const tb = p?.travel_bonus_enabled === false || blockedL ? 0
           : (d.tbRules ?? []).filter((x: any) => rIn(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0) * shareF;
         if (mo) { addLabor(id, hours * shareF, mo); bump(date.slice(0, 7), "labor", mo); }
         if (vt) {
@@ -627,9 +637,9 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const r = rdoKey.get(key);
       if ((r && !r.present) || (!r && hoursOf(key, a.work_id) <= 0)) continue;
       const p = person.get(a.collaborator_id);
-      const travelOn = a.travel_bonus_override ?? ((travelWorkMap.get(`${a.schedule_id}|${a.work_id}`) ?? (d.tbRules ?? []).some((x: any) => inRule(x, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0)))));
+      const travelOn = a.travel_bonus_override ?? (lodgingBlocked(a.collaborator_id, date) ? false : (travelWorkMap.get(`${a.schedule_id}|${a.work_id}`) ?? (d.tbRules ?? []).some((x: any) => inRule(x, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0)))));
       if (!travelOn) continue;
-      const dist = distFor(p?.city, d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
+      const dist = distFor(homeCityOf(a.collaborator_id, date), d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
       const cost = (d.tbRules ?? []).filter((x: any) => inRule(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0) * fraction(a, date);
       if (!cost) continue;
       const t = travelByDate.get(date) ?? { people: 0, cost: 0 };

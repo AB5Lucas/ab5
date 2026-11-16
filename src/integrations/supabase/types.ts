@@ -2985,6 +2985,36 @@ export type Database = {
           },
         ]
       }
+      lodging_stays: {
+        Row: {
+          collaborator_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          lodging: string
+          start_date: string
+        }
+        Insert: {
+          collaborator_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          lodging: string
+          start_date?: string
+        }
+        Update: {
+          collaborator_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          lodging?: string
+          start_date?: string
+        }
+        Relationships: []
+      }
       medical_leaves: {
         Row: {
           collaborator_id: string

@@ -715,6 +715,13 @@
       "when": 1795200000000,
       "tag": "0101_vehicle_extra_places",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1795300000000,
+      "tag": "0102_lodging_stays",
+      "breakpoints": true
     }
   ]
 }

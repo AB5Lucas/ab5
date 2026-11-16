@@ -59,6 +59,9 @@ import { buildDistanceLookup } from "@/lib/city-distance";
 import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
 import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
 import { WeeklyDaysOffDialog } from "@/components/weekly-days-off-dialog";
+import { effectiveCity, lodgingBlocksBenefits, lodgingOn, LODGING_LABEL, LODGING_TAG, type LodgingStay } from "@/lib/lodging";
+import { LodgingDialog } from "@/components/lodging-dialog";
+import { BedDouble } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -490,9 +493,20 @@ export function SchedulePlannerBoard({
       return { pouso, noVt };
     },
   });
+  // Alojamentos no dia (Americana: sem VT/prêmio na Suzano; Mogi Guaçu: como morador de Mogi Guaçu).
+  const lodgingStays = useQuery({
+    queryKey: ["lodging-stays", date],
+    queryFn: async () => ((await supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").lte("start_date", date).or(`end_date.is.null,end_date.gte.${date}`)).data ?? []) as LodgingStay[],
+  });
+  const lodgingOf = (collaboratorId: string) => lodgingOn(lodgingStays.data ?? [], collaboratorId, date);
+  const lodgingBlocked = (workId: string, collaboratorId: string) =>
+    lodgingBlocksBenefits(lodgingOf(collaboratorId), ctx.data?.works.find((w) => w.id === workId)?.clients?.name);
   const defaultAllocVt = (workId: string, collaboratorId: string) => {
-    if (pousoIds.data?.noVt.has(collaboratorId)) return false;
-    return workPaysVt(workId) || (pousoIds.data?.pouso.has(collaboratorId) ?? false);
+    if (pousoIds.data?.noVt.has(collaboratorId) || lodgingBlocked(workId, collaboratorId)) return false;
+    const lodging = lodgingOf(collaboratorId);
+    // Alojado vale a cidade do alojamento (não a do cadastro) para a regra de Pouso Alegre.
+    const pouso = lodging ? false : pousoIds.data?.pouso.has(collaboratorId) ?? false;
+    return workPaysVt(workId) || pouso;
   };
 
   const toggleWorkVt = useMutation({
@@ -544,9 +558,9 @@ export function SchedulePlannerBoard({
   const workPaysTravel = (workId: string) => workTravel.data?.get(workId) ?? workTravelDefault(workId);
   const defaultAllocTravel = (workId: string, collaboratorId: string) => {
     const t = travelInfo.data;
-    if (!t || !workPaysTravel(workId)) return false;
+    if (!t || !workPaysTravel(workId) || lodgingBlocked(workId, collaboratorId)) return false;
     const w = workOf(workId);
-    const km = t.distFor(t.city.get(collaboratorId), w?.clients?.city, Number(w?.clients?.distance_km ?? 0));
+    const km = t.distFor(effectiveCity(t.city.get(collaboratorId), lodgingOf(collaboratorId)), w?.clients?.city, Number(w?.clients?.distance_km ?? 0));
     return t.hit(km);
   };
   const setGroupTravel = useMutation({
@@ -1360,6 +1374,7 @@ export function SchedulePlannerBoard({
 
   const [confirmCopyPrev, setConfirmCopyPrev] = useState(false);
   const [openFolgas, setOpenFolgas] = useState(false);
+  const [openLodging, setOpenLodging] = useState(false);
   const [copyFrom, setCopyFrom] = useState(addDays(date, -1));
   const [selectedCopyBoxes, setSelectedCopyBoxes] = useState<Set<string>>(new Set());
   const copySource = useQuery({
@@ -1708,7 +1723,11 @@ export function SchedulePlannerBoard({
           <Button size="sm" variant="outline" onClick={() => setOpenFolgas(true)}>
             <CalendarDays className="h-4 w-4" /> Folgas
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setOpenLodging(true)}>
+            <BedDouble className="h-4 w-4" /> Alojamentos
+          </Button>
           <WeeklyDaysOffDialog date={date} open={openFolgas} onOpenChange={setOpenFolgas} editable={editable} />
+          <LodgingDialog date={date} open={openLodging} onOpenChange={setOpenLodging} editable={editable} />
           <ScheduleAlertsButton date={date} />
         </div>
       </div>
@@ -1958,6 +1977,14 @@ export function SchedulePlannerBoard({
                               <AlertTriangle className="h-4 w-4 fill-destructive text-destructive-foreground" />
                             </button>
                           );
+                        })()}
+                        {(() => {
+                          const l = lodgingOf(r.collaborator_id);
+                          return l ? (
+                            <span title={`Alojamento ${LODGING_LABEL[l]}`} className="shrink-0 rounded-[3px] border border-border px-1 text-[9px] font-semibold leading-[14px] text-muted-foreground">
+                              {LODGING_TAG[l]}
+                            </span>
+                          ) : null;
                         })()}
                         {r.has_pending_requirement && (
                           <Badge variant="destructive" className="shrink-0 px-1 py-0 text-[10px]">

@@ -165,6 +165,7 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
       leaves: shared.leaves,
       daysOff: shared.daysOff,
       vacations: shared.vacations,
+      lodgingStays: shared.lodgingStays,
       vtRules: shared.vtRules.data ?? [],
       dbRules: shared.dbRules.data ?? [],
       tbRules: shared.tbRules.data ?? [],

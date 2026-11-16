@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables, Enums } from "@/integrations/supabase/types";
 import { buildDistanceLookup } from "@/lib/city-distance";
+import { effectiveCity, lodgingBlocksBenefits, lodgingIndex, type LodgingStay } from "@/lib/lodging";
 
 
 type Rule = Tables<"travel_bonus_rules">;
@@ -147,7 +148,7 @@ export function BonusPage() {
 
       const { data: schedules, error: se } = await supabase
         .from("daily_schedules")
-        .select("id")
+        .select("id, schedule_date")
         .gte("schedule_date", start)
         .lt("schedule_date", end);
       if (se) throw se;
@@ -166,7 +167,7 @@ export function BonusPage() {
         const { data: page, error } = await supabase
           .from("daily_allocations")
           .select(
-            "collaborator_id, schedule_id, work_id, travel_bonus_override, collaborators(full_name, registration_number, city, travel_bonus_enabled), works(city, distance_km, clients(city, distance_km))",
+            "collaborator_id, schedule_id, work_id, travel_bonus_override, collaborators(full_name, registration_number, city, travel_bonus_enabled), works(city, distance_km, clients(name, city, distance_km))",
           )
           .in("schedule_id", ids)
           .order("id")
@@ -179,9 +180,14 @@ export function BonusPage() {
       const distFor = buildDistanceLookup(cityDist ?? []);
       const { data: trW } = await supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("schedule_id", ids);
       const travelWork = new Map((trW ?? []).map((v) => [`${v.schedule_id}|${v.work_id}`, v.pays_bonus]));
+      // Alojamentos: Americana na Suzano não recebe; senão a distância sai da cidade do alojamento.
+      const dateOf = new Map((schedules ?? []).map((s) => [s.id, s.schedule_date as string]));
+      const { data: staysR } = await supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").lt("start_date", end).or(`end_date.is.null,end_date.gte.${start}`);
+      const lodgingAt = lodgingIndex((staysR ?? []) as LodgingStay[]);
+      const lodgingOf = (a: any) => lodgingAt(a.collaborator_id, dateOf.get(a.schedule_id) ?? "");
 
       return (data ?? []).filter((a: any) =>
-        a.travel_bonus_override ?? ((travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? rulesFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)).length > 0)),
+        a.travel_bonus_override ?? (lodgingBlocksBenefits(lodgingOf(a), a.works?.clients?.name) ? false : (travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? rulesFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)).length > 0)),
       ).map((a) => {
         const row = a as unknown as {
           collaborator_id: string;
@@ -195,7 +201,7 @@ export function BonusPage() {
           name: row.collaborators?.full_name ?? "—",
           reg: row.collaborators?.registration_number ?? "",
           distance: distFor(
-            row.collaborators?.city,
+            effectiveCity(row.collaborators?.city, lodgingOf(row)),
             row.works?.clients?.city ?? row.works?.city,
             Number(row.works?.clients?.distance_km ?? row.works?.distance_km ?? 0),
           ),
