@@ -144,7 +144,14 @@ function certHeader(doc: jsPDF, lg: Awaited<ReturnType<typeof logo>>, W: number,
   doc.setDrawColor(20, 30, 210);
   doc.setLineWidth(1.2);
   doc.roundedRect(18, 18, W - 36, 180, 14, 14);
-  if (badge) doc.addImage(badge, "PNG", 30, 28, 24, 24);
+  if (badge) {
+    // Etiqueta da NR cabe numa caixa de 24×24 sem distorcer (as imagens têm proporções diferentes, ex.: NR-18 é alta).
+    const box = 24;
+    const { width, height } = doc.getImageProperties(badge);
+    const k = Math.min(box / width, box / height);
+    const w = width * k, h = height * k;
+    doc.addImage(badge, "PNG", 30 + (box - w) / 2, 28 + (box - h) / 2, w, h);
+  }
   let y = 26;
   if (lg) {
     const h = 18;
