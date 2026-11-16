@@ -743,6 +743,13 @@
       "when": 1795400002000,
       "tag": "0105_client_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1795400003000,
+      "tag": "0106_truck_by_work",
+      "breakpoints": true
     }
   ]
 }
