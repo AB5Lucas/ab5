@@ -349,7 +349,7 @@ function useNoteUpdate(onDone?: () => void) {
   const qc = useQueryClient();
   return useMutation({
     // sameXml: a foto é do XML todo, então nota atribuída/tirada vale para todos os itens dele ainda não aprovados.
-    mutationFn: async ({ id, patch, sameXml }: { id: string; patch: Partial<Note>; sameXml?: string }) => {
+    mutationFn: async ({ id, patch, sameXml }: { id: string; patch: Partial<Note>; sameXml?: string | undefined }) => {
       const q = supabase.from("fleet_fuel_notes").update(patch as never);
       const { error } = sameXml ? await q.eq("access_key", sameXml).is("approved_at", null) : await q.eq("id", id);
       if (error) throw error;
@@ -464,7 +464,7 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
               <div key={i} className="flex items-end gap-2">
                 <div className="min-w-0 flex-1 space-y-1">
                   {i === 0 && <span className="block text-xs text-muted-foreground">Centro de custo (aba Item Conta)</span>}
-                  <Select value={l.account || undefined} onValueChange={(v) => setSplit((s) => s.map((x, j) => (j === i ? { ...x, account: v } : x)))}>
+                  <Select value={l.account || ""} onValueChange={(v) => setSplit((s) => s.map((x, j) => (j === i ? { ...x, account: v } : x)))}>
                     <SelectTrigger><SelectValue placeholder="Escolha o CC" /></SelectTrigger>
                     <SelectContent className="max-h-72">
                       {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.description ?? "—"} · CC {a.cc_code} · item {a.item_account}</SelectItem>)}
