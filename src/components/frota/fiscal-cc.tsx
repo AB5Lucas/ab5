@@ -14,6 +14,22 @@ import { useFuelRows } from "./use-fuel-rows";
 const loadXlsx = () => import("xlsx");
 const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 const pct = (v: number) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+/** Postos: o CNPJ do emitente está no código de acesso da NF (posições 7 a 20). Padrão = Guaçu Brasil. */
+const STATIONS = [
+  { cnpj: "09429269000162", label: "Posto Guaçu Brasil - 09.429.269/0001-62", invoices: true },
+  { cnpj: "16581582000187", label: "Posto Apollo - 16.581.582/0001-87", invoices: false },
+] as const;
+const noteCnpj = (accessKey: string | null | undefined) => (accessKey ?? "").replace(/\D/g, "").slice(6, 20);
+/** Quinzenas dos últimos 12 meses (para posto sem fatura lida). */
+function recentFortnights() {
+  const out: { key: string; year: number; month: number; fortnight: 1 | 2 }[] = [];
+  const d = new Date();
+  for (let i = 0; i < 12; i++) {
+    const x = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    for (const f of [2, 1] as const) out.push({ key: `${x.getFullYear()}-${x.getMonth() + 1}-${f}`, year: x.getFullYear(), month: x.getMonth() + 1, fortnight: f });
+  }
+  return out;
+}
 const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 
 /**
@@ -24,23 +40,31 @@ export function FleetFiscalCc() {
   const invoices = useQuery({ queryKey: ["fleet-invoices"], queryFn: async () => (await supabase.from("fleet_invoices").select("*").order("issued_on")).data ?? [] });
   const list = useMemo(() => (invoices.data ?? []).map((i) => ({ ...i, numberShown: i.number ? invoiceNumber(i.number) : i.file_name, ...invoiceFortnight(i.period_from, i.issued_on) }))
     .filter((i) => i.month && i.year && i.fortnight).reverse(), [invoices.data]);
+  const [cnpj, setCnpj] = useState<string>(STATIONS[0].cnpj);
+  const station = STATIONS.find((x) => x.cnpj === cnpj) ?? STATIONS[0];
   const [id, setId] = useState<string>("");
   useEffect(() => { if (!id && list.length) setId(list[0]!.id); }, [list, id]);
-  const inv = list.find((i) => i.id === id);
-  const range = inv ? fortnightRange(inv.year!, inv.month!, inv.fortnight!) : { from: "1900-01-01", to: "1900-01-01" };
-  const { rows, loading } = useFuelRows(range);
+  // As faturas lidas são do Guaçu Brasil; para outro posto escolhe-se a quinzena.
+  const fortnights = useMemo(recentFortnights, []);
+  const [fKey, setFKey] = useState<string>(fortnights[0]!.key);
+  const inv = station.invoices ? list.find((i) => i.id === id) : undefined;
+  const fn = fortnights.find((f) => f.key === fKey);
+  const period = station.invoices ? (inv ? { year: inv.year!, month: inv.month!, fortnight: inv.fortnight! } : null) : fn ?? null;
+  const range = period ? fortnightRange(period.year, period.month, period.fortnight) : { from: "1900-01-01", to: "1900-01-01" };
+  const { rows: allRows, loading } = useFuelRows(range);
+  const rows = useMemo(() => allRows.filter((r) => noteCnpj(r.access_key) === cnpj), [allRows, cnpj]);
   const t = useMemo(() => ccTotals(rows), [rows]);
   const br = (d: string) => d.split("-").reverse().join("/");
 
   async function exportSheet() {
-    if (!inv) return;
+    if (!period) return;
     const XLSX = await loadXlsx();
     const r2 = (v: number) => Math.round(v * 100) / 100;
     const aoa: (string | number | null)[][] = [
-      ["Fatura", inv.numberShown],
-      ["Valor total da fatura (R$)", inv.total == null ? null : Number(inv.total)],
-      ["Mês de cobrança", `${MONTHS[inv.month! - 1]}/${inv.year}`],
-      ["Quinzena", `${inv.fortnight}ª quinzena`],
+      ["Posto", station.label],
+      ...(inv ? [["Fatura", inv.numberShown], ["Valor total da fatura (R$)", inv.total == null ? null : Number(inv.total)]] : []),
+      ["Mês de cobrança", `${MONTHS[period.month - 1]}/${period.year}`],
+      ["Quinzena", `${period.fortnight}ª quinzena`],
       ["Abastecimentos", `${br(range.from)} a ${br(range.to)}`],
       [],
       ["Centro de custo", "Item conta", "Valor (R$)", "% da quinzena"],
@@ -56,13 +80,31 @@ export function FleetFiscalCc() {
     ws["!cols"] = [{ wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 14 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Fiscal");
-    XLSX.writeFile(wb, `Fiscal_${inv.numberShown}_${inv.year}-${String(inv.month).padStart(2, "0")}_Q${inv.fortnight}.xlsx`);
+    XLSX.writeFile(wb, `Fiscal_${inv ? inv.numberShown : station.label.split(" - ")[0]!.replace(/\s+/g, "_")}_${period.year}-${String(period.month).padStart(2, "0")}_Q${period.fortnight}.xlsx`);
   }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
       <div className="space-y-4">
         <div className="panel space-y-3 p-4">
+          <div className="space-y-1">
+            <Label>CNPJ do posto</Label>
+            <Select value={cnpj} onValueChange={setCnpj}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{STATIONS.map((x) => <SelectItem key={x.cnpj} value={x.cnpj}>{x.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          {!station.invoices ? (
+            <div className="space-y-1">
+              <Label>Quinzena</Label>
+              <Select value={fKey} onValueChange={setFKey}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {fortnights.map((f) => <SelectItem key={f.key} value={f.key}>{f.fortnight}ª quinzena de {MONTHS[f.month - 1]}/{f.year}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
           <div className="space-y-1">
             <Label>Fatura</Label>
             <Select value={id} onValueChange={setId}>
@@ -73,6 +115,7 @@ export function FleetFiscalCc() {
             </Select>
             {!invoices.isLoading && !list.length && <p className="text-xs text-muted-foreground">Nenhuma fatura lida. Use Ler pasta na subaba Fatura.</p>}
           </div>
+          )}
           {inv && (
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div className="col-span-2"><dt className="text-xs text-muted-foreground">Valor total da fatura</dt><dd className="text-lg font-semibold tabular-nums">{brl(inv.total)}</dd></div>
@@ -81,13 +124,14 @@ export function FleetFiscalCc() {
               <div className="col-span-2 text-xs text-muted-foreground">Abastecimentos de {br(range.from)} a {br(range.to)}.</div>
             </dl>
           )}
-          {inv && (
+          {!inv && period && <p className="text-xs text-muted-foreground">Abastecimentos de {br(range.from)} a {br(range.to)}.</p>}
+          {period && (
             <Button variant="outline" className="w-full" disabled={loading || !t.lines.length} onClick={exportSheet}>
               <Download className="h-4 w-4" /> Exportar planilha
             </Button>
           )}
         </div>
-        {inv && (
+        {period && (
           <div className="panel space-y-2 p-4">
             <div className="text-xs text-muted-foreground">Divisão da quinzena</div>
             <div className="flex items-baseline justify-between text-sm"><span>Serviços (CC 2…)</span><span className="font-semibold tabular-nums">{pct(t.share.servicos)}</span></div>
@@ -108,7 +152,7 @@ export function FleetFiscalCc() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!inv ? <TableRow><TableCell colSpan={4} className="text-muted-foreground">Escolha uma fatura.</TableCell></TableRow>
+            {!period ? <TableRow><TableCell colSpan={4} className="text-muted-foreground">Escolha uma fatura.</TableCell></TableRow>
               : loading ? <TableRow><TableCell colSpan={4} className="text-muted-foreground">Carregando...</TableCell></TableRow>
               : !t.lines.length ? <TableRow><TableCell colSpan={4} className="text-muted-foreground">Nenhum abastecimento nesta quinzena.</TableCell></TableRow>
               : t.lines.map((l) => (
@@ -120,7 +164,7 @@ export function FleetFiscalCc() {
                 </TableRow>
               ))}
           </TableBody>
-          {inv && t.lines.length > 0 && (
+          {period && t.lines.length > 0 && (
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={2}>Total ({t.lines.length} centro(s) de custo)</TableCell>
@@ -130,7 +174,7 @@ export function FleetFiscalCc() {
             </TableFooter>
           )}
         </Table>
-        {inv && t.ticket > 0 && (
+        {period && t.ticket > 0 && (
           <p className="border-t border-border p-3 text-xs text-muted-foreground">
             CC TICKET fora da tabela, do total e do Saldo: {brl(t.ticket)}.
           </p>
