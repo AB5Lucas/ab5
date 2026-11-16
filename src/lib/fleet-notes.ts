@@ -243,7 +243,7 @@ export function matchDriverName(written: string | null | undefined, preferred: s
 export type RateioClient = { id: string; name: string; cc_prefix: string | null };
 export type RateioWork = { id: string; client_id: string | null; cc_suffix: string | null; active: boolean; name?: string | null };
 export type ItemAccount = { cc_code: string; item_account: string; description?: string | null };
-export type RateioSchedule = { vehicle_id: string; schedule_date: string; client_id: string | null; extra_client_ids?: string[] | null; is_maintenance?: boolean | null; km?: number | null; trips?: number | null; extra_km?: number | null; work_id?: string | null };
+export type RateioSchedule = { vehicle_id: string; schedule_date: string; client_id: string | null; extra_client_ids?: string[] | null; is_maintenance?: boolean | null; km?: number | null; trips?: number | null; extra_km?: number | null; work_id?: string | null; is_suzano_local?: boolean | null };
 export type RateioPart = { client_id: string; client: string; days: number; km?: number | undefined; pct: number; value: number; cc: string | null; cc_rule: string; item_account: string | null };
 /** basis: "km" = pelo km rodado em cada cliente; "dias" = sem km lançado, pelos dias (rateios antigos não têm). */
 export type Rateio = { from: string; to: string; fallback: boolean; basis?: "km" | "dias"; parts: RateioPart[] };
@@ -308,7 +308,11 @@ export function fuelRateio(opts: {
   // Desde o abastecimento anterior da mesma placa: dia seguinte a ele; se foi no mesmo dia, só o próprio dia
   // (antes caía nos últimos 30 dias). Sem abastecimento anterior, os últimos 30 dias.
   const from = opts.prevDay ? (opts.prevDay < opts.day ? addDays(opts.prevDay, 1) : opts.day) : addDays(opts.day, -29);
-  const own = opts.vehicleId ? opts.schedules.filter((s) => s.vehicle_id === opts.vehicleId && !s.is_maintenance) : [];
+  // Suzano Local (sem cliente na Transporte) vai para o CC da Suzano.
+  const suzanoId = [...opts.clients.values()].find((c) => /^suzano$/i.test(c.name.trim()))?.id
+    ?? [...opts.clients.values()].find((c) => /suzano/i.test(c.name))?.id;
+  const own = opts.vehicleId ? opts.schedules.filter((s) => s.vehicle_id === opts.vehicleId && !s.is_maintenance)
+    .map((s) => (s.is_suzano_local && !s.client_id && suzanoId ? { ...s, client_id: suzanoId } : s)) : [];
   const clientsOf = (s: RateioSchedule) => [...new Set([s.client_id, ...(s.extra_client_ids ?? [])].filter((c): c is string => !!c))];
   let days = own.filter((s) => s.schedule_date >= from && s.schedule_date <= opts.day && clientsOf(s).length);
   let fallback = false;

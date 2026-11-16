@@ -246,3 +246,15 @@ describe("rateio com serviço escolhido no caminhão", () => {
     expect(r.parts.map((p) => [p.client, p.cc, p.value])).toEqual([["INDUSTRIA · PPO", "1001001", 60], ["INDUSTRIA · Pliq", "1001004", 20], ["INDUSTRIA", "1001999", 20]]);
   });
 });
+
+describe("rateio com Suzano Local", () => {
+  it("Suzano Local vai para o CC da Suzano", () => {
+    const clients = new Map([["s", { id: "s", name: "SUZANO", cc_prefix: "2030" }], ["m", { id: "m", name: "MARS MM", cc_prefix: "2040" }]]);
+    const schedules = [
+      { vehicle_id: "v", schedule_date: "2026-11-10", client_id: null, is_suzano_local: true, km: 6, trips: 2 },
+      { vehicle_id: "v", schedule_date: "2026-11-11", client_id: "m", km: 6, trips: 2 },
+    ];
+    const r = _fuelRateio({ vehicleId: "v", day: "2026-11-12", prevDay: "2026-11-09", total: 100, schedules, clients, works: [], accounts: [] });
+    expect(r.parts.map((p) => [p.client, p.cc, p.value])).toEqual([["SUZANO", "2030999", 50], ["MARS MM", "2040999", 50]]);
+  });
+});

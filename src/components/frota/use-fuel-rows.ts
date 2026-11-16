@@ -32,7 +32,7 @@ export function useFuelRows(range: DayRange) {
   const release = useFleetRelease();
   const schedules = useQuery({
     queryKey: ["fleet-rateio-schedules", lookback, end],
-    queryFn: () => fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date, client_id, extra_client_ids, is_maintenance, km, trips, extra_km, work_id")
+    queryFn: () => fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date, client_id, extra_client_ids, is_maintenance, km, trips, extra_km, work_id, is_suzano_local")
       .gte("schedule_date", lookback).lte("schedule_date", end).order("schedule_date").range(a, b)),
   });
   const clients = useQuery({ queryKey: ["fleet-rateio-clients"], queryFn: async () => ((await supabase.from("clients").select("id, name, cc_prefix")).data ?? []) as RateioClient[] });
