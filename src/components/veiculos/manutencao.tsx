@@ -204,7 +204,7 @@ export function FleetMaintenancePage() {
         description={`Orçado: soma do transporte orçado dos serviços no mês (mensais: o mês inteiro; demais: pelo andamento do mês; Indústria, ADM, Comercial e Pátio ou sem orçado lançado: o custo real dos veículos, km e pedágio, sem VT), dividida entre os veículos pelo km. Clique no Orçado para ver o detalhe. Real: combustível (planilha do posto) + manutenção (planilha do Romildo) + pedágio + locação. Km × ${brl(BUDGET_KM_RATE)} fica só como referência.`}
         actions={
           <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
-            <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Lendo planilhas..." : "Atualizar planilhas"}
+            <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Sincronizando…" : "Sincronizar"}
           </Button>
         }
       />
@@ -227,7 +227,7 @@ export function FleetMaintenancePage() {
         <p className="pb-2 text-xs text-muted-foreground">
           {files.data?.length
             ? `Planilhas lidas em ${new Date(files.data[0]!.synced_at).toLocaleString("pt-BR")} (atualiza sozinho todo dia).`
-            : "As planilhas ainda não foram lidas: clique em Atualizar planilhas."}
+            : "As planilhas ainda não foram lidas: clique em Sincronizar."}
         </p>
         {loading && <span className="pb-2 text-sm text-muted-foreground">Carregando...</span>}
       </div>

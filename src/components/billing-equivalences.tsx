@@ -26,7 +26,7 @@ export function BillingEquivalences({names,reprocess}:{names:string[];reprocess:
  },onSuccess:async()=>{
   await qc.invalidateQueries({queryKey:['billing-sync','equivalences']});toast.success('Equivalências salvas');
   try {await reprocess();await qc.invalidateQueries({queryKey:['billing-sync']});toast.success('Notas reprocessadas');}
-  catch {toast.error('Equivalência salva; não foi possível reprocessar agora. Tente Sincronizar agora.');}
+  catch {toast.error('Equivalência salva; não foi possível reprocessar agora. Tente Sincronizar.');}
  },onError:(e:Error)=>toast.error(e.message)});
  return <div className="space-y-4">
  {(clients.error||aliases.error)&&<p role="alert" className="text-destructive">Não foi possível carregar as equivalências.</p>}

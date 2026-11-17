@@ -117,7 +117,7 @@ export async function executeFleetNotesSync(ym: string, c: Credentials) {
 
   const { data: n, error } = await supabaseAdmin.rpc("fleet_fuel_notes_sync", { p_month: ym, p_notes: JSON.parse(JSON.stringify(payload)), p_docs: JSON.parse(JSON.stringify(docPayload)) });
   if (error) throw error;
-  if (pendingRead > 0) errors.unshift(`Faltam ler ${pendingRead} foto(s): clique em Ler pastas de novo.`);
+  if (pendingRead > 0) errors.unshift(`Faltam ler ${pendingRead} foto(s): clique em Sincronizar de novo.`);
   return { xmlDir, notesDir, xml: files.length, saved: n as number, docs: docs.length, photosRead: readings.size, errors: errors.slice(0, 20) };
 }
 

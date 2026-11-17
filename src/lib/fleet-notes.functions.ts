@@ -8,7 +8,7 @@ function credentials() {
   return { lovableKey, excelKey };
 }
 
-/** Lê agora as pastas de XML e de notas do mês (botão "Ler pastas" em Frota › Abastecimento). */
+/** Lê agora as pastas de XML e de notas do mês (botão "Sincronizar" em Frota › Abastecimento). */
 export const syncFleetNotesNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { month: string }) => {

@@ -52,7 +52,7 @@ export function FleetFiscal() {
   });
   const linkFn = useServerFn(fleetNoteLink);
   async function openPdf(itemId: string | null) {
-    if (!itemId) { toast.error("Arquivo não encontrado. Clique em Ler pasta."); return; }
+    if (!itemId) { toast.error("Arquivo não encontrado. Clique em Sincronizar."); return; }
     try { const url = await linkFn({ data: { itemId } }); if (url) window.open(url, "_blank", "noopener"); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível abrir a fatura."); }
   }
@@ -78,10 +78,10 @@ export function FleetFiscal() {
       <div className="flex flex-wrap items-end gap-3">
         <Button variant="outline" onClick={() => setFolderOpen(true)}><FolderCog className="h-4 w-4" /> Pasta</Button>
         <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
-          <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Lendo pasta..." : "Ler pasta"}
+          <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Sincronizando…" : "Sincronizar"}
         </Button>
         <p className="pb-2 text-xs text-muted-foreground">
-          Faturas do posto em PDF na pasta {folder} (e nas pastas de cada ano). {lastRead ? `Lida em ${new Date(lastRead).toLocaleString("pt-BR")}.` : "Ainda não lida: clique em Ler pasta."}
+          Faturas do posto em PDF na pasta {folder} (e nas pastas de cada ano). {lastRead ? `Lida em ${new Date(lastRead).toLocaleString("pt-BR")}.` : "Ainda não lida: clique em Sincronizar."}
         </p>
       </div>
       {Object.keys(filters).length > 0 && (
@@ -99,7 +99,7 @@ export function FleetFiscal() {
           </TableHeader>
           <TableBody>
             {invoices.isLoading ? <TableRow><TableCell colSpan={7} className="text-muted-foreground">Carregando...</TableCell></TableRow>
-              : !shown.length ? <TableRow><TableCell colSpan={7} className="text-muted-foreground">{rows.length ? "Nenhuma fatura com esses filtros." : "Nenhuma fatura lida. Clique em Ler pasta."}</TableCell></TableRow>
+              : !shown.length ? <TableRow><TableCell colSpan={7} className="text-muted-foreground">{rows.length ? "Nenhuma fatura com esses filtros." : "Nenhuma fatura lida. Clique em Sincronizar."}</TableCell></TableRow>
               : shown.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="whitespace-nowrap">

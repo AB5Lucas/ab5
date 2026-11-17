@@ -75,7 +75,7 @@ export function MarsOrders() {
             <Input id="mars-ym" type="month" min="2026-01" className="w-40" value={month} onChange={(e) => setMonth(e.target.value || curMonth())} />
           </div>
           <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
-            <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} />{sync.isPending ? "Lendo…" : "Ler agora"}
+            <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} />{sync.isPending ? "Sincronizando…" : "Sincronizar"}
           </Button>
         </div>
       </div>

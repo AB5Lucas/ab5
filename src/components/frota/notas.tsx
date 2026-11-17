@@ -160,7 +160,7 @@ function FuelNotes() {
   const linkFn = useServerFn(fleetNoteLink);
   async function openDoc(file: string) {
     const doc = (docs.data ?? []).find((d) => d.file_name === file);
-    if (!doc?.item_id) { toast.error("Arquivo não encontrado na pasta do mês. Clique em Ler pastas."); return; }
+    if (!doc?.item_id) { toast.error("Arquivo não encontrado na pasta do mês. Clique em Sincronizar."); return; }
     try { const url = await linkFn({ data: { itemId: doc.item_id } }); if (url) window.open(url, "_blank", "noopener"); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível abrir a nota."); }
   }
@@ -186,11 +186,11 @@ function FuelNotes() {
           options={plates.map((p) => ({ plate: p, name: rows.find((r) => r.plateShown === p)?.vehicleLabel ?? null }))} />
         <Button variant="outline" onClick={() => setFolders(true)}><FolderCog className="h-4 w-4" /> Pastas</Button>
         <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
-          <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Lendo pastas..." : "Ler pastas"}
+          <RefreshCw className={`h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} /> {sync.isPending ? "Sincronizando…" : "Sincronizar"}
         </Button>
         <p className="pb-2 text-xs text-muted-foreground">
           {!settings.data?.["xml_folder"] ? "Informe as pastas dos XML e das notas em Pastas."
-            : notRead.length ? `${notRead.map(monthLabel).join(", ")} ainda não ${notRead.length > 1 ? "foram lidos" : "foi lido"}: clique em Ler pastas.`
+            : notRead.length ? `${notRead.map(monthLabel).join(", ")} ainda não ${notRead.length > 1 ? "foram lidos" : "foi lido"}: clique em Sincronizar.`
             : lastRead ? `Pastas lidas em ${new Date(lastRead).toLocaleString("pt-BR")}${months.length > 1 ? ` (${months.length} meses)` : ""}.` : ""}
         </p>
       </div>

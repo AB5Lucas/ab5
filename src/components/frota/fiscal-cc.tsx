@@ -113,7 +113,7 @@ export function FleetFiscalCc() {
                 {list.map((i) => <SelectItem key={i.id} value={i.id}>{i.numberShown} · {i.fortnight}ª quinzena de {MONTHS[i.month! - 1]}/{i.year}</SelectItem>)}
               </SelectContent>
             </Select>
-            {!invoices.isLoading && !list.length && <p className="text-xs text-muted-foreground">Nenhuma fatura lida. Use Ler pasta na subaba Fatura.</p>}
+            {!invoices.isLoading && !list.length && <p className="text-xs text-muted-foreground">Nenhuma fatura lida. Use Sincronizar na subaba Fatura.</p>}
           </div>
           )}
           {inv && (
