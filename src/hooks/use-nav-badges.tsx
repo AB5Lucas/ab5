@@ -28,6 +28,7 @@ function useBadgeData() {
     billing: canAccess("/relatorios/sincronizacao"),
     fleet: canAccess("/frota/notas"),
     scApproval: canAccess("/compras/aprovacao"),
+    scOpen: canAccess("/compras/solicitacoes"),
   };
   return useQuery({
     queryKey: ["menu-badges", can],
@@ -50,7 +51,7 @@ function useBadgeData() {
       // (menu_badge_counts, com a RLS do usuário); antes o navegador baixava as tabelas inteiras.
       // SCs aguardando a minha autorização (gestor ou substituto; a RLS só devolve as que posso ver).
       const uid = (await supabase.auth.getSession()).data.session?.user.id ?? "";
-      const [counts, fleetParts, scPend] = await Promise.all([
+      const [counts, fleetParts, scPend, scOpenRows] = await Promise.all([
         can.docs || can.purchases || can.orders || can.billing
           ? supabase.rpc("menu_badge_counts" as never, { p_today: today, p_docs: can.docs, p_purchases: can.purchases, p_orders: can.orders, p_billing: can.billing } as never)
             .then((r: { data: unknown; error: unknown }) => (r.error ? empty : (r.data as Counts) ?? empty), () => empty)
@@ -58,6 +59,9 @@ function useBadgeData() {
         when(can.fleet, () => fetchFleetBalanceParts().then((p) => [p])),
         when(can.scApproval && !!uid, async () => ((await supabase.from("purchase_requests").select("due_date, approver_id, substitute_id").eq("stage", "aprovacao")).data ?? [])
           .filter((r) => r.approver_id === uid || r.substitute_id === uid)),
+        // SCs em Compras ainda não compradas (as que a RLS deixa ver: próprias, em cópia, autorizadas; Comprador/admin veem todas).
+        when(can.scOpen, async () => (await supabase.from("purchase_requests").select("due_date").eq("stage", "compras")
+          .not("status", "in", '("COMPRA EFETIVADA","ALMOXARIFADO","CANCELADA","RECUSADA")')).data ?? []),
       ]);
       // Saldo do posto: faturas em aberto + abastecimentos ainda não faturados (mesma conta da aba Abastecimento).
       const fp = fleetParts[0] as { open: number; unbilled: number } | undefined;
@@ -70,7 +74,8 @@ function useBadgeData() {
       // Vermelho: alguma com prazo em até 5 dias; laranja: todas com mais de 5 dias.
       const soon = addDays(today, 5);
       const scApproval = { count: scPend.length, urgent: scPend.filter((r: any) => r.due_date <= soon).length };
-      return { scApproval, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
+      const scOpen = { count: scOpenRows.length, late: scOpenRows.filter((r: any) => r.due_date && r.due_date < today).length };
+      return { scApproval, scOpen, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
     },
   });
 }
@@ -116,6 +121,10 @@ export function useMenuBadges() {
     if (d.scApproval?.count) out["/compras/aprovacao"] = {
       count: d.scApproval.count, tone: d.scApproval.urgent ? "red" : "orange",
       detail: `${d.scApproval.count} solicitação(ões) de compra para autorizar${d.scApproval.urgent ? ` · ${d.scApproval.urgent} com prazo em até 5 dias` : ""}`,
+    };
+    if (d.scOpen?.count) out["/compras/solicitacoes"] = {
+      count: d.scOpen.count, tone: d.scOpen.late ? "red" : "orange",
+      detail: `${d.scOpen.count} SC(s) pendente(s) em Compras${d.scOpen.late ? ` · ${d.scOpen.late} com prazo vencido` : ""}`,
     };
     if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red", detail: `${d.purchases} linha(s) de compra pendente(s)` };
     // Vermelho = Serviços, laranja = Indústria; basta 1 da Serviços para ficar vermelho.
