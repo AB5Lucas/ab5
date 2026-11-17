@@ -20,13 +20,13 @@ export const Route = createFileRoute("/api/public/jobs/billing-sync")({
     const { executeBillingSync } = await import("@/lib/billing-sync.server");
     const { deferBilling } = await import("@/lib/billing-background.server");
     const { executeIndustrySync } = await import("@/lib/industry-sync.server");
-    const services = executeBillingSync({ lovableKey, excelKey }, "daily");
+    // MARS primeiro: os serviços que a planilha da MARS cria já recebem o faturamento na mesma execução.
+    const { executeMarsSync } = await import("@/lib/mars-sync.server");
+    const mars = executeMarsSync({ lovableKey, excelKey }, "daily").catch(error => console.error("MARS sync failed", error));
+    const services = mars.then(() => executeBillingSync({ lovableKey, excelKey }, "daily"));
     const industry = executeIndustrySync({ lovableKey, excelKey }, "daily").catch(error => console.error("Industry sync failed", error));
     const { executeFleetSync } = await import("@/lib/fleet-costs.server");
     const fleet = executeFleetSync({ lovableKey, excelKey }).catch(error => console.error("Fleet costs sync failed", error));
-    // Pedidos › MARS MM: planilha Faturamento MARS <ano>.xlsx (ordens de serviço do mês).
-    const { executeMarsSync } = await import("@/lib/mars-sync.server");
-    const mars = executeMarsSync({ lovableKey, excelKey }, "daily").catch(error => console.error("MARS sync failed", error));
     const work = services.finally(() => Promise.all([industry, fleet, mars]));
     const background = Promise.allSettled([services, industry, fleet, mars]).then(r => { if (r[0].status === "rejected") console.error("Billing sync failed", r[0].reason); });
     // Nitro's Cloudflare adapter attaches the execution context to the request.

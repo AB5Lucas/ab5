@@ -128,22 +128,41 @@ async function applyMars(parsed: MarsRow[], ym: string) {
     created++;
   }
 
-  // Medição do contrato (só a tabela de ordens): novas linhas do pedido do contrato nos serviços que já o têm.
+  // Medição do contrato (só a tabela de ordens): novas linhas nos serviços do contrato. Cada medição tem pedido novo
+  // (na planilha vem "Medição"): usa o pedido do faturamento da MARS no mês com o valor do contrato; sem ele, um
+  // provisório "MEDIÇÃO <mês>", trocado nas leituras seguintes quando o faturamento chegar.
   const contract = parsed.find((r) => r.table === "ordens" && r.contract);
   const ckey = `C:${ym}`;
-  if (contract && !byKey.has(ckey)) {
+  if (contract) {
     const total = contract.value > 0 ? contract.value : MARS_CONTRACT_VALUE;
-    if (contractMeasured(works, ym)) {
-      await upsertItem({ key: ckey, ...base(contract), action: "contract", work_id: null, synced_order: MARS_CONTRACT_ORDER, synced_value: total });
-    } else {
-      const split = splitContract(works, ym, total);
-      if (!split.length) notes.push("Medição do contrato sem serviços com o pedido do contrato no mês anterior");
-      for (const s of split) {
-        const w = works.find((x) => x.id === s.id)!;
-        await saveOrders(w, [...(w.orders ?? []), { number: MARS_CONTRACT_ORDER, value: s.value, date }]);
+    const used = new Set(works.flatMap((w) => (w.orders ?? []).map((o) => String(o.number ?? ""))));
+    const placeholder = `MEDIÇÃO ${ym}`;
+    const { data: noteRows } = await supabaseAdmin.from("billing_sync_notes").select("order_number, amount, issued_at")
+      .ilike("client_name", "%MARS%").eq("cancelled", false).gte("issued_at", `${ym}-01`).lte("issued_at", `${ym}-31`)
+      .gte("amount", total - 1).lte("amount", total + 1).not("order_number", "is", null);
+    const realOrder = (noteRows ?? []).map((n) => String(n.order_number ?? "").trim()).find((o) => /^\d{6,}$/.test(o) && (!used.has(o) || byKey.get(ckey)?.synced_order === o));
+    const m = byKey.get(ckey);
+    if (!m) {
+      // Contrato já medido no mês à mão (linhas do pedido do contrato com data no mês): só registra.
+      if (contractMeasured(works, ym)) {
+        await upsertItem({ key: ckey, ...base(contract), action: "contract", work_id: null, synced_order: MARS_CONTRACT_ORDER, synced_value: total });
+      } else {
+        const split = splitContract(works, ym, total);
+        if (!split.length) notes.push("Medição do contrato sem serviços com o pedido do contrato no mês anterior");
+        const number = realOrder ?? placeholder;
+        for (const s of split) {
+          const w = works.find((x) => x.id === s.id)!;
+          await saveOrders(w, [...(w.orders ?? []), { number, value: s.value, date }]);
+          updated++;
+        }
+        if (split.length) await upsertItem({ key: ckey, ...base(contract), action: "contract", work_id: null, synced_order: number, synced_value: total });
+      }
+    } else if (m.synced_order === placeholder && realOrder) {
+      for (const w of works.filter((x) => (x.orders ?? []).some((o) => String(o.number ?? "") === placeholder))) {
+        await saveOrders(w, (w.orders ?? []).map((o) => (String(o.number ?? "") === placeholder ? { ...o, number: realOrder } : o)));
         updated++;
       }
-      if (split.length) await upsertItem({ key: ckey, ...base(contract), action: "contract", work_id: null, synced_order: MARS_CONTRACT_ORDER, synced_value: total });
+      await upsertItem({ key: ckey, ...base(contract), action: "contract", work_id: null, synced_order: realOrder, synced_value: m.synced_value });
     }
   }
   return { created, updated, ignored, firstRun, message: notes.join(" · ") };

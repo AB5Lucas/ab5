@@ -127,6 +127,9 @@ export function splitContract(works: MarsWork[], ym: string, total: number, orde
   return out;
 }
 
-/** O contrato já foi medido no mês (alguma linha do pedido do contrato com data no mês). */
+/** Serviços do contrato: os que têm o pedido do contrato (4500777910, o da 1ª medição registrada). */
+const contractWorks = (works: MarsWork[], order: string) => works.filter((w) => (w.orders ?? []).some((o) => String(o.number ?? "") === order));
+
+/** O contrato já foi medido no mês: algum serviço do contrato tem linha com data no mês e o mesmo valor-base de pedido de medição. */
 export const contractMeasured = (works: MarsWork[], ym: string, order = MARS_CONTRACT_ORDER) =>
-  works.some((w) => (w.orders ?? []).some((o) => String(o.number ?? "") === order && String(o.date ?? "").slice(0, 7) === ym));
+  contractWorks(works, order).some((w) => (w.orders ?? []).some((o) => String(o.number ?? "") === order && String(o.date ?? "").slice(0, 7) === ym));
