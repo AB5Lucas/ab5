@@ -155,7 +155,7 @@ export function useScUsers() {
   });
 }
 
-/** Observadores em cópia: Lucas Garcia e Marcelo Barrella ficam sempre (cadeado); os demais se incluem e tiram. */
+/** Observadores em cópia: Marcelo Barrella fica sempre (cadeado); os demais se incluem e tiram. */
 export function ObserversField({ value, onChange, requesterId }: { value: string[]; onChange: (v: string[]) => void; requesterId?: string | null | undefined }) {
   const users = useScUsers();
   const name = new Map((users.data ?? []).map((u) => [u.id, u.full_name || u.email || "—"]));

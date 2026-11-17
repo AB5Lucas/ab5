@@ -85,5 +85,5 @@ export const deliveryLabel = (r: { delivery_kind: string; delivery_place: string
 export const brDate = (d: string | null | undefined) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "—");
 export const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 
-/** Observadores fixos em toda SC (o banco também garante, purchase_fixed_observers): Lucas Garcia e Marcelo Barrella. */
-export const FIXED_OBSERVERS = ["f3c94145-62f8-452f-a665-eb5e56cffd6a", "cfd87887-421e-48f6-871c-a229e8634700"];
+/** Observador fixo em toda SC (o banco também garante, purchase_fixed_observers): Marcelo Barrella. */
+export const FIXED_OBSERVERS = ["cfd87887-421e-48f6-871c-a229e8634700"];

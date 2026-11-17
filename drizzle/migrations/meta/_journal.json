@@ -827,6 +827,13 @@
       "when": 1795400014000,
       "tag": "0117_purchase_observers_totvs",
       "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1795400015000,
+      "tag": "0118_purchase_fixed_observer_barrella",
+      "breakpoints": true
     }
   ]
 }
