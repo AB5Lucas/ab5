@@ -212,7 +212,10 @@ export function IntegrationsPage() {
         if (!hit) return false;
       }
       return true;
-    }), (r) => statusOf(r.expires_at, today, r.documentation), (r) => r.expires_at);
+    }), (r) => statusOf(r.expires_at, today, r.documentation), (r) => r.expires_at, {
+      handled: (r) => scheduled.has(`${r.collaborator_id}|${r.client_id}`) || inConf.has(`${r.collaborator_id}|${r.client_id}`),
+      name: (r) => personById.get(r.collaborator_id)?.full_name ?? "",
+    });
   }, [integrations.data, search, clientFilter, statusFilter, followUp, scheduled, inConf, personById, clientById, positionById, today]);
 
   // "Não possuem": colaboradores ativos sem integração no cliente filtrado (ou sem nenhuma).

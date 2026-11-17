@@ -164,7 +164,10 @@ export function AsosPage() {
         if (!hit) return false;
       }
       return true;
-    }), (r) => asoStatusOf(r.expires_at, today), (r) => r.expires_at);
+    }), (r) => asoStatusOf(r.expires_at, today), (r) => r.expires_at, {
+      handled: (r) => scheduled.has(r.collaborator_id) || inConf.has(r.collaborator_id),
+      name: (r) => personById.get(r.collaborator_id)?.full_name ?? "",
+    });
   }, [asos.data, search, statusFilter, followUp, scheduled, inConf, personById, today]);
 
   const summary = useMemo(() => {

@@ -286,7 +286,10 @@ export function TrainingsPage() {
       if (!trainingIds.includes(r.training_id)) return false;
     }
     return true;
-  }), (r) => statusOf(r.expires_at), (r) => r.expires_at);
+  }), (r) => statusOf(r.expires_at), (r) => r.expires_at, {
+    handled: (r) => scheduled.has(`${r.collaborator_id}|${r.training_id}`) || inConf.has(`${r.collaborator_id}|${r.training_id}`),
+    name: (r) => nameById.get(r.collaborator_id) ?? "",
+  });
 
   /** "Não possuem": colaboradores ativos sem os treinamentos filtrados (ou sem nenhum). */
   const missing = useMemo(() => {
