@@ -46,8 +46,8 @@ export const priorityClass = (p: string | null | undefined) => SC_PRIORITIES.fin
 export const statusClass = (s: string | null | undefined) => SC_STATUSES.find((x) => x.value === s)?.cls ?? "bg-muted text-muted-foreground";
 
 /** Etapa do fluxo: rascunho (com o solicitante) → aprovação → compras. */
-export type ScStage = "rascunho" | "aprovacao" | "compras";
-export const STAGE_LABEL: Record<ScStage, string> = { rascunho: "Com o solicitante", aprovacao: "Com o aprovador", compras: "Em compras" };
+export type ScStage = "rascunho" | "aprovacao" | "compras" | "cancelada";
+export const STAGE_LABEL: Record<ScStage, string> = { rascunho: "Com o solicitante", aprovacao: "Com o aprovador", compras: "Em compras", cancelada: "Cancelada" };
 
 /**
  * Controle de prazo (como a coluna CONTROLE DE PRAZO da planilha): não enviado ainda; compra efetivada ou

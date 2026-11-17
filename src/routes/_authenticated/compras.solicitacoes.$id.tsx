@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Camera, Image as ImageIcon, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Camera, Image as ImageIcon, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pill, ScHeaderDialog, todayISO, useClientsList, type ScRow } from "@/components/compras/sc-shared";
+import { Pill, ScHeaderDialog, ScRemoveDialog, todayISO, useClientsList, useScRemove, type ScRow } from "@/components/compras/sc-shared";
 import {
   SC_ITEM_STATUSES, SC_UNITS, STAGE_LABEL, brDate, brl, budgetMissing, deadlineControl, deliveryLabel, priorityClass, statusClass, type ScStage,
 } from "@/lib/purchase-requests";
@@ -71,6 +71,9 @@ function Page() {
   const [total, setTotal] = useState("");
   const [dirty, setDirty] = useState(false);
   const [editingHeader, setEditingHeader] = useState(false);
+  const [removing, setRemoving] = useState<ScRow | null>(null);
+  const navigate = useNavigate();
+  const remove = useScRemove(() => { const wasDraft = removing?.stage === "rascunho"; setRemoving(null); if (wasDraft) navigate({ to: "/compras/solicitacoes" }); });
   useEffect(() => {
     if (!items.data || !r) return;
     setRows(items.data.length ? items.data.map(toDraft) : editable ? [emptyDraft()] : []);
@@ -108,10 +111,11 @@ function Page() {
       const filled = rows.filter((x) => x.description.trim() || x.quantity.trim());
       if (budgetMissing(r!.nature, num(total), filled.map((x) => num(x.budget)))) throw new Error("Informe a verba de cada item ou a verba total (só a natureza PROGRAMADA dispensa).");
       await saveItems();
-      const { error } = await supabase.rpc("purchase_request_send", { _id: id });
+      const { data, error } = await supabase.rpc("purchase_request_send", { _id: id });
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => { toast.success("Enviada para o aprovador"); refresh(); },
+    onSuccess: (to) => { toast.success(to === "compras" ? "Enviada direto para o Comprador" : "Enviada para o aprovador"); refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const setItem = useMutation({
@@ -163,6 +167,8 @@ function Page() {
           {editable && <Button variant="outline" size="sm" onClick={() => setEditingHeader(true)}><Pencil className="h-4 w-4" /> Editar cabeçalho</Button>}
           {editable && <Button variant="outline" size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}><Save className="h-4 w-4" /> Salvar itens</Button>}
           {editable && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
+          {editable && <Button variant="ghost" size="sm" onClick={() => setRemoving(r)}><Trash2 className="h-4 w-4 text-destructive" /> Apagar</Button>}
+          {r.requester_id === user?.id && (r.stage === "aprovacao" || r.stage === "compras") && <Button variant="outline" size="sm" onClick={() => setRemoving(r)}><Ban className="h-4 w-4" /> Cancelar SC</Button>}
         </div>
       </div>
 
@@ -293,6 +299,7 @@ function Page() {
       </div>
 
       <ScHeaderDialog open={editingHeader} onOpenChange={setEditingHeader} editing={r} />
+      <ScRemoveDialog row={removing} onClose={() => setRemoving(null)} pending={remove.isPending} onConfirm={(x) => remove.mutate(x)} />
     </div>
   );
 }

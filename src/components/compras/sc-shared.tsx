@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -247,5 +250,43 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Apagar (nunca enviada) ou cancelar (já enviada) uma SC do próprio solicitante. */
+export function useScRemove(onDone?: () => void) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (r: ScRow) => {
+      if (r.stage === "rascunho") {
+        const { error } = await supabase.from("purchase_requests").delete().eq("id", r.id);
+        if (error) throw error;
+        return "apagada";
+      }
+      const { error } = await supabase.rpc("purchase_request_cancel", { _id: r.id });
+      if (error) throw error;
+      return "cancelada";
+    },
+    onSuccess: (what) => { toast.success(`Solicitação ${what}`); qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["sc-request"] }); onDone?.(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+export function ScRemoveDialog({ row, onClose, onConfirm, pending }: { row: ScRow | null; onClose: () => void; onConfirm: (r: ScRow) => void; pending: boolean }) {
+  const del = row?.stage === "rascunho";
+  return (
+    <AlertDialog open={!!row} onOpenChange={(o) => !o && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{del ? "Apagar esta solicitação?" : "Cancelar esta solicitação?"}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {row?.number}. {del ? "Ela ainda não foi enviada e será apagada com os itens." : "Ela já foi enviada: fica no histórico com o status CANCELADA e sai do aprovador e do Comprador."}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Voltar</AlertDialogCancel>
+          <AlertDialogAction disabled={pending} onClick={(e) => { e.preventDefault(); if (row) onConfirm(row); }}>{del ? "Apagar" : "Cancelar SC"}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

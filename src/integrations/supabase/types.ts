@@ -3351,16 +3351,25 @@ export type Database = {
       }
       purchase_approvers: {
         Row: {
-          approver_id: string
+          substitute_id: string | null
+          self_approve: boolean
+          needs_approval: boolean
+          approver_id: string | null
           created_at: string
           requester_id: string
         }
         Insert: {
-          approver_id: string
+          substitute_id?: string | null
+          self_approve?: boolean
+          needs_approval?: boolean
+          approver_id?: string | null
           created_at?: string
           requester_id: string
         }
         Update: {
+          substitute_id?: string | null
+          self_approve?: boolean
+          needs_approval?: boolean
           approver_id?: string
           created_at?: string
           requester_id?: string
@@ -3417,6 +3426,10 @@ export type Database = {
       }
       purchase_requests: {
         Row: {
+          cancelled_at: string | null
+          decided_by: string | null
+          substitute_id: string | null
+          approver_collab_id: string | null
           approved_at: string | null
           approver_id: string | null
           approver_notes: string | null
@@ -3444,6 +3457,10 @@ export type Database = {
           total_budget: number | null
         }
         Insert: {
+          cancelled_at?: string | null
+          decided_by?: string | null
+          substitute_id?: string | null
+          approver_collab_id?: string | null
           approved_at?: string | null
           approver_id?: string | null
           approver_notes?: string | null
@@ -3471,6 +3488,10 @@ export type Database = {
           total_budget?: number | null
         }
         Update: {
+          cancelled_at?: string | null
+          decided_by?: string | null
+          substitute_id?: string | null
+          approver_collab_id?: string | null
           approved_at?: string | null
           approver_id?: string | null
           approver_notes?: string | null
@@ -5834,7 +5855,8 @@ export type Database = {
     }
     Functions: {
       purchase_request_create: { Args: { _p: Json }; Returns: string }
-      purchase_request_send: { Args: { _id: string }; Returns: undefined }
+      purchase_request_send: { Args: { _id: string }; Returns: string }
+      purchase_request_cancel: { Args: { _id: string }; Returns: undefined }
       purchase_request_decide: { Args: { _id: string; _approve: boolean; _notes: string }; Returns: undefined }
       purchase_request_set_status: { Args: { _id: string; _status: string; _notes: string }; Returns: undefined }
       purchase_item_set: { Args: { _item: string; _status: string; _order: string }; Returns: undefined }

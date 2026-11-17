@@ -38,6 +38,7 @@ import {
   ShieldCheck,
   FilePlus,
   PackageCheck,
+  BadgeCheck,
 } from "lucide-react";
 
 /** url = chave de acesso (Acessos); to = para onde o menu leva, quando diferente (ex.: Clientes abre em /clientes). */
@@ -107,11 +108,12 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    // Solicitações de compra (SC): solicitante → aprovador (filtro Minhas aprovações em Solicitações) → comprador (subaba Aprovadores). Relatório = a antiga aba Compras (mesma chave de acesso).
+    // Solicitações de compra (SC): solicitante → Aprovação (gestor do cliente) → Comprador (subaba Aprovadores). Relatório = a antiga aba Compras (mesma chave de acesso).
     label: "Compras",
     icon: ShoppingCart,
     items: [
       { title: "Solicitações", url: "/compras/solicitacoes", icon: FilePlus },
+      { title: "Aprovação", url: "/compras/aprovacao", icon: BadgeCheck },
       { title: "Comprador", url: "/compras/comprador", icon: PackageCheck },
       { title: "Relatório", url: "/obras/compras", icon: ChartPie },
     ],

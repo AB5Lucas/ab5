@@ -40,6 +40,7 @@ import { Route as AuthenticatedColaboradoresIndexRouteImport } from './routes/_a
 import { Route as AuthenticatedColaboradoresAsosRouteImport } from './routes/_authenticated/colaboradores.asos'
 import { Route as AuthenticatedColaboradoresEstruturaRouteImport } from './routes/_authenticated/colaboradores.estrutura'
 import { Route as AuthenticatedColaboradoresTurnosRouteImport } from './routes/_authenticated/colaboradores.turnos'
+import { Route as AuthenticatedComprasAprovacaoRouteImport } from './routes/_authenticated/compras.aprovacao'
 import { Route as AuthenticatedComprasCompradorRouteImport } from './routes/_authenticated/compras.comprador'
 import { Route as AuthenticatedDemandasCertificadosRouteImport } from './routes/_authenticated/demandas.certificados'
 import { Route as AuthenticatedDemandasContratacoesRouteImport } from './routes/_authenticated/demandas.contratacoes'
@@ -247,6 +248,12 @@ const AuthenticatedColaboradoresTurnosRoute =
     path: '/colaboradores/turnos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedComprasAprovacaoRoute =
+  AuthenticatedComprasAprovacaoRouteImport.update({
+    id: '/compras/aprovacao',
+    path: '/compras/aprovacao',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedComprasCompradorRoute =
   AuthenticatedComprasCompradorRouteImport.update({
     id: '/compras/comprador',
@@ -449,6 +456,7 @@ export interface FileRoutesByFullPath {
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
+  '/compras/aprovacao': typeof AuthenticatedComprasAprovacaoRoute
   '/compras/comprador': typeof AuthenticatedComprasCompradorRoute
   '/demandas/certificados': typeof AuthenticatedDemandasCertificadosRoute
   '/demandas/contratacoes': typeof AuthenticatedDemandasContratacoesRoute
@@ -510,6 +518,7 @@ export interface FileRoutesByTo {
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
+  '/compras/aprovacao': typeof AuthenticatedComprasAprovacaoRoute
   '/compras/comprador': typeof AuthenticatedComprasCompradorRoute
   '/demandas/certificados': typeof AuthenticatedDemandasCertificadosRoute
   '/demandas/contratacoes': typeof AuthenticatedDemandasContratacoesRoute
@@ -573,6 +582,7 @@ export interface FileRoutesById {
   '/_authenticated/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/_authenticated/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/_authenticated/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
+  '/_authenticated/compras/aprovacao': typeof AuthenticatedComprasAprovacaoRoute
   '/_authenticated/compras/comprador': typeof AuthenticatedComprasCompradorRoute
   '/_authenticated/demandas/certificados': typeof AuthenticatedDemandasCertificadosRoute
   '/_authenticated/demandas/contratacoes': typeof AuthenticatedDemandasContratacoesRoute
@@ -636,6 +646,7 @@ export interface FileRouteTypes {
     | '/colaboradores/asos'
     | '/colaboradores/estrutura'
     | '/colaboradores/turnos'
+    | '/compras/aprovacao'
     | '/compras/comprador'
     | '/demandas/certificados'
     | '/demandas/contratacoes'
@@ -697,6 +708,7 @@ export interface FileRouteTypes {
     | '/colaboradores/asos'
     | '/colaboradores/estrutura'
     | '/colaboradores/turnos'
+    | '/compras/aprovacao'
     | '/compras/comprador'
     | '/demandas/certificados'
     | '/demandas/contratacoes'
@@ -759,6 +771,7 @@ export interface FileRouteTypes {
     | '/_authenticated/colaboradores/asos'
     | '/_authenticated/colaboradores/estrutura'
     | '/_authenticated/colaboradores/turnos'
+    | '/_authenticated/compras/aprovacao'
     | '/_authenticated/compras/comprador'
     | '/_authenticated/demandas/certificados'
     | '/_authenticated/demandas/contratacoes'
@@ -1020,6 +1033,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedColaboradoresTurnosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/compras/aprovacao': {
+      id: '/_authenticated/compras/aprovacao'
+      path: '/compras/aprovacao'
+      fullPath: '/compras/aprovacao'
+      preLoaderRoute: typeof AuthenticatedComprasAprovacaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/compras/comprador': {
       id: '/_authenticated/compras/comprador'
       path: '/compras/comprador'
@@ -1252,6 +1272,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedColaboradoresAsosRoute: typeof AuthenticatedColaboradoresAsosRoute
   AuthenticatedColaboradoresEstruturaRoute: typeof AuthenticatedColaboradoresEstruturaRoute
   AuthenticatedColaboradoresTurnosRoute: typeof AuthenticatedColaboradoresTurnosRoute
+  AuthenticatedComprasAprovacaoRoute: typeof AuthenticatedComprasAprovacaoRoute
   AuthenticatedComprasCompradorRoute: typeof AuthenticatedComprasCompradorRoute
   AuthenticatedDemandasCertificadosRoute: typeof AuthenticatedDemandasCertificadosRoute
   AuthenticatedDemandasContratacoesRoute: typeof AuthenticatedDemandasContratacoesRoute
@@ -1315,6 +1336,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedColaboradoresEstruturaRoute:
     AuthenticatedColaboradoresEstruturaRoute,
   AuthenticatedColaboradoresTurnosRoute: AuthenticatedColaboradoresTurnosRoute,
+  AuthenticatedComprasAprovacaoRoute: AuthenticatedComprasAprovacaoRoute,
   AuthenticatedComprasCompradorRoute: AuthenticatedComprasCompradorRoute,
   AuthenticatedDemandasCertificadosRoute:
     AuthenticatedDemandasCertificadosRoute,
