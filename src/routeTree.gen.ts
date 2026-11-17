@@ -40,6 +40,9 @@ import { Route as AuthenticatedColaboradoresIndexRouteImport } from './routes/_a
 import { Route as AuthenticatedColaboradoresAsosRouteImport } from './routes/_authenticated/colaboradores.asos'
 import { Route as AuthenticatedColaboradoresEstruturaRouteImport } from './routes/_authenticated/colaboradores.estrutura'
 import { Route as AuthenticatedColaboradoresTurnosRouteImport } from './routes/_authenticated/colaboradores.turnos'
+import { Route as AuthenticatedComprasAprovacaoRouteImport } from './routes/_authenticated/compras.aprovacao'
+import { Route as AuthenticatedComprasAprovadoresRouteImport } from './routes/_authenticated/compras.aprovadores'
+import { Route as AuthenticatedComprasCompradorRouteImport } from './routes/_authenticated/compras.comprador'
 import { Route as AuthenticatedDemandasCertificadosRouteImport } from './routes/_authenticated/demandas.certificados'
 import { Route as AuthenticatedDemandasContratacoesRouteImport } from './routes/_authenticated/demandas.contratacoes'
 import { Route as AuthenticatedExternoRelatorioDiarioRouteImport } from './routes/_authenticated/externo.relatorio-diario'
@@ -64,6 +67,8 @@ import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedVeiculosMotoristasRouteImport } from './routes/_authenticated/veiculos.motoristas'
 import { Route as AuthenticatedVeiculosRelatoriosRouteImport } from './routes/_authenticated/veiculos.relatorios'
 import { Route as AuthenticatedVeiculosTransporteRouteImport } from './routes/_authenticated/veiculos.transporte'
+import { Route as AuthenticatedComprasSolicitacoesIndexRouteImport } from './routes/_authenticated/compras.solicitacoes.index'
+import { Route as AuthenticatedComprasSolicitacoesIdRouteImport } from './routes/_authenticated/compras.solicitacoes.$id'
 import { Route as ApiPublicJobsBillingSyncRouteImport } from './routes/api/public/jobs/billing-sync'
 import { Route as ApiPublicJobsRecurringEntriesRouteImport } from './routes/api/public/jobs/recurring-entries'
 
@@ -244,6 +249,24 @@ const AuthenticatedColaboradoresTurnosRoute =
     path: '/colaboradores/turnos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedComprasAprovacaoRoute =
+  AuthenticatedComprasAprovacaoRouteImport.update({
+    id: '/compras/aprovacao',
+    path: '/compras/aprovacao',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedComprasAprovadoresRoute =
+  AuthenticatedComprasAprovadoresRouteImport.update({
+    id: '/compras/aprovadores',
+    path: '/compras/aprovadores',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedComprasCompradorRoute =
+  AuthenticatedComprasCompradorRouteImport.update({
+    id: '/compras/comprador',
+    path: '/compras/comprador',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDemandasCertificadosRoute =
   AuthenticatedDemandasCertificadosRouteImport.update({
     id: '/demandas/certificados',
@@ -386,6 +409,18 @@ const AuthenticatedVeiculosTransporteRoute =
     path: '/veiculos/transporte',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedComprasSolicitacoesIndexRoute =
+  AuthenticatedComprasSolicitacoesIndexRouteImport.update({
+    id: '/compras/solicitacoes/',
+    path: '/compras/solicitacoes/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedComprasSolicitacoesIdRoute =
+  AuthenticatedComprasSolicitacoesIdRouteImport.update({
+    id: '/compras/solicitacoes/$id',
+    path: '/compras/solicitacoes/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const ApiPublicJobsBillingSyncRoute =
   ApiPublicJobsBillingSyncRouteImport.update({
     id: '/api/public/jobs/billing-sync',
@@ -428,6 +463,9 @@ export interface FileRoutesByFullPath {
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
+  '/compras/aprovacao': typeof AuthenticatedComprasAprovacaoRoute
+  '/compras/aprovadores': typeof AuthenticatedComprasAprovadoresRoute
+  '/compras/comprador': typeof AuthenticatedComprasCompradorRoute
   '/demandas/certificados': typeof AuthenticatedDemandasCertificadosRoute
   '/demandas/contratacoes': typeof AuthenticatedDemandasContratacoesRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
@@ -454,8 +492,10 @@ export interface FileRoutesByFullPath {
   '/obras/': typeof AuthenticatedObrasIndexRoute
   '/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos/': typeof AuthenticatedVeiculosIndexRoute
+  '/compras/solicitacoes/$id': typeof AuthenticatedComprasSolicitacoesIdRoute
   '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
   '/api/public/jobs/recurring-entries': typeof ApiPublicJobsRecurringEntriesRoute
+  '/compras/solicitacoes/': typeof AuthenticatedComprasSolicitacoesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -486,6 +526,9 @@ export interface FileRoutesByTo {
   '/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
+  '/compras/aprovacao': typeof AuthenticatedComprasAprovacaoRoute
+  '/compras/aprovadores': typeof AuthenticatedComprasAprovadoresRoute
+  '/compras/comprador': typeof AuthenticatedComprasCompradorRoute
   '/demandas/certificados': typeof AuthenticatedDemandasCertificadosRoute
   '/demandas/contratacoes': typeof AuthenticatedDemandasContratacoesRoute
   '/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
@@ -512,8 +555,10 @@ export interface FileRoutesByTo {
   '/obras': typeof AuthenticatedObrasIndexRoute
   '/relatorios': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos': typeof AuthenticatedVeiculosIndexRoute
+  '/compras/solicitacoes/$id': typeof AuthenticatedComprasSolicitacoesIdRoute
   '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
   '/api/public/jobs/recurring-entries': typeof ApiPublicJobsRecurringEntriesRoute
+  '/compras/solicitacoes': typeof AuthenticatedComprasSolicitacoesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -546,6 +591,9 @@ export interface FileRoutesById {
   '/_authenticated/colaboradores/asos': typeof AuthenticatedColaboradoresAsosRoute
   '/_authenticated/colaboradores/estrutura': typeof AuthenticatedColaboradoresEstruturaRoute
   '/_authenticated/colaboradores/turnos': typeof AuthenticatedColaboradoresTurnosRoute
+  '/_authenticated/compras/aprovacao': typeof AuthenticatedComprasAprovacaoRoute
+  '/_authenticated/compras/aprovadores': typeof AuthenticatedComprasAprovadoresRoute
+  '/_authenticated/compras/comprador': typeof AuthenticatedComprasCompradorRoute
   '/_authenticated/demandas/certificados': typeof AuthenticatedDemandasCertificadosRoute
   '/_authenticated/demandas/contratacoes': typeof AuthenticatedDemandasContratacoesRoute
   '/_authenticated/externo/relatorio-diario': typeof AuthenticatedExternoRelatorioDiarioRoute
@@ -572,8 +620,10 @@ export interface FileRoutesById {
   '/_authenticated/obras/': typeof AuthenticatedObrasIndexRoute
   '/_authenticated/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/_authenticated/veiculos/': typeof AuthenticatedVeiculosIndexRoute
+  '/_authenticated/compras/solicitacoes/$id': typeof AuthenticatedComprasSolicitacoesIdRoute
   '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
   '/api/public/jobs/recurring-entries': typeof ApiPublicJobsRecurringEntriesRoute
+  '/_authenticated/compras/solicitacoes/': typeof AuthenticatedComprasSolicitacoesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -606,6 +656,9 @@ export interface FileRouteTypes {
     | '/colaboradores/asos'
     | '/colaboradores/estrutura'
     | '/colaboradores/turnos'
+    | '/compras/aprovacao'
+    | '/compras/aprovadores'
+    | '/compras/comprador'
     | '/demandas/certificados'
     | '/demandas/contratacoes'
     | '/externo/relatorio-diario'
@@ -632,8 +685,10 @@ export interface FileRouteTypes {
     | '/obras/'
     | '/relatorios/'
     | '/veiculos/'
+    | '/compras/solicitacoes/$id'
     | '/api/public/jobs/billing-sync'
     | '/api/public/jobs/recurring-entries'
+    | '/compras/solicitacoes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -664,6 +719,9 @@ export interface FileRouteTypes {
     | '/colaboradores/asos'
     | '/colaboradores/estrutura'
     | '/colaboradores/turnos'
+    | '/compras/aprovacao'
+    | '/compras/aprovadores'
+    | '/compras/comprador'
     | '/demandas/certificados'
     | '/demandas/contratacoes'
     | '/externo/relatorio-diario'
@@ -690,8 +748,10 @@ export interface FileRouteTypes {
     | '/obras'
     | '/relatorios'
     | '/veiculos'
+    | '/compras/solicitacoes/$id'
     | '/api/public/jobs/billing-sync'
     | '/api/public/jobs/recurring-entries'
+    | '/compras/solicitacoes'
   id:
     | '__root__'
     | '/'
@@ -723,6 +783,9 @@ export interface FileRouteTypes {
     | '/_authenticated/colaboradores/asos'
     | '/_authenticated/colaboradores/estrutura'
     | '/_authenticated/colaboradores/turnos'
+    | '/_authenticated/compras/aprovacao'
+    | '/_authenticated/compras/aprovadores'
+    | '/_authenticated/compras/comprador'
     | '/_authenticated/demandas/certificados'
     | '/_authenticated/demandas/contratacoes'
     | '/_authenticated/externo/relatorio-diario'
@@ -749,8 +812,10 @@ export interface FileRouteTypes {
     | '/_authenticated/obras/'
     | '/_authenticated/relatorios/'
     | '/_authenticated/veiculos/'
+    | '/_authenticated/compras/solicitacoes/$id'
     | '/api/public/jobs/billing-sync'
     | '/api/public/jobs/recurring-entries'
+    | '/_authenticated/compras/solicitacoes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -981,6 +1046,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedColaboradoresTurnosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/compras/aprovacao': {
+      id: '/_authenticated/compras/aprovacao'
+      path: '/compras/aprovacao'
+      fullPath: '/compras/aprovacao'
+      preLoaderRoute: typeof AuthenticatedComprasAprovacaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/compras/aprovadores': {
+      id: '/_authenticated/compras/aprovadores'
+      path: '/compras/aprovadores'
+      fullPath: '/compras/aprovadores'
+      preLoaderRoute: typeof AuthenticatedComprasAprovadoresRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/compras/comprador': {
+      id: '/_authenticated/compras/comprador'
+      path: '/compras/comprador'
+      fullPath: '/compras/comprador'
+      preLoaderRoute: typeof AuthenticatedComprasCompradorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/demandas/certificados': {
       id: '/_authenticated/demandas/certificados'
       path: '/demandas/certificados'
@@ -1149,6 +1235,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVeiculosTransporteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/compras/solicitacoes/': {
+      id: '/_authenticated/compras/solicitacoes/'
+      path: '/compras/solicitacoes'
+      fullPath: '/compras/solicitacoes/'
+      preLoaderRoute: typeof AuthenticatedComprasSolicitacoesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/compras/solicitacoes/$id': {
+      id: '/_authenticated/compras/solicitacoes/$id'
+      path: '/compras/solicitacoes/$id'
+      fullPath: '/compras/solicitacoes/$id'
+      preLoaderRoute: typeof AuthenticatedComprasSolicitacoesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/api/public/jobs/billing-sync': {
       id: '/api/public/jobs/billing-sync'
       path: '/api/public/jobs/billing-sync'
@@ -1192,6 +1292,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedColaboradoresAsosRoute: typeof AuthenticatedColaboradoresAsosRoute
   AuthenticatedColaboradoresEstruturaRoute: typeof AuthenticatedColaboradoresEstruturaRoute
   AuthenticatedColaboradoresTurnosRoute: typeof AuthenticatedColaboradoresTurnosRoute
+  AuthenticatedComprasAprovacaoRoute: typeof AuthenticatedComprasAprovacaoRoute
+  AuthenticatedComprasAprovadoresRoute: typeof AuthenticatedComprasAprovadoresRoute
+  AuthenticatedComprasCompradorRoute: typeof AuthenticatedComprasCompradorRoute
   AuthenticatedDemandasCertificadosRoute: typeof AuthenticatedDemandasCertificadosRoute
   AuthenticatedDemandasContratacoesRoute: typeof AuthenticatedDemandasContratacoesRoute
   AuthenticatedExternoRelatorioDiarioRoute: typeof AuthenticatedExternoRelatorioDiarioRoute
@@ -1218,6 +1321,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedObrasIndexRoute: typeof AuthenticatedObrasIndexRoute
   AuthenticatedRelatoriosIndexRoute: typeof AuthenticatedRelatoriosIndexRoute
   AuthenticatedVeiculosIndexRoute: typeof AuthenticatedVeiculosIndexRoute
+  AuthenticatedComprasSolicitacoesIdRoute: typeof AuthenticatedComprasSolicitacoesIdRoute
+  AuthenticatedComprasSolicitacoesIndexRoute: typeof AuthenticatedComprasSolicitacoesIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -1252,6 +1357,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedColaboradoresEstruturaRoute:
     AuthenticatedColaboradoresEstruturaRoute,
   AuthenticatedColaboradoresTurnosRoute: AuthenticatedColaboradoresTurnosRoute,
+  AuthenticatedComprasAprovacaoRoute: AuthenticatedComprasAprovacaoRoute,
+  AuthenticatedComprasAprovadoresRoute: AuthenticatedComprasAprovadoresRoute,
+  AuthenticatedComprasCompradorRoute: AuthenticatedComprasCompradorRoute,
   AuthenticatedDemandasCertificadosRoute:
     AuthenticatedDemandasCertificadosRoute,
   AuthenticatedDemandasContratacoesRoute:
@@ -1286,6 +1394,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedObrasIndexRoute: AuthenticatedObrasIndexRoute,
   AuthenticatedRelatoriosIndexRoute: AuthenticatedRelatoriosIndexRoute,
   AuthenticatedVeiculosIndexRoute: AuthenticatedVeiculosIndexRoute,
+  AuthenticatedComprasSolicitacoesIdRoute:
+    AuthenticatedComprasSolicitacoesIdRoute,
+  AuthenticatedComprasSolicitacoesIndexRoute:
+    AuthenticatedComprasSolicitacoesIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

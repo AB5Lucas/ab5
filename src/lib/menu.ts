@@ -36,6 +36,10 @@ import {
   ClipboardList,
   Boxes,
   ShieldCheck,
+  FilePlus,
+  BadgeCheck,
+  PackageCheck,
+  UserCheck,
 } from "lucide-react";
 
 /** url = chave de acesso (Acessos); to = para onde o menu leva, quando diferente (ex.: Clientes abre em /clientes). */
@@ -91,7 +95,6 @@ const RAW_GROUPS: MenuGroup[] = [
     icon: Building2,
     items: [
       { title: "Clientes", url: "/obras", to: "/clientes", icon: Building2 },
-      { title: "Compras", url: "/obras/compras", icon: ShoppingCart },
       { title: "Resultados", url: "/obras/resultado", icon: TrendingUp },
       { title: "Fechamento", url: "/fechamentos/financeiro", icon: Calculator },
       { title: "Relatório Diário", url: "/externo/relatorio-diario", icon: NotebookPen },
@@ -103,6 +106,18 @@ const RAW_GROUPS: MenuGroup[] = [
     items: [
       { title: "Pedidos", url: "/fechamentos/suzano", icon: Receipt },
       { title: "Faturamento", url: "/relatorios/sincronizacao", icon: FileText },
+    ],
+  },
+  {
+    // Solicitações de compra (SC): solicitante → aprovador → comprador. Relatório = a antiga aba Compras (mesma chave de acesso).
+    label: "Compras",
+    icon: ShoppingCart,
+    items: [
+      { title: "Solicitações", url: "/compras/solicitacoes", icon: FilePlus },
+      { title: "Aprovação", url: "/compras/aprovacao", icon: BadgeCheck },
+      { title: "Comprador", url: "/compras/comprador", icon: PackageCheck },
+      { title: "Aprovadores", url: "/compras/aprovadores", icon: UserCheck },
+      { title: "Relatório", url: "/obras/compras", icon: ChartPie },
     ],
   },
   {
@@ -149,5 +164,7 @@ export function menuUrlFor(pathname: string): string | null {
   if (pathname.startsWith("/programacao")) return "/programacao/diaria";
   if (pathname === "/clientes") return "/obras";
   if (pathname.startsWith("/ausencias")) return "/ausencias";
+  // Página de uma SC: a RLS decide quem vê (solicitante, aprovador ou comprador), sem trava de página.
+  if (pathname.startsWith("/compras/solicitacoes/")) return null;
   return null;
 }

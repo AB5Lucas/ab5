@@ -3349,6 +3349,171 @@ export type Database = {
           },
         ]
       }
+      purchase_approvers: {
+        Row: {
+          approver_id: string
+          created_at: string
+          requester_id: string
+        }
+        Insert: {
+          approver_id: string
+          created_at?: string
+          requester_id: string
+        }
+        Update: {
+          approver_id?: string
+          created_at?: string
+          requester_id?: string
+        }
+        Relationships: []
+      }
+      purchase_request_items: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          item_no: number
+          notes: string | null
+          order_number: string | null
+          photo_path: string | null
+          quantity: number
+          request_id: string
+          status: string
+          unit: string
+          budget: number | null
+          work_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          item_no: number
+          notes?: string | null
+          order_number?: string | null
+          photo_path?: string | null
+          quantity: number
+          request_id: string
+          status?: string
+          unit: string
+          budget?: number | null
+          work_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          item_no?: number
+          notes?: string | null
+          order_number?: string | null
+          photo_path?: string | null
+          quantity?: number
+          request_id?: string
+          status?: string
+          unit?: string
+          budget?: number | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      purchase_requests: {
+        Row: {
+          approved_at: string | null
+          approver_id: string | null
+          approver_notes: string | null
+          buyer_notes: string | null
+          category: string
+          client_id: string | null
+          created_at: string
+          delivery_kind: string
+          delivery_place: string | null
+          due_date: string
+          id: string
+          nature: string
+          notes: string | null
+          number: string
+          priority: string
+          request_date: string
+          requester_id: string
+          requester_name: string
+          sent_at: string | null
+          seq: number
+          stage: string
+          status: string
+          status_at: string
+          system: string
+          total_budget: number | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approver_id?: string | null
+          approver_notes?: string | null
+          buyer_notes?: string | null
+          category: string
+          client_id?: string | null
+          created_at?: string
+          delivery_kind?: string
+          delivery_place?: string | null
+          due_date: string
+          id?: string
+          nature: string
+          notes?: string | null
+          number: string
+          priority: string
+          request_date?: string
+          requester_id?: string
+          requester_name: string
+          sent_at?: string | null
+          seq: number
+          stage?: string
+          status?: string
+          status_at?: string
+          system: string
+          total_budget?: number | null
+        }
+        Update: {
+          approved_at?: string | null
+          approver_id?: string | null
+          approver_notes?: string | null
+          buyer_notes?: string | null
+          category?: string
+          client_id?: string | null
+          created_at?: string
+          delivery_kind?: string
+          delivery_place?: string | null
+          due_date?: string
+          id?: string
+          nature?: string
+          notes?: string | null
+          number?: string
+          priority?: string
+          request_date?: string
+          requester_id?: string
+          requester_name?: string
+          sent_at?: string | null
+          seq?: number
+          stage?: string
+          status?: string
+          status_at?: string
+          system?: string
+          total_budget?: number | null
+        }
+        Relationships: []
+      }
+      purchase_sc_seq: {
+        Row: {
+          last_number: number
+          requester_key: string
+        }
+        Insert: {
+          last_number?: number
+          requester_key: string
+        }
+        Update: {
+          last_number?: number
+          requester_key?: string
+        }
+        Relationships: []
+      }
       purchase_cc_lines: {
         Row: {
           amount: number
@@ -5668,6 +5833,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      purchase_request_create: { Args: { _p: Json }; Returns: string }
+      purchase_request_send: { Args: { _id: string }; Returns: undefined }
+      purchase_request_decide: { Args: { _id: string; _approve: boolean; _notes: string }; Returns: undefined }
+      purchase_request_set_status: { Args: { _id: string; _status: string; _notes: string }; Returns: undefined }
+      purchase_item_set: { Args: { _item: string; _status: string; _order: string }; Returns: undefined }
       _andam_move: {
         Args: {
           _fc: string

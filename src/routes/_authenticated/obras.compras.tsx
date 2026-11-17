@@ -183,7 +183,7 @@ function ComprasPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Compras"
+        title="Relatório de Compras"
         description="Despesas da planilha de Compras (pasta Compras/RELATÓRIOS) lançadas nos serviços pelo centro de custo."
         actions={<div className="flex flex-wrap gap-2"><PurchaseRules canWrite={canWrite} />{canWrite && <><Button variant="outline" size="sm" onClick={runReprocess} disabled={busy}>Reprocessar</Button><Button size="sm" onClick={runSync} disabled={busy}><RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} /> Sincronizar</Button></>}</div>}
       />
