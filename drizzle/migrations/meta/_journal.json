@@ -841,6 +841,13 @@
       "when": 1795400016000,
       "tag": "0119_purchase_delivery_pickup",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1795400017000,
+      "tag": "0120_purchase_fixed_observer_vitoria",
+      "breakpoints": true
     }
   ]
 }

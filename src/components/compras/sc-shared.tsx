@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
+import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -155,9 +156,11 @@ export function useScUsers() {
   });
 }
 
-/** Observadores em cópia: Marcelo Barrella fica sempre (cadeado); os demais se incluem e tiram. */
+/** Observadores em cópia: Marcelo Barrella e Vitória Brasilino ficam sempre (cadeado; nunca o próprio solicitante); os demais se incluem e tiram. */
 export function ObserversField({ value, onChange, requesterId }: { value: string[]; onChange: (v: string[]) => void; requesterId?: string | null | undefined }) {
   const users = useScUsers();
+  const { user } = useCurrentUser();
+  requesterId = requesterId ?? user?.id;
   const name = new Map((users.data ?? []).map((u) => [u.id, u.full_name || u.email || "—"]));
   const list = [...new Set([...FIXED_OBSERVERS, ...value])].filter((id) => id !== requesterId);
   const options = (users.data ?? []).filter((u) => u.active !== false && !list.includes(u.id) && u.id !== requesterId)
