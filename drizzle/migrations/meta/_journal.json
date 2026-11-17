@@ -778,6 +778,13 @@
       "when": 1795400007000,
       "tag": "0110_purchase_approvers_in_buyer",
       "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1795400008000,
+      "tag": "0111_appointments_replace_future",
+      "breakpoints": true
     }
   ]
 }

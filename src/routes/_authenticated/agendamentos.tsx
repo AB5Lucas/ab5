@@ -1,5 +1,6 @@
 import { LeaveNotice } from "@/components/leave-notice";
 import { findDateConflicts } from "@/lib/date-conflicts";
+import { futureSameKind, replacedText } from "@/lib/appointment-replace";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -389,8 +390,10 @@ function AppointmentsPage() {
       if (!form.scheduled_time) throw new Error("Informe o horário");
       if (form.type === "treinamento" && !form.training_id) throw new Error("Selecione a NR");
       if (form.type === "integracao" && !form.client_id) throw new Error("Selecione o cliente");
-      const conflicts = await findDateConflicts(form.collaborator_id, form.scheduled_date, form.scheduled_date, undefined, form.scheduled_time);
+      const conflicts = await findDateConflicts(form.collaborator_id, form.scheduled_date, form.scheduled_date, undefined, form.scheduled_time,
+        { type: form.type, training_id: form.type === "treinamento" ? form.training_id : null, client_id: form.type === "integracao" ? form.client_id : null });
       if (conflicts.length) throw new Error(`Não é possível agendar: ${conflicts.join("; ")}`);
+      const replaced = await futureSameKind({ collaborator_id: form.collaborator_id, type: form.type, training_id: form.training_id, client_id: form.client_id });
       const { error } = await supabase.from("appointments").insert({
         type: form.type,
         collaborator_id: form.collaborator_id,
@@ -405,9 +408,10 @@ function AppointmentsPage() {
         notes: form.notes.trim() || null,
       });
       if (error) throw error;
+      return replaced;
     },
-    onSuccess: () => {
-      toast.success("Agendamento criado");
+    onSuccess: (replaced) => {
+      toast.success(`Agendamento criado${replacedText(replaced ?? [])}`);
       setOpenNew(false);
       setForm(emptyForm());
       setPersonQuery("");

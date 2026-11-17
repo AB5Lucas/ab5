@@ -1,3 +1,4 @@
+import { futureSameKind, replacedText } from "@/lib/appointment-replace";
 import { LeaveNotice } from "@/components/leave-notice";
 import { findDateConflicts } from "@/lib/date-conflicts";
 import { useMemo, useState } from "react";
@@ -206,7 +207,8 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
       if (!form.scheduled_time) throw new Error("Informe o horário do agendamento");
       if (type === "treinamento" && !form.training_id) throw new Error("Selecione o treinamento (NR)");
       if (type === "integracao" && !form.client_id) throw new Error("Selecione o cliente");
-      const conflicts = await findDateConflicts(form.collaborator_id, form.scheduled_date, form.scheduled_date, editing ? { table: "appointments", id: editing.id } : undefined, form.scheduled_time);
+      const conflicts = await findDateConflicts(form.collaborator_id, form.scheduled_date, form.scheduled_date, editing ? { table: "appointments", id: editing.id } : undefined, form.scheduled_time,
+        editing ? undefined : { type, training_id: type === "treinamento" ? form.training_id : null, client_id: type === "integracao" ? form.client_id : null });
       if (conflicts.length) throw new Error(`Não é possível agendar: ${conflicts.join("; ")}`);
       const payload = {
         type,
@@ -222,12 +224,15 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
         const { error } = await supabase.from("appointments").update(payload).eq("id", editing.id);
         if (error) throw error;
       } else {
+        const replaced = await futureSameKind(payload);
         const { error } = await supabase.from("appointments").insert(payload);
         if (error) throw error;
+        return replaced;
       }
+      return [] as string[];
     },
-    onSuccess: () => {
-      toast.success(editing ? "Agendamento atualizado" : "Agendamento criado");
+    onSuccess: (replaced?: string[]) => {
+      toast.success(editing ? "Agendamento atualizado" : `Agendamento criado${replacedText(replaced ?? [])}`);
       reset();
       qc.invalidateQueries({ queryKey: ["appointments"] });
       qc.invalidateQueries({ queryKey: ["appointments-day"] });

@@ -15,12 +15,14 @@ export async function findDateConflicts(
   to: string,
   exclude?: { table: string; id: string },
   scheduledTime?: string,
+  /** Novo agendamento do mesmo tipo substitui o antigo (trigger no banco): o antigo não conta como conflito. */
+  replaces?: { type: string; training_id?: string | null; client_id?: string | null },
 ): Promise<string[]> {
   const skip = (table: string, id: string) => exclude?.table === table && exclude.id === id;
   const [ap, vac, off, med] = await Promise.all([
     supabase
       .from("appointments")
-      .select("id,type,scheduled_date,scheduled_time,status")
+      .select("id,type,scheduled_date,scheduled_time,status,training_id,client_id")
       .eq("collaborator_id", collaboratorId)
       .gte("scheduled_date", from)
       .lte("scheduled_date", to),
@@ -42,6 +44,9 @@ export async function findDateConflicts(
   const out: string[] = [];
   for (const a of ap.data ?? []) {
     if (skip("appointments", a.id) || /cancel/i.test(a.status ?? "")) continue;
+    if (replaces && a.status === "agendado" && a.type === replaces.type
+      && (a.type !== "treinamento" || a.training_id === (replaces.training_id ?? null))
+      && (a.type !== "integracao" || a.client_id === (replaces.client_id ?? null))) continue;
     if (!appointmentTimesConflict(a.scheduled_time, scheduledTime)) continue;
     out.push(`${TYPE_LABEL[a.type] ?? a.type} agendado em ${formatDateBR(a.scheduled_date)}${a.scheduled_time ? ` às ${a.scheduled_time.slice(0, 5)}` : " (sem horário)"}`);
   }
