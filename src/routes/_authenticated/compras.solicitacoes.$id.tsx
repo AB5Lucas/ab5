@@ -56,9 +56,14 @@ function Page() {
   const works = useQuery({
     queryKey: ["sc-works", r?.client_id],
     enabled: !!r?.client_id,
-    queryFn: async () => (await supabase.from("works").select("id, name, cc_suffix, active").eq("client_id", r!.client_id!).order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("works").select("id, name, cc_suffix, active, order_number").eq("client_id", r!.client_id!).order("name")).data ?? [],
   });
-  const workName = useMemo(() => new Map((works.data ?? []).map((w) => [w.id, w.name])), [works.data]);
+  // Serviço com o nº do pedido antes ("4502503659 - Andaimes Engenharia Klaus"); vários pedidos: o primeiro e "…".
+  const workLabel = (w: { name: string; order_number: string | null }) => {
+    const orders = (w.order_number ?? "").split(/[\s\/;,]+/).filter(Boolean);
+    return orders.length ? `${orders[0]}${orders.length > 1 ? "…" : ""} - ${w.name}` : w.name;
+  };
+  const workName = useMemo(() => new Map((works.data ?? []).map((w) => [w.id, workLabel(w)])), [works.data]);
   const editable = !!r && r.requester_id === user?.id && r.stage === "rascunho";
   const isBuyer = !!r && r.stage === "compras" && canAccess("/compras/comprador");
 
@@ -220,7 +225,7 @@ function Page() {
                         <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                         <SelectContent className="max-h-72">
                           <SelectItem value={RATEIO}>Rateio geral do cliente</SelectItem>
-                          {(works.data ?? []).filter((w) => w.active || w.id === x.work_id).map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                          {(works.data ?? []).filter((w) => w.active || w.id === x.work_id).map((w) => <SelectItem key={w.id} value={w.id}>{workLabel(w)}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     ) : x.work_id === RATEIO ? "Rateio geral" : workName.get(x.work_id) ?? "—"}
