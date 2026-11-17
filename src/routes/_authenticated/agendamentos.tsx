@@ -1,3 +1,4 @@
+import { TrainingDateInput } from "@/components/training-date-input";
 import { LeaveNotice } from "@/components/leave-notice";
 import { findDateConflicts } from "@/lib/date-conflicts";
 import { futureSameKind, replacedText } from "@/lib/appointment-replace";
@@ -857,12 +858,16 @@ function AppointmentsPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="new-date">Data *</Label>
-                <Input
-                  id="new-date"
-                  type="date"
-                  value={form.scheduled_date}
-                  onChange={(e) => set("scheduled_date", e.target.value)}
-                />
+                {form.type === "treinamento" ? (
+                  <TrainingDateInput id="new-date" value={form.scheduled_date} onChange={(v) => set("scheduled_date", v)} trainingId={form.training_id || null} />
+                ) : (
+                  <Input
+                    id="new-date"
+                    type="date"
+                    value={form.scheduled_date}
+                    onChange={(e) => set("scheduled_date", e.target.value)}
+                  />
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="new-time">

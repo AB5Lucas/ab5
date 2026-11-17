@@ -1,3 +1,4 @@
+import { TrainingDateInput } from "@/components/training-date-input";
 import { futureSameKind, replacedText } from "@/lib/appointment-replace";
 import { LeaveNotice } from "@/components/leave-notice";
 import { findDateConflicts } from "@/lib/date-conflicts";
@@ -342,12 +343,16 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
 
                 <div className="space-y-1.5">
                   <Label htmlFor="appt-date">Data do agendamento *</Label>
-                  <Input
-                    id="appt-date"
-                    type="date"
-                    value={form.scheduled_date}
-                    onChange={(e) => set("scheduled_date", e.target.value)}
-                  />
+                  {type === "treinamento" ? (
+                    <TrainingDateInput id="appt-date" value={form.scheduled_date} onChange={(v) => set("scheduled_date", v)} trainingId={form.training_id || null} ignoreId={editing?.id ?? null} />
+                  ) : (
+                    <Input
+                      id="appt-date"
+                      type="date"
+                      value={form.scheduled_date}
+                      onChange={(e) => set("scheduled_date", e.target.value)}
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
