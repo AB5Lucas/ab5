@@ -48,7 +48,7 @@ function useBadgeData() {
       const empty: Counts = { byKind: { agendamentos: zero, aso: zero, int: zero, trn: zero, epi: zero }, conference: zero, purchases: 0, orders: 0, billingInd: 0, billingSrv: 0 };
       // Contagens de Documentação, Conferência, Compras, Pedidos e Faturamento vêm prontas do banco
       // (menu_badge_counts, com a RLS do usuário); antes o navegador baixava as tabelas inteiras.
-      // SCs aguardando a minha aprovação (gestor ou substituto; a RLS só devolve as que posso ver).
+      // SCs aguardando a minha autorização (gestor ou substituto; a RLS só devolve as que posso ver).
       const uid = (await supabase.auth.getSession()).data.session?.user.id ?? "";
       const [counts, fleetParts, scPend] = await Promise.all([
         can.docs || can.purchases || can.orders || can.billing
@@ -115,7 +115,7 @@ export function useMenuBadges() {
     if (ft) out["/frota/notas"] = { count: 1, label: "!", tone: ft, title: `Saldo do posto: ${d.fleetSaldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}` };
     if (d.scApproval?.count) out["/compras/aprovacao"] = {
       count: d.scApproval.count, tone: d.scApproval.urgent ? "red" : "orange",
-      detail: `${d.scApproval.count} solicitação(ões) de compra para aprovar${d.scApproval.urgent ? ` · ${d.scApproval.urgent} com prazo em até 5 dias` : ""}`,
+      detail: `${d.scApproval.count} solicitação(ões) de compra para autorizar${d.scApproval.urgent ? ` · ${d.scApproval.urgent} com prazo em até 5 dias` : ""}`,
     };
     if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red", detail: `${d.purchases} linha(s) de compra pendente(s)` };
     // Vermelho = Serviços, laranja = Indústria; basta 1 da Serviços para ficar vermelho.

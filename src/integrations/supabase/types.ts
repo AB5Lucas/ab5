@@ -3388,6 +3388,7 @@ export type Database = {
           notes: string | null
           order_number: string | null
           photo_path: string | null
+          quote_path: string | null
           quantity: number
           request_id: string
           status: string
@@ -3403,6 +3404,7 @@ export type Database = {
           notes?: string | null
           order_number?: string | null
           photo_path?: string | null
+          quote_path?: string | null
           quantity: number
           request_id: string
           status?: string
@@ -3418,6 +3420,7 @@ export type Database = {
           notes?: string | null
           order_number?: string | null
           photo_path?: string | null
+          quote_path?: string | null
           quantity?: number
           request_id?: string
           status?: string
@@ -3437,17 +3440,17 @@ export type Database = {
           approver_id: string | null
           approver_notes: string | null
           buyer_notes: string | null
-          category: string
+          category: string | null
           client_id: string | null
           created_at: string
           delivery_kind: string
           delivery_place: string | null
-          due_date: string
+          due_date: string | null
           id: string
-          nature: string
+          nature: string | null
           notes: string | null
           number: string
-          priority: string
+          priority: string | null
           request_date: string
           requester_id: string
           requester_name: string
@@ -3458,6 +3461,11 @@ export type Database = {
           status_at: string
           system: string
           total_budget: number | null
+          observer_ids: string[]
+          return_notes: string | null
+          returned_by: string | null
+          photo_path: string | null
+          quote_path: string | null
         }
         Insert: {
           cancelled_at?: string | null
@@ -3468,17 +3476,17 @@ export type Database = {
           approver_id?: string | null
           approver_notes?: string | null
           buyer_notes?: string | null
-          category: string
+          category?: string | null
           client_id?: string | null
           created_at?: string
           delivery_kind?: string
           delivery_place?: string | null
-          due_date: string
+          due_date?: string | null
           id?: string
-          nature: string
+          nature?: string | null
           notes?: string | null
           number: string
-          priority: string
+          priority?: string | null
           request_date?: string
           requester_id?: string
           requester_name: string
@@ -3489,6 +3497,11 @@ export type Database = {
           status_at?: string
           system: string
           total_budget?: number | null
+          observer_ids?: string[]
+          return_notes?: string | null
+          returned_by?: string | null
+          photo_path?: string | null
+          quote_path?: string | null
         }
         Update: {
           cancelled_at?: string | null
@@ -3499,17 +3512,17 @@ export type Database = {
           approver_id?: string | null
           approver_notes?: string | null
           buyer_notes?: string | null
-          category?: string
+          category?: string | null
           client_id?: string | null
           created_at?: string
           delivery_kind?: string
           delivery_place?: string | null
-          due_date?: string
+          due_date?: string | null
           id?: string
-          nature?: string
+          nature?: string | null
           notes?: string | null
           number?: string
-          priority?: string
+          priority?: string | null
           request_date?: string
           requester_id?: string
           requester_name?: string
@@ -3520,6 +3533,11 @@ export type Database = {
           status_at?: string
           system?: string
           total_budget?: number | null
+          observer_ids?: string[]
+          return_notes?: string | null
+          returned_by?: string | null
+          photo_path?: string | null
+          quote_path?: string | null
         }
         Relationships: []
       }
@@ -5862,6 +5880,8 @@ export type Database = {
     Functions: {
       purchase_request_create: { Args: { _p: Json }; Returns: string }
       purchase_request_send: { Args: { _id: string }; Returns: string }
+      purchase_request_return: { Args: { _id: string; _notes: string }; Returns: undefined }
+      purchase_request_create_totvs: { Args: { _number: string; _photo: string; _observers?: string[] }; Returns: string }
       purchase_request_cancel: { Args: { _id: string }; Returns: undefined }
       purchase_request_decide: { Args: { _id: string; _approve: boolean; _notes: string }; Returns: undefined }
       purchase_request_set_status: { Args: { _id: string; _status: string; _notes: string }; Returns: undefined }

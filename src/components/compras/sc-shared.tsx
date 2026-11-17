@@ -13,11 +13,13 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/search-select";
+import { Camera, Lock, X } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import {
-  SC_CATEGORIES, SC_NATURES, SC_PRIORITIES, SC_STATUSES, SC_SYSTEMS, STAGE_LABEL, brDate, deadlineControl, deliveryLabel,
-  priorityClass, statusClass, type ScStage,
+  FIXED_OBSERVERS, SC_CATEGORIES, SC_NATURES, SC_PRIORITIES, SC_STATUSES, SC_SYSTEMS, STAGE_LABEL, brDate, deadlineControl, deliveryLabel,
+  priorityClass, statusClass, statusDot, type ScStage,
 } from "@/lib/purchase-requests";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -96,22 +98,23 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
             return (
               <TableRow key={r.id}>
                 <TableCell className="whitespace-nowrap font-medium">
+                  <span className={cn("mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle", statusDot(r.status))} title={r.status} aria-label={`Status: ${r.status}`} />
                   <Link to="/compras/solicitacoes/$id" params={{ id: r.id }} className="text-primary hover:underline">{r.number}</Link>
                 </TableCell>
                 <TableCell>{brDate(r.request_date)}</TableCell>
                 {showRequester && <TableCell className="whitespace-nowrap">{r.requester_name}</TableCell>}
                 <TableCell>{r.system}</TableCell>
-                <TableCell>{r.category}</TableCell>
-                <TableCell>{r.nature}</TableCell>
-                <TableCell><Pill className={priorityClass(r.priority)}>{r.priority}</Pill></TableCell>
+                <TableCell>{r.category ?? "—"}</TableCell>
+                <TableCell>{r.nature ?? "—"}</TableCell>
+                <TableCell>{r.priority ? <Pill className={priorityClass(r.priority)}>{r.priority}</Pill> : "—"}</TableCell>
                 <TableCell>{r.client_id ? clientName.get(r.client_id) ?? "—" : "—"}</TableCell>
                 <TableCell>{brDate(r.due_date)}</TableCell>
                 <TableCell>{deliveryLabel(r, r.client_id ? clientName.get(r.client_id) : null)}</TableCell>
                 <TableCell className="whitespace-nowrap">{r.sent_at ? brDate(r.sent_at.slice(0, 10)) : <span className="text-muted-foreground">não enviado</span>}</TableCell>
                 <TableCell><Pill className={dl.cls}>{dl.label}</Pill></TableCell>
-                <TableCell className="whitespace-nowrap" title={r.approver_notes ?? undefined}>
+                <TableCell className="whitespace-nowrap" title={r.return_notes ?? r.approver_notes ?? undefined}>
                   {STAGE_LABEL[r.stage as ScStage] ?? r.stage}
-                  {r.stage === "rascunho" && r.approver_notes && <div className="text-[11px] text-destructive">devolvida: {r.approver_notes}</div>}
+                  {r.stage === "rascunho" && r.return_notes && <div className="max-w-56 truncate text-[11px] text-destructive">devolvida · {r.return_notes}</div>}
                 </TableCell>
                 <TableCell className="whitespace-nowrap">
                   <Pill className={statusClass(r.status)}>{r.status}</Pill>
@@ -136,31 +139,89 @@ export const statusCounts = (rows: ScRow[]) => {
 
 type HeaderForm = {
   system: string; category: string; nature: string; priority: string; client_id: string; due_date: string;
-  delivery_kind: "ab5" | "cliente" | "outro"; delivery_place: string; notes: string;
+  delivery_kind: "ab5" | "cliente" | "outro"; delivery_place: string; notes: string; observer_ids: string[];
 };
-const EMPTY: HeaderForm = { system: "PLANILHA", category: "", nature: "", priority: "", client_id: "", due_date: "", delivery_kind: "ab5", delivery_place: "", notes: "" };
+const EMPTY: HeaderForm = {
+  system: "PLANILHA", category: "", nature: "", priority: "", client_id: "", due_date: "", delivery_kind: "ab5", delivery_place: "", notes: "",
+  observer_ids: FIXED_OBSERVERS,
+};
+
+/** Usuários ativos (observadores em cópia). */
+export function useScUsers() {
+  return useQuery({
+    queryKey: ["sc-users"],
+    staleTime: 10 * 60_000,
+    queryFn: async () => (await supabase.from("users_profiles").select("id, full_name, email, active").order("full_name")).data ?? [],
+  });
+}
+
+/** Observadores em cópia: Lucas Garcia e Marcelo Barrella ficam sempre (cadeado); os demais se incluem e tiram. */
+export function ObserversField({ value, onChange, requesterId }: { value: string[]; onChange: (v: string[]) => void; requesterId?: string | null | undefined }) {
+  const users = useScUsers();
+  const name = new Map((users.data ?? []).map((u) => [u.id, u.full_name || u.email || "—"]));
+  const list = [...new Set([...FIXED_OBSERVERS, ...value])].filter((id) => id !== requesterId);
+  const options = (users.data ?? []).filter((u) => u.active !== false && !list.includes(u.id) && u.id !== requesterId)
+    .map((u) => ({ value: u.id, label: u.full_name || u.email || "—", hint: u.full_name ? u.email ?? undefined : undefined }));
+  return (
+    <div className="space-y-1">
+      <Label className="block">Observadores em cópia</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {list.map((id) => {
+          const fixed = FIXED_OBSERVERS.includes(id);
+          return (
+            <span key={id} className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs">
+              {name.get(id) ?? "…"}
+              {fixed
+                ? <Lock className="h-3 w-3 text-muted-foreground" aria-label="Fixo" />
+                : <button type="button" aria-label={`Tirar ${name.get(id) ?? ""}`} onClick={() => onChange(value.filter((x) => x !== id))}><X className="h-3 w-3" /></button>}
+            </span>
+          );
+        })}
+      </div>
+      <SearchSelect value="" onChange={(v) => onChange([...new Set([...value, v])])} options={options} placeholder="+ Incluir observador" searchPlaceholder="Digite o nome" className="h-8 sm:w-72" />
+      <p className="text-xs text-muted-foreground">Os observadores recebem a SC só para acompanhar.</p>
+    </div>
+  );
+}
 
 /**
  * Formulário de controle (cabeçalho da SC). Novo: cria pela função purchase_request_create (número
  * SC-NOME-001 e solicitante automáticos) e abre a página da solicitação; edição: só enquanto está com o solicitante.
+ * TOTVS: só o número da SC do TOTVS e a foto; Enviar manda direto para o Comprador.
  */
 export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean; onOpenChange: (o: boolean) => void; editing?: ScRow | null }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const clients = useClientsList();
   const [f, setF] = useState<HeaderForm>(EMPTY);
+  const [totvs, setTotvs] = useState<{ number: string; file: File | null }>({ number: "", file: null });
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const key = open ? editing?.id ?? "new" : null;
   if (key !== loadedFor) {
     setLoadedFor(key);
-    if (open) setF(editing ? {
-      system: editing.system, category: editing.category, nature: editing.nature, priority: editing.priority, client_id: editing.client_id ?? "",
-      due_date: editing.due_date, delivery_kind: editing.delivery_kind as HeaderForm["delivery_kind"], delivery_place: editing.delivery_place ?? "", notes: editing.notes ?? "",
-    } : EMPTY);
+    if (open) {
+      setTotvs({ number: "", file: null });
+      setF(editing ? {
+        system: editing.system, category: editing.category ?? "", nature: editing.nature ?? "", priority: editing.priority ?? "", client_id: editing.client_id ?? "",
+        due_date: editing.due_date ?? "", delivery_kind: editing.delivery_kind as HeaderForm["delivery_kind"], delivery_place: editing.delivery_place ?? "",
+        notes: editing.notes ?? "", observer_ids: editing.observer_ids ?? [],
+      } : EMPTY);
+    }
   }
+  const isTotvs = !editing && f.system === "TOTVS";
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
   const save = useMutation({
     mutationFn: async () => {
+      if (isTotvs) {
+        if (!totvs.number.trim()) throw new Error("Informe o número da SC do TOTVS.");
+        if (!totvs.file) throw new Error("Anexe a foto da SC do TOTVS.");
+        const path = `totvs/${crypto.randomUUID()}-${totvs.file.name.replace(/[^\w.-]/g, "_")}`;
+        const up = await supabase.storage.from("purchase-photos").upload(path, totvs.file);
+        if (up.error) throw up.error;
+        const { data, error } = await supabase.rpc("purchase_request_create_totvs", { _number: totvs.number, _photo: path, _observers: f.observer_ids });
+        if (error) throw error;
+        return data as string;
+      }
       const miss = [!f.category && "categoria", !f.nature && "natureza", !f.priority && "prioridade", !f.client_id && "cliente", !f.due_date && "data prazo",
         f.delivery_kind === "outro" && !f.delivery_place.trim() && "local de entrega"].filter(Boolean);
       if (miss.length) throw new Error(`Preencha: ${miss.join(", ")}.`);
@@ -168,8 +229,9 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
       const payload = { ...f, delivery_place: f.delivery_kind === "outro" ? f.delivery_place.trim() : "" };
       if (editing) {
         const { error } = await supabase.from("purchase_requests").update({
-          system: payload.system, category: payload.category, nature: payload.nature, priority: payload.priority, client_id: payload.client_id,
+          category: payload.category, nature: payload.nature, priority: payload.priority, client_id: payload.client_id,
           due_date: payload.due_date, delivery_kind: payload.delivery_kind, delivery_place: payload.delivery_place || null, notes: payload.notes.trim() || null,
+          observer_ids: payload.observer_ids,
         }).eq("id", editing.id);
         if (error) throw error;
         return editing.id;
@@ -182,7 +244,8 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
       qc.invalidateQueries({ queryKey: ["sc-requests"] });
       qc.invalidateQueries({ queryKey: ["sc-request", id] });
       onOpenChange(false);
-      if (!editing) { toast.success("Solicitação criada. Agora inclua os itens."); navigate({ to: "/compras/solicitacoes/$id", params: { id } }); }
+      if (isTotvs) toast.success("SC do TOTVS enviada para o Comprador");
+      else if (!editing) { toast.success("Solicitação criada. Agora inclua os itens."); navigate({ to: "/compras/solicitacoes/$id", params: { id } }); }
       else toast.success("Solicitação atualizada");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -199,54 +262,70 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
+      <DialogContent className={cn("max-h-[92vh] overflow-y-auto", isTotvs ? "max-w-md" : "max-w-2xl")}>
         <DialogHeader>
-          <DialogTitle>{editing ? `Editar ${editing.number}` : "Nova solicitação de compra"}</DialogTitle>
+          <DialogTitle>{editing ? `Editar ${editing.number}` : isTotvs ? "SC do TOTVS" : "Nova solicitação de compra"}</DialogTitle>
           <DialogDescription>
-            {editing ? "Controle da solicitação." : "Data, solicitante e número (SC-NOME-001) são preenchidos sozinhos. Depois de salvar, você inclui os itens."}
+            {editing ? "Controle da solicitação." : isTotvs ? "Informe o número da SC aberta no TOTVS e a foto. Ela vai direto para o Comprador."
+              : "Data, solicitante e número (SC-NOME-001) são preenchidos sozinhos. Depois de salvar, você inclui os itens."}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {sel("Planilha ou TOTVS", "system", SC_SYSTEMS)}
-          {sel("Categoria", "category", SC_CATEGORIES)}
-          {sel("Natureza da compra", "nature", SC_NATURES)}
-          {sel("Prioridade", "priority", SC_PRIORITIES.map((p) => p.value), (v) => <Pill className={priorityClass(v)}>{v}</Pill>)}
-          <div className="space-y-1">
-            <Label>Cliente</Label>
-            <Select value={f.client_id} onValueChange={(v) => set("client_id", v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-              <SelectContent className="max-h-72">{(clients.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="sc-due">Data prazo dos itens</Label>
-            <Input id="sc-due" type="date" min={todayISO()} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label>Local de entrega</Label>
-            <Select value={f.delivery_kind} onValueChange={(v) => set("delivery_kind", v as HeaderForm["delivery_kind"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ab5">AB5</SelectItem>
-                <SelectItem value="cliente">{f.client_id ? clientName.get(f.client_id) ?? "Cliente" : "Cliente (o escolhido acima)"}</SelectItem>
-                <SelectItem value="outro">Outro (escrever)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {f.delivery_kind === "outro" && (
+        {!editing && sel("Planilha ou TOTVS", "system", SC_SYSTEMS)}
+        {isTotvs ? (
+          <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="sc-place">Endereço / local</Label>
-              <Input id="sc-place" value={f.delivery_place} onChange={(e) => set("delivery_place", e.target.value)} />
+              <Label htmlFor="sc-totvs">Nº da SC no TOTVS</Label>
+              <Input id="sc-totvs" value={totvs.number} onChange={(e) => setTotvs((t) => ({ ...t, number: e.target.value }))} />
             </div>
-          )}
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="sc-notes">Observações</Label>
-            <Textarea id="sc-notes" rows={3} value={f.notes} onChange={(e) => set("notes", e.target.value)} />
+            <div className="space-y-1">
+              <Label className="block">Foto</Label>
+              <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input px-3 text-sm hover:bg-accent">
+                <Camera className="h-4 w-4" /> {totvs.file ? totvs.file.name : "Escolher foto"}
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const file = e.target.files?.[0] ?? null; setTotvs((t) => ({ ...t, file })); e.target.value = ""; }} />
+              </label>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {sel("Categoria", "category", SC_CATEGORIES)}
+            {sel("Natureza da compra", "nature", SC_NATURES)}
+            {sel("Prioridade", "priority", SC_PRIORITIES.map((p) => p.value), (v) => <Pill className={priorityClass(v)}>{v}</Pill>)}
+            <div className="space-y-1">
+              <Label>Cliente</Label>
+              <SearchSelect value={f.client_id} onChange={(v) => set("client_id", v)} placeholder="Selecione o cliente" searchPlaceholder="Digite o cliente"
+                options={(clients.data ?? []).map((c) => ({ value: c.id, label: c.name }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="sc-due">Data prazo dos itens</Label>
+              <Input id="sc-due" type="date" min={todayISO()} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Local de entrega</Label>
+              <Select value={f.delivery_kind} onValueChange={(v) => set("delivery_kind", v as HeaderForm["delivery_kind"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ab5">AB5</SelectItem>
+                  <SelectItem value="cliente">{f.client_id ? clientName.get(f.client_id) ?? "Cliente" : "Cliente (o escolhido acima)"}</SelectItem>
+                  <SelectItem value="outro">Outro (escrever)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {f.delivery_kind === "outro" && (
+              <div className="space-y-1">
+                <Label htmlFor="sc-place">Endereço / local</Label>
+                <Input id="sc-place" value={f.delivery_place} onChange={(e) => set("delivery_place", e.target.value)} />
+              </div>
+            )}
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="sc-notes">Observações</Label>
+              <Textarea id="sc-notes" rows={3} value={f.notes} onChange={(e) => set("notes", e.target.value)} />
+            </div>
+          </div>
+        )}
+        <ObserversField value={f.observer_ids} onChange={(v) => set("observer_ids", v)} requesterId={editing?.requester_id} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button disabled={save.isPending} onClick={() => save.mutate()}>{editing ? "Salvar" : "Criar e incluir itens"}</Button>
+          <Button disabled={save.isPending} onClick={() => save.mutate()}>{editing ? "Salvar" : isTotvs ? "Enviar" : "Criar e incluir itens"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -279,7 +358,7 @@ export function ScRemoveDialog({ row, onClose, onConfirm, pending }: { row: ScRo
         <AlertDialogHeader>
           <AlertDialogTitle>{del ? "Apagar esta solicitação?" : "Cancelar esta solicitação?"}</AlertDialogTitle>
           <AlertDialogDescription>
-            {row?.number}. {del ? "Ela ainda não foi enviada e será apagada com os itens." : "Ela já foi enviada: fica no histórico com o status CANCELADA e sai do aprovador e do Comprador."}
+            {row?.number}. {del ? "Ela ainda não foi enviada e será apagada com os itens." : "Ela já foi enviada: fica no histórico com o status CANCELADA e sai do autorizante e do Comprador."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

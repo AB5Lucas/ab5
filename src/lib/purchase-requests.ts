@@ -45,17 +45,27 @@ export const SC_UNITS = ["UN", "PC", "CX", "KG", "M", "M²", "M³", "L", "PAR", 
 export const priorityClass = (p: string | null | undefined) => SC_PRIORITIES.find((x) => x.value === p)?.cls ?? "bg-muted text-muted-foreground";
 export const statusClass = (s: string | null | undefined) => SC_STATUSES.find((x) => x.value === s)?.cls ?? "bg-muted text-muted-foreground";
 
-/** Etapa do fluxo: rascunho (com o solicitante) → aprovação → compras. */
+/** Bolinha de status antes do número (cor forte da mesma família da etiqueta). */
+const STATUS_DOT: Record<string, string> = {
+  "EM PREPARAÇÃO": "bg-zinc-400", "SOLICITAÇÃO ENVIADA": "bg-cyan-500", "SOLICITAÇÃO RECEBIDA": "bg-sky-500", "EM ANÁLISE": "bg-yellow-400",
+  "SOLICITAÇÃO COM PENDÊNCIAS": "bg-red-500", COTAR: "bg-violet-500", "EM ANDAMENTO": "bg-blue-900", "APROVAÇÃO PENDENTE": "bg-orange-500",
+  RECUSADA: "bg-zinc-900 dark:bg-zinc-200", APROVADA: "bg-emerald-500", "COMPRA PARCIAL": "bg-lime-500", "COMPRA EFETIVADA": "bg-green-600",
+  ALMOXARIFADO: "bg-teal-600", CANCELADA: "bg-zinc-900 dark:bg-zinc-200",
+};
+export const statusDot = (s: string | null | undefined) => STATUS_DOT[s ?? ""] ?? "bg-zinc-400";
+
+/** Etapa do fluxo: rascunho (com o solicitante) → autorização ("aprovacao" no banco) → compras. */
 export type ScStage = "rascunho" | "aprovacao" | "compras" | "cancelada";
-export const STAGE_LABEL: Record<ScStage, string> = { rascunho: "Com o solicitante", aprovacao: "Com o aprovador", compras: "Em compras", cancelada: "Cancelada" };
+export const STAGE_LABEL: Record<ScStage, string> = { rascunho: "Com o solicitante", aprovacao: "Com o autorizante", compras: "Em compras", cancelada: "Cancelada" };
 
 /**
  * Controle de prazo (como a coluna CONTROLE DE PRAZO da planilha): não enviado ainda; compra efetivada ou
  * almoxarifado compara a data do status com o prazo; nos demais, hoje com o prazo.
  */
-export type Deadline = { label: "NÃO ENVIADO" | "DENTRO DO PRAZO" | "NO LIMITE" | "FORA DO PRAZO"; cls: string };
-export function deadlineControl(r: { sent_at: string | null; due_date: string; status: string; status_at: string }, today: string): Deadline {
+export type Deadline = { label: "NÃO ENVIADO" | "SEM PRAZO" | "DENTRO DO PRAZO" | "NO LIMITE" | "FORA DO PRAZO"; cls: string };
+export function deadlineControl(r: { sent_at: string | null; due_date: string | null; status: string; status_at: string }, today: string): Deadline {
   if (!r.sent_at) return { label: "NÃO ENVIADO", cls: "text-muted-foreground" };
+  if (!r.due_date) return { label: "SEM PRAZO", cls: "text-muted-foreground" };
   const ref = r.status === "COMPRA EFETIVADA" || r.status === "ALMOXARIFADO" ? r.status_at : today;
   if (ref < r.due_date) return { label: "DENTRO DO PRAZO", cls: "bg-emerald-100 text-emerald-950 dark:bg-emerald-900/50 dark:text-emerald-100" };
   if (ref === r.due_date) return { label: "NO LIMITE", cls: "bg-orange-200 text-orange-950 dark:bg-orange-900/60 dark:text-orange-100" };
@@ -63,8 +73,8 @@ export function deadlineControl(r: { sent_at: string | null; due_date: string; s
 }
 
 /** Verba obrigatória (por item ou total), menos quando a natureza é PROGRAMADA. */
-export function budgetMissing(nature: string, totalBudget: number | null | undefined, itemBudgets: (number | null | undefined)[]) {
-  if (nature.toUpperCase() === "PROGRAMADA") return false;
+export function budgetMissing(nature: string | null, totalBudget: number | null | undefined, itemBudgets: (number | null | undefined)[]) {
+  if ((nature ?? "").toUpperCase() === "PROGRAMADA") return false;
   if (Number(totalBudget ?? 0) > 0) return false;
   return !itemBudgets.length || itemBudgets.some((b) => !(Number(b ?? 0) > 0));
 }
@@ -74,3 +84,6 @@ export const deliveryLabel = (r: { delivery_kind: string; delivery_place: string
 
 export const brDate = (d: string | null | undefined) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "—");
 export const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+
+/** Observadores fixos em toda SC (o banco também garante, purchase_fixed_observers): Lucas Garcia e Marcelo Barrella. */
+export const FIXED_OBSERVERS = ["f3c94145-62f8-452f-a665-eb5e56cffd6a", "cfd87887-421e-48f6-871c-a229e8634700"];

@@ -14,15 +14,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ScTable, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 
 export const Route = createFileRoute("/_authenticated/compras/aprovacao")({
-  head: () => ({ meta: [{ title: "Aprovação de Compras | AB5 Hub" }, { name: "description", content: "Solicitações de compra para eu aprovar e as que já aprovei." }] }),
+  head: () => ({ meta: [{ title: "Autorização de Compras | AB5 Hub" }, { name: "description", content: "Solicitações de compra para eu autorizar e as que já autorizei." }] }),
   component: Page,
 });
 
 type View = "pendentes" | "aprovadas" | "devolvidas" | "todas";
 
 /**
- * Aprovador = gestor do cliente da SC (ou o substituto enquanto ele está de férias; a RLS só mostra o que é dele).
- * Pendentes para aprovar/devolver; aprovadas e devolvidas por ele para consulta.
+ * Autorizante = gestor do cliente da SC (ou o substituto enquanto ele está de férias; a RLS só mostra o que é dele).
+ * Pendentes para autorizar/devolver; autorizadas e devolvidas por ele para consulta.
  */
 function Page() {
   const { user } = useCurrentUser();
@@ -39,7 +39,7 @@ function Page() {
   const returned = all.filter((r) => r.decided_by === uid && r.stage === "rascunho");
   const base = view === "pendentes" ? pending : view === "aprovadas" ? approved : view === "devolvidas" ? returned : [...new Map([...pending, ...approved, ...returned].map((r) => [r.id, r])).values()];
   const rows = base.filter((r) => client === "all" || r.client_id === client)
-    .sort((a, b) => (view === "pendentes" ? a.due_date.localeCompare(b.due_date) : (b.sent_at ?? "").localeCompare(a.sent_at ?? "")));
+    .sort((a, b) => (view === "pendentes" ? (a.due_date ?? "").localeCompare(b.due_date ?? "") : (b.sent_at ?? "").localeCompare(a.sent_at ?? "")));
   const usedClients = [...new Set([...pending, ...approved, ...returned].map((r) => r.client_id).filter((x): x is string => !!x))];
 
   const [deciding, setDeciding] = useState<{ row: ScRow; approve: boolean } | null>(null);
@@ -49,20 +49,20 @@ function Page() {
       const { error } = await supabase.rpc("purchase_request_decide", { _id: deciding!.row.id, _approve: deciding!.approve, _notes: notes });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success(deciding?.approve ? "Aprovada e enviada para o Comprador" : "Devolvida ao solicitante"); setDeciding(null); setNotes(""); qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["nav-badges"] }); },
+    onSuccess: () => { toast.success(deciding?.approve ? "Autorizada e enviada para o Comprador" : "Devolvida ao solicitante"); setDeciding(null); setNotes(""); qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["nav-badges"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   return (
     <div className="space-y-4">
-      <PageHeader title="Aprovação" description="Solicitações dos clientes em que você é o gestor (ou substituto durante as férias dele). Clique no número para ver os itens." />
+      <PageHeader title="Autorização" description="Solicitações dos clientes em que você é o gestor (ou substituto durante as férias dele). Clique no número para ver os itens." />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label className="text-xs">Situação</Label>
           <Select value={view} onValueChange={(v) => setView(v as View)}>
             <SelectTrigger className="w-60"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="pendentes">Para aprovar ({pending.length})</SelectItem>
-              <SelectItem value="aprovadas">Aprovadas por mim ({approved.length})</SelectItem>
+              <SelectItem value="pendentes">Para autorizar ({pending.length})</SelectItem>
+              <SelectItem value="aprovadas">Autorizadas por mim ({approved.length})</SelectItem>
               <SelectItem value="devolvidas">Devolvidas por mim ({returned.length})</SelectItem>
               <SelectItem value="todas">Todas</SelectItem>
             </SelectContent>
@@ -82,7 +82,7 @@ function Page() {
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
         <ScTable rows={rows} clientName={clientName} actions={(r) => r.stage === "aprovacao" && (r.approver_id === uid || r.substitute_id === uid) ? (
           <div className="flex justify-end gap-1">
-            <Button size="sm" onClick={() => setDeciding({ row: r, approve: true })}><Check className="h-3.5 w-3.5" /> Aprovar</Button>
+            <Button size="sm" onClick={() => setDeciding({ row: r, approve: true })}><Check className="h-3.5 w-3.5" /> Autorizar</Button>
             <Button size="sm" variant="outline" onClick={() => setDeciding({ row: r, approve: false })}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
           </div>
         ) : null} />
@@ -90,7 +90,7 @@ function Page() {
       <Dialog open={!!deciding} onOpenChange={(o) => { if (!o) { setDeciding(null); setNotes(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{deciding?.approve ? "Aprovar solicitação" : "Devolver ao solicitante"}</DialogTitle>
+            <DialogTitle>{deciding?.approve ? "Autorizar solicitação" : "Devolver ao solicitante"}</DialogTitle>
             <DialogDescription>{deciding?.row.number}</DialogDescription>
           </DialogHeader>
           <div className="space-y-1">
@@ -99,7 +99,7 @@ function Page() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeciding(null)}>Cancelar</Button>
-            <Button disabled={decide.isPending} onClick={() => decide.mutate()}>{deciding?.approve ? "Aprovar" : "Devolver"}</Button>
+            <Button disabled={decide.isPending} onClick={() => decide.mutate()}>{deciding?.approve ? "Autorizar" : "Devolver"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

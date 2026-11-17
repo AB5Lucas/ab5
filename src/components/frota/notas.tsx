@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/search-select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -479,12 +480,9 @@ function EditDialog({ row, accounts, onClose }: { row: Row | null; accounts: Tab
               <div key={i} className="flex items-end gap-2">
                 <div className="min-w-0 flex-1 space-y-1">
                   {i === 0 && <span className="block text-xs text-muted-foreground">Centro de custo (aba Item Conta)</span>}
-                  <Select value={l.account || ""} onValueChange={(v) => setSplit((s) => s.map((x, j) => (j === i ? { ...x, account: v } : x)))}>
-                    <SelectTrigger><SelectValue placeholder="Escolha o CC" /></SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.description ?? "—"} · CC {a.cc_code} · item {a.item_account}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchSelect value={l.account || ""} onChange={(v) => setSplit((s) => s.map((x, j) => (j === i ? { ...x, account: v } : x)))}
+                    placeholder="Escolha o CC" searchPlaceholder="Digite o CC ou o serviço"
+                    options={accounts.map((a) => ({ value: a.id, label: `${a.description ?? "—"} · CC ${a.cc_code} · item ${a.item_account}` }))} />
                 </div>
                 <div className="w-20 space-y-1">
                   {i === 0 && <span className="block text-xs text-muted-foreground">%</span>}
