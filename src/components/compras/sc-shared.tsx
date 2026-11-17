@@ -139,7 +139,7 @@ export const statusCounts = (rows: ScRow[]) => {
 
 type HeaderForm = {
   system: string; category: string; nature: string; priority: string; client_id: string; due_date: string;
-  delivery_kind: "ab5" | "cliente" | "outro"; delivery_place: string; notes: string; observer_ids: string[];
+  delivery_kind: "ab5" | "cliente" | "outro" | "retirar"; delivery_place: string; notes: string; observer_ids: string[];
 };
 const EMPTY: HeaderForm = {
   system: "PLANILHA", category: "", nature: "", priority: "", client_id: "", due_date: "", delivery_kind: "ab5", delivery_place: "", notes: "",
@@ -306,6 +306,7 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
                 <SelectContent>
                   <SelectItem value="ab5">AB5</SelectItem>
                   <SelectItem value="cliente">{f.client_id ? clientName.get(f.client_id) ?? "Cliente" : "Cliente (o escolhido acima)"}</SelectItem>
+                  <SelectItem value="retirar">Retirar</SelectItem>
                   <SelectItem value="outro">Outro (escrever)</SelectItem>
                 </SelectContent>
               </Select>

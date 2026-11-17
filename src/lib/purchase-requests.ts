@@ -80,7 +80,7 @@ export function budgetMissing(nature: string | null, totalBudget: number | null 
 }
 
 export const deliveryLabel = (r: { delivery_kind: string; delivery_place: string | null }, clientName: string | null | undefined) =>
-  r.delivery_kind === "ab5" ? "AB5" : r.delivery_kind === "cliente" ? clientName ?? "Cliente" : r.delivery_place ?? "—";
+  r.delivery_kind === "ab5" ? "AB5" : r.delivery_kind === "retirar" ? "Retirar" : r.delivery_kind === "cliente" ? clientName ?? "Cliente" : r.delivery_place ?? "—";
 
 export const brDate = (d: string | null | undefined) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "—");
 export const brl = (v: number | null | undefined) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));

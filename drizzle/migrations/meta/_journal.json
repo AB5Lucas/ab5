@@ -834,6 +834,13 @@
       "when": 1795400015000,
       "tag": "0118_purchase_fixed_observer_barrella",
       "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1795400016000,
+      "tag": "0119_purchase_delivery_pickup",
+      "breakpoints": true
     }
   ]
 }
