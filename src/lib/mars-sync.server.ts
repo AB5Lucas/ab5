@@ -18,6 +18,9 @@ const EMPTY_BUDGET = { mo: 0, materiais: 0, ferramentas: 0, andaimes: 0, transpo
  */
 export async function executeMarsSync(c: Credentials, kind: string, month?: string) {
   const ym = month ?? curMonth();
+  // Leitura antiga parada em "running" (servidor interrompido): fecha como erro para não confundir.
+  await supabaseAdmin.from("billing_sync_runs").update({ status: "error", finished_at: new Date().toISOString(), errors: 1, error_message: "Leitura interrompida antes de terminar" })
+    .eq("category", "mars").eq("status", "running").lt("started_at", new Date(Date.now() - 10 * 60_000).toISOString());
   const file = marsFile(ym);
   const { data: run, error: re } = await supabaseAdmin.from("billing_sync_runs")
     .insert({ category: "mars", source: "ordens", ref_month: ym, file_path: file, trigger_kind: kind, status: "running" }).select("id").single();
@@ -62,21 +65,20 @@ async function applyMars(parsed: MarsRow[], ym: string) {
   const { data: mapped, error: me } = await supabaseAdmin.from("mars_sync_items").select("*");
   if (me) throw me;
   const byKey = new Map((mapped ?? []).map((m) => [m.key, m]));
-  const firstRun = !(mapped ?? []).some((m) => m.action !== "contract");
+  // 1ª leitura = nenhuma leitura concluída ainda (também a tabela de faturamento).
+  const { count: doneRuns } = await supabaseAdmin.from("billing_sync_runs").select("id", { count: "exact", head: true }).eq("category", "mars").eq("status", "completed");
+  const firstRun = !doneRuns;
   const date = ym === curMonth() ? today() : `${ym}-01`;
   let created = 0; let updated = 0; const notes: string[] = [];
   const items = rowsToSync(parsed, firstRun);
   const ignored = parsed.filter((r) => !r.contract).length - items.length;
 
-  const saveOrders = async (w: MarsWork, orders: MarsOrder[]) => {
-    const nums = [...new Set(orders.map((o) => String(o.number ?? "")).filter(Boolean))];
-    const { error } = await supabaseAdmin.from("works").update({
-      orders: orders as never, order_number: nums.join(" / ") || null,
-      order_value: orders.reduce((a, o) => a + Number(o.value ?? 0), 0),
-    }).eq("id", w.id);
-    if (error) throw error;
-    w.orders = orders;
-  };
+  // Tudo é juntado na memória e gravado em lote no fim (uma linha por vez estourava o tempo do servidor).
+  const changedOrders = new Map<string, MarsWork>();
+  const saveOrders = async (w: MarsWork, orders: MarsOrder[]) => { w.orders = orders; changedOrders.set(w.id, w); };
+  const itemRows: Record<string, unknown>[] = [];
+  const upsertItem = async (row: Record<string, unknown>) => { itemRows.push(row); };
+  const newWorks: Record<string, unknown>[] = [];
   const base = (r: MarsRow) => ({
     ref_month: ym, source: r.table, quote: r.quote || null, order_number: r.order, description: r.description, value: r.value,
     requester: r.requester || null, category: r.category || null, sheet_status: r.status || null, notes: r.notes || null,
@@ -112,19 +114,17 @@ async function applyMars(parsed: MarsRow[], ym: string) {
       await upsertItem({ key: r.key, ...base(r), action: "existing", work_id: hit.id, synced_order: r.order, synced_value: r.value });
       continue;
     }
+    const id = crypto.randomUUID();
     const orders = [{ number: r.order ?? "", value: r.value, date }];
-    const { data: w, error } = await supabaseAdmin.from("works").insert({
-      client_id: client.id, name: r.description.slice(0, 200), quote_number: r.quote || null, order_number: r.order, order_value: r.value,
-      orders: orders as never, budget_items: EMPTY_BUDGET as never, status: "active", active: true, monthly_enabled: false,
+    newWorks.push({
+      id, client_id: client.id, name: r.description.slice(0, 200), quote_number: r.quote || null, order_number: r.order, order_value: r.value,
+      orders, budget_items: EMPTY_BUDGET, status: "active", active: true, monthly_enabled: false,
       manager_id: mgr?.id ?? null, supervisor_id: null,
       notes: [`MARS: ${r.requester}`, r.category].filter(Boolean).join(" · ") || null,
-    } as never).select("id, name, quote_number, orders, active").single();
-    if (error) throw error;
-    const nw = w as unknown as MarsWork;
-    works.push({ ...nw, order_number: r.order, order_value: r.value });
-    const { error: pe } = await supabaseAdmin.from("work_progress").upsert({ work_id: nw.id, month: date, percent: 100 }, { onConflict: "work_id,month" });
-    if (pe) throw pe;
-    await upsertItem({ key: r.key, ...base(r), action: "created", work_id: nw.id, synced_order: r.order, synced_value: r.value });
+    });
+    // Entra na lista para casar repetições na mesma leitura (mesmo pedido em outro orçamento continua sendo serviço próprio).
+    works.push({ id, name: r.description, quote_number: r.quote || null, orders: [], order_number: r.order, order_value: r.value });
+    await upsertItem({ key: r.key, ...base(r), action: "created", work_id: id, synced_order: r.order, synced_value: r.value });
     created++;
   }
 
@@ -165,10 +165,24 @@ async function applyMars(parsed: MarsRow[], ym: string) {
       await upsertItem({ key: ckey, ...base(contract), action: "contract", work_id: null, synced_order: realOrder, synced_value: m.synced_value });
     }
   }
+  if (newWorks.length) {
+    const { error } = await supabaseAdmin.from("works").insert(newWorks as never);
+    if (error) throw error;
+    const { error: pe } = await supabaseAdmin.from("work_progress")
+      .upsert(newWorks.map((w) => ({ work_id: w["id"] as string, month: date, percent: 100 })), { onConflict: "work_id,month" });
+    if (pe) throw pe;
+  }
+  await Promise.all([...changedOrders.values()].filter((w) => !newWorks.some((n) => n["id"] === w.id)).map(async (w) => {
+    const orders = w.orders ?? [];
+    const nums = [...new Set(orders.map((o) => String(o.number ?? "")).filter(Boolean))];
+    const { error } = await supabaseAdmin.from("works").update({
+      orders: orders as never, order_number: nums.join(" / ") || null, order_value: orders.reduce((a, o) => a + Number(o.value ?? 0), 0),
+    }).eq("id", w.id);
+    if (error) throw error;
+  }));
+  if (itemRows.length) {
+    const { error } = await supabaseAdmin.from("mars_sync_items").upsert(itemRows as never, { onConflict: "key" });
+    if (error) throw error;
+  }
   return { created, updated, ignored, firstRun, message: notes.join(" · ") };
-}
-
-async function upsertItem(row: Record<string, unknown>) {
-  const { error } = await supabaseAdmin.from("mars_sync_items").upsert(row as never, { onConflict: "key" });
-  if (error) throw error;
 }
