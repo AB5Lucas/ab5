@@ -1595,7 +1595,15 @@ export function SchedulePlannerBoard({
               <Input id="copy-source-date" type="date" value={copyFrom} disabled={copyPrevious.isPending} onChange={(e) => { setCopyFrom(e.target.value); setSelectedCopyBoxes(new Set()); }} />
             </label>
             <div className="space-y-1">
-              <p className="text-sm font-medium">Obras com efetivo</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">Obras com efetivo</p>
+                <div className="flex gap-1">
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={copyPrevious.isPending || !sourceBoxes.length}
+                    onClick={() => setSelectedCopyBoxes(new Set(sourceBoxes.map((b) => b.key)))}>Todos</Button>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={copyPrevious.isPending || !selectedCopyBoxes.size}
+                    onClick={() => setSelectedCopyBoxes(new Set())}>Nenhum</Button>
+                </div>
+              </div>
               <div className="max-h-72 overflow-y-auto rounded-md border border-border divide-y divide-border">
                 {copySource.isFetching ? <p className="p-3 text-sm text-muted-foreground">Carregando obras...</p> : copySource.error ? <p className="p-3 text-sm text-destructive">Não foi possível carregar a programação.</p> : sourceBoxes.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Nenhuma obra com efetivo nesta data.</p> : sourceBoxes.map((box) => (
                   <label key={box.key} className="flex items-center gap-3 px-3 py-2 text-sm">
