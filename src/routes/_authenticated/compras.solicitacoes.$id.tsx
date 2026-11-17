@@ -340,10 +340,10 @@ function Page() {
             : <p className="text-sm font-medium">{brl(r.total_budget)}</p>}
         </div>
         <div className="flex items-center gap-1">
-          {r.quote_path && <Button variant="outline" size="sm" onClick={() => openPhoto(r.quote_path!)}><FileText className="h-4 w-4" /> Cotação da verba total</Button>}
+          {r.quote_path && <Button variant="outline" size="sm" onClick={() => openPhoto(r.quote_path!)}><FileText className="h-4 w-4" /> Cotação/Orçamento</Button>}
           {editable && (
             <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input px-3 text-sm hover:bg-accent" title="Foto ou PDF">
-              <Paperclip className="h-4 w-4" /> {r.quote_path ? "Trocar cotação/orçamento" : "Incluir cotação/orçamento"}
+              <Paperclip className="h-4 w-4" /> {r.quote_path ? "Trocar Cotação/Orçamento" : "Cotação/Orçamento"}
               <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadQuote(-1, f); e.target.value = ""; }} />
             </label>
           )}
