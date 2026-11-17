@@ -34,10 +34,10 @@ function useBadgeData() {
   return useQuery({
     queryKey: ["menu-badges", can],
     enabled: !loading,
-    // Atualiza a cada 5 min e quando a janela volta ao foco (a consulta é pesada para todos os usuários).
-    refetchInterval: 5 * 60_000,
+    // Atualiza a cada 2 min, ao voltar à janela e logo depois de qualquer gravação (MutationCache em router.tsx).
+    refetchInterval: 2 * 60_000,
     refetchOnWindowFocus: true,
-    staleTime: 2 * 60_000,
+    staleTime: 30_000,
     queryFn: async () => {
       const today = todayISO();
       const safe = async <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
@@ -183,9 +183,9 @@ export function useWorkflowBadges() {
   return useQuery({
     queryKey: ["workflow-badges", can],
     enabled: !loading,
-    refetchInterval: 5 * 60_000,
+    refetchInterval: 2 * 60_000,
     refetchOnWindowFocus: true,
-    staleTime: 2 * 60_000,
+    staleTime: 30_000,
     queryFn: async () => {
       // Sessão local (sem ir ao servidor de login a cada atualização).
       const { data: auth } = await supabase.auth.getSession();
