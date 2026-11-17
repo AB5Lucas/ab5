@@ -265,3 +265,18 @@ describe("nome do motorista com 2 letras erradas em sobrenome longo", () => {
     expect(_mdn("Guilherme Gosalves da Silva", [], ["Guilherme Goncalves da Silva", "Guilherme Fernando de Oliveira"])).toBe("Guilherme Goncalves da Silva");
   });
 });
+
+describe("obra adicional com serviço (caminhão/pickup)", () => {
+  it("cada obra adicional vai para o CC do seu serviço", () => {
+    const clients = new Map([["i", { id: "i", name: "INDUSTRIA", cc_prefix: "1001" }]]);
+    const works = [
+      { id: "ppo", client_id: "i", cc_suffix: "001", active: true, name: "PPO" },
+      { id: "pliq", client_id: "i", cc_suffix: "004", active: true, name: "Pliq" },
+    ];
+    const schedules = [
+      { vehicle_id: "t", schedule_date: "2026-11-10", client_id: "i", work_id: "ppo", km: 10, trips: 1, extra_client_ids: ["i"], extra_work_ids: ["pliq"], extra_km: 20 },
+    ];
+    const r = _fuelRateio({ vehicleId: "t", day: "2026-11-11", prevDay: "2026-11-09", total: 100, schedules, clients, works, accounts: [] });
+    expect(r.parts.map((p) => [p.cc, p.value])).toEqual([["1001001", 50], ["1001004", 50]]);
+  });
+});
