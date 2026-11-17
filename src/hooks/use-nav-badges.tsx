@@ -28,7 +28,8 @@ function useBadgeData() {
     billing: canAccess("/relatorios/sincronizacao"),
     fleet: canAccess("/frota/notas"),
     scApproval: canAccess("/compras/aprovacao"),
-    scOpen: canAccess("/compras/solicitacoes"),
+    scOpen: canAccess("/compras/solicitacoes") || canAccess("/compras/comprador"),
+    scBuyer: canAccess("/compras/comprador"),
   };
   return useQuery({
     queryKey: ["menu-badges", can],
@@ -75,7 +76,7 @@ function useBadgeData() {
       const soon = addDays(today, 5);
       const scApproval = { count: scPend.length, urgent: scPend.filter((r: any) => r.due_date <= soon).length };
       const scOpen = { count: scOpenRows.length, late: scOpenRows.filter((r: any) => r.due_date && r.due_date < today).length };
-      return { scApproval, scOpen, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
+      return { scApproval, scOpen, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
     },
   });
 }
@@ -125,6 +126,11 @@ export function useMenuBadges() {
     if (d.scOpen?.count) out["/compras/solicitacoes"] = {
       count: d.scOpen.count, tone: d.scOpen.late ? "red" : "orange",
       detail: `${d.scOpen.count} SC(s) pendente(s) em Compras${d.scOpen.late ? ` · ${d.scOpen.late} com prazo vencido` : ""}`,
+    };
+    // Comprador: mesmas SCs em aberto (o comprador vê todas as de Compras pela RLS).
+    if (d.scBuyer && d.scOpen?.count) out["/compras/comprador"] = {
+      count: d.scOpen.count, tone: d.scOpen.late ? "red" : "orange",
+      detail: `${d.scOpen.count} SC(s) para comprar${d.scOpen.late ? ` · ${d.scOpen.late} com prazo vencido` : ""}`,
     };
     if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red", detail: `${d.purchases} linha(s) de compra pendente(s)` };
     // Vermelho = Serviços, laranja = Indústria; basta 1 da Serviços para ficar vermelho.

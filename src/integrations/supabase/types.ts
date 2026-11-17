@@ -3447,6 +3447,7 @@ export type Database = {
           item_no: number
           notes: string | null
           order_number: string | null
+          order_file_path: string | null
           photo_path: string | null
           quote_path: string | null
           quantity: number
@@ -3463,6 +3464,7 @@ export type Database = {
           item_no: number
           notes?: string | null
           order_number?: string | null
+          order_file_path?: string | null
           photo_path?: string | null
           quote_path?: string | null
           quantity: number
@@ -3479,6 +3481,7 @@ export type Database = {
           item_no?: number
           notes?: string | null
           order_number?: string | null
+          order_file_path?: string | null
           photo_path?: string | null
           quote_path?: string | null
           quantity?: number
@@ -5940,6 +5943,7 @@ export type Database = {
     Functions: {
       purchase_request_create: { Args: { _p: Json }; Returns: string }
       purchase_request_send: { Args: { _id: string }; Returns: string }
+      purchase_item_set_file: { Args: { _item: string; _path: string }; Returns: undefined }
       purchase_request_return: { Args: { _id: string; _notes: string }; Returns: undefined }
       purchase_request_create_totvs: { Args: { _number: string; _photo: string; _observers?: string[] }; Returns: string }
       purchase_request_cancel: { Args: { _id: string }; Returns: undefined }

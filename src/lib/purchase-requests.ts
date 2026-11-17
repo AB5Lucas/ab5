@@ -87,3 +87,6 @@ export const brl = (v: number | null | undefined) => (v == null ? "—" : Number
 
 /** Observadores fixos em toda SC (o banco também garante, purchase_fixed_observers): Marcelo Barrella e Vitória Brasilino. */
 export const FIXED_OBSERVERS = ["cfd87887-421e-48f6-871c-a229e8634700", "01d11e92-6fa0-4a73-acd8-9561d98de54e"];
+
+/** Status em que a SC já saiu do Comprador (comprada, entregue ou encerrada). */
+export const SC_DONE_STATUSES = ["COMPRA EFETIVADA", "ALMOXARIFADO", "CANCELADA", "RECUSADA"];

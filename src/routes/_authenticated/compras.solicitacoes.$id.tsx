@@ -174,6 +174,15 @@ function Page() {
     change(i, { photo_path: path });
     toast.success("Foto anexada (salve os itens)");
   };
+  // Pedido de compras do item (Comprador): anexo em PDF ou foto.
+  const attachOrder = async (item: string, file: File) => {
+    const path = await putFile(file);
+    if (!path) return;
+    const { error } = await supabase.rpc("purchase_item_set_file", { _item: item, _path: path });
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries({ queryKey: ["sc-items", id] });
+    toast.success("Pedido de compras anexado");
+  };
   // Cotação ou orçamento (foto ou PDF) da verba do item, ou da verba total (i = -1).
   const uploadQuote = async (i: number, file: File) => {
     const path = await putFile(file);
@@ -336,6 +345,17 @@ function Page() {
                       <Input className="h-8" value={orders[saved.id] ?? saved.order_number ?? ""} onChange={(e) => setOrders((o) => ({ ...o, [saved.id]: e.target.value }))}
                         onBlur={() => { const v = orders[saved.id]; if (v !== undefined && v !== (saved.order_number ?? "")) setItem.mutate({ item: saved.id, status: saved.status, order: v }); }} />
                     ) : saved?.order_number ?? "—"}
+                    {saved && (saved.order_file_path || isBuyer) && (
+                      <div className="mt-1 flex items-center gap-1">
+                        {saved.order_file_path && <Button variant="ghost" size="sm" className="h-7 px-2" title="Ver pedido de compras" onClick={() => openPhoto(saved.order_file_path!)}><FileText className="h-4 w-4 text-primary" /> Pedido</Button>}
+                        {isBuyer && (
+                          <label className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-xs hover:bg-accent" title="Anexar o pedido de compras (PDF ou foto)">
+                            <Paperclip className="h-3.5 w-3.5 text-muted-foreground" /> {saved.order_file_path ? "Trocar" : "Anexar"}
+                            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void attachOrder(saved.id, f); e.target.value = ""; }} />
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                   {editable && (
                     <TableCell>

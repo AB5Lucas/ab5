@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApproversPanel } from "@/components/compras/approvers";
 import { Pill, ScTable, StatusFilter, statusCounts, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
-import { SC_STATUSES, statusClass } from "@/lib/purchase-requests";
+import { SC_DONE_STATUSES, SC_STATUSES, statusClass } from "@/lib/purchase-requests";
 
 export const Route = createFileRoute("/_authenticated/compras/comprador")({
   head: () => ({ meta: [{ title: "Comprador | AB5 Hub" }, { name: "description", content: "Solicitações de compra aprovadas, para o comprador tratar." }] }),
@@ -24,10 +24,13 @@ export const Route = createFileRoute("/_authenticated/compras/comprador")({
 function Page() {
   const qc = useQueryClient();
   const [status, setStatus] = useState("all");
+  const [scope, setScope] = useState<"abertas" | "concluidas" | "todas">("abertas");
   const list = useScRequests("buyer", (q) => q.eq("stage", "compras"));
   const clients = useClientsList();
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
-  const rows = (list.data ?? []).filter((r) => status === "all" || r.status === status);
+  const done = (r: ScRow) => SC_DONE_STATUSES.includes(r.status);
+  const scoped = (list.data ?? []).filter((r) => scope === "todas" || (scope === "concluidas" ? done(r) : !done(r)));
+  const rows = scoped.filter((r) => status === "all" || r.status === status);
   const [edit, setEdit] = useState<ScRow | null>(null);
   const [form, setForm] = useState({ status: "", notes: "" });
   const [returning, setReturning] = useState<ScRow | null>(null);
@@ -50,14 +53,27 @@ function Page() {
   });
   return (
     <div className="space-y-4">
-      <PageHeader title="Comprador" description="Solicitações autorizadas (e as do TOTVS). Clique no número para ver e tratar os itens; Devolver manda de volta ao solicitante para editar." />
+      <PageHeader title="Comprador" description="Solicitações autorizadas (e as do TOTVS). Em aberto ficam até a compra efetivada, almoxarifado, cancelada ou recusada. Clique no número para tratar os itens e anexar o pedido de compras." />
       <Tabs pageTabs defaultValue="solicitacoes">
         <TabsList>
           <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
           <TabsTrigger value="aprovadores">Autorizantes</TabsTrigger>
         </TabsList>
         <TabsContent value="solicitacoes" className="mt-4 space-y-4">
-          <StatusFilter value={status} onChange={setStatus} counts={statusCounts(list.data ?? [])} />
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label className="block text-xs">Mostrar</Label>
+              <Select value={scope} onValueChange={(v) => setScope(v as typeof scope)}>
+                <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="abertas">Em aberto ({(list.data ?? []).filter((r) => !done(r)).length})</SelectItem>
+                  <SelectItem value="concluidas">Compradas/encerradas ({(list.data ?? []).filter(done).length})</SelectItem>
+                  <SelectItem value="todas">Todas ({(list.data ?? []).length})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <StatusFilter value={status} onChange={setStatus} counts={statusCounts(scoped)} />
+          </div>
           {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
             <ScTable rows={rows} clientName={clientName} actions={(r) => (
               <div className="flex justify-end gap-1">
