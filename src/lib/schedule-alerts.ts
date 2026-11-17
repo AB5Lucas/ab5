@@ -43,7 +43,7 @@ export type AlertData = {
   prevAllocations: { collaborator_id: string; work_id: string }[];
   works: Map<string, AlertWork>;
   clients: Map<string, { name: string; needs_company_transport: boolean | null }>;
-  people: Map<string, { name: string; position: string | null; cnh: string | null; active: boolean; contract?: string | null }>;
+  people: Map<string, { name: string; position: string | null; cnh: string | null; active: boolean; contract?: string | null; noticeEnd?: string | null }>;
   /** Clientes com transporte montado no dia (aba Serviços → Montar transporte). */
   builtTransport?: Set<string>;
   vehicles: { plate: string; driver_id: string | null; extra_driver_ids: string[]; client_id: string | null; extra_client_ids: string[]; is_maintenance: boolean; is_external: boolean }[];
@@ -142,9 +142,10 @@ export function scheduleAlerts(d: AlertData): ScheduleAlert[] {
   if (unbooked.length) out.push({ key: "l2", tone: "orange", title: `${unbooked.length} integração(ões) sem confirmação na plataforma`, people: unbooked.map((a) => `${name(a.collaborator_id)} · ${a.label}`).sort() });
 
   // L5: quem trabalhou nos últimos 14 dias e está sem escalação, quadro, férias, folga ou agendamento (só em dia útil).
+  // Quem já terminou o aviso prévio não pode mais ser escalado: fica fora.
   if (businessDay && d.scheduleExists && d.allocations.length) {
     // Intermitentes e PJ não contam: trabalham só quando chamados.
-    const idle = [...d.recent].filter((id) => { const p = d.people.get(id); return p?.active && !["intermitente", "pj"].includes(String(p.contract ?? "").toLowerCase()) && !staff.has(id) && !d.accounted.has(id); }).map(name).sort();
+    const idle = [...d.recent].filter((id) => { const p = d.people.get(id); return p?.active && !["intermitente", "pj"].includes(String(p.contract ?? "").toLowerCase()) && !(p.noticeEnd && p.noticeEnd < d.date) && !staff.has(id) && !d.accounted.has(id); }).map(name).sort();
     if (idle.length) out.push({ key: "l5", tone: "orange", title: `${idle.length} pessoa(s) sem escalação no dia`, people: idle });
   }
   return out.sort((a, b) => Number(b.tone === "red") - Number(a.tone === "red"));
