@@ -19,16 +19,17 @@ export const Route = createFileRoute("/_authenticated/compras/solicitacoes/")({
 /** Visão do solicitante: as SCs dele e as que tem em cópia (observador), filtro de status, Enviar, Apagar (não enviada) e Cancelar (enviada). */
 type Scope = "todas" | "minhas" | "copia";
 function Page() {
-  const { user } = useCurrentUser();
+  const { user, isAdmin } = useCurrentUser();
   const qc = useQueryClient();
   const [status, setStatus] = useState("all");
   const [scope, setScope] = useState<Scope>("todas");
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<ScRow | null>(null);
   const uid = user?.id ?? "00000000-0000-0000-0000-000000000000";
-  const list = useScRequests(`mine-${uid}`, (q) => q.or(`requester_id.eq.${uid},observer_ids.cs.{${uid}}`));
+  // Administrador vê todas as SCs (a RLS libera); os demais, as próprias e as em cópia.
+  const list = useScRequests(`mine-${uid}-${isAdmin}`, (q) => (isAdmin ? q : q.or(`requester_id.eq.${uid},observer_ids.cs.{${uid}}`)));
   const mine = (list.data ?? []).filter((r) => r.requester_id === uid);
-  const copied = (list.data ?? []).filter((r) => r.requester_id !== uid);
+  const copied = (list.data ?? []).filter((r) => r.requester_id !== uid && (r.observer_ids ?? []).includes(uid));
   const scoped = scope === "minhas" ? mine : scope === "copia" ? copied : list.data ?? [];
   const clients = useClientsList();
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
@@ -48,7 +49,7 @@ function Page() {
           <Select value={scope} onValueChange={(v) => setScope(v as Scope)}>
             <SelectTrigger className="w-60"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="todas">Todas ({(list.data ?? []).length})</SelectItem>
+              <SelectItem value="todas">{isAdmin ? "Todas do sistema" : "Todas"} ({(list.data ?? []).length})</SelectItem>
               <SelectItem value="minhas">Feitas por mim ({mine.length})</SelectItem>
               <SelectItem value="copia">Em cópia (observador) ({copied.length})</SelectItem>
             </SelectContent>

@@ -61,7 +61,7 @@ function useBadgeData() {
         when(can.scApproval && !!uid, async () => ((await supabase.from("purchase_requests").select("due_date, approver_id, substitute_id").eq("stage", "aprovacao")).data ?? [])
           .filter((r) => r.approver_id === uid || r.substitute_id === uid)),
         // SCs em Compras ainda não compradas (as que a RLS deixa ver: próprias, em cópia, autorizadas; Comprador/admin veem todas).
-        when(can.scOpen, async () => (await supabase.from("purchase_requests").select("due_date").eq("stage", "compras")
+        when(can.scOpen, async () => (await supabase.from("purchase_requests").select("due_date, requester_id, observer_ids").eq("stage", "compras")
           .not("status", "in", '("COMPRA EFETIVADA","ALMOXARIFADO","CANCELADA","RECUSADA")')).data ?? []),
       ]);
       // Saldo do posto: faturas em aberto + abastecimentos ainda não faturados (mesma conta da aba Abastecimento).
@@ -75,8 +75,13 @@ function useBadgeData() {
       // Vermelho: alguma com prazo em até 5 dias; laranja: todas com mais de 5 dias.
       const soon = addDays(today, 5);
       const scApproval = { count: scPend.length, urgent: scPend.filter((r: any) => r.due_date <= soon).length };
-      const scOpen = { count: scOpenRows.length, late: scOpenRows.filter((r: any) => r.due_date && r.due_date < today).length };
-      return { scApproval, scOpen, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
+      const isAdmin = can.scOpen && !!uid && ((await supabase.from("user_roles").select("role").eq("user_id", uid)).data ?? []).some((r) => r.role === "admin");
+      // Solicitações: as que aparecem na lista (próprias e em cópia; admin vê todas). Comprador: todas as de Compras em aberto.
+      const late = (rows: any[]) => rows.filter((r) => r.due_date && r.due_date < today).length;
+      const mineRows = isAdmin ? scOpenRows : scOpenRows.filter((r: any) => r.requester_id === uid || (r.observer_ids ?? []).includes(uid));
+      const scOpen = { count: mineRows.length, late: late(mineRows) };
+      const scBuy = { count: scOpenRows.length, late: late(scOpenRows) };
+      return { scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
     },
   });
 }
@@ -128,9 +133,9 @@ export function useMenuBadges() {
       detail: `${d.scOpen.count} SC(s) pendente(s) em Compras${d.scOpen.late ? ` · ${d.scOpen.late} com prazo vencido` : ""}`,
     };
     // Comprador: mesmas SCs em aberto (o comprador vê todas as de Compras pela RLS).
-    if (d.scBuyer && d.scOpen?.count) out["/compras/comprador"] = {
-      count: d.scOpen.count, tone: d.scOpen.late ? "red" : "orange",
-      detail: `${d.scOpen.count} SC(s) para comprar${d.scOpen.late ? ` · ${d.scOpen.late} com prazo vencido` : ""}`,
+    if (d.scBuyer && d.scBuy?.count) out["/compras/comprador"] = {
+      count: d.scBuy.count, tone: d.scBuy.late ? "red" : "orange",
+      detail: `${d.scBuy.count} SC(s) para comprar${d.scBuy.late ? ` · ${d.scBuy.late} com prazo vencido` : ""}`,
     };
     if (d.purchases) out["/obras/compras"] = { count: d.purchases, tone: "red", detail: `${d.purchases} linha(s) de compra pendente(s)` };
     // Vermelho = Serviços, laranja = Indústria; basta 1 da Serviços para ficar vermelho.
