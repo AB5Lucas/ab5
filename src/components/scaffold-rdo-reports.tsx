@@ -12,6 +12,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCurrentUser } from "@/hooks/use-auth";
 import { fetchAll, monthEnd } from "@/lib/results-engine";
 import { parseOrder } from "@/lib/andaimes";
+import { nightHours } from "@/lib/labor-cost";
+
+/** Serviço da Suzano? (exportação no modelo do cliente) e dados do cabeçalho do apontamento. */
+function useWorkInfo(workId: string) {
+  return useQuery({
+    queryKey: ["work-export-info", workId],
+    enabled: !!workId,
+    staleTime: 10 * 60_000,
+    queryFn: async () => (await supabase.from("works").select("id, name, order_number, clients(name)").eq("id", workId).maybeSingle()).data as
+      { id: string; name: string; order_number: string | null; clients: { name: string } | null } | null,
+  });
+}
+const isSuzano = (w: { clients: { name: string } | null } | null | undefined) => /suzano/i.test(w?.clients?.name ?? "");
 
 /** xlsx (~480 KB) só é baixado ao exportar. */
 const loadXlsx = () => import("xlsx");
@@ -80,7 +93,7 @@ function usePresent(workId: string, start: string, end: string) {
     queryFn: async () =>
       fetchAll<any>((a, b) =>
         supabase.from("rdo_workforce")
-          .select("report_date, collaborator_id, present, positions(name), collaborators(full_name, cpf, positions(name))")
+          .select("report_date, collaborator_id, present, worked_hours, entry_time, exit_time, break_minutes, rdos(shift), positions(name), collaborators(full_name, cpf, positions(name))")
           .eq("work_id", workId).eq("present", true).gte("report_date", start).lte("report_date", end).order("id").range(a, b)),
   });
 }
@@ -127,7 +140,7 @@ export function Apontamentos({ workId, start, end, ym }: { workId: string; start
       byDay.set(r.report_date, l);
     }
     const order = (prio.data ?? []).map((p: any) => p.collaborator_id);
-    const out: { date: string; name: string; cpf: string; role: string }[] = [];
+    const out: { date: string; name: string; cpf: string; role: string; raw: any }[] = [];
     for (const date of [...byDay.keys()].sort()) {
       const people = byDay.get(date)!;
       const roles = dayRoles(people, order);
@@ -136,6 +149,7 @@ export function Apontamentos({ workId, start, end, ym }: { workId: string; start
         name: r.collaborators?.full_name ?? "—",
         cpf: r.collaborators?.cpf ?? "",
         role: roles[i]!,
+        raw: r,
       }));
       const rank = (x: { role: string }) => (x.role === "ENCARREGADO" ? 0 : x.role === "MONTADOR DE ANDAIME" ? 1 : 2);
       list.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "pt-BR"));
@@ -144,7 +158,40 @@ export function Apontamentos({ workId, start, end, ym }: { workId: string; start
     return out;
   }, [present.data, prio.data]);
 
+  const info = useWorkInfo(workId);
+  const holidays = useQuery({
+    queryKey: ["holidays-all"],
+    staleTime: 60 * 60_000,
+    queryFn: async () => new Set(((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string)),
+  });
   const exportXlsx = async () => {
+    if (isSuzano(info.data)) {
+      // Modelo do cliente: horas normais pela fórmula do modelo (9 h; sexta 8 h); extras e noturnas pelo RDO.
+      const { exportSuzanoApontamento } = await import("@/lib/suzano-xlsx");
+      const hol = holidays.data ?? new Set<string>();
+      const data = rows.map((r) => {
+        const worked = r.raw?.worked_hours == null ? null : Number(r.raw.worked_hours);
+        const dow = new Date(`${r.date}T12:00:00`).getDay();
+        const sunHol = dow === 0 || hol.has(r.date);
+        const night = r.raw?.rdos?.shift === "night" ? nightHours(r.raw.entry_time, r.raw.exit_time, r.raw.break_minutes ?? 60) : 0;
+        const std = dow === 5 ? 8 : 9;
+        const h = worked ?? 0;
+        const round = (v: number) => Math.round(v * 100) / 100;
+        if (sunHol) return { ...r, normal: 0, he60: 0, he100: round(h), night };
+        if (dow === 6) return { ...r, normal: 0, he60: round(h), he100: 0, night };
+        if (worked != null && worked < std) return { ...r, normal: round(worked), he60: 0, he100: 0, night };
+        return { ...r, normal: null, he60: round(Math.max(0, h - std)), he100: 0, night };
+      });
+      const eng = /engenharia/i.test(info.data?.name ?? "");
+      const orders = (info.data?.order_number ?? "").split(/[^\d]+/).filter(Boolean);
+      await exportSuzanoApontamento(data, {
+        ym, lastDate: rows[rows.length - 1]!.date, atendimento: eng ? "ENGENHARIA" : "MANUTENÇÃO",
+        area: eng ? "" : "PG2025", responsavel: eng ? "" : "PEDRO MIGUEL",
+        pedido: eng ? orders.length === 1 ? orders[0]! : "" : "4501977819",
+        obs: "MONTAGEM E DESMONTAGEM DE ANDAIME",
+      });
+      return;
+    }
     const XLSX = await loadXlsx();
     const ws = XLSX.utils.json_to_sheet(rows.map((r) => ({ Data: br(r.date), "Nome completo": r.name, CPF: r.cpf, "Função": r.role })));
     const wb = XLSX.utils.book_new();
@@ -296,7 +343,13 @@ export function useProdRows(workId: string, start: string, end: string) {
 
 export function Produtividade({ workId, start, end }: { workId: string; start: string; end: string }) {
   const { rows, loading } = useProdRows(workId, start, end);
+  const info = useWorkInfo(workId);
   const exportXlsx = async () => {
+    if (isSuzano(info.data)) {
+      const { exportSuzanoProdutividade } = await import("@/lib/suzano-xlsx");
+      await exportSuzanoProdutividade(rows, start.slice(0, 7));
+      return;
+    }
     const XLSX = await loadXlsx();
     const ws = XLSX.utils.json_to_sheet(rows.map((r) => ({
       Data: br(r.date), Ordem: r.ord, Atividade: r.op === "desmontagem" ? "Desmontagem" : "Montagem",
