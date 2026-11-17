@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Ban, Camera, Check, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
@@ -91,6 +91,7 @@ function Page() {
   const [editingHeader, setEditingHeader] = useState(false);
   const [removing, setRemoving] = useState<ScRow | null>(null);
   const navigate = useNavigate();
+  const router = useRouter();
   // Autorizante (gestor ou substituto) autoriza ou devolve aqui mesmo, como na aba Autorização.
   const [deciding, setDeciding] = useState<boolean | null>(null);
   const [decNotes, setDecNotes] = useState("");
@@ -213,7 +214,10 @@ function Page() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" asChild><Link to="/compras/solicitacoes"><ArrowLeft className="h-4 w-4" /> Solicitações</Link></Button>
+        {/* Volta para a tela de onde veio (Solicitações, Autorização ou Comprador); aberta direto, vai para Solicitações. */}
+        <Button variant="ghost" size="sm" onClick={() => (router.history.canGoBack() ? router.history.back() : navigate({ to: "/compras/solicitacoes" }))}>
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Button>
         <span className={`inline-block h-3 w-3 rounded-full ${statusDot(r.status)}`} title={r.status} aria-label={`Status: ${r.status}`} />
         <h1 className="font-display text-xl font-semibold uppercase tracking-wide">{r.number}</h1>
         <div className="ml-auto flex gap-2">
