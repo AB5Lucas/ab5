@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ApproversPanel } from "@/components/compras/approvers";
 import { Pill, ScTable, StatusFilter, statusCounts, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 import { SC_STATUSES, statusClass } from "@/lib/purchase-requests";
 
@@ -39,12 +41,21 @@ function Page() {
   return (
     <div className="space-y-4">
       <PageHeader title="Comprador" description="Solicitações aprovadas pelos aprovadores. Clique no número para ver e tratar os itens." />
-      <StatusFilter value={status} onChange={setStatus} counts={statusCounts(list.data ?? [])} />
-      {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
-        <ScTable rows={rows} clientName={clientName} actions={(r) => (
-          <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "" }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
-        )} />
-      )}
+      <Tabs pageTabs defaultValue="solicitacoes">
+        <TabsList>
+          <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
+          <TabsTrigger value="aprovadores">Aprovadores</TabsTrigger>
+        </TabsList>
+        <TabsContent value="solicitacoes" className="mt-4 space-y-4">
+          <StatusFilter value={status} onChange={setStatus} counts={statusCounts(list.data ?? [])} />
+          {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
+            <ScTable rows={rows} clientName={clientName} actions={(r) => (
+              <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "" }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
+            )} />
+          )}
+        </TabsContent>
+        <TabsContent value="aprovadores" className="mt-4"><ApproversPanel /></TabsContent>
+      </Tabs>
       <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
         <DialogContent>
           <DialogHeader>

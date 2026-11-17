@@ -771,6 +771,13 @@
       "when": 1795400006000,
       "tag": "0109_purchase_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1795400007000,
+      "tag": "0110_purchase_approvers_in_buyer",
+      "breakpoints": true
     }
   ]
 }

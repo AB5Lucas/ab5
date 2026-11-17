@@ -1,24 +1,18 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const Route = createFileRoute("/_authenticated/compras/aprovadores")({
-  head: () => ({ meta: [{ title: "Aprovadores de Compras | AB5 Hub" }, { name: "description", content: "Quem aprova as solicitações de compra de cada solicitante." }] }),
-  component: Page,
-});
 
 const NONE = "__none__";
 
 /** Cada usuário (solicitante) ligado ao seu aprovador. Sem aprovador, a SC não pode ser enviada. */
-function Page() {
+export function ApproversPanel() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const users = useQuery({
@@ -42,7 +36,7 @@ function Page() {
   });
   return (
     <div className="space-y-4">
-      <PageHeader title="Aprovadores" description="Escolha quem aprova as solicitações de compra de cada pessoa. A SC enviada vai para esse aprovador e depois para Compras." />
+      <p className="text-sm text-muted-foreground">Escolha quem aprova as solicitações de compra de cada pessoa. A SC enviada vai para esse aprovador e depois para o Comprador.</p>
       <div className="space-y-1">
         <Label htmlFor="appr-q" className="text-xs">Buscar</Label>
         <div className="relative w-72">
