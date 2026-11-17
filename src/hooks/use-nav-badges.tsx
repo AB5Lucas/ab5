@@ -1,3 +1,4 @@
+import { fetchFleetBalanceParts } from "@/components/frota/use-fuel-rows";
 import { useQuery } from "@tanstack/react-query";
 import { useAccess } from "@/hooks/use-access";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +10,6 @@ import { useSeenAlerts } from "@/hooks/use-seen-alerts";
 import { worstAlertTone } from "@/lib/schedule-alerts";
 import { hiringBadge } from "@/lib/hiring-badge";
 import { balanceBadgeTone, fleetBalance } from "@/lib/fleet-balance";
-import { isoDay, withDateFix } from "@/lib/fleet-notes";
 import { nonTicketTotal } from "@/lib/fleet-fiscal";
 import { currentMonthRange } from "@/components/date-range-picker";
 
@@ -47,16 +47,16 @@ function useBadgeData() {
       const empty: Counts = { byKind: { agendamentos: zero, aso: zero, int: zero, trn: zero, epi: zero }, conference: zero, purchases: 0, orders: 0, billingInd: 0, billingSrv: 0 };
       // Contagens de Documentação, Conferência, Compras, Pedidos e Faturamento vêm prontas do banco
       // (menu_badge_counts, com a RLS do usuário); antes o navegador baixava as tabelas inteiras.
-      const [counts, fleetOpen, fleetNotes] = await Promise.all([
+      const [counts, fleetParts] = await Promise.all([
         can.docs || can.purchases || can.orders || can.billing
           ? supabase.rpc("menu_badge_counts" as never, { p_today: today, p_docs: can.docs, p_purchases: can.purchases, p_orders: can.orders, p_billing: can.billing } as never)
             .then((r: { data: unknown; error: unknown }) => (r.error ? empty : (r.data as Counts) ?? empty), () => empty)
           : Promise.resolve(empty),
-        when(can.fleet, () => fetchAll<any>((a, b) => supabase.from("fleet_invoices").select("total").eq("paid", false).range(a, b))),
-        when(can.fleet, () => fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("issued_at, issued_on_fix, total, approved_at, allocation, cc_split, cc_fix").or(`and(issued_at.gte.${addDays(month.from, -1)},issued_at.lte.${addDays(month.to, 1)}T23:59:59),and(issued_on_fix.gte.${month.from},issued_on_fix.lte.${month.to})`).range(a, b)).then((r) => r.map(withDateFix))),
+        when(can.fleet, () => fetchFleetBalanceParts().then((p) => [p])),
       ]);
-      const fleetPeriod = fleetNotes.filter((n) => { const d = isoDay(n.issued_at); return !!d && d >= month.from && d <= month.to; }).reduce((s, n) => s + nonTicketTotal(n), 0);
-      const fleetSaldo = fleetBalance(fleetOpen.reduce((s, i) => s + Number(i.total ?? 0), 0), fleetPeriod);
+      // Saldo do posto: faturas em aberto + abastecimentos ainda não faturados (mesma conta da aba Abastecimento).
+      const fp = fleetParts[0] as { open: number; unbilled: number } | undefined;
+      const fleetSaldo = fleetBalance(fp?.open ?? 0, fp?.unbilled ?? 0);
       const byKind = counts.byKind;
       const vals = Object.values(byKind);
       const expired = vals.reduce((a, v) => a + Number(v.expired), 0);

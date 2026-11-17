@@ -23,7 +23,7 @@ import { PlateFilter } from "./plate-filter";
 import { FleetRelease, useCnhPeople, useFleetRelease } from "./liberacao";
 import { FleetFiscal } from "./fiscal";
 import { FleetFiscalCc } from "./fiscal-cc";
-import { useFuelRows, useOpenInvoicesTotal, type Note, type Row } from "./use-fuel-rows";
+import { useFleetBalanceParts, useFuelRows, type Note, type Row } from "./use-fuel-rows";
 import { balanceTone, fleetBalance, FLEET_CREDIT } from "@/lib/fleet-balance";
 import { nonTicketTotal } from "@/lib/fleet-fiscal";
 import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
@@ -148,10 +148,10 @@ function FuelNotes() {
     return day >= start && day <= end;
   }).sort((a, b) => (photoTime(a.file_name) ?? 0) - (photoTime(b.file_name) ?? 0) || a.file_name.localeCompare(b.file_name));
   const [showOrphans, setShowOrphans] = useState(false);
-  const openInvoices = useOpenInvoicesTotal();
+  const balanceParts = useFleetBalanceParts();
   // TICKET (pago no ticket) não entra nas somas nem desconta do Saldo.
   const periodTotal = rows.reduce((s, r) => s + nonTicketTotal(r), 0);
-  const balance = fleetBalance(openInvoices.data ?? 0, periodTotal);
+  const balance = fleetBalance(balanceParts.data?.open ?? 0, balanceParts.data?.unbilled ?? 0);
   const loading = notes.isLoading || schedules.isLoading || vehicles.isLoading;
   const notRead = months.filter((m) => !settings.data?.[`synced:${m}`]);
   const lastRead = months.map((m) => settings.data?.[`synced:${m}`]).filter((v): v is string => !!v).sort().at(-1);
@@ -205,7 +205,7 @@ function FuelNotes() {
         </button>
         <Kpi label="Aguardando aprovação" value={String(count("pendente"))} />
         <Kpi label="Saldo" value={brl(balance)} tone={balanceTone(balance)}
-          title={`${brl(FLEET_CREDIT)} − faturas em aberto (${brl(openInvoices.data ?? 0)}) − total do período (${brl(periodTotal)})`} />
+          title={`${brl(FLEET_CREDIT)} − faturas em aberto (${brl(balanceParts.data?.open ?? 0)}) − abastecimentos ainda não faturados${balanceParts.data?.lastBilledTo ? ` depois de ${brDate(balanceParts.data.lastBilledTo)}` : ""} (${brl(balanceParts.data?.unbilled ?? 0)}). Não depende do período filtrado.`} />
         <Kpi label="Total do período" value={brl(periodTotal)} />
       </div>
 
