@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IndustryOrders } from "@/components/industry-billing";
+import { MarsOrders } from "@/components/mars-orders";
 import { Filter } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { monthEnd } from "@/lib/results-engine";
@@ -47,7 +48,7 @@ function useFilters() {
 }
 
 function SuzanoPage() {
-  return <div className="space-y-6"><PageHeader title="Pedidos" description="Pedidos e faturamentos do cliente selecionado." /><Tabs pageTabs defaultValue="servicos"><TabsList><TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="industria">Indústria</TabsTrigger></TabsList><TabsContent value="servicos"><ServicesOrders /></TabsContent><TabsContent value="industria"><IndustryOrders /></TabsContent></Tabs></div>;
+  return <div className="space-y-6"><PageHeader title="Pedidos" description="Pedidos e faturamentos do cliente selecionado." /><Tabs pageTabs defaultValue="servicos"><TabsList><TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="industria">Indústria</TabsTrigger><TabsTrigger value="mars">MARS MM</TabsTrigger></TabsList><TabsContent value="servicos"><ServicesOrders /></TabsContent><TabsContent value="industria"><IndustryOrders /></TabsContent><TabsContent value="mars" className="mt-4"><MarsOrders /></TabsContent></Tabs></div>;
 }
 
 function ServicesOrders() {

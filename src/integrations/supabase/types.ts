@@ -3138,6 +3138,66 @@ export type Database = {
           },
         ]
       }
+      mars_sync_items: {
+        Row: {
+          key: string
+          ref_month: string
+          source: string
+          quote: string | null
+          order_number: string | null
+          description: string
+          value: number
+          requester: string | null
+          category: string | null
+          sheet_status: string | null
+          notes: string | null
+          action: string
+          work_id: string | null
+          synced_order: string | null
+          synced_value: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          ref_month: string
+          source: string
+          quote?: string | null
+          order_number?: string | null
+          description: string
+          value?: number
+          requester?: string | null
+          category?: string | null
+          sheet_status?: string | null
+          notes?: string | null
+          action: string
+          work_id?: string | null
+          synced_order?: string | null
+          synced_value?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          ref_month?: string
+          source?: string
+          quote?: string | null
+          order_number?: string | null
+          description?: string
+          value?: number
+          requester?: string | null
+          category?: string | null
+          sheet_status?: string | null
+          notes?: string | null
+          action?: string
+          work_id?: string | null
+          synced_order?: string | null
+          synced_value?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lodging_stays: {
         Row: {
           collaborator_id: string

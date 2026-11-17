@@ -22,3 +22,14 @@ export const syncIndustryNow = createServerFn({ method: "POST" }).middleware([re
   const { executeIndustrySync } = await import("./industry-sync.server");
   return executeIndustrySync({ lovableKey, excelKey }, "manual", data.month ? [data.month] : undefined);
 });
+export const syncMarsNow = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator((d: { month?: string | undefined } | undefined) => ({ month: d?.month && /^\d{4}-\d{2}$/.test(d.month) ? d.month : undefined }))
+  .handler(async ({ context, data }) => {
+  const { data: ok } = await context.supabase.rpc("can_access_page", { _path: "/fechamentos/suzano" });
+  if (!ok) throw new Error("Você não tem acesso a Pedidos");
+  const lovableKey = process.env["LOVABLE_API_KEY"];
+  const excelKey = process.env["MICROSOFT_EXCEL_API_KEY"];
+  if (!lovableKey || !excelKey) throw new Error("Conexão do Excel indisponível");
+  const { executeMarsSync } = await import("./mars-sync.server");
+  return executeMarsSync({ lovableKey, excelKey }, "manual", data.month);
+});

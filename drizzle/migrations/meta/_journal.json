@@ -848,6 +848,13 @@
       "when": 1795400017000,
       "tag": "0120_purchase_fixed_observer_vitoria",
       "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1795400018000,
+      "tag": "0121_mars_sync",
+      "breakpoints": true
     }
   ]
 }
