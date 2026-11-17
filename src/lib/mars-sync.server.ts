@@ -10,6 +10,7 @@ type Credentials = { lovableKey: string; excelKey: string };
 const enc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
 const today = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const curMonth = () => today().slice(0, 7);
+const nextMonth = (ym: string) => { const [y, m] = ym.split("-").map(Number) as [number, number]; return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`; };
 const EMPTY_BUDGET = { mo: 0, materiais: 0, ferramentas: 0, andaimes: 0, transporte: 0, bdi: 1 };
 
 /**
@@ -65,9 +66,8 @@ async function applyMars(parsed: MarsRow[], ym: string) {
   const { data: mapped, error: me } = await supabaseAdmin.from("mars_sync_items").select("*");
   if (me) throw me;
   const byKey = new Map((mapped ?? []).map((m) => [m.key, m]));
-  // 1ª leitura = nenhuma leitura concluída ainda (também a tabela de faturamento).
-  const { count: doneRuns } = await supabaseAdmin.from("billing_sync_runs").select("id", { count: "exact", head: true }).eq("category", "mars").eq("status", "completed");
-  const firstRun = !doneRuns;
+  // 1ª leitura = a tabela de faturamento ainda não foi lida (nenhum item dela registrado); depois só a de ordens.
+  const firstRun = !(mapped ?? []).some((m) => m.source === "faturamento");
   const date = ym === curMonth() ? today() : `${ym}-01`;
   let created = 0; let updated = 0; const notes: string[] = [];
   const items = rowsToSync(parsed, firstRun);
@@ -137,9 +137,10 @@ async function applyMars(parsed: MarsRow[], ym: string) {
     const total = contract.value > 0 ? contract.value : MARS_CONTRACT_VALUE;
     const used = new Set(works.flatMap((w) => (w.orders ?? []).map((o) => String(o.number ?? ""))));
     const placeholder = `MEDIÇÃO ${ym}`;
-    const { data: noteRows } = await supabaseAdmin.from("billing_sync_notes").select("order_number, amount, issued_at")
-      .ilike("client_name", "%MARS%").eq("cancelled", false).gte("issued_at", `${ym}-01`).lte("issued_at", `${ym}-31`)
+    const { data: noteRows, error: ne } = await supabaseAdmin.from("billing_sync_notes").select("order_number, amount, issued_at")
+      .ilike("client_name", "%MARS%").eq("cancelled", false).gte("issued_at", `${ym}-01`).lt("issued_at", `${nextMonth(ym)}-01`)
       .gte("amount", total - 1).lte("amount", total + 1).not("order_number", "is", null);
+    if (ne) throw ne;
     const realOrder = (noteRows ?? []).map((n) => String(n.order_number ?? "").trim()).find((o) => /^\d{6,}$/.test(o) && (!used.has(o) || byKey.get(ckey)?.synced_order === o));
     const m = byKey.get(ckey);
     if (!m) {
