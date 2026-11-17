@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Camera, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Camera, Check, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchSelect } from "@/components/search-select";
@@ -89,6 +91,21 @@ function Page() {
   const [editingHeader, setEditingHeader] = useState(false);
   const [removing, setRemoving] = useState<ScRow | null>(null);
   const navigate = useNavigate();
+  // Autorizante (gestor ou substituto) autoriza ou devolve aqui mesmo, como na aba Autorização.
+  const [deciding, setDeciding] = useState<boolean | null>(null);
+  const [decNotes, setDecNotes] = useState("");
+  const decide = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("purchase_request_decide", { _id: id, _approve: !!deciding, _notes: decNotes });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success(deciding ? "Autorizada e enviada para o Comprador" : "Devolvida ao solicitante");
+      setDeciding(null); setDecNotes("");
+      qc.invalidateQueries({ queryKey: ["sc-request", id] }); qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["menu-badges"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const remove = useScRemove(() => { const wasDraft = removing?.stage === "rascunho"; setRemoving(null); if (wasDraft) navigate({ to: "/compras/solicitacoes" }); });
   useEffect(() => {
     if (!items.data || !r) return;
@@ -204,6 +221,12 @@ function Page() {
           {editable && <Button variant="outline" size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}><Save className="h-4 w-4" /> Salvar itens</Button>}
           {editable && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
           {editable && <Button variant="ghost" size="sm" onClick={() => setRemoving(r)}><Trash2 className="h-4 w-4 text-destructive" /> Apagar</Button>}
+          {r.stage === "aprovacao" && !!user?.id && (r.approver_id === user.id || r.substitute_id === user.id) && (
+            <>
+              <Button size="sm" onClick={() => setDeciding(true)}><Check className="h-4 w-4" /> Autorizar</Button>
+              <Button variant="outline" size="sm" onClick={() => setDeciding(false)}><Undo2 className="h-4 w-4" /> Devolver</Button>
+            </>
+          )}
           {r.requester_id === user?.id && (r.stage === "aprovacao" || r.stage === "compras") && <Button variant="outline" size="sm" onClick={() => setRemoving(r)}><Ban className="h-4 w-4" /> Cancelar SC</Button>}
         </div>
       </div>
@@ -334,7 +357,7 @@ function Page() {
       <div className="flex flex-wrap items-end gap-4">
         {editable && <Button variant="outline" size="sm" onClick={() => { setRows((s) => [...s, emptyDraft()]); setDirty(true); }}><Plus className="h-4 w-4" /> Adicionar item</Button>}
         <div className="space-y-1">
-          <Label htmlFor="sc-total" className="text-xs">Verba total (se não informar por item)</Label>
+          <Label htmlFor="sc-total" className="text-xs">Verba (R$) total</Label>
           {editable
             ? <Input id="sc-total" className="w-44" inputMode="decimal" placeholder="0,00" value={total} onChange={(e) => { setTotal(e.target.value); setDirty(true); }} />
             : <p className="text-sm font-medium">{brl(r.total_budget)}</p>}
@@ -355,6 +378,22 @@ function Page() {
         )}
       </div>
 
+      <Dialog open={deciding !== null} onOpenChange={(o) => { if (!o) { setDeciding(null); setDecNotes(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{deciding ? "Autorizar solicitação" : "Devolver ao solicitante"}</DialogTitle>
+            <DialogDescription>{r.number}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <Label htmlFor="dec-notes">{deciding ? "Observação (opcional)" : "Motivo da devolução"}</Label>
+            <Textarea id="dec-notes" rows={3} value={decNotes} onChange={(e) => setDecNotes(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeciding(null)}>Cancelar</Button>
+            <Button disabled={decide.isPending || (!deciding && !decNotes.trim())} onClick={() => decide.mutate()}>{deciding ? "Autorizar" : "Devolver"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <ScHeaderDialog open={editingHeader} onOpenChange={setEditingHeader} editing={r} />
       <ScRemoveDialog row={removing} onClose={() => setRemoving(null)} pending={remove.isPending} onConfirm={(x) => remove.mutate(x)} />
     </div>
