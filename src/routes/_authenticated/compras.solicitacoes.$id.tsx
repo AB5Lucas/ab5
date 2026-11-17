@@ -136,13 +136,17 @@ function Page() {
   if (!r) return <p className="text-sm text-muted-foreground">Solicitação não encontrada ou sem acesso.</p>;
   const dl = deadlineControl(r, todayISO());
   const cName = r.client_id ? clientName.get(r.client_id) ?? "—" : "—";
-  const head: [string, React.ReactNode][] = [
-    ["Data da SC", brDate(r.request_date)], ["Requisitante", r.requester_name], ["Tipo", r.system],
-    ["Categoria", r.category], ["Natureza da compra", r.nature], ["Prioridade", <Pill key="p" className={priorityClass(r.priority)}>{r.priority}</Pill>],
-    ["Cliente", cName], ["Prazo de entrega", brDate(r.due_date)], ["Local de entrega", deliveryLabel(r, cName)],
-    ["Envio", r.sent_at ? new Date(r.sent_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "não enviado"],
-    ["Controle de prazo", <Pill key="d" className={dl.cls}>{dl.label}</Pill>],
-    ["Etapa / status", <span key="s" className="space-x-1">{STAGE_LABEL[r.stage as ScStage]} <Pill className={statusClass(r.status)}>{r.status}</Pill> <span className="text-xs text-muted-foreground">{brDate(r.status_at)}</span></span>],
+  // Cabeçalho em colunas, como o modelo FR-CPS-SC: quem/quando · o quê · para onde/quando entregar · andamento.
+  const created = new Date(r.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+  const headCols: [string, React.ReactNode][][] = [
+    [["Data da SC", brDate(r.request_date)], ["Horário", created], ["Requisitante", r.requester_name]],
+    [["Categoria", r.category], ["Natureza da compra", r.nature], ["Prioridade", <Pill key="p" className={priorityClass(r.priority)}>{r.priority}</Pill>]],
+    [["Cliente", cName], ["Prazo de entrega", brDate(r.due_date)], ["Local de entrega", deliveryLabel(r, cName)]],
+    [
+      ["Envio", r.sent_at ? new Date(r.sent_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "não enviado"],
+      ["Controle de prazo", <Pill key="d" className={dl.cls}>{dl.label}</Pill>],
+      ["Etapa / status", <span key="s" className="space-x-1">{STAGE_LABEL[r.stage as ScStage]} <Pill className={statusClass(r.status)}>{r.status}</Pill> <span className="text-xs text-muted-foreground">{brDate(r.status_at)}</span></span>],
+    ],
   ];
 
   return (
@@ -162,9 +166,13 @@ function Page() {
           <span className="text-sm font-semibold">Ab5 Indústria e Comércio LTDA</span>
           <span className="font-display text-sm uppercase tracking-wide">Solicitação de compras</span>
         </div>
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          {head.map(([k, v]) => <div key={k}><dt className="text-[11px] uppercase text-muted-foreground">{k}</dt><dd className="font-medium">{v}</dd></div>)}
-        </dl>
+        <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-border">
+          {headCols.map((col, i) => (
+            <dl key={i} className="space-y-2 lg:pl-4 lg:first:pl-0">
+              {col.map(([k, v]) => <div key={k}><dt className="text-[11px] uppercase text-muted-foreground">{k}</dt><dd className="font-medium">{v}</dd></div>)}
+            </dl>
+          ))}
+        </div>
         {r.notes && <p className="mt-3 rounded-md bg-muted p-2 text-xs"><b>Observações:</b> {r.notes}</p>}
         {r.approver_notes && <p className={`mt-2 rounded-md p-2 text-xs ${r.stage === "rascunho" ? "bg-destructive/10 text-destructive" : "bg-muted"}`}><b>Aprovador:</b> {r.approver_notes}</p>}
         {r.buyer_notes && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Comprador:</b> {r.buyer_notes}</p>}
