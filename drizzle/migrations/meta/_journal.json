@@ -813,6 +813,13 @@
       "when": 1795400012000,
       "tag": "0115_vehicle_extra_works",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1795400013000,
+      "tag": "0116_vt_always_full",
+      "breakpoints": true
     }
   ]
 }

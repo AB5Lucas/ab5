@@ -1673,6 +1673,7 @@ export type Database = {
           travel_bonus_enabled: boolean
           updated_at: string
           vt_enabled: boolean
+          vt_always_full: boolean
         }
         Insert: {
           birth_date?: string | null
@@ -1706,6 +1707,7 @@ export type Database = {
           travel_bonus_enabled?: boolean
           updated_at?: string
           vt_enabled?: boolean
+          vt_always_full?: boolean
         }
         Update: {
           birth_date?: string | null
@@ -1739,6 +1741,7 @@ export type Database = {
           travel_bonus_enabled?: boolean
           updated_at?: string
           vt_enabled?: boolean
+          vt_always_full?: boolean
         }
         Relationships: [
           {

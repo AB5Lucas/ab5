@@ -152,6 +152,7 @@ type FormState = {
   status: "active" | "inactive";
   is_driver: boolean;
   vt_enabled: boolean;
+  vt_always_full: boolean;
   notice: boolean;
   notice_start: string;
   notice_end: string;
@@ -179,6 +180,7 @@ const emptyForm: FormState = {
   status: "active",
   is_driver: false,
   vt_enabled: true,
+  vt_always_full: false,
   notice: false,
   notice_start: "",
   notice_end: "",
@@ -207,6 +209,7 @@ function toForm(c: Collaborator): FormState {
     status: c.status,
     is_driver: c.is_driver,
     vt_enabled: (c as { vt_enabled?: boolean | null }).vt_enabled !== false,
+    vt_always_full: !!(c as { vt_always_full?: boolean | null }).vt_always_full,
     notice: !!c.notice_start,
     notice_start: c.notice_start ?? "",
     notice_end: c.notice_end ?? "",
@@ -325,6 +328,7 @@ function CollaboratorsPage() {
         status: form.status,
         is_driver: form.is_driver,
         vt_enabled: form.vt_enabled,
+        vt_always_full: form.vt_always_full,
         notice_start: form.notice ? nn(form.notice_start) : null,
         notice_end: form.notice ? nn(form.notice_end) : null,
         driver_license_category: form.is_driver ? nn(form.driver_license_category) : null,
@@ -687,6 +691,10 @@ function CollaboratorsPage() {
               <div className="flex items-center gap-3">
                 <Switch id="vt_enabled" checked={form.vt_enabled} onCheckedChange={(v) => set("vt_enabled", v)} />
                 <Label htmlFor="vt_enabled">Vale Transporte</Label>
+              </div>
+              <div className="flex items-center gap-3" title="Recebe VT em todo dia trabalhado no Fechamento, em qualquer obra (inclusive externas e com transporte da empresa)">
+                <Switch id="vt_always_full" checked={form.vt_always_full} onCheckedChange={(v) => set("vt_always_full", v)} />
+                <Label htmlFor="vt_always_full">VT cheio</Label>
               </div>
               <div className="flex items-center gap-3">
                 <Switch id="notice" checked={form.notice} onCheckedChange={(v) => set("notice", v)} />
