@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { fetchAll, monthEnd } from "@/lib/results-engine";
-import { parseOrder } from "@/lib/andaimes";
+import { parseOrder, parseTag } from "@/lib/andaimes";
 import { nightHours } from "@/lib/labor-cost";
 
 /** Serviço da Suzano? (exportação no modelo do cliente) e dados do cabeçalho do apontamento. */
@@ -304,7 +304,7 @@ export function useProdRows(workId: string, start: string, end: string) {
     queryKey: ["suzano-scaffolds", workId, start, end],
     enabled: !!workId,
     queryFn: async () =>
-      (await supabase.from("rdo_scaffolds").select("*, rdos!inner(report_date, work_id)")
+      (await supabase.from("rdo_scaffolds").select("*, rdos!inner(report_date, work_id, activities)")
         .eq("rdos.work_id", workId).gte("rdos.report_date", start).lte("rdos.report_date", end)).data ?? [],
   });
   const prio = useForemanPriority();
@@ -331,8 +331,11 @@ export function useProdRows(workId: string, start: string, end: string) {
       const date = s.rdos?.report_date as string;
       const vol = Number(s.length_m ?? 0) * Number(s.width_m ?? 0) * Number(s.height_m ?? 0) * Number(s.quantity ?? 1);
       const people = perDay.get(date)?.size ?? 0;
-      const ord = [s.notes, s.location, s.scaffold_type].map((t) => parseOrder(t)).find(Boolean) ?? "";
-      return { id: s.id, date, ord, op: s.operation, l: Number(s.length_m ?? 0), w: Number(s.width_m ?? 0), h: Number(s.height_m ?? 0), vol, people, prod: people ? vol / people : 0 };
+      // ORDEM e TAG do andaime; se não estiverem no andaime, as escritas nas atividades do RDO.
+      const texts = [s.notes, s.location, s.scaffold_type, s.rdos?.activities];
+      const ord = texts.map((t) => parseOrder(t)).find(Boolean) ?? "";
+      const tag = texts.map((t) => parseTag(t)).find(Boolean) ?? "";
+      return { id: s.id, date, ord, tag, op: s.operation, l: Number(s.length_m ?? 0), w: Number(s.width_m ?? 0), h: Number(s.height_m ?? 0), vol, people, prod: people ? vol / people : 0 };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
   // Pessoa-dia: cada dia trabalhado conta (5 dias = 5), só dias com andaime lançado
@@ -352,7 +355,7 @@ export function Produtividade({ workId, start, end }: { workId: string; start: s
     }
     const XLSX = await loadXlsx();
     const ws = XLSX.utils.json_to_sheet(rows.map((r) => ({
-      Data: br(r.date), Ordem: r.ord, Atividade: r.op === "desmontagem" ? "Desmontagem" : "Montagem",
+      Data: br(r.date), Ordem: r.ord, TAG: r.tag, Atividade: r.op === "desmontagem" ? "Desmontagem" : "Montagem",
       "Comprimento (m)": r.l, "Largura (m)": r.w, "Altura (m)": r.h, "Volume (m³)": Number(r.vol.toFixed(2)),
       "Pessoas no dia": r.people, "Produtividade (m³/pessoa)": Number(r.prod.toFixed(2)),
     })));
@@ -367,19 +370,20 @@ export function Produtividade({ workId, start, end }: { workId: string; start: s
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Data</TableHead><TableHead>Ordem</TableHead><TableHead>Atividade</TableHead>
+            <TableHead>Data</TableHead><TableHead>Ordem</TableHead><TableHead>TAG</TableHead><TableHead>Atividade</TableHead>
             <TableHead className="text-right">Comprimento (m)</TableHead><TableHead className="text-right">Largura (m)</TableHead>
             <TableHead className="text-right">Altura (m)</TableHead><TableHead className="text-right">Volume (m³)</TableHead>
             <TableHead className="text-right">Pessoas no dia</TableHead><TableHead className="text-right">Produtividade (m³/pessoa)</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {loading && <TableRow><TableCell colSpan={9}>Carregando...</TableCell></TableRow>}
-          {!loading && !rows.length && <TableRow><TableCell colSpan={9} className="text-muted-foreground">Nenhum andaime registrado nos RDOs do período.</TableCell></TableRow>}
+          {loading && <TableRow><TableCell colSpan={10}>Carregando...</TableCell></TableRow>}
+          {!loading && !rows.length && <TableRow><TableCell colSpan={10} className="text-muted-foreground">Nenhum andaime registrado nos RDOs do período.</TableCell></TableRow>}
           {rows.map((r) => (
             <TableRow key={r.id}>
               <TableCell>{br(r.date)}</TableCell>
               <TableCell>{r.ord || "—"}</TableCell>
+              <TableCell>{r.tag || "—"}</TableCell>
               <TableCell>{r.op === "desmontagem" ? "Desmontagem" : "Montagem"}</TableCell>
               <TableCell className="text-right">{n2(r.l)}</TableCell>
               <TableCell className="text-right">{n2(r.w)}</TableCell>

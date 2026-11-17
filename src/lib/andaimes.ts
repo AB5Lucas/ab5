@@ -56,10 +56,22 @@ export function depreciation(acq: number, lifeMonths: number, acquiredAt: string
 }
 
 /** Número da ordem após "ORDEM": só dígitos; tolera espaços/letras/pontuação isolados entre os números. Sem número → "". */
-export function parseOrder(text: string | null | undefined): string {
-  const m = /ORDEM[^0-9]{0,8}?([0-9](?:[\s.\-\/_a-zA-Z]?[0-9])*)/i.exec(text ?? "");
-  return m?.[1] ? m[1].replace(/\D/g, "") : "";
+/**
+ * Valor escrito depois de um rótulo (ORDEM, TAG) na mesma linha, como foi digitado: "ORDEM:2202HO2" → 2202HO2,
+ * "ORDEM:NP" → NP. Número com espaços/pontos vira só os dígitos ("1234 5678" → 12345678). Nunca passa para a
+ * linha de baixo (antes "ORDEM:NP\nTAG:302BV08" virava 30208, os números da TAG).
+ */
+function labeledValue(label: string, text: string | null | undefined): string {
+  for (const line of String(text ?? "").split(/\r?\n/)) {
+    const m = new RegExp(`\\b${label}\\b\\s*(?:n[º°o]\\.?\\s*)?[:=\\-–]?\\s*([A-Z0-9][A-Z0-9.\\-\\/_]*(?:\\s+\\d[\\d.\\-\\/]*)*)`, "i").exec(line);
+    if (!m?.[1]) continue;
+    const v = m[1].trim().replace(/[.\-\/_]+$/, "");
+    return /^[\d\s.\-\/]+$/.test(v) ? v.replace(/\D/g, "") : v.replace(/\s+/g, " ").toUpperCase();
+  }
+  return "";
 }
+export const parseOrder = (text: string | null | undefined) => labeledValue("ORDEM", text);
+export const parseTag = (text: string | null | undefined) => labeledValue("TAG", text);
 
 /** Fluxo único da solicitação: etapa → responsável e ação esperada */
 export type FlowActor = "coordenador" | "patio" | "solicitante";

@@ -22,12 +22,18 @@ t2("depreciação linear limitada", () => {
   e2(depreciation(1200, 12, "2020-01-01", "2026-07-01")).toBe(1200);
 });
 
-import { parseOrder } from "./andaimes";
-t2("ordem sempre numérica", () => {
+import { parseOrder, parseTag } from "./andaimes";
+t2("ordem e tag como digitadas, sem passar para a linha de baixo", () => {
   e2(parseOrder("ORDEM 12345678")).toBe("12345678");
   e2(parseOrder("ordem: 1234 5678 montagem")).toBe("12345678");
-  e2(parseOrder("ORDEM nº 12a34")).toBe("1234");
-  e2(parseOrder("ORDEM pendente")).toBe("");
+  e2(parseOrder("ORDEM nº 12a34")).toBe("12A34");
+  e2(parseOrder("ORDEM:2202HO2\nTAG:302BC006")).toBe("2202HO2");
+  e2(parseOrder("ORDEM:NP\nTAG:302BV08\n")).toBe("NP");
+  e2(parseTag("ORDEM:NP\nTAG:302BV08\n")).toBe("302BV08");
+  e2(parseTag("ORDEM:22131699\nTAG:302CIL1-777")).toBe("302CIL1-777");
+  e2(parseTag("Montagem de andaime\nTag: 3092H2 80\nOrdem: 23067978")).toBe("3092H2 80");
+  e2(parseOrder("Montagem de andaime\nTag: 3092H2 80\nOrdem: 23067978")).toBe("23067978");
+  e2(parseOrder("ORDEM:\nTAG:123")).toBe("");
   e2(parseOrder(null)).toBe("");
 });
 

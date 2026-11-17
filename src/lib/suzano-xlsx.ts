@@ -118,7 +118,7 @@ export async function exportSuzanoApontamento(rows: ApontRow[], meta: ApontMeta)
   await download(zip, name);
 }
 
-export type ProdRow = { date: string; ord: string; op: string; l: number; w: number; h: number; vol: number; people: number };
+export type ProdRow = { date: string; ord: string; tag?: string; op: string; l: number; w: number; h: number; vol: number; people: number };
 
 /** Produtividade (abas RESUMO, RDO e MEDIA GERAL): andaimes do RDO; o resumo, a média e o gráfico são as fórmulas do modelo. */
 export async function buildSuzanoProdutividade(rows: ProdRow[], ym: string, url = prodUrl) {
@@ -133,7 +133,7 @@ export async function buildSuzanoProdutividade(rows: ProdRow[], ym: string, url 
       A: { n: excelSerial(r.date) }, B: /^\d+$/.test(r.ord) ? { n: Number(r.ord) } : r.ord ? { s: r.ord } : null,
       C: { s: r.op === "desmontagem" ? "Desmontagem" : "Montagem" }, D: { n: r.l }, E: { n: r.w }, F: { n: r.h },
       G: { n: Math.round(r.vol * 100) / 100 }, H: { n: r.people },
-      I: { f: `IF(C${n}="MONTAGEM",G${n},0)` }, J: { f: `IF(C${n}="DESMONTAGEM",G${n},0)` }, K: null,
+      I: { f: `IF(C${n}="MONTAGEM",G${n},0)` }, J: { f: `IF(C${n}="DESMONTAGEM",G${n},0)` }, K: r.tag ? { s: `TAG: ${r.tag}` } : null,
     });
   });
   const lastRdo = 1 + Math.max(1, rows.length);
