@@ -7,7 +7,7 @@ import { resplitClient } from "@/lib/resplit";
 import { laborCost, nightHours, ENCARGOS } from "@/lib/labor-cost";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { workVtDefault } from "@/lib/transport-rules";
-import { effectiveCity, lodgingBlocksBenefits, lodgingIndex, type LodgingStay } from "@/lib/lodging";
+import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingIndex, type LodgingStay } from "@/lib/lodging";
 
 /** Motor de cálculo de Resultados — usado pela página Resultados e pelo Financeiro (mesma lógica). */
 export const TAX_RATE = 0.1867;
@@ -71,7 +71,7 @@ const RESPLIT_AT = new Map<string, number>();
 /** Query-scoped shared inputs: no singleton cache across users or requests. */
 export async function loadResultShared() {
   const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations, lodgingStays] = await Promise.all([
-    fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled, positions(name)").range(a, b)),
     fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("schedule_id, collaborator_id, daily_schedules(schedule_date)").in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b)),
     fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
     supabase.from("transport_voucher_rules").select("*").eq("active", true),
@@ -111,7 +111,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
         fetchAll<any>((a, b) => supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", workIds).order("entry_date", { ascending: false }).order("id").range(a, b)),
-        shared ? Promise.resolve(shared.people) : fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled").range(a, b)),
+        shared ? Promise.resolve(shared.people) : fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled, positions(name)").range(a, b)),
         w.client_id ? supabase.from("works").select("id, monthly_enabled, night_shift").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
@@ -498,6 +498,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     // Alojados: Americana na Suzano = sem VT e sem prêmio; senão VT/prêmio pela cidade do alojamento.
     const lodgingAt = lodgingIndex((d.lodgingStays ?? []) as LodgingStay[]);
     const lodgingBlocked = (id: string, date: string) => lodgingBlocksBenefits(lodgingAt(id, date), d.client?.name);
+    const vtNever = (id: string, date: string) => lodgingBlocksVtAlways(lodgingAt(id, date), person.get(id)?.positions?.name);
     const homeCityOf = (id: string, date: string) => effectiveCity(person.get(id)?.city, lodgingAt(id, date));
     // Marcação de VT vale para o cliente no dia (qualquer serviço do cliente marcado)
     const workVt = new Map<string, boolean>();
@@ -518,7 +519,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const p = person.get(a.collaborator_id);
       const pouso = String(homeCityOf(a.collaborator_id, date) ?? "").toLowerCase().includes("pouso alegre");
       const base = p?.vt_enabled === false || lodgingBlocked(a.collaborator_id, date) ? false : workVtDefault(workVt.get(a.schedule_id), d.client?.needs_transport_voucher) || pouso;
-      if (!(a.vt_override ?? base)) continue;
+      if (!(a.vt_override ?? base) || vtNever(a.collaborator_id, date)) continue;
       const cost = vtDay(!!a.driver) * fraction(a, date);
       if (!cost) continue;
       const v = vtByDate.get(date) ?? { people: 0, cost: 0 };
@@ -586,7 +587,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         const mo = hours * (rate.get(id) ?? 0) * enc(id) * shareF;
         const p = person.get(id);
         const blockedL = lodgingBlocked(id, date);
-        const vt = !paysVt || p?.vt_enabled === false || blockedL ? 0 : vtCost * shareF;
+        const vt = !paysVt || p?.vt_enabled === false || blockedL || vtNever(id, date) ? 0 : vtCost * shareF;
         const dist = distF(homeCityOf(id, date), d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
         const tb = p?.travel_bonus_enabled === false || blockedL ? 0
           : (d.tbRules ?? []).filter((x: any) => rIn(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0) * shareF;

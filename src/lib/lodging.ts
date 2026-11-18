@@ -35,6 +35,10 @@ export function lodgingIndex(stays: LodgingStay[]) {
 /** Cidade que vale para VT e prêmio viagem: a do alojamento, se estiver alojado; senão a do cadastro. */
 export const effectiveCity = (city: string | null | undefined, lodging: Lodging | null) => (lodging ? LODGING_CITY[lodging] : city ?? null);
 
+/** Montador (cargo com "Montador") alojado em Mogi Guaçu: nunca recebe VT, em nenhuma obra. */
+export const isMontador = (position: string | null | undefined) => /MONTADOR/.test(plain(position));
+export const lodgingBlocksVtAlways = (lodging: Lodging | null, position: string | null | undefined) => lodging === "mogi_guacu" && isMontador(position);
+
 /** Alojado em Americana trabalhando na Suzano: sem VT e sem prêmio viagem. */
 export const lodgingBlocksBenefits = (lodging: Lodging | null, clientName: string | null | undefined) =>
   lodging === "americana" && isSuzanoClient(clientName);

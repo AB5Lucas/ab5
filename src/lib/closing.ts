@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { loadBuiltTransport, vtFor, driverBonusFor, workVtDefault } from "@/lib/transport-rules";
-import { effectiveCity, lodgingBlocksBenefits, lodgingIndex, type LodgingStay } from "@/lib/lodging";
+import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingIndex, type LodgingStay } from "@/lib/lodging";
 
 /** Fechamento: competência = dia 26 do mês anterior até 25 do mês selecionado. */
 export function periodOf(month: string) {
@@ -54,7 +54,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
 
   const [allocs, entries, workVt, boxVtR, personVtR, holidays, daysOff, vacations, leaves, rdoWf, vtRules, tbRules, adjs] = await Promise.all([
     ids.length ? all<any>((f, t) => supabase.from("daily_allocations")
-      .select("collaborator_id, schedule_id, work_id, driver, overnight, vt_override, travel_bonus_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled, vt_always_full, travel_bonus_enabled), works(name, city, distance_km, client_id, clients(name, city, distance_km, needs_transport_voucher))")
+      .select("collaborator_id, schedule_id, work_id, driver, overnight, vt_override, travel_bonus_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled, vt_always_full, travel_bonus_enabled, positions(name)), works(name, city, distance_km, client_id, clients(name, city, distance_km, needs_transport_voucher))")
       .in("schedule_id", ids).order("id").range(f, t)) : [],
     ids.length ? all<any>((f, t) => supabase.from("daily_status_entries")
       .select("schedule_id, collaborator_id, box_key, collaborators(full_name, registration_number)").in("schedule_id", ids).order("id").range(f, t)) : [],
@@ -143,7 +143,8 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     const homeCity = effectiveCity(cc?.city, lodging);
     const base = cc?.vt_enabled === false || blocked ? false : (workVtDefault(vtWork.get(`${a.schedule_id}|${a.work_id}`), a.works?.clients?.needs_transport_voucher) || (homeCity ?? "").toLowerCase().includes("pouso alegre"));
     // VT cheio (cadastro): todo dia trabalhado paga VT, em qualquer obra, com ou sem transporte da empresa.
-    const pays = cc?.vt_always_full ? true : vtFor(transport, a.works?.client_id, date, a.collaborator_id, !!(a.vt_override ?? base));
+    // Montador alojado em Mogi Guaçu: nunca VT (vale mais que VT cheio e marcação à mão).
+    const pays = lodgingBlocksVtAlways(lodging, cc?.positions?.name) ? false : cc?.vt_always_full ? true : vtFor(transport, a.works?.client_id, date, a.collaborator_id, !!(a.vt_override ?? base));
     r.vtRows.push({ date, work, pays: !!pays, value: pays ? perDay(a.driver, 1) : 0 });
     const dist = distFor(homeCity, a.works?.clients?.city ?? a.works?.city, Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0));
     const travelOn = a.travel_bonus_override ?? (blocked ? false : (travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? prizeFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)) > 0));

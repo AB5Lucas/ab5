@@ -59,7 +59,7 @@ import { buildDistanceLookup } from "@/lib/city-distance";
 import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
 import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
 import { WeeklyDaysOffDialog } from "@/components/weekly-days-off-dialog";
-import { effectiveCity, lodgingBlocksBenefits, lodgingOn, LODGING_LABEL, LODGING_TAG, type LodgingStay } from "@/lib/lodging";
+import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingOn, LODGING_LABEL, LODGING_TAG, type LodgingStay } from "@/lib/lodging";
 import { LodgingDialog } from "@/components/lodging-dialog";
 import { BedDouble } from "lucide-react";
 import {
@@ -483,14 +483,16 @@ export function SchedulePlannerBoard({
   const pousoIds = useQuery({
     queryKey: ["pouso-alegre-collabs"],
     queryFn: async () => {
-      const { data } = await supabase.from("collaborators").select("id, city, vt_enabled");
+      const { data } = await supabase.from("collaborators").select("id, city, vt_enabled, positions(name)");
       const pouso = new Set<string>();
       const noVt = new Set<string>();
+      const position = new Map<string, string>();
       for (const r of data ?? []) {
+        position.set(r.id, (r.positions as { name: string } | null)?.name ?? "");
         if (r.vt_enabled === false) noVt.add(r.id);
         else if ((r.city ?? "").toLowerCase().includes("pouso alegre")) pouso.add(r.id);
       }
-      return { pouso, noVt };
+      return { pouso, noVt, position };
     },
   });
   // Alojamentos no dia (Americana: sem VT/prêmio na Suzano; Mogi Guaçu: como morador de Mogi Guaçu).
@@ -503,6 +505,7 @@ export function SchedulePlannerBoard({
     lodgingBlocksBenefits(lodgingOf(collaboratorId), ctx.data?.works.find((w) => w.id === workId)?.clients?.name);
   const defaultAllocVt = (workId: string, collaboratorId: string) => {
     if (pousoIds.data?.noVt.has(collaboratorId) || lodgingBlocked(workId, collaboratorId)) return false;
+    if (lodgingBlocksVtAlways(lodgingOf(collaboratorId), pousoIds.data?.position.get(collaboratorId))) return false;
     const lodging = lodgingOf(collaboratorId);
     // Alojado vale a cidade do alojamento (não a do cadastro) para a regra de Pouso Alegre.
     const pouso = lodging ? false : pousoIds.data?.pouso.has(collaboratorId) ?? false;
