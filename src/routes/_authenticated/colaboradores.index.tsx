@@ -226,7 +226,9 @@ const nn = (v: string) => (v.trim() === "" ? null : v.trim());
 const ref = (v: string) => (v === NONE ? null : v);
 
 function CollaboratorsPage() {
-  const { canWrite, isAdmin } = useCurrentUser();
+  const { canWrite, role } = useCurrentUser();
+  // Valor hora/salário: só administrador e coordenador veem; para os demais o campo fica borrado e não é gravado.
+  const canSeeSalary = role === "admin" || role === "coordenador";
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string[]>(["active"]);
@@ -316,7 +318,7 @@ function CollaboratorsPage() {
         cpf: nn(form.cpf),
         city: titleCaseOrNull(form.city ?? ""),
         rg: nn(form.rg),
-        salary: form.salary.trim() === "" ? null : Number(form.salary.replace(",", ".")),
+        ...(canSeeSalary ? { salary: form.salary.trim() === "" ? null : Number(form.salary.replace(",", ".")) } : {}),
         contract_type: form.contract_type === NONE ? null : (form.contract_type as "efetivo" | "pj" | "intermitente"),
         phone: nn(form.phone),
         email: nn(form.email),
@@ -414,7 +416,7 @@ function CollaboratorsPage() {
           driver_license_category: emptyToNull(r["cnh_categoria"] ?? ""),
           driver_license_expiry: parseDate(r["cnh_validade"] ?? ""),
           rg: emptyToNull(r["rg"] ?? ""),
-          salary: parseNum(r["salario"] ?? ""),
+          ...(canSeeSalary ? { salary: parseNum(r["salario"] ?? "") } : {}),
           contract_type: contractFromText(r["tipo_contrato"] ?? ""),
           notes: emptyToNull(r["observacoes"] ?? ""),
         },
@@ -447,7 +449,7 @@ function CollaboratorsPage() {
             <ExportCollaboratorsDialog
               rows={filtered}
               ctx={{ names: nameById, contractLabels: CONTRACT_LABELS }}
-              isAdmin={isAdmin}
+              isAdmin={canSeeSalary}
               disabled={collaborators.isLoading || !filtered.length}
             />
             {canWrite && (
@@ -736,13 +738,17 @@ function CollaboratorsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="salary">Valor hora (R$)</Label>
-              <Input
-                id="salary"
-                inputMode="decimal"
-                value={form.salary}
-                onChange={(e) => set("salary", e.target.value.replace(/[^\d.,]/g, ""))}
-                placeholder="11,22"
-              />
+              {canSeeSalary ? (
+                <Input
+                  id="salary"
+                  inputMode="decimal"
+                  value={form.salary}
+                  onChange={(e) => set("salary", e.target.value.replace(/[^\d.,]/g, ""))}
+                  placeholder="11,22"
+                />
+              ) : (
+                <Input id="salary" disabled value="00,00" className="select-none blur-sm" aria-label="Valor hora oculto" title="Visível só para administradores e coordenadores" />
+              )}
             </div>
 
             <div className="space-y-2">
