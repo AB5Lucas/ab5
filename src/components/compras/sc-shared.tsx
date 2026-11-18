@@ -362,7 +362,7 @@ export function ScRemoveDialog({ row, onClose, onConfirm, pending }: { row: ScRo
         <AlertDialogHeader>
           <AlertDialogTitle>{del ? "Apagar esta solicitação?" : "Cancelar esta solicitação?"}</AlertDialogTitle>
           <AlertDialogDescription>
-            {row?.number}. {del ? "Ela ainda não foi enviada e será apagada com os itens." : "Ela já foi enviada: fica no histórico com o status CANCELADA e sai do autorizante e do Comprador."}
+            {row?.number}. {del ? "Ela ainda não foi enviada e será apagada com os itens." : "Ela já foi enviada: fica no histórico com o status CANCELADA e sai do validador e do Comprador."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

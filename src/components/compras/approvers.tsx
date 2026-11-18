@@ -13,8 +13,8 @@ const NONE = "__none__";
 type Cfg = { requester_id: string; needs_approval: boolean; self_approve: boolean; substitute_id: string | null };
 
 /**
- * Autorização por solicitante. O autorizante é o gestor do cliente da SC (cadastro do serviço); aqui fica só:
- * precisa de autorizante (desligado = vai direto para Compras) e o substituto, que recebe as SCs
+ * Validação por solicitante. O validador é o gestor do cliente da SC (cadastro do serviço); aqui fica só:
+ * precisa de validador (desligado = vai direto para Compras) e o substituto, que recebe as SCs
  * enquanto o gestor está de férias na Programação (ou sempre, se o gestor não tem usuário no sistema).
  */
 export function ApproversPanel() {
@@ -44,8 +44,8 @@ export function ApproversPanel() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        O autorizante de cada SC é o <b>gestor do cliente</b> (cadastro do serviço). Aqui você define, por solicitante, se a SC precisa de
-        autorizante (desligado: vai direto para o Comprador) e o <b>substituto</b>, que recebe as SCs enquanto o gestor está de férias na
+        O validador de cada SC é o <b>gestor do cliente</b> (cadastro do serviço). Aqui você define, por solicitante, se a SC precisa de
+        validador (desligado: vai direto para o Comprador) e o <b>substituto</b>, que recebe as SCs enquanto o gestor está de férias na
         Programação.
       </p>
       <div className="space-y-1">
@@ -60,7 +60,7 @@ export function ApproversPanel() {
           <TableHeader>
             <TableRow>
               <TableHead>Solicitante</TableHead>
-              <TableHead className="text-center">Precisa de autorizante</TableHead>
+              <TableHead className="text-center">Precisa de validador</TableHead>
               <TableHead className="w-72">Substituto (férias do gestor)</TableHead>
             </TableRow>
           </TableHeader>
@@ -74,7 +74,7 @@ export function ApproversPanel() {
                     <div className="text-xs text-muted-foreground">{u.email}</div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Switch checked={c.needs_approval} onCheckedChange={(v) => save.mutate({ requester: u.id, patch: { needs_approval: v } })} aria-label="Precisa de autorizante" />
+                    <Switch checked={c.needs_approval} onCheckedChange={(v) => save.mutate({ requester: u.id, patch: { needs_approval: v } })} aria-label="Precisa de validador" />
                   </TableCell>
                   <TableCell>
                     <Select value={c.substitute_id ?? NONE} disabled={!c.needs_approval}

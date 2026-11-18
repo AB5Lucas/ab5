@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { linkPurchaseOrderFile } from "@/lib/purchase-orders.functions";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Camera, Check, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Camera, Check, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
@@ -82,7 +84,10 @@ function Page() {
     return orders.length ? `${orders[0]}${orders.length > 1 ? "…" : ""} - ${w.name}` : w.name;
   };
   const workName = useMemo(() => new Map((works.data ?? []).map((w) => [w.id, workLabel(w)])), [works.data]);
-  const editable = !!r && r.requester_id === user?.id && r.stage === "rascunho";
+  const isDraftOwner = !!r && r.requester_id === user?.id && r.stage === "rascunho";
+  // O validador (gestor ou substituto) também pode editar a SC enquanto ela está com ele, antes de validar.
+  const isValidator = !!r && !!user?.id && r.stage === "aprovacao" && (r.approver_id === user.id || r.substitute_id === user.id);
+  const editable = isDraftOwner || isValidator;
   const isBuyer = !!r && r.stage === "compras" && canAccess("/compras/comprador");
 
   const [rows, setRows] = useState<Draft[]>([]);
@@ -92,16 +97,17 @@ function Page() {
   const [removing, setRemoving] = useState<ScRow | null>(null);
   const navigate = useNavigate();
   const router = useRouter();
-  // Autorizante (gestor ou substituto) autoriza ou devolve aqui mesmo, como na aba Autorização.
+  // Validador (gestor ou substituto) valida ou devolve aqui mesmo, como na aba Validação.
   const [deciding, setDeciding] = useState<boolean | null>(null);
   const [decNotes, setDecNotes] = useState("");
   const decide = useMutation({
     mutationFn: async () => {
+      if (deciding && dirty) await saveItems(); // validador editou os itens: salva antes de validar
       const { error } = await supabase.rpc("purchase_request_decide", { _id: id, _approve: !!deciding, _notes: decNotes });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success(deciding ? "Autorizada e enviada para o Comprador" : "Devolvida ao solicitante");
+      toast.success(deciding ? "Validada e enviada para o Comprador" : "Devolvida ao solicitante");
       setDeciding(null); setDecNotes("");
       qc.invalidateQueries({ queryKey: ["sc-request", id] }); qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["menu-badges"] });
     },
@@ -149,7 +155,7 @@ function Page() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (to) => { toast.success(to === "compras" ? "Enviada direto para o Comprador" : "Enviada para o autorizante"); refresh(); },
+    onSuccess: (to) => { toast.success(to === "compras" ? "Enviada direto para o Comprador" : "Enviada para o validador"); refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const setItem = useMutation({
@@ -157,7 +163,23 @@ function Page() {
       const { error } = await supabase.rpc("purchase_item_set", { _item: item, _status: status, _order: order });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Item atualizado"); qc.invalidateQueries({ queryKey: ["sc-items", id] }); },
+    onSuccess: (_d, v) => {
+      toast.success("Item atualizado");
+      qc.invalidateQueries({ queryKey: ["sc-items", id] });
+      // Procura o arquivo quando o nº muda ou ainda não há arquivo ligado.
+      const prev = (items.data ?? []).find((it) => it.id === v.item);
+      if (v.order.trim() && (prev?.order_number !== v.order.trim() || !prev?.order_file_path)) findOrder.mutate({ item: v.item, order: v.order.trim() });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  // Pedido de compras: ao digitar o nº, o sistema procura o PDF na pasta 04 COMPRAS/02 PEDIDOS DE COMPRAS/<ano> do SharePoint.
+  const linkOrder = useServerFn(linkPurchaseOrderFile);
+  const findOrder = useMutation({
+    mutationFn: (v: { item: string; order: string }) => linkOrder({ data: v }),
+    onSuccess: (file) => {
+      qc.invalidateQueries({ queryKey: ["sc-items", id] });
+      file ? toast.success(`Pedido encontrado: ${file.name}`) : toast.warning("Pedido não encontrado na pasta de pedidos de compras");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const [orders, setOrders] = useState<Record<string, string>>({});
@@ -174,15 +196,7 @@ function Page() {
     change(i, { photo_path: path });
     toast.success("Foto anexada (salve os itens)");
   };
-  // Pedido de compras do item (Comprador): anexo em PDF ou foto.
-  const attachOrder = async (item: string, file: File) => {
-    const path = await putFile(file);
-    if (!path) return;
-    const { error } = await supabase.rpc("purchase_item_set_file", { _item: item, _path: path });
-    if (error) { toast.error(error.message); return; }
-    qc.invalidateQueries({ queryKey: ["sc-items", id] });
-    toast.success("Pedido de compras anexado");
-  };
+
   // Cotação ou orçamento (foto ou PDF) da verba do item, ou da verba total (i = -1).
   const uploadQuote = async (i: number, file: File) => {
     const path = await putFile(file);
@@ -198,6 +212,7 @@ function Page() {
     toast.success("Cotação anexada (salve os itens)");
   };
   const openPhoto = async (path: string) => {
+    if (/^https?:\/\//.test(path)) { window.open(path, "_blank", "noopener"); return; } // arquivo do SharePoint
     const { data, error } = await supabase.storage.from("purchase-photos").createSignedUrl(path, 600);
     if (error || !data) { toast.error(error?.message ?? "Foto indisponível"); return; }
     window.open(data.signedUrl, "_blank", "noopener");
@@ -223,7 +238,7 @@ function Page() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {/* Volta para a tela de onde veio (Solicitações, Autorização ou Comprador); aberta direto, vai para Solicitações. */}
+        {/* Volta para a tela de onde veio (Solicitações, Validação ou Comprador); aberta direto, vai para Solicitações. */}
         <Button variant="ghost" size="sm" onClick={() => (router.history.canGoBack() ? router.history.back() : navigate({ to: "/compras/solicitacoes" }))}>
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Button>
@@ -232,11 +247,11 @@ function Page() {
         <div className="ml-auto flex gap-2">
           {editable && <Button variant="outline" size="sm" onClick={() => setEditingHeader(true)}><Pencil className="h-4 w-4" /> Editar cabeçalho</Button>}
           {editable && <Button variant="outline" size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}><Save className="h-4 w-4" /> Salvar itens</Button>}
-          {editable && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
-          {editable && <Button variant="ghost" size="sm" onClick={() => setRemoving(r)}><Trash2 className="h-4 w-4 text-destructive" /> Apagar</Button>}
+          {isDraftOwner && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
+          {isDraftOwner && <Button variant="ghost" size="sm" onClick={() => setRemoving(r)}><Trash2 className="h-4 w-4 text-destructive" /> Apagar</Button>}
           {r.stage === "aprovacao" && !!user?.id && (r.approver_id === user.id || r.substitute_id === user.id) && (
             <>
-              <Button size="sm" onClick={() => setDeciding(true)}><Check className="h-4 w-4" /> Autorizar</Button>
+              <Button size="sm" onClick={() => setDeciding(true)}><Check className="h-4 w-4" /> Validar</Button>
               <Button variant="outline" size="sm" onClick={() => setDeciding(false)}><Undo2 className="h-4 w-4" /> Devolver</Button>
             </>
           )}
@@ -258,7 +273,7 @@ function Page() {
         </div>
         {r.notes && <p className="mt-3 rounded-md bg-muted p-2 text-xs"><b>Observações:</b> {r.notes}</p>}
         {r.stage === "rascunho" && r.return_notes && <p className="mt-2 rounded-md bg-destructive/10 p-2 text-xs text-destructive"><b>Devolvida</b> · {r.return_notes}</p>}
-        {r.approver_notes && r.stage !== "rascunho" && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Autorizante:</b> {r.approver_notes}</p>}
+        {r.approver_notes && r.stage !== "rascunho" && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Validador:</b> {r.approver_notes}</p>}
         {r.photo_path && <Button variant="outline" size="sm" className="mt-2" onClick={() => openPhoto(r.photo_path!)}><ImageIcon className="h-4 w-4" /> Foto da SC do TOTVS</Button>}
         <p className="mt-2 text-xs text-muted-foreground"><b>Observadores:</b> {(r.observer_ids ?? []).map((u) => userName.get(u) ?? "…").join(", ") || "—"}</p>
         {r.buyer_notes && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Comprador:</b> {r.buyer_notes}</p>}
@@ -345,14 +360,14 @@ function Page() {
                       <Input className="h-8" value={orders[saved.id] ?? saved.order_number ?? ""} onChange={(e) => setOrders((o) => ({ ...o, [saved.id]: e.target.value }))}
                         onBlur={() => { const v = orders[saved.id]; if (v !== undefined && v !== (saved.order_number ?? "")) setItem.mutate({ item: saved.id, status: saved.status, order: v }); }} />
                     ) : saved?.order_number ?? "—"}
-                    {saved && (saved.order_file_path || isBuyer) && (
+                    {saved && (saved.order_file_path || (isBuyer && saved.order_number)) && (
                       <div className="mt-1 flex items-center gap-1">
-                        {saved.order_file_path && <Button variant="ghost" size="sm" className="h-7 px-2" title="Ver pedido de compras" onClick={() => openPhoto(saved.order_file_path!)}><FileText className="h-4 w-4 text-primary" /> Pedido</Button>}
-                        {isBuyer && (
-                          <label className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-xs hover:bg-accent" title="Anexar o pedido de compras (PDF ou foto)">
-                            <Paperclip className="h-3.5 w-3.5 text-muted-foreground" /> {saved.order_file_path ? "Trocar" : "Anexar"}
-                            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void attachOrder(saved.id, f); e.target.value = ""; }} />
-                          </label>
+                        {saved.order_file_path && <Button variant="ghost" size="sm" className="h-7 px-2" title="Abrir o pedido de compras" onClick={() => openPhoto(saved.order_file_path!)}><FileText className="h-4 w-4 text-primary" /> Pedido</Button>}
+                        {isBuyer && saved.order_number && (
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={findOrder.isPending} title="Procurar de novo na pasta de pedidos de compras"
+                            onClick={() => findOrder.mutate({ item: saved.id, order: saved.order_number! })}>
+                            <RefreshCw className={`h-3.5 w-3.5 ${findOrder.isPending ? "animate-spin" : ""}`} /> {saved.order_file_path ? "" : "Procurar"}
+                          </Button>
                         )}
                       </div>
                     )}
@@ -405,7 +420,7 @@ function Page() {
       <Dialog open={deciding !== null} onOpenChange={(o) => { if (!o) { setDeciding(null); setDecNotes(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{deciding ? "Autorizar solicitação" : "Devolver ao solicitante"}</DialogTitle>
+            <DialogTitle>{deciding ? "Validar solicitação" : "Devolver ao solicitante"}</DialogTitle>
             <DialogDescription>{r.number}</DialogDescription>
           </DialogHeader>
           <div className="space-y-1">
@@ -414,7 +429,7 @@ function Page() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeciding(null)}>Cancelar</Button>
-            <Button disabled={decide.isPending || (!deciding && !decNotes.trim())} onClick={() => decide.mutate()}>{deciding ? "Autorizar" : "Devolver"}</Button>
+            <Button disabled={decide.isPending || (!deciding && !decNotes.trim())} onClick={() => decide.mutate()}>{deciding ? "Validar" : "Devolver"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

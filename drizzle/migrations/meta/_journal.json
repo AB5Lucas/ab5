@@ -862,6 +862,13 @@
       "when": 1795400019000,
       "tag": "0122_purchase_order_file",
       "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1795400020000,
+      "tag": "0123_purchase_validator_edit",
+      "breakpoints": true
     }
   ]
 }

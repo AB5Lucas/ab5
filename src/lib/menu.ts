@@ -108,12 +108,12 @@ const RAW_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    // Solicitações de compra (SC): solicitante → Autorização (gestor do cliente) → Comprador (subaba Autorizantes). Relatório = a antiga aba Compras (mesma chave de acesso).
+    // Solicitações de compra (SC): solicitante → Validação (gestor do cliente) → Comprador (subaba Validadores). Relatório = a antiga aba Compras (mesma chave de acesso).
     label: "Compras",
     icon: ShoppingCart,
     items: [
       { title: "Solicitações", url: "/compras/solicitacoes", icon: FilePlus },
-      { title: "Autorização", url: "/compras/aprovacao", icon: BadgeCheck },
+      { title: "Validação", url: "/compras/aprovacao", icon: BadgeCheck },
       { title: "Comprador", url: "/compras/comprador", icon: PackageCheck },
       { title: "Relatório", url: "/obras/compras", icon: ChartPie },
     ],
@@ -162,7 +162,7 @@ export function menuUrlFor(pathname: string): string | null {
   if (pathname.startsWith("/programacao")) return "/programacao/diaria";
   if (pathname === "/clientes") return "/obras";
   if (pathname.startsWith("/ausencias")) return "/ausencias";
-  // Página de uma SC: a RLS decide quem vê (solicitante, observador, autorizante ou comprador), sem trava de página.
+  // Página de uma SC: a RLS decide quem vê (solicitante, observador, validador ou comprador), sem trava de página.
   if (pathname.startsWith("/compras/solicitacoes/")) return null;
   return null;
 }

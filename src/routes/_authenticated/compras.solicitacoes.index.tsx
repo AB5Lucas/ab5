@@ -36,13 +36,13 @@ function Page() {
   const rows = scoped.filter((r) => status === "all" || r.status === status);
   const send = useMutation({
     mutationFn: async (id: string) => { const { data, error } = await supabase.rpc("purchase_request_send", { _id: id }); if (error) throw error; return data; },
-    onSuccess: (to) => { toast.success(to === "compras" ? "Enviada direto para o Comprador" : "Enviada para o autorizante"); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
+    onSuccess: (to) => { toast.success(to === "compras" ? "Enviada direto para o Comprador" : "Enviada para o validador"); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   const remove = useScRemove(() => setRemoving(null));
   return (
     <div className="space-y-4">
-      <PageHeader title="Solicitações" description="Suas solicitações e as que você acompanha em cópia. Enviar manda para o autorizante (gestor do cliente); depois de autorizada, vai para o Comprador. Enviada, só volta a ser editável se o autorizante ou o Comprador devolver." />
+      <PageHeader title="Solicitações" description="Suas solicitações e as que você acompanha em cópia. Enviar manda para o validador (gestor do cliente); depois de validada, vai para o Comprador. Enviada, só volta a ser editável se o validador ou o Comprador devolver." />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label className="block text-xs">Acompanhar</Label>

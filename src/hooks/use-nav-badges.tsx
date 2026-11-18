@@ -50,7 +50,7 @@ function useBadgeData() {
       const empty: Counts = { byKind: { agendamentos: zero, aso: zero, int: zero, trn: zero, epi: zero }, conference: zero, purchases: 0, orders: 0, billingInd: 0, billingSrv: 0 };
       // Contagens de Documentação, Conferência, Compras, Pedidos e Faturamento vêm prontas do banco
       // (menu_badge_counts, com a RLS do usuário); antes o navegador baixava as tabelas inteiras.
-      // SCs aguardando a minha autorização (gestor ou substituto; a RLS só devolve as que posso ver).
+      // SCs aguardando a minha validação (gestor ou substituto; a RLS só devolve as que posso ver).
       const uid = (await supabase.auth.getSession()).data.session?.user.id ?? "";
       const [counts, fleetParts, scPend, scOpenRows] = await Promise.all([
         can.docs || can.purchases || can.orders || can.billing
@@ -60,7 +60,7 @@ function useBadgeData() {
         when(can.fleet, () => fetchFleetBalanceParts().then((p) => [p])),
         when(can.scApproval && !!uid, async () => ((await supabase.from("purchase_requests").select("due_date, approver_id, substitute_id").eq("stage", "aprovacao")).data ?? [])
           .filter((r) => r.approver_id === uid || r.substitute_id === uid)),
-        // SCs em Compras ainda não compradas (as que a RLS deixa ver: próprias, em cópia, autorizadas; Comprador/admin veem todas).
+        // SCs em Compras ainda não compradas (as que a RLS deixa ver: próprias, em cópia, validadas; Comprador/admin veem todas).
         when(can.scOpen, async () => (await supabase.from("purchase_requests").select("due_date, requester_id, observer_ids").eq("stage", "compras")
           .not("status", "in", '("COMPRA EFETIVADA","ALMOXARIFADO","CANCELADA","RECUSADA")')).data ?? []),
       ]);
@@ -126,7 +126,7 @@ export function useMenuBadges() {
     if (ft) out["/frota/notas"] = { count: 1, label: "!", tone: ft, title: `Saldo do posto: ${d.fleetSaldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}` };
     if (d.scApproval?.count) out["/compras/aprovacao"] = {
       count: d.scApproval.count, tone: d.scApproval.urgent ? "red" : "orange",
-      detail: `${d.scApproval.count} solicitação(ões) de compra para autorizar${d.scApproval.urgent ? ` · ${d.scApproval.urgent} com prazo em até 5 dias` : ""}`,
+      detail: `${d.scApproval.count} solicitação(ões) de compra para validar${d.scApproval.urgent ? ` · ${d.scApproval.urgent} com prazo em até 5 dias` : ""}`,
     };
     if (d.scOpen?.count) out["/compras/solicitacoes"] = {
       count: d.scOpen.count, tone: d.scOpen.late ? "red" : "orange",

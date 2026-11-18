@@ -54,9 +54,9 @@ const STATUS_DOT: Record<string, string> = {
 };
 export const statusDot = (s: string | null | undefined) => STATUS_DOT[s ?? ""] ?? "bg-zinc-400";
 
-/** Etapa do fluxo: rascunho (com o solicitante) → autorização ("aprovacao" no banco) → compras. */
+/** Etapa do fluxo: rascunho (com o solicitante) → validação ("aprovacao" no banco) → compras. */
 export type ScStage = "rascunho" | "aprovacao" | "compras" | "cancelada";
-export const STAGE_LABEL: Record<ScStage, string> = { rascunho: "Com o solicitante", aprovacao: "Com o autorizante", compras: "Em compras", cancelada: "Cancelada" };
+export const STAGE_LABEL: Record<ScStage, string> = { rascunho: "Com o solicitante", aprovacao: "Com o validador", compras: "Em compras", cancelada: "Cancelada" };
 
 /**
  * Controle de prazo (como a coluna CONTROLE DE PRAZO da planilha): não enviado ainda; compra efetivada ou

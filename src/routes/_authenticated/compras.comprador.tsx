@@ -7,12 +7,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApproversPanel } from "@/components/compras/approvers";
-import { Pill, ScTable, StatusFilter, statusCounts, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
+import { Pill, ScTable, todayISO, StatusFilter, statusCounts, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 import { SC_DONE_STATUSES, SC_STATUSES, statusClass } from "@/lib/purchase-requests";
 
 export const Route = createFileRoute("/_authenticated/compras/comprador")({
@@ -32,7 +33,7 @@ function Page() {
   const scoped = (list.data ?? []).filter((r) => scope === "todas" || (scope === "concluidas" ? done(r) : !done(r)));
   const rows = scoped.filter((r) => status === "all" || r.status === status);
   const [edit, setEdit] = useState<ScRow | null>(null);
-  const [form, setForm] = useState({ status: "", notes: "" });
+  const [form, setForm] = useState({ status: "", notes: "", date: "" });
   const [returning, setReturning] = useState<ScRow | null>(null);
   const [reason, setReason] = useState("");
   const giveBack = useMutation({
@@ -45,7 +46,7 @@ function Page() {
   });
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("purchase_request_set_status", { _id: edit!.id, _status: form.status, _notes: form.notes });
+      const { error } = await supabase.rpc("purchase_request_set_status", { _id: edit!.id, _status: form.status, _notes: form.notes, ...(form.date ? { _date: form.date } : {}) });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Status atualizado"); setEdit(null); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
@@ -53,11 +54,11 @@ function Page() {
   });
   return (
     <div className="space-y-4">
-      <PageHeader title="Comprador" description="Solicitações autorizadas (e as do TOTVS). Em aberto ficam até a compra efetivada, almoxarifado, cancelada ou recusada. Clique no número para tratar os itens e anexar o pedido de compras." />
+      <PageHeader title="Comprador" description="Solicitações validadas (e as do TOTVS). Em aberto ficam até a compra efetivada, almoxarifado, cancelada ou recusada. Clique no número para tratar os itens e anexar o pedido de compras." />
       <Tabs pageTabs defaultValue="solicitacoes">
         <TabsList>
           <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
-          <TabsTrigger value="aprovadores">Autorizantes</TabsTrigger>
+          <TabsTrigger value="aprovadores">Validadores</TabsTrigger>
         </TabsList>
         <TabsContent value="solicitacoes" className="mt-4 space-y-4">
           <div className="flex flex-wrap items-end gap-3">
@@ -77,7 +78,7 @@ function Page() {
           {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
             <ScTable rows={rows} clientName={clientName} actions={(r) => (
               <div className="flex justify-end gap-1">
-                <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "" }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
+                <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "", date: r.status_at }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
                 <Button size="sm" variant="ghost" title="Devolver ao solicitante para corrigir" onClick={() => { setReturning(r); setReason(""); }}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
               </div>
             )} />
@@ -105,15 +106,19 @@ function Page() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Status da solicitação</DialogTitle>
-            <DialogDescription>{edit?.number}. A data do status passa a ser a de hoje quando o status muda.</DialogDescription>
+            <DialogDescription>{edit?.number}. Ao mudar o status a data vira a de hoje; ajuste se a compra foi finalizada em outro dia.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Status</Label>
-              <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}>
+              <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v, date: v !== edit?.status ? todayISO() : edit?.status_at ?? f.date }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent className="max-h-80">{SC_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}><Pill className={statusClass(s.value)}>{s.value}</Pill></SelectItem>)}</SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="buyer-date">Data do status (ex.: dia em que a compra foi finalizada)</Label>
+              <Input id="buyer-date" type="date" className="w-48" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="buyer-notes">Observação do comprador</Label>
