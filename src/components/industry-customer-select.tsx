@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,10 +53,11 @@ export function industryToll(list: IndustryCustomer[] | undefined, name: string 
 export function IndustryCustomerSelect({ value, onChange, ariaLabel, disabled }: { value: string; onChange: (name: string) => void; ariaLabel?: string; disabled?: boolean }) {
   const customers = useIndustryCustomers();
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(false);
   const match = findIndustryCustomer(customers.data, value);
   const selected = match ? match.id : value.trim() ? LEGACY : "";
   return (
-    <>
+    <div className="flex items-center gap-1">
       <Select
         value={selected}
         disabled={!!disabled}
@@ -82,17 +83,28 @@ export function IndustryCustomerSelect({ value, onChange, ariaLabel, disabled }:
           ))}
         </SelectContent>
       </Select>
+      {match && !disabled && (
+        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" title="Editar cliente Indústria" aria-label="Editar cliente Indústria" onClick={() => setEditing(true)}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+      )}
       <AddIndustryCustomer open={adding} onOpenChange={setAdding} onCreated={(c) => onChange(c.name)} />
-    </>
+      {match && <AddIndustryCustomer key={match.id} editing={match} open={editing} onOpenChange={setEditing} onCreated={(c) => onChange(c.name)} />}
+    </div>
   );
 }
 
-function AddIndustryCustomer({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (c: IndustryCustomer) => void }) {
+/**
+ * Incluir ou editar (lápis) um cliente Indústria. Ao renomear, os dias da Transporte com o nome antigo passam para o
+ * novo (local e obras adicionais); km e pedágio novos são recalculados pela Transporte desde LOGISTICS_START.
+ */
+function AddIndustryCustomer({ open, onOpenChange, onCreated, editing }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (c: IndustryCustomer) => void; editing?: IndustryCustomer }) {
   const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [km, setKm] = useState("");
-  const [hasToll, setHasToll] = useState(false);
-  const [toll, setToll] = useState("");
+  const fmt = (n: number | null | undefined) => (n == null ? "" : String(n).replace(".", ","));
+  const [name, setName] = useState(editing?.name ?? "");
+  const [km, setKm] = useState(fmt(editing?.km_one_way));
+  const [hasToll, setHasToll] = useState(!!editing?.has_toll);
+  const [toll, setToll] = useState(fmt(editing?.toll_amount));
   const save = useMutation({
     mutationFn: async () => {
       const n = name.trim().replace(/\s+/g, " ");
@@ -101,16 +113,20 @@ function AddIndustryCustomer({ open, onOpenChange, onCreated }: { open: boolean;
       if (k != null && (!Number.isFinite(k) || k < 0)) throw new Error("Km de ida inválido.");
       const t = hasToll ? Number(toll.replace(",", ".")) : null;
       if (hasToll && (!Number.isFinite(t) || (t ?? 0) <= 0)) throw new Error("Informe o valor do pedágio.");
-      const { data, error } = await supabase.from("industry_customers").insert({ name: n.toUpperCase(), km_one_way: k, has_toll: hasToll, toll_amount: t })
-        .select("id, name, km_one_way, has_toll, toll_amount").single();
+      const row = { name: n.toUpperCase(), km_one_way: k, has_toll: hasToll, toll_amount: t };
+      const { data, error } = editing
+        ? await supabase.from("industry_customers").update(row).eq("id", editing.id).select("id, name, km_one_way, has_toll, toll_amount").single()
+        : await supabase.from("industry_customers").insert(row).select("id, name, km_one_way, has_toll, toll_amount").single();
       if (error) throw new Error(error.code === "23505" ? "Esse cliente já está cadastrado." : error.message);
+      if (editing && norm(editing.name) !== norm(row.name)) await renamePlace(editing.name, row.name);
       return data as IndustryCustomer;
     },
     onSuccess: (c) => {
       qc.invalidateQueries({ queryKey: ["industry-customers"] });
-      toast.success(`Cliente ${c.name} cadastrado`);
+      toast.success(editing ? `Cliente ${c.name} atualizado` : `Cliente ${c.name} cadastrado`);
+      if (editing) qc.invalidateQueries({ queryKey: ["vehicle-schedules"] });
       onCreated(c);
-      setName(""); setKm(""); setHasToll(false); setToll("");
+      if (!editing) { setName(""); setKm(""); setHasToll(false); setToll(""); }
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -119,7 +135,7 @@ function AddIndustryCustomer({ open, onOpenChange, onCreated }: { open: boolean;
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Adicionar cliente Indústria</DialogTitle>
+          <DialogTitle>{editing ? "Editar cliente Indústria" : "Adicionar cliente Indústria"}</DialogTitle>
           <DialogDescription>Lista própria do caminhão, separada dos clientes de Serviços. O km de ida e o pedágio contam × 2 (ida e volta); sem km, vale 100 km.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -149,4 +165,20 @@ function AddIndustryCustomer({ open, onOpenChange, onCreated }: { open: boolean;
       </DialogContent>
     </Dialog>
   );
+}
+
+/** Troca o nome do local nos dias da Transporte (local principal e obras adicionais). */
+async function renamePlace(oldName: string, newName: string) {
+  const { data, error } = await supabase.from("vehicle_schedules").select("id, external_place, extra_places")
+    .or(`external_place.ilike.${oldName.replace(/[,()]/g, " ")},extra_places.cs.{"${oldName.replace(/"/g, "")}"}`);
+  if (error) throw error;
+  for (const r of data ?? []) {
+    const patch: { external_place?: string; extra_places?: string[] } = {};
+    if (norm(r.external_place) === norm(oldName)) patch.external_place = newName;
+    if ((r.extra_places ?? []).some((p) => norm(p) === norm(oldName))) patch.extra_places = (r.extra_places ?? []).map((p) => (norm(p) === norm(oldName) ? newName : p));
+    if (Object.keys(patch).length) {
+      const { error: e } = await supabase.from("vehicle_schedules").update(patch).eq("id", r.id);
+      if (e) throw e;
+    }
+  }
 }
