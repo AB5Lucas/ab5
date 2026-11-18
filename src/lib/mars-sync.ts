@@ -24,6 +24,8 @@ export type MarsTable = "faturamento" | "ordens";
 export type MarsRow = {
   table: MarsTable; key: string; quote: string; order: string | null; requester: string; category: string;
   description: string; value: number; status: string; notes: string; contract: boolean; cancelled: boolean;
+  /** Sufixo do CC do serviço (coluna B da planilha); vazio = sem sufixo informado. */
+  suffix: string;
 };
 
 export const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
@@ -35,6 +37,17 @@ const isQuote = (s: string) => /^\d{2}\/\d+/.test(s);
 export function rowKey(r: Pick<MarsRow, "quote" | "order" | "description">) {
   if (isQuote(r.quote)) return `Q:${r.quote}`;
   return r.order ? `P:${r.order}:${norm(r.description)}` : `D:${norm(r.description)}`;
+}
+
+/**
+ * Coluna do sufixo do CC: título com "SUFIXO"/"SULFIXO"/"CC"/"CENTRO DE CUSTO"; sem título assim, a coluna B
+ * quando ela não é nenhuma das outras (Nº Orç., pedido, cliente…).
+ */
+export function suffixCol(cells: string[]): number {
+  const byName = cells.findIndex((c) => /SU?L?FIXO|^CC$|CENTRO DE CUSTO/.test(c));
+  if (byName >= 0) return byName;
+  const b = cells[1] ?? "";
+  return !b || !/ORC|PEDIDO|CLIENTE|CATEGORIA|DESCRI|VALOR|STATUS|OBSERVA|NF|DATA|RESPONS|PRAZO/.test(b) ? 1 : -1;
 }
 
 /** Lê as duas tabelas da aba do mês pelos títulos e cabeçalhos (colunas achadas pelo nome). */
@@ -55,6 +68,7 @@ export function parseMarsSheet(rows: unknown[][]): MarsRow[] {
           quote: at((c) => c.includes("ORC")), order: at((c) => c.includes("PEDIDO")), requester: at((c) => c === "CLIENTE"),
           category: at((c) => c === "CATEGORIA"), description: at((c) => c.startsWith("DESCRI")), value: at((c) => c === "VALOR"),
           status: at((c) => c === "STATUS"), notes: at((c) => c.startsWith("OBSERVA")),
+          suffix: suffixCol(cells),
         };
       }
       continue;
@@ -67,8 +81,9 @@ export function parseMarsSheet(rows: unknown[][]): MarsRow[] {
     const order = orderOf(get("order"));
     const status = String(get("status") ?? "").trim();
     const notes = String(get("notes") ?? "").trim();
+    const suffix = String(get("suffix") ?? "").replace(/\D/g, "");
     const r = {
-      table, quote, order, description, value, status, notes,
+      table, quote, order, description, value, status, notes, suffix,
       requester: String(get("requester") ?? "").trim(), category: String(get("category") ?? "").trim(),
       contract: /CONTRATO SANITATION/.test(norm(description)),
       cancelled: /CANCELAD/.test(norm(`${status} ${notes}`)),

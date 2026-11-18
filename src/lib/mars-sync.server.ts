@@ -60,9 +60,9 @@ async function applyMars(parsed: MarsRow[], ym: string) {
   if (ce) throw ce;
   if (!client) throw new Error(`Cliente ${MARS_CLIENT} não encontrado`);
   const { data: mgr } = await supabaseAdmin.from("collaborators").select("id").eq("full_name", MARS_MANAGER).maybeSingle();
-  const { data: worksData, error: we } = await supabaseAdmin.from("works").select("id, name, quote_number, orders, active, order_number, order_value").eq("client_id", client.id);
+  const { data: worksData, error: we } = await supabaseAdmin.from("works").select("id, name, quote_number, orders, active, order_number, order_value, cc_suffix").eq("client_id", client.id);
   if (we) throw we;
-  const works = (worksData ?? []) as (MarsWork & { order_number: string | null; order_value: number | null })[];
+  const works = (worksData ?? []) as (MarsWork & { order_number: string | null; order_value: number | null; cc_suffix?: string | null })[];
   const { data: mapped, error: me } = await supabaseAdmin.from("mars_sync_items").select("*");
   if (me) throw me;
   const byKey = new Map((mapped ?? []).map((m) => [m.key, m]));
@@ -127,12 +127,12 @@ async function applyMars(parsed: MarsRow[], ym: string) {
     const orders = [{ number: r.order ?? "", value: r.value, date }];
     newWorks.push({
       id, client_id: client.id, name: r.description.slice(0, 200), quote_number: r.quote || null, order_number: r.order, order_value: r.value,
-      orders, budget_items: EMPTY_BUDGET, status: "active", active: true, monthly_enabled: false,
+      orders, budget_items: EMPTY_BUDGET, status: "active", active: true, monthly_enabled: false, cc_suffix: r.suffix || null,
       manager_id: mgr?.id ?? null, supervisor_id: null,
       notes: [`MARS: ${r.requester}`, r.category].filter(Boolean).join(" · ") || null,
     });
     // Entra na lista para casar repetições na mesma leitura (mesmo pedido em outro orçamento continua sendo serviço próprio).
-    works.push({ id, name: r.description, quote_number: r.quote || null, orders: [], order_number: r.order, order_value: r.value });
+    works.push({ id, name: r.description, quote_number: r.quote || null, orders: [], order_number: r.order, order_value: r.value, cc_suffix: r.suffix || null });
     await upsertItem({ key: r.key, ...base(r), action: "created", work_id: id, synced_order: r.order, synced_value: r.value });
     created++;
   }
@@ -190,6 +190,22 @@ async function applyMars(parsed: MarsRow[], ym: string) {
     }).eq("id", w.id);
     if (error) throw error;
   }));
+  // Sufixo do CC (coluna B): serviço do item ainda sem sufixo recebe o da planilha (todas as linhas das duas tabelas,
+  // inclusive itens já lidos antes); nunca troca um sufixo já preenchido. Medição do contrato não mexe.
+  const itemWork = new Map(itemRows.map((x) => [String(x["key"]), x["work_id"] as string | null]));
+  const suffixFor = new Map<string, string>();
+  for (const r of parsed) {
+    if (!r.suffix || r.contract || r.cancelled) continue;
+    const wid = itemWork.get(r.key) ?? byKey.get(r.key)?.work_id ?? matchWork(r, works)?.id ?? null;
+    const w = wid ? works.find((x) => x.id === wid) : undefined;
+    if (!w || (w.cc_suffix ?? "").trim() || suffixFor.has(w.id) || newWorks.some((n) => n["id"] === w.id)) continue;
+    suffixFor.set(w.id, r.suffix);
+  }
+  await Promise.all([...suffixFor].map(async ([id, cc_suffix]) => {
+    const { error } = await supabaseAdmin.from("works").update({ cc_suffix }).eq("id", id);
+    if (error) throw error;
+  }));
+  if (suffixFor.size) notes.push(`Sufixo preenchido em ${suffixFor.size} serviço(s)`);
   if (itemRows.length) {
     const { error } = await supabaseAdmin.from("mars_sync_items").upsert(itemRows as never, { onConflict: "key" });
     if (error) throw error;

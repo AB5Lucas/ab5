@@ -67,3 +67,16 @@ describe("planilha da MARS", () => {
     expect(findScaffoldWork([{ id: "x", name: "Contrato Andaimes", quote_number: null, orders: [] }])?.id).toBe("x");
   });
 });
+
+describe("sufixo do CC (coluna B)", () => {
+  it("lê a coluna B como sufixo quando ela não é outra coluna", () => {
+    const rows = [
+      ["GESTÃO DE ORDENS DE SERVIÇOS"],
+      ["Nº ORÇ.", "SUFIXO", "N° PEDIDO", "CLIENTE", "CATEGORIA", "DESCRIÇÃO", "VALOR", "STATUS"],
+      ["26/600", "224", "4500780144", "Anderson", "Facilities", "REPAROS", 12000, "Em execução"],
+    ];
+    expect(parseMarsSheet(rows)[0]!.suffix).toBe("224");
+    const old = [["GESTÃO DE ORDENS DE SERVIÇOS"], ["Nº ORÇ.", "N° PEDIDO", "CLIENTE", "CATEGORIA", "DESCRIÇÃO", "VALOR"], ["26/600", "4500780144", "A", "F", "REPAROS", 1]];
+    expect(parseMarsSheet(old)[0]!.suffix).toBe("");
+  });
+});
