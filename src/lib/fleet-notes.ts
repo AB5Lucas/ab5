@@ -397,7 +397,11 @@ export function fuelRateio(opts: {
 export type CcSplitItem = { cc_code: string; item_account: string | null; label: string | null; pct: number };
 
 /** Placas que vão sempre para o mesmo centro de custo, sem rateio pela Transporte (pedido do usuário). */
-export const FIXED_PLATE_CC: Record<string, string> = { DAJ5I66: "2004221" };
+export const FIXED_PLATE_CC: Record<string, string> = {
+  DAJ5I66: "2004221",
+  // Diretoria (CC 2000, item conta 010)
+  FOY5H15: "2000", GEH0D16: "2000", RNT3F19: "2000", STW1E26: "2000", UQG2H16: "2000",
+};
 
 /** Rateio fixo a partir de CCs informados (à mão ou pela regra da placa): divide o valor pelas % (o último fecha os centavos). */
 export function fixedRateio(split: CcSplitItem[], total: number, day: string | null, rule: string, accounts: ItemAccount[]): Rateio {
