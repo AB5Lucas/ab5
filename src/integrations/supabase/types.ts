@@ -3567,6 +3567,8 @@ export type Database = {
           nature: string | null
           notes: string | null
           justification: string | null
+          validator_open_by: string | null
+          validator_open_at: string | null
           number: string
           priority: string | null
           request_date: string
@@ -3604,6 +3606,8 @@ export type Database = {
           nature?: string | null
           notes?: string | null
           justification?: string | null
+          validator_open_by?: string | null
+          validator_open_at?: string | null
           number: string
           priority?: string | null
           request_date?: string
@@ -3641,6 +3645,8 @@ export type Database = {
           nature?: string | null
           notes?: string | null
           justification?: string | null
+          validator_open_by?: string | null
+          validator_open_at?: string | null
           number?: string
           priority?: string | null
           request_date?: string
@@ -6011,6 +6017,8 @@ export type Database = {
       purchase_request_send: { Args: { _id: string }; Returns: string }
       purchase_item_set_file: { Args: { _item: string; _path: string }; Returns: undefined }
       purchase_request_return: { Args: { _id: string; _notes: string }; Returns: undefined }
+      purchase_request_recall: { Args: { _id: string }; Returns: undefined }
+      purchase_request_validator_open: { Args: { _id: string; _open: boolean }; Returns: undefined }
       purchase_request_create_totvs: { Args: { _number: string; _photo: string; _observers?: string[] }; Returns: string }
       purchase_request_cancel: { Args: { _id: string }; Returns: undefined }
       purchase_request_decide: { Args: { _id: string; _approve: boolean; _notes: string }; Returns: undefined }

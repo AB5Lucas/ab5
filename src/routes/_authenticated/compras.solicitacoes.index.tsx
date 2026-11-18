@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Ban, Plus, Send, Trash2 } from "lucide-react";
+import { Ban, Copy, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
@@ -43,9 +43,61 @@ function Page() {
     onError: (e: Error) => toast.error(e.message),
   });
   const remove = useScRemove(() => setRemoving(null));
+  const navigate = useNavigate();
+  const [editing, setEditing] = useState<ScRow | null>(null);
+  // Lápis: rascunho abre o cabeçalho; em validação, puxa de volta antes (bloqueado se o validador estiver com ela aberta).
+  const edit = useMutation({
+    mutationFn: async (r: ScRow) => {
+      if (r.stage === "aprovacao") {
+        const { error } = await supabase.rpc("purchase_request_recall", { _id: r.id });
+        if (error) throw error;
+        const { data } = await supabase.from("purchase_requests").select("*").eq("id", r.id).maybeSingle();
+        return (data as ScRow | null) ?? r;
+      }
+      return r;
+    },
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["menu-badges"] }); setEditing(r); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  // Copiar: SC nova (rascunho, número novo, minha) com o mesmo cabeçalho e itens; status, pedidos e datas ficam de fora.
+  const copy = useMutation({
+    mutationFn: async (r: ScRow) => {
+      const today = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+      const payload = {
+        category: r.category, nature: r.nature, priority: r.priority, client_id: r.client_id ?? "",
+        due_date: r.due_date && r.due_date >= today ? r.due_date : null, delivery_kind: r.delivery_kind, delivery_place: r.delivery_place ?? "",
+        notes: r.notes ?? "", justification: r.justification || "Cópia de " + r.number, observer_ids: r.observer_ids ?? [],
+      };
+      const { data: newId, error } = await supabase.rpc("purchase_request_create", { _p: payload as never });
+      if (error) throw error;
+      const { data: items, error: ie } = await supabase.from("purchase_request_items").select("*").eq("request_id", r.id).order("item_no");
+      if (ie) throw ie;
+      if (items?.length) {
+        const { error: ce } = await supabase.from("purchase_request_items").insert(items.map((i) => ({
+          request_id: newId as string, item_no: i.item_no, quantity: i.quantity, unit: i.unit, description: i.description, budget: i.budget,
+          notes: i.notes, work_id: i.work_id, cc_code: i.cc_code, photo_path: i.photo_path, quote_path: i.quote_path,
+        })));
+        if (ce) throw ce;
+      }
+      if (r.total_budget != null) await supabase.from("purchase_requests").update({ total_budget: r.total_budget }).eq("id", newId as string);
+      return newId as string;
+    },
+    onSuccess: (id) => {
+      toast.success("Cópia criada. Confira a data prazo e envie.");
+      qc.invalidateQueries({ queryKey: ["sc-requests"] });
+      navigate({ to: "/compras/solicitacoes/$id", params: { id } });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const copyBtn = (r: ScRow) => (
+    <Button size="icon" variant="ghost" className="h-8 w-8" title="Copiar para uma SC nova" aria-label="Copiar solicitação" disabled={copy.isPending} onClick={() => copy.mutate(r)}><Copy className="h-4 w-4" /></Button>
+  );
+  const editBtn = (r: ScRow) => (
+    <Button size="icon" variant="ghost" className="h-8 w-8" title={r.stage === "aprovacao" ? "Puxar de volta e editar (antes da validação)" : "Editar"} aria-label="Editar solicitação" disabled={edit.isPending} onClick={() => edit.mutate(r)}><Pencil className="h-4 w-4" /></Button>
+  );
   return (
     <div className="space-y-4">
-      <PageHeader title="Solicitações" description="Suas solicitações e as que você acompanha em cópia. Enviar manda para o validador (gestor do cliente); depois de validada, vai para o Comprador. Enviada, só volta a ser editável se o validador ou o Comprador devolver." />
+      <PageHeader title="Solicitações" description="Suas solicitações e as que você acompanha em cópia. Enviar manda para o validador (gestor do cliente); depois de validada, vai para o Comprador. Antes da validação você pode puxar de volta pelo lápis (fica bloqueado enquanto o validador está com ela aberta); depois, só se o validador ou o Comprador devolver. O botão de copiar cria uma SC nova igual." />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label className="block text-xs">Acompanhar</Label>
@@ -62,16 +114,23 @@ function Page() {
         <Button className="ml-auto" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nova</Button>
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
-        <ScTable rows={rows} clientName={clientName} showRequester={scope !== "minhas"} actions={(r) => r.requester_id !== uid ? null : r.stage === "rascunho" ? (
+        <ScTable rows={rows} clientName={clientName} showRequester={scope !== "minhas"} actions={(r) => r.requester_id !== uid ? <div className="flex justify-end">{copyBtn(r)}</div> : r.stage === "rascunho" ? (
           <div className="flex justify-end gap-1">
             <Button size="sm" disabled={send.isPending} onClick={() => send.mutate(r.id)}><Send className="h-3.5 w-3.5" /> Enviar</Button>
+            {editBtn(r)}
+            {copyBtn(r)}
             <Button size="icon" variant="ghost" className="h-8 w-8" title="Apagar" aria-label="Apagar solicitação" onClick={() => setRemoving(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
           </div>
-        ) : r.stage === "aprovacao" || r.stage === "compras" ? (
-          <Button size="sm" variant="outline" onClick={() => setRemoving(r)}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>
-        ) : null} />
+        ) : (
+          <div className="flex justify-end gap-1">
+            {r.stage === "aprovacao" && editBtn(r)}
+            {copyBtn(r)}
+            {(r.stage === "aprovacao" || r.stage === "compras") && <Button size="sm" variant="outline" onClick={() => setRemoving(r)}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}
+          </div>
+        )} />
       )}
       <ScHeaderDialog open={creating} onOpenChange={setCreating} />
+      <ScHeaderDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)} editing={editing} />
       <ScRemoveDialog row={removing} onClose={() => setRemoving(null)} pending={remove.isPending} onConfirm={(r) => remove.mutate(r)} />
     </div>
   );

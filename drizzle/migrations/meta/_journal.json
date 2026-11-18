@@ -925,6 +925,13 @@
       "when": 1795400028000,
       "tag": "0131_purchase_item_cc",
       "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1795400029000,
+      "tag": "0132_purchase_recall",
+      "breakpoints": true
     }
   ]
 }

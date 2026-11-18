@@ -50,6 +50,8 @@ function Page() {
   const req = useQuery({
     queryKey: ["sc-request", id],
     queryFn: async () => (await supabase.from("purchase_requests").select("*").eq("id", id).maybeSingle()).data as ScRow | null,
+    // Solicitante com a SC em validação: relê para saber se o validador abriu (bloqueia o "Puxar de volta").
+    refetchInterval: (q) => ((q.state.data as ScRow | null)?.stage === "aprovacao" ? 15_000 : false),
   });
   const items = useQuery({
     queryKey: ["sc-items", id],
@@ -88,6 +90,28 @@ function Page() {
   // O validador (gestor ou substituto) também pode editar a SC enquanto ela está com ele, antes de validar.
   const isValidator = !!r && !!user?.id && r.stage === "aprovacao" && (r.approver_id === user.id || r.substitute_id === user.id);
   const editable = isDraftOwner || isValidator;
+  // Validador com a SC aberta: avisa o banco a cada 30 s (vale 90 s); enquanto isso o solicitante não puxa de volta.
+  useEffect(() => {
+    if (!isValidator) return;
+    const ping = (open: boolean) => { void supabase.rpc("purchase_request_validator_open", { _id: id, _open: open }); };
+    ping(true);
+    const t = setInterval(() => ping(true), 30_000);
+    return () => { clearInterval(t); ping(false); };
+  }, [isValidator, id]);
+  const isRequesterWaiting = !!r && r.requester_id === user?.id && r.stage === "aprovacao";
+  const openBy = r?.validator_open_by && r.validator_open_at && Date.now() - new Date(r.validator_open_at).getTime() < 90_000 && r.validator_open_by !== user?.id
+    ? r.validator_open_by : null;
+  const recall = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("purchase_request_recall", { _id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("SC puxada de volta. Agora você pode editar e enviar de novo.");
+      qc.invalidateQueries({ queryKey: ["sc-request", id] }); qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["menu-badges"] });
+    },
+    onError: (e: Error) => { toast.error(e.message); qc.invalidateQueries({ queryKey: ["sc-request", id] }); },
+  });
   const isBuyer = !!r && r.stage === "compras" && canAccess("/compras/comprador");
 
   const [rows, setRows] = useState<Draft[]>([]);
@@ -255,9 +279,21 @@ function Page() {
               <Button variant="outline" size="sm" onClick={() => setDeciding(false)}><Undo2 className="h-4 w-4" /> Devolver</Button>
             </>
           )}
+          {isRequesterWaiting && (
+            <Button variant="outline" size="sm" disabled={!!openBy || recall.isPending} onClick={() => recall.mutate()}
+              title={openBy ? "Bloqueada: aberta para o validador" : "Volta para você editar; depois envie de novo"}>
+              <Undo2 className="h-4 w-4" /> Puxar de volta
+            </Button>
+          )}
           {r.requester_id === user?.id && (r.stage === "aprovacao" || r.stage === "compras") && <Button variant="outline" size="sm" onClick={() => setRemoving(r)}><Ban className="h-4 w-4" /> Cancelar SC</Button>}
         </div>
       </div>
+
+      {isRequesterWaiting && openBy && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <b>Solicitação bloqueada</b>: está aberta para o Validador <b>{userName.get(openBy) ?? "—"}</b>. Você poderá puxar de volta quando ele fechar.
+        </div>
+      )}
 
       <div className="panel p-4">
         <div className="mb-3 flex items-baseline justify-between gap-2 border-b border-border pb-2">
