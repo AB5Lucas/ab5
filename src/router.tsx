@@ -3,7 +3,7 @@ import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
 /** Consultas dos avisos do menu (use-nav-badges, use-schedule-alerts, use-service-distribution). */
-const MENU_BADGE_KEYS = [["menu-badges"], ["schedule-alerts", "next-business-day"], ["service-distribution"]];
+const MENU_BADGE_KEYS = [["menu-badges"], ["schedule-alerts"], ["service-distribution"]];
 
 export const getRouter = () => {
   // 30 s de cache: listas de apoio (clientes, obras...) não são relidas a cada tela; as gravações já invalidam o que mudam.
