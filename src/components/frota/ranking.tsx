@@ -71,7 +71,7 @@ export function DriverRanking() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        O motorista de cada abastecimento é o que estava com o veículo na Transporte naquele dia (ou no dia anterior, para abastecimento de madrugada); sem programação, vale o nome escrito na nota. Pontuação = % das notas entregues (100 = sempre entrega). Abastecimentos dos últimos {NOTE_GRACE_DAYS} dias ainda estão no prazo e não contam. Clique em quem tem pendência para ver os XML sem nota.
+        O motorista de cada abastecimento é o nome escrito no XML quando ele combina com um colaborador cadastrado; se não combinar, vale quem estava com o veículo na Transporte naquele dia (ou no dia anterior, para abastecimento de madrugada); sem nenhum dos dois, o nome escrito. Pontuação = % das notas entregues (100 = sempre entrega). Abastecimentos dos últimos {NOTE_GRACE_DAYS} dias ainda estão no prazo e não contam. Clique em quem tem pendência para ver os XML sem nota.
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <DateRangePicker id="rank-range" value={range} onChange={setRange} />
@@ -110,7 +110,7 @@ export function DriverRanking() {
                     <TableCell className="font-medium tabular-nums">{i + 1}º</TableCell>
                     <TableCell>
                       {r.name}
-                      {r.source === "nota" && <span className="block text-xs text-muted-foreground">pelo nome da nota (sem programação na Transporte)</span>}
+                      {r.key.startsWith("nome:") && <span className="block text-xs text-muted-foreground">nome da nota, sem cadastro que combine</span>}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{r.total}</TableCell>
                     <TableCell className="text-right tabular-nums">{r.delivered}</TableCell>

@@ -472,16 +472,16 @@ export function driverRanking(notes: RankingNote[], schedules: RankingSchedule[]
     const day = isoDay(n.issued_at);
     const plate = normalizePlate(n.plate_fix ?? n.plate ?? "") || null;
     const vehicleId = plate ? vehicleIdByPlate.get(plate) : undefined;
-    let driverId: string | null = null;
-    if (vehicleId && day) {
+    const written = (n.driver_fix ?? n.driver ?? "").trim();
+    // 1º o nome da nota quando casa com um só colaborador; senão o motorista do veículo na Transporte (dia, depois o anterior).
+    let driverId: string | null = written ? byWrittenName(written) : null;
+    let fromTransport = false;
+    if (!driverId && vehicleId && day) {
       for (const d of [day, addDays(day, -1)]) {
         const s = (byVehicleDay.get(`${vehicleId}|${d}`) ?? []).find((x) => x.driver_id) ?? null;
-        if (s?.driver_id) { driverId = s.driver_id; break; }
+        if (s?.driver_id) { driverId = s.driver_id; fromTransport = true; break; }
       }
     }
-    const written = (n.driver_fix ?? n.driver ?? "").trim();
-    const fromTransport = !!driverId;
-    if (!driverId && written) driverId = byWrittenName(written);
     const key = driverId ? `id:${driverId}` : written ? `nome:${plain(written).replace(/\s+/g, " ")}` : "sem-motorista";
     const name = driverId ? names.get(driverId) ?? "Motorista" : written || "Sem motorista identificado";
     const e = out.get(key) ?? { key, name, source: fromTransport ? "transporte" : "nota", total: 0, delivered: 0, pending: 0, waiting: 0, score: 0, pendingNotes: [] };

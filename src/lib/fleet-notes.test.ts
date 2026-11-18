@@ -157,6 +157,13 @@ describe("ranking de entrega de notas", () => {
     const andre = r.find((x) => x.key === "id:m2")!;
     expect([andre.source, andre.waiting, andre.pending]).toEqual(["nota", 1, 0]);
   });
+  it("nome da nota que casa com o cadastro vale mais que a Transporte", () => {
+    const names = new Map([["c1", "Cristiano Aparecido Petekevicius"], ["m3", "Matheus Jonathan Braz de Viveiros"]]);
+    const r = driverRanking(
+      [{ id: "x", nf_number: "9", issued_at: "2026-11-05T11:58:00-03:00", plate: "TDJ9B39", plate_fix: null, driver: "Matheus Jonathan", driver_fix: "MATHEUS JONATHAN BRAZ DE VIVEIROS", total: 50, note_file: null }],
+      [{ vehicle_id: "v", schedule_date: "2026-11-04", driver_id: "c1" }], new Map([["TDJ9B39", "v"]]), names, "2026-11-18");
+    expect(r.map((x) => [x.key, x.pending])).toEqual([["id:m3", 1]]);
+  });
 });
 
 describe("CC à mão e placa com CC fixo", () => {
