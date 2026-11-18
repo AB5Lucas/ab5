@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { findDateConflicts } from "@/lib/date-conflicts";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { DateRangePicker, type DayRange } from "@/components/date-range-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -65,6 +66,9 @@ export function AbsenceManager({
   const [extra, setExtra] = useState("");
   const [notes, setNotes] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [fq, setFq] = useState("");
+  const [fStatus, setFStatus] = useState("all");
+  const [fRange, setFRange] = useState<DayRange | null>(null);
 
   const people = useQuery({
     queryKey: ["collaborators-min"],
@@ -190,6 +194,19 @@ export function AbsenceManager({
     return mode === "single" ? (r.end_date || r.date || "") < t : (r.end_date ?? "") < t;
   };
 
+  const shown = (rows.data ?? []).filter((r) => {
+    if (fq.trim() && !(nameById.get(r.collaborator_id) ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(fq.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) return false;
+    if (fStatus === "current" && !isCurrent(r)) return false;
+    if (fStatus === "past" && !isPast(r)) return false;
+    if (fStatus === "future" && (isCurrent(r) || isPast(r))) return false;
+    if (fRange) {
+      const from = (mode === "single" ? r.date : r.start_date) ?? "";
+      const to = (mode === "single" ? r.end_date || r.date : r.end_date) ?? from;
+      if (from > fRange.to || to < fRange.from) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -203,6 +220,34 @@ export function AbsenceManager({
           )
         }
       />
+
+      {/* Filtros: nome, situação e período (registros que tocam o período). */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label htmlFor={`${table}-q`} className="block text-xs">Colaborador</Label>
+          <div className="relative w-64">
+            <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input id={`${table}-q`} className="pl-8" placeholder="Buscar pelo nome" value={fq} onChange={(e) => setFq(e.target.value)} />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="block text-xs">Situação</Label>
+          <Select value={fStatus} onValueChange={setFStatus}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="current">Em curso</SelectItem>
+              <SelectItem value="future">Programado</SelectItem>
+              <SelectItem value="past">Encerrado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <DateRangePicker id={`${table}-range`} value={fRange} onChange={setFRange} onClear={() => setFRange(null)} emptyLabel="Qualquer data" />
+        {(fq || fStatus !== "all" || fRange) && (
+          <Button variant="ghost" size="sm" onClick={() => { setFq(""); setFStatus("all"); setFRange(null); }}>Limpar filtros</Button>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">{shown.length} de {(rows.data ?? []).length}</span>
+      </div>
 
       <div className="panel overflow-x-auto">
         <Table>
@@ -231,12 +276,12 @@ export function AbsenceManager({
               <TableRow>
                 <TableCell colSpan={7} className="text-sm text-muted-foreground">Carregando...</TableCell>
               </TableRow>
-            ) : (rows.data ?? []).length === 0 ? (
+            ) : shown.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-sm text-muted-foreground">Nenhum registro cadastrado.</TableCell>
+                <TableCell colSpan={7} className="text-sm text-muted-foreground">{(rows.data ?? []).length ? "Nenhum registro com esses filtros." : "Nenhum registro cadastrado."}</TableCell>
               </TableRow>
             ) : (
-              (rows.data ?? []).map((r) => (
+              shown.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{nameById.get(r.collaborator_id) ?? "—"}</TableCell>
                   {mode === "single" ? (
