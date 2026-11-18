@@ -6,7 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 
 type Cfg = { requester_id: string; needs_approval: boolean; self_approve: boolean; substitute_id: string | null };
 
@@ -17,6 +18,8 @@ type Cfg = { requester_id: string; needs_approval: boolean; self_approve: boolea
 export function ApproversPanel() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const [filters, setFilters] = useState<ColumnFilters>({});
+  const [sort, setSort] = useState<ColumnSort>(null);
   const users = useQuery({
     queryKey: ["sc-users"],
     queryFn: async () => (await supabase.from("users_profiles").select("id, full_name, email, active").order("full_name")).data ?? [],
@@ -29,6 +32,12 @@ export function ApproversPanel() {
   const active = (users.data ?? []).filter((u) => u.active !== false);
   const shown = active.filter((u) => !q.trim() || `${u.full_name ?? ""} ${u.email ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()));
   const label = (u: { full_name: string | null; email: string | null }) => u.full_name || u.email || "—";
+  type U = (typeof active)[number];
+  const cols: ColumnDef<U>[] = [
+    { key: "name", label: "Solicitante", values: (u) => [label(u)] },
+    { key: "needs", label: "Precisa de validador", values: (u) => [(cfgOf.get(u.id)?.needs_approval ?? true) ? "Sim" : "Não"] },
+  ];
+  const listed = applyColumnFilters(shown, cols, filters, sort);
   const save = useMutation({
     mutationFn: async ({ requester, patch }: { requester: string; patch: Partial<Cfg> }) => {
       const cur = cfgOf.get(requester) ?? { requester_id: requester, needs_approval: true, self_approve: false, substitute_id: null };
@@ -56,12 +65,11 @@ export function ApproversPanel() {
         <Table className="text-sm">
           <TableHeader>
             <TableRow>
-              <TableHead>Solicitante</TableHead>
-              <TableHead className="text-center">Precisa de validador</TableHead>
+              {cols.map((c) => <FilterHead key={c.key} column={c} rows={rowsForColumn(shown, cols, filters, c.key)} filters={filters} setFilters={setFilters} sort={sort} setSort={setSort} />)}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {shown.map((u) => {
+            {listed.map((u) => {
               const c = cfgOf.get(u.id) ?? { requester_id: u.id, needs_approval: true, self_approve: false, substitute_id: null };
               return (
                 <TableRow key={u.id}>

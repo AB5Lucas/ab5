@@ -18,6 +18,7 @@ import { SearchSelect } from "@/components/search-select";
 import { Camera, Lock, X } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 import {
   FIXED_OBSERVERS, SC_CATEGORIES, SC_NATURES, SC_PRIORITIES, SC_STATUSES, SC_SYSTEMS, STAGE_LABEL, brDate, deadlineControl, deliveryLabel,
   priorityClass, statusClass, statusDot, type ScStage,
@@ -63,71 +64,78 @@ export function StatusFilter({ value, onChange, counts }: { value: string; onCha
   );
 }
 
-/** Tabela de controle (mesmas colunas da aba CONTROLE DE SC que o sistema usa). */
+/** Tabela de controle (mesmas colunas da aba CONTROLE DE SC que o sistema usa); cada título filtra/ordena como no Excel. */
 export function ScTable({ rows, clientName, actions, showRequester = true }: {
   rows: ScRow[]; clientName: Map<string, string>; actions?: (r: ScRow) => ReactNode; showRequester?: boolean;
 }) {
   const today = todayISO();
+  const [filters, setFilters] = useState<ColumnFilters>({});
+  const [sort, setSort] = useState<ColumnSort>(null);
+  const cli = (r: ScRow) => (r.client_id ? clientName.get(r.client_id) ?? "" : "");
+  type Col = ColumnDef<ScRow> & { cell: (r: ScRow, dl: ReturnType<typeof deadlineControl>) => ReactNode; className?: string };
+  const cols: Col[] = [
+    { key: "number", label: "Nº da solicitação", values: (r) => [r.number], sort: (r) => r.number, className: "whitespace-nowrap font-medium",
+      cell: (r) => <>
+        <span className={cn("mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle", statusDot(r.status))} title={r.status} aria-label={`Status: ${r.status}`} />
+        <Link to="/compras/solicitacoes/$id" params={{ id: r.id }} className="text-primary hover:underline">{r.number}</Link>
+      </> },
+    { key: "date", label: "Data", values: (r) => [brDate(r.request_date)], sort: (r) => r.request_date, cell: (r) => brDate(r.request_date) },
+    ...(showRequester ? [{ key: "requester", label: "Solicitante", values: (r: ScRow) => [r.requester_name], className: "whitespace-nowrap", cell: (r: ScRow) => r.requester_name } as Col] : []),
+    { key: "system", label: "Tipo", values: (r) => [r.system], cell: (r) => r.system },
+    { key: "category", label: "Categoria", values: (r) => [r.category ?? ""], cell: (r) => r.category ?? "—" },
+    { key: "nature", label: "Natureza", values: (r) => [r.nature ?? ""], cell: (r) => r.nature ?? "—" },
+    { key: "priority", label: "Prioridade", values: (r) => [r.priority ?? ""], cell: (r) => (r.priority ? <Pill className={priorityClass(r.priority)}>{r.priority}</Pill> : "—") },
+    { key: "client", label: "Cliente", values: (r) => [cli(r)], cell: (r) => cli(r) || "—" },
+    { key: "due", label: "Prazo", values: (r) => [brDate(r.due_date)], sort: (r) => r.due_date, cell: (r) => brDate(r.due_date) },
+    { key: "delivery", label: "Local de entrega", values: (r) => [deliveryLabel(r, cli(r) || null)], cell: (r) => deliveryLabel(r, cli(r) || null) },
+    { key: "sent", label: "Envio", values: (r) => [r.sent_at ? brDate(r.sent_at.slice(0, 10)) : "não enviado"], sort: (r) => r.sent_at, className: "whitespace-nowrap",
+      cell: (r) => (r.sent_at ? brDate(r.sent_at.slice(0, 10)) : <span className="text-muted-foreground">não enviado</span>) },
+    { key: "deadline", label: "Controle de prazo", values: (r) => [deadlineControl(r, today).label], cell: (_r, dl) => <Pill className={dl.cls}>{dl.label}</Pill> },
+    { key: "stage", label: "Etapa", values: (r) => [STAGE_LABEL[r.stage as ScStage] ?? r.stage], className: "whitespace-nowrap",
+      cell: (r) => <>
+        {STAGE_LABEL[r.stage as ScStage] ?? r.stage}
+        {r.stage === "rascunho" && r.return_notes && <div className="max-w-56 truncate text-[11px] text-destructive">devolvida · {r.return_notes}</div>}
+      </> },
+    { key: "status", label: "Status", values: (r) => [r.status], className: "whitespace-nowrap",
+      cell: (r) => <>
+        <Pill className={statusClass(r.status)}>{r.status}</Pill>
+        <div className="text-[11px] text-muted-foreground">{brDate(r.status_at)}</div>
+      </> },
+    { key: "buyer", label: "Obs. comprador", values: (r) => [r.buyer_notes ?? ""], className: "max-w-48 truncate", cell: (r) => r.buyer_notes ?? "—" },
+  ];
+  const shown = applyColumnFilters(rows, cols, filters, sort);
+  const filtered = Object.keys(filters).some((k) => filters[k]);
   return (
-    <div className="panel overflow-x-auto">
-      <Table className="text-xs">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nº da solicitação</TableHead>
-            <TableHead>Data</TableHead>
-            {showRequester && <TableHead>Solicitante</TableHead>}
-            <TableHead>Tipo</TableHead>
-            <TableHead>Categoria</TableHead>
-            <TableHead>Natureza</TableHead>
-            <TableHead>Prioridade</TableHead>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Prazo</TableHead>
-            <TableHead>Local de entrega</TableHead>
-            <TableHead>Envio</TableHead>
-            <TableHead>Controle de prazo</TableHead>
-            <TableHead>Etapa</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Obs. comprador</TableHead>
-            {actions && <TableHead className="text-right">Ações</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {!rows.length ? (
-            <TableRow><TableCell colSpan={16} className="text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>
-          ) : rows.map((r) => {
-            const dl = deadlineControl(r, today);
-            return (
-              <TableRow key={r.id}>
-                <TableCell className="whitespace-nowrap font-medium">
-                  <span className={cn("mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle", statusDot(r.status))} title={r.status} aria-label={`Status: ${r.status}`} />
-                  <Link to="/compras/solicitacoes/$id" params={{ id: r.id }} className="text-primary hover:underline">{r.number}</Link>
-                </TableCell>
-                <TableCell>{brDate(r.request_date)}</TableCell>
-                {showRequester && <TableCell className="whitespace-nowrap">{r.requester_name}</TableCell>}
-                <TableCell>{r.system}</TableCell>
-                <TableCell>{r.category ?? "—"}</TableCell>
-                <TableCell>{r.nature ?? "—"}</TableCell>
-                <TableCell>{r.priority ? <Pill className={priorityClass(r.priority)}>{r.priority}</Pill> : "—"}</TableCell>
-                <TableCell>{r.client_id ? clientName.get(r.client_id) ?? "—" : "—"}</TableCell>
-                <TableCell>{brDate(r.due_date)}</TableCell>
-                <TableCell>{deliveryLabel(r, r.client_id ? clientName.get(r.client_id) : null)}</TableCell>
-                <TableCell className="whitespace-nowrap">{r.sent_at ? brDate(r.sent_at.slice(0, 10)) : <span className="text-muted-foreground">não enviado</span>}</TableCell>
-                <TableCell><Pill className={dl.cls}>{dl.label}</Pill></TableCell>
-                <TableCell className="whitespace-nowrap" title={r.return_notes ?? r.approver_notes ?? undefined}>
-                  {STAGE_LABEL[r.stage as ScStage] ?? r.stage}
-                  {r.stage === "rascunho" && r.return_notes && <div className="max-w-56 truncate text-[11px] text-destructive">devolvida · {r.return_notes}</div>}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  <Pill className={statusClass(r.status)}>{r.status}</Pill>
-                  <div className="text-[11px] text-muted-foreground">{brDate(r.status_at)}</div>
-                </TableCell>
-                <TableCell className="max-w-48 truncate" title={r.buyer_notes ?? undefined}>{r.buyer_notes ?? "—"}</TableCell>
-                {actions && <TableCell className="text-right">{actions(r)}</TableCell>}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+    <div className="space-y-1">
+      {filtered && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {shown.length} de {rows.length}
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setFilters({})}>Limpar filtros</Button>
+        </div>
+      )}
+      <div className="panel overflow-x-auto">
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow>
+              {cols.map((c) => <FilterHead key={c.key} column={c} rows={rowsForColumn(rows, cols, filters, c.key)} filters={filters} setFilters={setFilters} sort={sort} setSort={setSort} />)}
+              {actions && <TableHead className="text-right">Ações</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {!shown.length ? (
+              <TableRow><TableCell colSpan={cols.length + 1} className="text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>
+            ) : shown.map((r) => {
+              const dl = deadlineControl(r, today);
+              return (
+                <TableRow key={r.id}>
+                  {cols.map((c) => <TableCell key={c.key} className={c.className} title={c.key === "buyer" ? r.buyer_notes ?? undefined : c.key === "stage" ? r.return_notes ?? r.approver_notes ?? undefined : undefined}>{c.cell(r, dl)}</TableCell>)}
+                  {actions && <TableCell className="text-right">{actions(r)}</TableCell>}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
