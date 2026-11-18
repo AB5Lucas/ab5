@@ -6,16 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-const NONE = "__none__";
 type Cfg = { requester_id: string; needs_approval: boolean; self_approve: boolean; substitute_id: string | null };
 
 /**
  * Validação por solicitante. O validador é o gestor do cliente da SC (cadastro do serviço); aqui fica só:
- * precisa de validador (desligado = vai direto para Compras) e o substituto, que recebe as SCs
- * enquanto o gestor está de férias na Programação (ou sempre, se o gestor não tem usuário no sistema).
+ * precisa de validador (desligado = vai direto para Compras). O substituto do gestor fica no cadastro do serviço.
  */
 export function ApproversPanel() {
   const qc = useQueryClient();
@@ -45,8 +42,8 @@ export function ApproversPanel() {
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         O validador de cada SC é o <b>gestor do cliente</b> (cadastro do serviço). Aqui você define, por solicitante, se a SC precisa de
-        validador (desligado: vai direto para o Comprador) e o <b>substituto</b>, que recebe as SCs enquanto o gestor está de férias na
-        Programação.
+        validador (desligado: vai direto para o Comprador). O <b>substituto do gestor</b> (férias) é cadastrado no próprio serviço, em
+        Clientes › Serviços.
       </p>
       <div className="space-y-1">
         <Label htmlFor="appr-q" className="text-xs">Buscar</Label>
@@ -61,7 +58,6 @@ export function ApproversPanel() {
             <TableRow>
               <TableHead>Solicitante</TableHead>
               <TableHead className="text-center">Precisa de validador</TableHead>
-              <TableHead className="w-72">Substituto (férias do gestor)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -75,16 +71,6 @@ export function ApproversPanel() {
                   </TableCell>
                   <TableCell className="text-center">
                     <Switch checked={c.needs_approval} onCheckedChange={(v) => save.mutate({ requester: u.id, patch: { needs_approval: v } })} aria-label="Precisa de validador" />
-                  </TableCell>
-                  <TableCell>
-                    <Select value={c.substitute_id ?? NONE} disabled={!c.needs_approval}
-                      onValueChange={(v) => save.mutate({ requester: u.id, patch: { substitute_id: v === NONE ? null : v } })}>
-                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        <SelectItem value={NONE}>Sem substituto</SelectItem>
-                        {active.filter((a) => a.id !== u.id).map((a) => <SelectItem key={a.id} value={a.id}>{label(a)}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
                   </TableCell>
                 </TableRow>
               );

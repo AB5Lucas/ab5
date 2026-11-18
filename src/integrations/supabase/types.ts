@@ -5808,6 +5808,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           manager_id: string | null
+          substitute_manager_id: string | null
           monthly_enabled: boolean
           name: string
           neighborhood: string | null
@@ -5852,6 +5853,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           manager_id?: string | null
+          substitute_manager_id?: string | null
           monthly_enabled?: boolean
           name: string
           neighborhood?: string | null
@@ -5896,6 +5898,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           manager_id?: string | null
+          substitute_manager_id?: string | null
           monthly_enabled?: boolean
           name?: string
           neighborhood?: string | null

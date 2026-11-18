@@ -883,6 +883,13 @@
       "when": 1795400022000,
       "tag": "0125_purchase_buyer_sees_all",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1795400023000,
+      "tag": "0126_work_substitute_manager",
+      "breakpoints": true
     }
   ]
 }

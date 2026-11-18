@@ -83,6 +83,7 @@ type FormState = {
   status: WorkStatusValue;
   supervisor_id: string;
   manager_id: string;
+  substitute_manager_id: string;
   active: boolean;
   night_shift: boolean;
   notes: string;
@@ -98,6 +99,7 @@ const emptyForm: FormState = {
   status: "active",
   supervisor_id: NONE,
   manager_id: NONE,
+  substitute_manager_id: NONE,
   active: true,
   night_shift: false,
   notes: "",
@@ -114,6 +116,7 @@ function toForm(w: Work): FormState {
     status: w.status,
     supervisor_id: w.supervisor_id ?? NONE,
     manager_id: w.manager_id ?? NONE,
+    substitute_manager_id: w.substitute_manager_id ?? NONE,
     active: w.active,
     night_shift: !!w.night_shift,
     notes: w.notes ?? "",
@@ -218,6 +221,7 @@ function WorksPage() {
         status: form.status,
         supervisor_id: ref(form.supervisor_id),
         manager_id: ref(form.manager_id),
+        substitute_manager_id: ref(form.substitute_manager_id),
         active: form.active,
         notes: nn(form.notes),
         cc_suffix: nn(form.cc_suffix),
@@ -480,6 +484,23 @@ function WorksPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Substituto do gestor (opcional)</Label>
+              <Select value={form.substitute_manager_id} onValueChange={(v) => set("substitute_manager_id", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Nenhum</SelectItem>
+                  {(people.data ?? []).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Valida as solicitações de compra enquanto o gestor está de férias (ou se ele não tem usuário).</p>
             </div>
             <div className="flex items-center gap-2 sm:col-span-2">
               <Switch checked={form.active} onCheckedChange={(v) => set("active", v)} id="work-active" />
