@@ -91,7 +91,13 @@ export function AppSidebar() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton className="h-11" tooltip={profile?.full_name ?? "Usuário"}>
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-[11px] font-semibold">{initials}</span>
+          <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-[11px] font-semibold">
+            {initials}
+            {/* Bolinha vermelha: algum aviso da Administração (ex.: usuário novo aguardando acesso). */}
+            {adminItems.some(({ item }) => badges[item.url]) && (
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-sidebar" aria-label="Avisos na Administração" />
+            )}
+          </span>
           {!collapsed && (
             <span className="min-w-0 leading-tight">
               <span className="block truncate text-sm font-medium">{profile?.full_name || profile?.email}</span>
@@ -106,7 +112,14 @@ export function AppSidebar() {
             <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">Administração</DropdownMenuLabel>
             {adminItems.map(({ item, group }) => {
               const Icon = item.icon ?? group.icon;
-              return <DropdownMenuItem key={item.url} asChild><Link to={item.to ?? item.url} onClick={closeMobile}><Icon className="h-4 w-4" /> {item.title}</Link></DropdownMenuItem>;
+              return (
+                <DropdownMenuItem key={item.url} asChild>
+                  <Link to={item.to ?? item.url} onClick={closeMobile}>
+                    <Icon className="h-4 w-4" /> {item.title}
+                    {badges[item.url] && <span className="ml-auto h-2 w-2 rounded-full bg-destructive" title={badges[item.url]!.detail ?? undefined} />}
+                  </Link>
+                </DropdownMenuItem>
+              );
             })}
             <DropdownMenuSeparator />
           </>

@@ -30,6 +30,7 @@ function useBadgeData() {
     scApproval: canAccess("/compras/aprovacao"),
     scOpen: canAccess("/compras/solicitacoes") || canAccess("/compras/comprador"),
     scBuyer: canAccess("/compras/comprador"),
+    users: canAccess("/admin/usuarios"),
   };
   return useQuery({
     queryKey: ["menu-badges", can],
@@ -52,7 +53,7 @@ function useBadgeData() {
       // (menu_badge_counts, com a RLS do usuário); antes o navegador baixava as tabelas inteiras.
       // SCs aguardando a minha validação (gestor ou substituto; a RLS só devolve as que posso ver).
       const uid = (await supabase.auth.getSession()).data.session?.user.id ?? "";
-      const [counts, fleetParts, scPend, scOpenRows] = await Promise.all([
+      const [counts, fleetParts, scPend, scOpenRows, pendingUsers] = await Promise.all([
         can.docs || can.purchases || can.orders || can.billing
           ? supabase.rpc("menu_badge_counts" as never, { p_today: today, p_docs: can.docs, p_purchases: can.purchases, p_orders: can.orders, p_billing: can.billing } as never)
             .then((r: { data: unknown; error: unknown }) => (r.error ? empty : (r.data as Counts) ?? empty), () => empty)
@@ -63,6 +64,8 @@ function useBadgeData() {
         // SCs em Compras ainda não compradas (as que a RLS deixa ver: próprias, em cópia, validadas; Comprador/admin veem todas).
         when(can.scOpen, async () => (await supabase.from("purchase_requests").select("due_date, requester_id, observer_ids").eq("stage", "compras")
           .not("status", "in", '("COMPRA EFETIVADA","ALMOXARIFADO","CANCELADA","RECUSADA")')).data ?? []),
+        // Usuários novos aguardando liberação (bolinha no rodapé do menu).
+        when(can.users, async () => (await supabase.from("users_profiles").select("id").eq("pending", true)).data ?? []),
       ]);
       // Saldo do posto: faturas em aberto + abastecimentos ainda não faturados (mesma conta da aba Abastecimento).
       const fp = fleetParts[0] as { open: number; unbilled: number } | undefined;
@@ -81,7 +84,7 @@ function useBadgeData() {
       const mineRows = isAdmin || can.scBuyer ? scOpenRows : scOpenRows.filter((r: any) => r.requester_id === uid || (r.observer_ids ?? []).includes(uid));
       const scOpen = { count: mineRows.length, late: late(mineRows) };
       const scBuy = { count: scOpenRows.length, late: late(scOpenRows) };
-      return { scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
+      return { pendingUsers: pendingUsers.length, scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
     },
   });
 }
@@ -128,6 +131,7 @@ export function useMenuBadges() {
       count: d.scApproval.count, tone: d.scApproval.urgent ? "red" : "orange",
       detail: `${d.scApproval.count} solicitação(ões) de compra para validar${d.scApproval.urgent ? ` · ${d.scApproval.urgent} com prazo em até 5 dias` : ""}`,
     };
+    if (d.pendingUsers) out["/admin/usuarios"] = { count: d.pendingUsers, tone: "red", detail: `${d.pendingUsers} usuário(s) novo(s) aguardando liberação de acesso` };
     if (d.scOpen?.count) out["/compras/solicitacoes"] = {
       count: d.scOpen.count, tone: d.scOpen.late ? "red" : "orange",
       detail: `${d.scOpen.count} SC(s) pendente(s) em Compras${d.scOpen.late ? ` · ${d.scOpen.late} com prazo vencido` : ""}`,

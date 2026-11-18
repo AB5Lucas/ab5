@@ -80,6 +80,8 @@ function UsersPage() {
       if (delError) throw delError;
       const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
       if (error) throw error;
+      // Trocar o perfil também resolve o "novo usuário" (sai a bolinha do rodapé).
+      await supabase.from("users_profiles").update({ pending: false }).eq("id", userId);
     },
     onSuccess: () => {
       toast.success("Perfil atualizado");
@@ -165,6 +167,11 @@ function UsersPage() {
                   {u.id === user?.id && (
                     <Badge variant="outline" className="ml-2">
                       você
+                    </Badge>
+                  )}
+                  {u.pending && (
+                    <Badge variant="destructive" className="ml-2" title="Criou a conta e aguarda liberação: ative ou escolha o perfil">
+                      novo
                     </Badge>
                   )}
                 </TableCell>
