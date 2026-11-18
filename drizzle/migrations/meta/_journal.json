@@ -974,6 +974,13 @@
       "when": 1795400035000,
       "tag": "0138_purchase_totvs_cc_validation",
       "breakpoints": true
+    },
+    {
+      "idx": 139,
+      "version": "7",
+      "when": 1795400036000,
+      "tag": "0139_rdo_add_integration",
+      "breakpoints": true
     }
   ]
 }

@@ -390,6 +390,44 @@ function AddWorker({ rdoId, night, work, date, existing }: { rdoId: string; nigh
     queryFn: async () =>
       (await supabase.from("collaborators").select("id, full_name, position_id").eq("status", "active").order("full_name")).data ?? [],
   });
+  // Em integração no cliente no dia (agendamento de integração ou quadro da Programação), ainda fora deste RDO.
+  const integ = useQuery({
+    queryKey: ["rdo-integ-people", work.id, date],
+    enabled: !!work.client_id && !work.rdo_general,
+    queryFn: async () => {
+      const [{ data: ap }, { data: cl }, { data: s }] = await Promise.all([
+        supabase.from("appointments").select("collaborator_id").eq("type", "integracao").eq("client_id", work.client_id!).eq("scheduled_date", date).neq("status", "cancelado"),
+        supabase.from("clients").select("name").eq("id", work.client_id!).maybeSingle(),
+        supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle(),
+      ]);
+      const ids = new Set((ap ?? []).map((a) => a.collaborator_id).filter((x): x is string => !!x));
+      if (s && cl?.name) {
+        const { data: bx } = await supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", s.id).eq("box_key", `integracao:${cl.name}`);
+        (bx ?? []).forEach((b) => ids.add(b.collaborator_id));
+      }
+      if (!ids.size) return [];
+      return (await supabase.from("collaborators").select("id, full_name").in("id", [...ids]).order("full_name")).data ?? [];
+    },
+  });
+  const integList = (integ.data ?? []).filter((p) => !existing.includes(p.id));
+  const addInteg = useMutation({
+    mutationFn: async (id: string) => {
+      const exit = (wd === 0 || wd === 5 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
+      const { error } = await supabase.rpc("rdo_add_integration" as never, {
+        _rdo_id: rdoId, _collaborator_id: id,
+        _entry: night ? NIGHT_ENTRY : work.entry_time?.slice(0, 5) ?? "07:00",
+        _exit: night ? NIGHT_EXIT : exit?.slice(0, 5) ?? "17:00",
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Incluído no RDO: a integração passa a ser deste serviço");
+      qc.invalidateQueries({ queryKey: ["rdo-team", rdoId] });
+      qc.invalidateQueries({ queryKey: ["rdo-planned", work.id, date] });
+      qc.invalidateQueries({ queryKey: ["rdo-integ-people", work.id, date] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const add = useMutation({
     mutationFn: async (p: { id: string; position_id: string | null }) => {
       const exit = (wd === 0 || wd === 5 || wd === 6) && work.exit_time_weekend ? work.exit_time_weekend : work.exit_time;
@@ -409,7 +447,7 @@ function AddWorker({ rdoId, night, work, date, existing }: { rdoId: string; nigh
     },
     onError: (e: Error) => toast.error(e.message),
   });
-  if (!allowed) return null;
+  if (!allowed && !integList.length) return null;
   const list = (people.data ?? []).filter(
     (p) => !existing.includes(p.id) && p.full_name.toLowerCase().includes(q.toLowerCase()),
   );
@@ -421,8 +459,24 @@ function AddWorker({ rdoId, night, work, date, existing }: { rdoId: string; nigh
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] overflow-hidden">
           <DialogHeader><DialogTitle>Adicionar colaborador</DialogTitle></DialogHeader>
-          <Input placeholder="Buscar pelo nome" value={q} onChange={(e) => setQ(e.target.value)} />
-          <ul className="max-h-[55vh] space-y-1 overflow-y-auto">
+          {integList.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Em integração neste cliente hoje (o custo do dia vai para este serviço)</p>
+              <ul className="space-y-1">
+                {integList.map((p) => (
+                  <li key={p.id}>
+                    <button type="button" disabled={addInteg.isPending}
+                      className="w-full rounded-md border border-primary/40 bg-primary/5 p-3 text-left text-sm hover:bg-primary/10"
+                      onClick={() => addInteg.mutate(p.id)}>
+                      {p.full_name} <span className="text-xs text-muted-foreground">· integração</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {allowed && <Input placeholder="Buscar pelo nome" value={q} onChange={(e) => setQ(e.target.value)} />}
+          {allowed && <ul className="max-h-[55vh] space-y-1 overflow-y-auto">
             {people.isLoading && <li className="text-sm text-muted-foreground">Carregando...</li>}
             {list.map((p) => (
               <li key={p.id}>
@@ -436,7 +490,7 @@ function AddWorker({ rdoId, night, work, date, existing }: { rdoId: string; nigh
                 </button>
               </li>
             ))}
-          </ul>
+          </ul>}
         </DialogContent>
       </Dialog>
     </>
