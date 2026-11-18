@@ -73,7 +73,7 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
-            <StatusFilter value={status} onChange={setStatus} counts={statusCounts(scoped)} />
+            <StatusFilter value={status} onChange={setStatus} counts={statusCounts(scoped)} exclude={["EM PREPARAÇÃO"]} />
           </div>
           {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
             <ScTable rows={rows} clientName={clientName} actions={(r) => (

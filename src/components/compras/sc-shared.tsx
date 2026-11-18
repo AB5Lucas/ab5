@@ -50,7 +50,7 @@ export function Pill({ children, className, title }: { children: ReactNode; clas
 }
 
 /** Filtro de status como a coluna AA da planilha (com "Todos"). */
-export function StatusFilter({ value, onChange, counts }: { value: string; onChange: (v: string) => void; counts: Map<string, number> }) {
+export function StatusFilter({ value, onChange, counts, exclude = [] }: { value: string; onChange: (v: string) => void; counts: Map<string, number>; exclude?: string[] }) {
   return (
     <div className="space-y-1">
       <Label className="text-xs">Status</Label>
@@ -58,7 +58,7 @@ export function StatusFilter({ value, onChange, counts }: { value: string; onCha
         <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
         <SelectContent className="max-h-80">
           <SelectItem value="all">Todos ({[...counts.values()].reduce((s, n) => s + n, 0)})</SelectItem>
-          {SC_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.value} ({counts.get(s.value) ?? 0})</SelectItem>)}
+          {SC_STATUSES.filter((s) => !exclude.includes(s.value)).map((s) => <SelectItem key={s.value} value={s.value}>{s.value} ({counts.get(s.value) ?? 0})</SelectItem>)}
         </SelectContent>
       </Select>
     </div>
