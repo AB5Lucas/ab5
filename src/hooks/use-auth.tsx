@@ -5,13 +5,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type AppRole = "admin" | "programmer" | "viewer" | "encarregado" | "coordenador" | "cliente";
 
+/** Perfil = alcance dos dados (as páginas vêm do grupo de acesso). */
 export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Administrador",
-  programmer: "Programador",
-  viewer: "Consulta",
-  encarregado: "Encarregado",
-  coordenador: "Coordenador",
-  cliente: "Cliente",
+  programmer: "Interno (todos os clientes)",
+  viewer: "Interno (consulta)",
+  encarregado: "Serviços vinculados",
+  coordenador: "Clientes vinculados",
+  cliente: "Cliente externo",
 };
 
 export function useSession() {

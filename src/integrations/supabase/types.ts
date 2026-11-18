@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_groups: {
+        Row: {
+          id: string
+          key: string
+          name: string
+          cargos: string[]
+          sort: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          name: string
+          cargos?: string[]
+          sort?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          name?: string
+          cargos?: string[]
+          sort?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      access_group_pages: {
+        Row: {
+          group_id: string
+          path: string
+          allowed: boolean
+          updated_at: string
+        }
+        Insert: {
+          group_id: string
+          path: string
+          allowed: boolean
+          updated_at?: string
+        }
+        Update: {
+          group_id?: string
+          path?: string
+          allowed?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       andam_asset_values: {
         Row: {
           acquired_at: string | null
@@ -5041,6 +5089,7 @@ export type Database = {
       }
       users_profiles: {
         Row: {
+          access_group_id: string | null
           active: boolean
           created_at: string
           email: string
@@ -5050,6 +5099,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_group_id?: string | null
           active?: boolean
           created_at?: string
           email?: string
@@ -5059,6 +5109,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_group_id?: string | null
           active?: boolean
           created_at?: string
           email?: string
