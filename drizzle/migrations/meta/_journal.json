@@ -967,6 +967,13 @@
       "when": 1795400034000,
       "tag": "0137_vehicle_adm_place",
       "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1795400035000,
+      "tag": "0138_purchase_totvs_cc_validation",
+      "breakpoints": true
     }
   ]
 }

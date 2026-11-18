@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ import {
 import type { Tables } from "@/integrations/supabase/types";
 
 export type ScRow = Tables<"purchase_requests">;
+const RATEIO_KEY = "__rateio__";
 export const todayISO = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 
 export function useClientsList() {
@@ -213,14 +214,14 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
   const navigate = useNavigate();
   const clients = useClientsList();
   const [f, setF] = useState<HeaderForm>(EMPTY);
-  const [totvs, setTotvs] = useState<{ number: string; file: File | null }>({ number: "", file: null });
+  const [totvs, setTotvs] = useState<{ number: string; file: File | null; work: string; cc: string }>({ number: "", file: null, work: RATEIO_KEY, cc: "" });
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [totvsStep, setTotvsStep] = useState(false);
   const key = open ? editing?.id ?? "new" : null;
   if (key !== loadedFor) {
     setLoadedFor(key);
     if (open) {
-      setTotvs({ number: "", file: null });
+      setTotvs({ number: "", file: null, work: RATEIO_KEY, cc: "" });
       setTotvsStep(false);
       setF(editing ? {
         system: editing.system, category: editing.category ?? "", nature: editing.nature ?? "", priority: editing.priority ?? "", client_id: editing.client_id ?? "",
@@ -238,6 +239,25 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
     if (!editing && f.due_date < todayISO()) throw new Error("A data prazo não pode ser antes de hoje.");
   };
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
+  // TOTVS: centro de custo (serviço do cliente ou rateio) e CC (automático = prefixo do cliente + sufixo; dá para digitar).
+  const totvsDest = useRef<string>("");
+  const totvsWorks = useQuery({
+    queryKey: ["sc-works", f.client_id],
+    enabled: isTotvs && !!f.client_id,
+    queryFn: async () => (await supabase.from("works").select("id, name, cc_suffix, active, order_number").eq("client_id", f.client_id).order("name")).data ?? [],
+  });
+  const totvsPrefix = useQuery({
+    queryKey: ["sc-client-prefix", f.client_id],
+    enabled: isTotvs && !!f.client_id,
+    queryFn: async () => (await supabase.from("clients").select("cc_prefix").eq("id", f.client_id).maybeSingle()).data?.cc_prefix ?? null,
+  });
+  const totvsCcOf = (workId: string) => {
+    const p = totvsPrefix.data;
+    if (!p) return "—";
+    if (workId === RATEIO_KEY) return `${p}999`;
+    const w = (totvsWorks.data ?? []).find((x) => x.id === workId);
+    return w?.cc_suffix ? `${p}${w.cc_suffix}` : "—";
+  };
   const save = useMutation({
     mutationFn: async () => {
       checkHeader();
@@ -247,9 +267,16 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
         const path = `totvs/${crypto.randomUUID()}-${totvs.file.name.replace(/[^\w.-]/g, "_")}`;
         const up = await supabase.storage.from("purchase-photos").upload(path, totvs.file);
         if (up.error) throw up.error;
-        const header = { ...f, justification: f.justification.trim(), delivery_place: f.delivery_kind === "outro" ? f.delivery_place.trim() : "" };
+        const header = {
+          ...f, justification: f.justification.trim(), delivery_place: f.delivery_kind === "outro" ? f.delivery_place.trim() : "",
+          work_id: totvs.work === RATEIO_KEY ? "" : totvs.work, cc_code: totvs.cc.trim() || totvsCcOf(totvs.work).replace(/\D/g, ""),
+        };
         const { data, error } = await supabase.rpc("purchase_request_create_totvs", { _number: totvs.number, _photo: path, _observers: f.observer_ids, _p: header as never });
         if (error) throw error;
+        // Envia já: passa pela Validação como a da planilha (ou vai direto ao Comprador se o solicitante não precisa de validador).
+        const sent = await supabase.rpc("purchase_request_send", { _id: data as string });
+        if (sent.error) throw new Error(`SC do TOTVS salva como rascunho, mas não foi enviada: ${sent.error.message}`);
+        totvsDest.current = sent.data as string;
         return data as string;
       }
       const payload = { ...f, justification: f.justification.trim(), delivery_place: f.delivery_kind === "outro" ? f.delivery_place.trim() : "" };
@@ -270,7 +297,7 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
       qc.invalidateQueries({ queryKey: ["sc-requests"] });
       qc.invalidateQueries({ queryKey: ["sc-request", id] });
       onOpenChange(false);
-      if (isTotvs) toast.success("SC do TOTVS enviada para o Comprador");
+      if (isTotvs) toast.success(totvsDest.current === "compras" ? "SC do TOTVS enviada para o Comprador" : "SC do TOTVS enviada para o validador");
       else if (!editing) { toast.success("Solicitação criada. Agora inclua os itens."); navigate({ to: "/compras/solicitacoes/$id", params: { id } }); }
       else toast.success("Solicitação atualizada");
     },
@@ -292,7 +319,7 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
         <DialogHeader>
           <DialogTitle>{editing ? `Editar ${editing.number}` : isTotvs && totvsStep ? "SC do TOTVS" : "Nova solicitação de compra"}</DialogTitle>
           <DialogDescription>
-            {editing ? "Controle da solicitação." : isTotvs && totvsStep ? "Informe o número da SC aberta no TOTVS e a foto. Ela vai direto para o Comprador."
+            {editing ? "Controle da solicitação." : isTotvs && totvsStep ? "Informe o número da SC aberta no TOTVS, a foto e o centro de custo. Ela vai para o validador (ou direto ao Comprador, se você não precisa de validador)."
               : "Data, solicitante e número (SC-NOME-001) são preenchidos sozinhos. Depois de salvar, você inclui os itens."}
           </DialogDescription>
         </DialogHeader>
@@ -309,6 +336,22 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
                 <Camera className="h-4 w-4" /> {totvs.file ? totvs.file.name : "Escolher foto"}
                 <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const file = e.target.files?.[0] ?? null; setTotvs((t) => ({ ...t, file })); e.target.value = ""; }} />
               </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
+              <div className="space-y-1">
+                <Label>Centro de custo</Label>
+                <SearchSelect value={totvs.work} onChange={(v) => setTotvs((t) => ({ ...t, work: v, cc: "" }))} searchPlaceholder="Digite o pedido, serviço ou CC"
+                  options={[{ value: RATEIO_KEY, label: "Rateio geral do cliente" },
+                    ...(totvsWorks.data ?? []).filter((w) => w.active).map((w) => {
+                      const orders = (w.order_number ?? "").split(/[\s/;,]+/).filter(Boolean);
+                      return { value: w.id, label: orders.length ? `${orders[0]}${orders.length > 1 ? "…" : ""} - ${w.name}` : w.name, hint: [w.order_number, totvsCcOf(w.id)].filter((v) => v && v !== "—").join(" ") };
+                    })]} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="sc-totvs-cc">CC</Label>
+                <Input id="sc-totvs-cc" className="font-mono" value={totvs.cc} placeholder={totvsCcOf(totvs.work)} title="CC automático; digite para trocar"
+                  onChange={(e) => setTotvs((t) => ({ ...t, cc: e.target.value.replace(/[^\w]/g, "") }))} />
+              </div>
             </div>
           </div>
         ) : (

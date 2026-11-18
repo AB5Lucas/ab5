@@ -3740,6 +3740,8 @@ export type Database = {
           due_date: string | null
           id: string
           justification: string | null
+          work_id: string | null
+          cc_code: string | null
           nature: string | null
           notes: string | null
           number: string
@@ -3779,6 +3781,8 @@ export type Database = {
           due_date?: string | null
           id?: string
           justification?: string | null
+          work_id?: string | null
+          cc_code?: string | null
           nature?: string | null
           notes?: string | null
           number: string
@@ -3818,6 +3822,8 @@ export type Database = {
           due_date?: string | null
           id?: string
           justification?: string | null
+          work_id?: string | null
+          cc_code?: string | null
           nature?: string | null
           notes?: string | null
           number?: string
