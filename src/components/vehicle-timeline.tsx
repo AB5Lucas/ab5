@@ -1126,15 +1126,12 @@ export function VehicleTimeline() {
                           <>
                             <div className="flex items-center gap-1">
                               <span
-                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${row.driver_bonus ? "bg-success" : "bg-muted-foreground/40"}`}
-                                title={row.driver_bonus ? "Com prêmio de motorista" : "Sem prêmio de motorista"}
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${driverUndefined(row) ? "bg-destructive" : row.driver_bonus ? "bg-success" : "bg-muted-foreground/40"}`}
+                                title={driverUndefined(row) ? "Motorista a definir" : row.driver_bonus ? "Com prêmio de motorista" : "Sem prêmio de motorista"}
                               />
                               <span className="truncate text-[10px] font-medium">
                                 {row.driver_id ? shortName(driverName.get(row.driver_id) ?? "—") : "Sem motorista"}
                               </span>
-                              {driverUndefined(row) && (
-                                <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-destructive" title="Motorista a definir" aria-label="Motorista a definir" />
-                              )}
                             </div>
                             <div
                               className="truncate text-[10px] uppercase text-muted-foreground"
