@@ -1030,7 +1030,28 @@ export function VehicleTimeline() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>{byWork ? "Cliente" : "Obra / Cliente"}</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label>{byWork ? "Cliente" : "Obra / Cliente"}</Label>
+                {/* Mais de um frete no dia: exclui o de cima e a 1ª obra adicional passa a ser a principal. */}
+                {form.extras.length > 0 && (
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-destructive" title="Excluir este frete e deixar só as obras adicionais"
+                    onClick={() => setForm((f) => {
+                      const c = f.extras[0] ?? NONE;
+                      const w = f.extraWorks[0] ?? "";
+                      return {
+                        ...f,
+                        client_id: w ? WORK_PREFIX + w : c,
+                        driver_id: f.extraDrivers[0] && f.extraDrivers[0] !== NONE ? f.extraDrivers[0] : f.driver_id,
+                        external_place: f.extraPlaces[0] ?? "",
+                        km: "",
+                        trips: "1",
+                        extras: f.extras.slice(1), extraDrivers: f.extraDrivers.slice(1), extraPlaces: f.extraPlaces.slice(1), extraWorks: f.extraWorks.slice(1),
+                      };
+                    })}>
+                    <Trash2 className="h-3.5 w-3.5" /> Excluir este frete
+                  </Button>
+                )}
+              </div>
               {/* Caminhão: primeiro o cliente, depois (opcional) o serviço. Só o cliente = rateio pelas horas dos serviços dele. */}
               <Select value={byWork ? truckClient : form.client_id} onValueChange={(v) => setForm((f) => ({ ...f, client_id: v }))}>
                 <SelectTrigger><SelectValue placeholder={byWork ? "Selecione o cliente" : "Selecione a obra"} /></SelectTrigger>
