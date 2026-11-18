@@ -225,10 +225,23 @@ function toForm(c: Collaborator): FormState {
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
 const ref = (v: string) => (v === NONE ? null : v);
 
+const SALARY_GROUPS = ["diretoria / administrador", "rh / pessoal"];
+
 function CollaboratorsPage() {
-  const { canWrite, role } = useCurrentUser();
-  // Valor hora/salário: só administrador e coordenador veem; para os demais o campo fica borrado e não é gravado.
-  const canSeeSalary = role === "admin" || role === "coordenador";
+  const { canWrite, role, user } = useCurrentUser();
+  // Valor hora/salário: só administrador e os grupos Diretoria / Administrador e RH / Pessoal veem; para os demais o campo fica borrado e não é gravado.
+  const myGroup = useQuery({
+    queryKey: ["my-access-group-name", user?.id],
+    enabled: !!user?.id,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data: me } = await supabase.from("users_profiles").select("access_group_id").eq("id", user!.id).maybeSingle();
+      if (!me?.access_group_id) return "";
+      const { data: g } = await supabase.from("access_groups").select("name").eq("id", me.access_group_id).maybeSingle();
+      return g?.name ?? "";
+    },
+  });
+  const canSeeSalary = role === "admin" || SALARY_GROUPS.includes((myGroup.data ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string[]>(["active"]);
@@ -685,22 +698,22 @@ function CollaboratorsPage() {
               </Select>
             </div>
 
-            <div className="flex items-center gap-6 pt-6">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 sm:col-span-2">
               <div className="flex items-center gap-3">
                 <Switch id="driver" checked={form.is_driver} onCheckedChange={(v) => set("is_driver", v)} />
-                <Label htmlFor="driver">É motorista</Label>
+                <Label htmlFor="driver" className="whitespace-nowrap">É motorista</Label>
               </div>
               <div className="flex items-center gap-3">
                 <Switch id="vt_enabled" checked={form.vt_enabled} onCheckedChange={(v) => set("vt_enabled", v)} />
-                <Label htmlFor="vt_enabled">Vale Transporte</Label>
+                <Label htmlFor="vt_enabled" className="whitespace-nowrap">Vale Transporte</Label>
               </div>
               <div className="flex items-center gap-3" title="Recebe VT em todo dia trabalhado no Fechamento, em qualquer obra (inclusive externas e com transporte da empresa)">
                 <Switch id="vt_always_full" checked={form.vt_always_full} onCheckedChange={(v) => set("vt_always_full", v)} />
-                <Label htmlFor="vt_always_full">VT cheio</Label>
+                <Label htmlFor="vt_always_full" className="whitespace-nowrap">VT cheio</Label>
               </div>
               <div className="flex items-center gap-3">
                 <Switch id="notice" checked={form.notice} onCheckedChange={(v) => set("notice", v)} />
-                <Label htmlFor="notice">Aviso prévio</Label>
+                <Label htmlFor="notice" className="whitespace-nowrap">Aviso prévio</Label>
               </div>
             </div>
 
