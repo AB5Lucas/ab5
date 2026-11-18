@@ -52,7 +52,7 @@ export type MenuGroup = { label: string; icon: typeof Users; items: MenuItem[]; 
  */
 const RAW_GROUPS: MenuGroup[] = [
   {
-    label: "Operação",
+    label: "Planejamento",
     icon: CalendarDays,
     items: [
       { title: "Programação", url: "/programacao/diaria", icon: CalendarDays },
