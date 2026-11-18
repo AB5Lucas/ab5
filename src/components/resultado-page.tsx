@@ -871,7 +871,12 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                   })()}
                 </span>
                 <Lbl>Nº Orç. AB5</Lbl>
-                <span>{w.quote_number || "—"}</span>
+                {(() => {
+                  // Igual ao Nº Pedido: vários orçamentos (geral do cliente ou serviço com mais de um) viram "N orçamentos";
+                  // a lista (sem repetir) aparece ao passar o mouse.
+                  const qs = [...new Set(String(w.quote_number ?? "").split(/\s*,\s*/).map((x) => x.trim()).filter(Boolean))];
+                  return <span title={qs.length > 1 ? qs.join(", ") : undefined}>{qs.length > 1 ? `${qs.length} orçamentos` : qs[0] ?? "—"}</span>;
+                })()}
                 <Lbl>Valor Faturado</Lbl>
                 <span className="flex justify-between">
                   <span>{brl(billed)}</span>
