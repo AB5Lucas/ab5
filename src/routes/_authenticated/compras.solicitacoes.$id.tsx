@@ -28,14 +28,14 @@ export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")
 });
 
 type Item = Tables<"purchase_request_items">;
-type Draft = { id?: string; quantity: string; unit: string; description: string; budget: string; notes: string; work_id: string; photo_path: string | null; quote_path: string | null };
+type Draft = { id?: string; quantity: string; unit: string; description: string; budget: string; notes: string; work_id: string; cc: string; photo_path: string | null; quote_path: string | null };
 const RATEIO = "__rateio__";
 const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(/\./g, "").replace(",", ".")));
 const toDraft = (i: Item): Draft => ({
   id: i.id, quantity: String(i.quantity).replace(".", ","), unit: i.unit, description: i.description, budget: i.budget == null ? "" : String(i.budget).replace(".", ","),
-  notes: i.notes ?? "", work_id: i.work_id ?? RATEIO, photo_path: i.photo_path, quote_path: i.quote_path,
+  notes: i.notes ?? "", work_id: i.work_id ?? RATEIO, cc: i.cc_code ?? "", photo_path: i.photo_path, quote_path: i.quote_path,
 });
-const emptyDraft = (): Draft => ({ quantity: "", unit: "UN", description: "", budget: "", notes: "", work_id: RATEIO, photo_path: null, quote_path: null });
+const emptyDraft = (): Draft => ({ quantity: "", unit: "UN", description: "", budget: "", notes: "", work_id: RATEIO, cc: "", photo_path: null, quote_path: null });
 
 /**
  * Página da solicitação (modelo FR-CPS-SC): cabeçalho já preenchido pelo controle e a tabela de itens
@@ -136,7 +136,7 @@ function Page() {
     for (const [i, x] of filled.entries()) {
       const payload = {
         request_id: id, item_no: i + 1, quantity: num(x.quantity)!, unit: x.unit.trim() || "UN", description: x.description.trim(),
-        budget: num(x.budget), notes: x.notes.trim() || null, work_id: x.work_id === RATEIO ? null : x.work_id, photo_path: x.photo_path, quote_path: x.quote_path,
+        budget: num(x.budget), notes: x.notes.trim() || null, work_id: x.work_id === RATEIO ? null : x.work_id, cc_code: x.cc.trim() || null, photo_path: x.photo_path, quote_path: x.quote_path,
       };
       const { error } = x.id ? await supabase.from("purchase_request_items").update(payload).eq("id", x.id) : await supabase.from("purchase_request_items").insert(payload);
       if (error) throw error;
@@ -291,7 +291,7 @@ function Page() {
               <TableHead className="w-28">Verba (R$)</TableHead>
               <TableHead className="min-w-40">Observações</TableHead>
               <TableHead className="min-w-48">Centro de custo</TableHead>
-              <TableHead className="w-20">CC</TableHead>
+              <TableHead className="w-28">CC</TableHead>
               <TableHead className="w-16">Foto</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="min-w-32">Pedido de compras AB5</TableHead>
@@ -330,12 +330,17 @@ function Page() {
                   <TableCell>{editable ? <Input className="h-8" value={x.notes} onChange={(e) => change(i, { notes: e.target.value })} /> : x.notes || "—"}</TableCell>
                   <TableCell>
                     {editable ? (
-                      <SearchSelect className="h-8" value={x.work_id} onChange={(v) => change(i, { work_id: v })} searchPlaceholder="Digite o pedido, serviço ou CC"
+                      <SearchSelect className="h-8" value={x.work_id} onChange={(v) => change(i, { work_id: v, cc: "" })} searchPlaceholder="Digite o pedido, serviço ou CC"
                         options={[{ value: RATEIO, label: "Rateio geral do cliente" },
                           ...(works.data ?? []).filter((w) => w.active || w.id === x.work_id).map((w) => ({ value: w.id, label: workLabel(w), hint: [w.order_number, ccOf(w.id)].filter((v) => v && v !== "—").join(" ") }))]} />
                     ) : x.work_id === RATEIO ? "Rateio geral" : workName.get(x.work_id) ?? "—"}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap font-mono">{ccOf(x.work_id)}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono">
+                    {editable ? (
+                      <Input className="h-8 w-28 font-mono" value={x.cc} placeholder={ccOf(x.work_id)} title="CC automático; digite para trocar"
+                        onChange={(e) => change(i, { cc: e.target.value.replace(/[^\w]/g, "") })} />
+                    ) : x.cc || ccOf(x.work_id)}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       {x.photo_path && <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver foto" onClick={() => openPhoto(x.photo_path!)}><ImageIcon className="h-4 w-4" /></Button>}

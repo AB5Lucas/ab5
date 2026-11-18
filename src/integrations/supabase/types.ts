@@ -3490,6 +3490,7 @@ export type Database = {
       purchase_request_items: {
         Row: {
           created_at: string
+          cc_code: string | null
           description: string
           id: string
           item_no: number
@@ -3508,6 +3509,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          cc_code?: string | null
           description: string
           id?: string
           item_no: number
@@ -3526,6 +3528,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          cc_code?: string | null
           description?: string
           id?: string
           item_no?: number
