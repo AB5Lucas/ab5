@@ -854,6 +854,10 @@ export function VehicleTimeline() {
     list.splice(to, 0, item!);
     return setFreights(f, list);
   });
+  // Toggle Motorista ligado e ainda em "Definir" (sem motorista escolhido, ou igual ao solicitante) em algum frete do dia.
+  const driverUndefined = (r: VehicleScheduleRow) =>
+    (!!r.driver_toggle && (!r.driver_id || r.driver_id === r.requester_id))
+    || (r.extra_client_ids ?? []).some((_, i) => !!r.extra_driver_toggles?.[i] && (!r.extra_driver_ids?.[i] || r.extra_driver_ids[i] === r.extra_requester_ids?.[i]));
   const driverOptions = useMemo(() => [{ value: NONE, label: "Sem motorista" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
   const requesterOptions = useMemo(() => [{ value: NONE, label: "Sem solicitante" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
   const pickDriverOptions = useMemo(() => [{ value: NONE, label: "Definir" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
@@ -1128,6 +1132,9 @@ export function VehicleTimeline() {
                               <span className="truncate text-[10px] font-medium">
                                 {row.driver_id ? shortName(driverName.get(row.driver_id) ?? "—") : "Sem motorista"}
                               </span>
+                              {driverUndefined(row) && (
+                                <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-destructive" title="Motorista a definir" aria-label="Motorista a definir" />
+                              )}
                             </div>
                             <div
                               className="truncate text-[10px] uppercase text-muted-foreground"
