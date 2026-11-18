@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contractMeasured, marsFile, marsSheetName, matchWork, parseMarsSheet, rowsToSync, splitContract, type MarsWork } from "./mars-sync";
+import { contractMeasured, findScaffoldWork, isScaffoldRow, marsFile, marsSheetName, matchWork, parseMarsSheet, rowsToSync, splitContract, type MarsWork } from "./mars-sync";
 
 const sheet: unknown[][] = [
   ["FATURAMENTO MARS 2026"],
@@ -60,5 +60,10 @@ describe("planilha da MARS", () => {
     expect(split[0]!.value).toBeCloseTo(150504.84, 2);
     expect(contractMeasured(works, "2026-10")).toBe(true);
     expect(contractMeasured(works, "2026-11")).toBe(false);
+  });
+  it("andaime vai para o Contrato Andaimes", () => {
+    expect(isScaffoldRow({ description: "MONTAGEM DE ANDAIME PARA TROCA DE SILOS" })).toBe(true);
+    expect(isScaffoldRow({ description: "LIMPEZA DO SECADOR" })).toBe(false);
+    expect(findScaffoldWork([{ id: "x", name: "Contrato Andaimes", quote_number: null, orders: [] }])?.id).toBe("x");
   });
 });

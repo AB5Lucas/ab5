@@ -9,6 +9,8 @@ export const MARS_MANAGER = "Felipe Hideki Oki";
 /** Pedido do contrato recorrente: os serviços que têm esse pedido recebem as linhas de cada medição. */
 export const MARS_CONTRACT_ORDER = "4500777910";
 export const MARS_CONTRACT_VALUE = 188131.05;
+/** Pedidos com "andaime" na descrição não viram serviço: entram como linhas do serviço Contrato Andaimes. */
+export const MARS_SCAFFOLD_WORK = "Contrato Andaimes";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 export const marsFile = (ym: string) => `Serviços/SERVIÇOS EXTERNOS/MARS MM/Faturamento MARS ${ym.slice(0, 4)}.xlsx`;
@@ -133,3 +135,7 @@ const contractWorks = (works: MarsWork[], order: string) => works.filter((w) => 
 /** O contrato já foi medido no mês: algum serviço do contrato tem linha com data no mês e o mesmo valor-base de pedido de medição. */
 export const contractMeasured = (works: MarsWork[], ym: string, order = MARS_CONTRACT_ORDER) =>
   contractWorks(works, order).some((w) => (w.orders ?? []).some((o) => String(o.number ?? "") === order && String(o.date ?? "").slice(0, 7) === ym));
+
+/** Item de andaime (vai para o Contrato Andaimes em vez de criar serviço). */
+export const isScaffoldRow = (r: Pick<MarsRow, "description">) => /ANDAIME/.test(norm(r.description));
+export const findScaffoldWork = (works: MarsWork[]) => works.find((w) => norm(w.name) === norm(MARS_SCAFFOLD_WORK));

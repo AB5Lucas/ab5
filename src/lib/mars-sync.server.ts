@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
 import {
   MARS_CLIENT, MARS_CONTRACT_ORDER, MARS_CONTRACT_VALUE, MARS_MANAGER, contractMeasured, marsFile, marsSheetName, matchWork,
-  parseMarsSheet, prevMonth, rowsToSync, splitContract, type MarsOrder, type MarsRow, type MarsWork,
+  findScaffoldWork, isScaffoldRow, parseMarsSheet, prevMonth, rowsToSync, splitContract, type MarsOrder, type MarsRow, type MarsWork,
 } from "./mars-sync";
 
 type Credentials = { lovableKey: string; excelKey: string };
@@ -71,6 +71,7 @@ async function applyMars(parsed: MarsRow[], ym: string) {
   const date = ym === curMonth() ? today() : `${ym}-01`;
   let created = 0; let updated = 0; const notes: string[] = [];
   const items = rowsToSync(parsed, firstRun);
+  const scaffold = findScaffoldWork(works);
   const ignored = parsed.filter((r) => !r.contract).length - items.length;
 
   // Tudo é juntado na memória e gravado em lote no fim (uma linha por vez estourava o tempo do servidor).
@@ -90,14 +91,15 @@ async function applyMars(parsed: MarsRow[], ym: string) {
     if (m) {
       // Serviço criado pela leitura: o pedido que chegou depois ("SEM" → número) ou o valor novo troca a linha que a leitura gravou.
       const w = m.work_id ? works.find((x) => x.id === m.work_id) : undefined;
-      if (m.action === "created" && w && ((r.order ?? null) !== (m.synced_order ?? null) || r.value !== Number(m.synced_value ?? 0))) {
+      // Também no Contrato Andaimes, onde a leitura acrescenta as linhas dos pedidos de andaime.
+      if (w && (m.action === "created" || w.id === scaffold?.id) && ((r.order ?? null) !== (m.synced_order ?? null) || r.value !== Number(m.synced_value ?? 0))) {
         const orders = (w.orders ?? []).slice();
         const i = orders.findIndex((o) => String(o.number ?? "") === (m.synced_order ?? "") && Number(o.value ?? 0) === Number(m.synced_value ?? 0));
         if (i >= 0) {
           orders[i] = { ...orders[i], number: r.order ?? "", value: r.value };
           await saveOrders(w, orders);
           updated++;
-          await upsertItem({ key: r.key, ...base(r), action: "created", work_id: w.id, synced_order: r.order, synced_value: r.value });
+          await upsertItem({ key: r.key, ...base(r), action: m.action, work_id: w.id, synced_order: r.order, synced_value: r.value });
           continue;
         }
       }
@@ -112,6 +114,13 @@ async function applyMars(parsed: MarsRow[], ym: string) {
         updated++;
       }
       await upsertItem({ key: r.key, ...base(r), action: "existing", work_id: hit.id, synced_order: r.order, synced_value: r.value });
+      continue;
+    }
+    // Andaime: entra como linha nova do Contrato Andaimes (não cria serviço).
+    if (scaffold && isScaffoldRow(r)) {
+      await saveOrders(scaffold, [...(scaffold.orders ?? []), { number: r.order ?? "", value: r.value, date }]);
+      updated++;
+      await upsertItem({ key: r.key, ...base(r), action: "existing", work_id: scaffold.id, synced_order: r.order, synced_value: r.value });
       continue;
     }
     const id = crypto.randomUUID();
