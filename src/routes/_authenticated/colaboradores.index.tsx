@@ -6,7 +6,7 @@ import { TurnosPage } from "@/components/colaboradores/turnos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ChevronDown, Copy, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { collaboratorNamesText, matchesPositions } from "@/lib/collaborator-list";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -228,7 +228,7 @@ const ref = (v: string) => (v === NONE ? null : v);
 const SALARY_GROUPS = ["diretoria / administrador", "rh / pessoal"];
 
 function CollaboratorsPage() {
-  const { canWrite, role, user } = useCurrentUser();
+  const { canWrite: canWriteRole, role, user } = useCurrentUser();
   // Valor hora/salário: só administrador e os grupos Diretoria / Administrador e RH / Pessoal veem; para os demais o campo fica borrado e não é gravado.
   const myGroup = useQuery({
     queryKey: ["my-access-group-name", user?.id],
@@ -242,6 +242,8 @@ function CollaboratorsPage() {
     },
   });
   const canSeeSalary = role === "admin" || SALARY_GROUPS.includes((myGroup.data ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
+  // Editar/incluir/importar/excluir só quem pode ver o salário; os demais só consultam (sem o salário).
+  const canWrite = canWriteRole && canSeeSalary;
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string[]>(["active"]);
@@ -603,11 +605,9 @@ function CollaboratorsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {canWrite && (
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(c)} title={canWrite ? "Editar" : "Consultar"}>
+                      {canWrite ? <Pencil className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
                     {canWrite && (
                       <Button variant="ghost" size="sm" onClick={() => setDeleting(c)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -627,9 +627,10 @@ function CollaboratorsPage() {
         </DialogTrigger>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? "Editar colaborador" : "Novo colaborador"}</DialogTitle>
+            <DialogTitle>{!canWrite ? "Colaborador" : editing ? "Editar colaborador" : "Novo colaborador"}</DialogTitle>
           </DialogHeader>
 
+          <fieldset disabled={!canWrite} className="contents">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="registration">Matrícula *</Label>
@@ -783,12 +784,15 @@ function CollaboratorsPage() {
               <Textarea id="notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={3} />
             </div>
           </div>
+          </fieldset>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending || !canWrite}>
-              {save.isPending ? "Salvando..." : "Salvar"}
-            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>{canWrite ? "Cancelar" : "Fechar"}</Button>
+            {canWrite && (
+              <Button onClick={() => save.mutate()} disabled={save.isPending}>
+                {save.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
