@@ -835,7 +835,7 @@ export function VehicleTimeline() {
       <div key={i}
         onDragOver={(e) => { if (dragFreight !== null) e.preventDefault(); }}
         onDrop={(e) => { e.preventDefault(); if (dragFreight !== null && dragFreight !== i) moveFreight(dragFreight, i); setDragFreight(null); }}
-        className={`space-y-2 rounded-md border p-3 ${dragFreight === i ? "border-primary opacity-60" : "border-border"}`}>
+        className={`space-y-2 rounded-md border p-2.5 ${dragFreight === i ? "border-primary opacity-60" : "border-border"}`}>
         <div className="flex items-center gap-2">
           {total > 1 && (
             <span draggable onDragStart={(e) => { setDragFreight(i); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => setDragFreight(null)}
@@ -851,6 +851,7 @@ export function VehicleTimeline() {
             </Button>
           )}
         </div>
+        <div className="grid gap-2 sm:grid-cols-2">
         <div className="space-y-1">
           <Label>Motorista</Label>
           <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={driverOptions} placeholder="Selecione o motorista" searchPlaceholder="Buscar motorista" />
@@ -891,10 +892,11 @@ export function VehicleTimeline() {
         {i === 0 && isAdmClient(base) && (
           <div className="space-y-1">
             <Label htmlFor="vehicle-adm-km">Km do dia (ida)</Label>
-            <Input id="vehicle-adm-km" className="w-40" inputMode="decimal" placeholder="Ex.: 35" value={form.km}
+            <Input id="vehicle-adm-km" inputMode="decimal" placeholder="Ex.: 35" value={form.km}
               onChange={(e) => setForm((f) => ({ ...f, km: e.target.value.replace(/[^\d,.]/g, "") }))} />
           </div>
         )}
+        </div>
         <p className="text-xs text-muted-foreground">{freightKmText(fr, i) || "A quilometragem vem da distância cadastrada do cliente."}</p>
         {byWork && i === 0 && base !== NONE && !SPECIAL_KEYS.has(base) && !fr.client.startsWith(WORK_PREFIX) && (
           <p className="text-xs text-muted-foreground">O custo do caminhão no dia é dividido entre os serviços do cliente pelas horas trabalhadas em cada um.</p>
@@ -1133,11 +1135,11 @@ export function VehicleTimeline() {
 
       {/* Editor da célula */}
       <Dialog open={!!cell} onOpenChange={(o) => !o && setCell(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col gap-3">
           <DialogHeader>
             <DialogTitle>Programação do veículo</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="-mx-1 min-h-0 flex-1 space-y-3 overflow-y-auto px-1">
             {/* Cada frete do dia é uma caixa igual (motorista, cliente, serviço, local, km); o 1º é o principal.
                 Dá para excluir qualquer um e arrastar pela alça para mudar a ordem. */}
             <div className="space-y-2">
@@ -1152,37 +1154,25 @@ export function VehicleTimeline() {
                 <p className="text-xs text-muted-foreground">O 1º frete é o principal (prêmios e viagens); o km dos outros é somado no relatório da frota.</p>
               )}
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
-              <div>
-                <Label>Viagens no dia</Label>
-                <p className="text-xs text-muted-foreground">
-                  Na 1ª viagem vai a lotação cheia; nas seguintes, uma pessoa a menos (ex.: Suzano, 6 e 5).
-                </p>
+            <div className="grid gap-3 rounded-md border border-border p-2.5 sm:grid-cols-3">
+              <div className="space-y-1" title="Na 1ª viagem vai a lotação cheia; nas seguintes, uma pessoa a menos (ex.: Suzano, 6 e 5).">
+                <Label htmlFor="vehicle-trips">Viagens no dia</Label>
+                <Input id="vehicle-trips" type="number" min={1} step="1" value={form.trips} onChange={(e) => setForm((f) => ({ ...f, trips: e.target.value }))} />
               </div>
-              <Input
-                type="number"
-                min={1}
-                step="1"
-                className="w-20"
-                value={form.trips}
-                onChange={(e) => setForm((f) => ({ ...f, trips: e.target.value }))}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-md border border-border p-3">
-              <div>
-                <Label>Recebe Prêmio de Motorista</Label>
-                <p className="text-xs text-muted-foreground">Verde = recebe · Cinza = não recebe</p>
+              <div className="space-y-1" title="Verde = recebe · Cinza = não recebe">
+                <Label className="block">Prêmio de Motorista</Label>
+                <div className="flex h-10 items-center">
+                  <Switch
+                    checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY && form.client_id !== MAINTENANCE_KEY && !(isIndustryClient(truckClient) && form.external_place.trim())}
+                    disabled={form.client_id === EXTERNAL_KEY || form.client_id === MAINTENANCE_KEY || (isIndustryClient(truckClient) && !!form.external_place.trim())}
+                    onCheckedChange={(v) => setForm((f) => ({ ...f, driver_bonus: v }))}
+                  />
+                </div>
               </div>
-              <Switch
-                checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY && form.client_id !== MAINTENANCE_KEY && !(isIndustryClient(truckClient) && form.external_place.trim())}
-                disabled={form.client_id === EXTERNAL_KEY || form.client_id === MAINTENANCE_KEY || (isIndustryClient(truckClient) && !!form.external_place.trim())}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, driver_bonus: v }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Repetir até (opcional)</Label>
-              <Input type="date" value={form.repeat_until} onChange={(e) => setForm((f) => ({ ...f, repeat_until: e.target.value }))} />
-              <p className="text-xs text-muted-foreground">Aplica a mesma programação nos dias seguintes até a data escolhida.</p>
+              <div className="space-y-1" title="Aplica a mesma programação nos dias seguintes até a data escolhida.">
+                <Label htmlFor="vehicle-repeat">Repetir até (opcional)</Label>
+                <Input id="vehicle-repeat" type="date" value={form.repeat_until} onChange={(e) => setForm((f) => ({ ...f, repeat_until: e.target.value }))} />
+              </div>
             </div>
           </div>
           <DialogFooter className="justify-between sm:justify-between">
