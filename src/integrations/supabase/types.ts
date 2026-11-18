@@ -14,51 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
-      access_groups: {
-        Row: {
-          id: string
-          key: string
-          name: string
-          cargos: string[]
-          sort: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          key: string
-          name: string
-          cargos?: string[]
-          sort?: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          key?: string
-          name?: string
-          cargos?: string[]
-          sort?: number
-          created_at?: string
-        }
-        Relationships: []
-      }
       access_group_pages: {
         Row: {
+          allowed: boolean
           group_id: string
           path: string
-          allowed: boolean
           updated_at: string
         }
         Insert: {
+          allowed: boolean
           group_id: string
           path: string
-          allowed: boolean
           updated_at?: string
         }
         Update: {
+          allowed?: boolean
           group_id?: string
           path?: string
-          allowed?: boolean
           updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_group_pages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "access_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      access_groups: {
+        Row: {
+          cargos: string[]
+          created_at: string
+          id: string
+          key: string
+          name: string
+          sort: number
+        }
+        Insert: {
+          cargos?: string[]
+          created_at?: string
+          id?: string
+          key: string
+          name: string
+          sort?: number
+        }
+        Update: {
+          cargos?: string[]
+          created_at?: string
+          id?: string
+          key?: string
+          name?: string
+          sort?: number
         }
         Relationships: []
       }
@@ -1720,8 +1728,8 @@ export type Database = {
           supervisor_id: string | null
           travel_bonus_enabled: boolean
           updated_at: string
-          vt_enabled: boolean
           vt_always_full: boolean
+          vt_enabled: boolean
         }
         Insert: {
           birth_date?: string | null
@@ -1754,8 +1762,8 @@ export type Database = {
           supervisor_id?: string | null
           travel_bonus_enabled?: boolean
           updated_at?: string
-          vt_enabled?: boolean
           vt_always_full?: boolean
+          vt_enabled?: boolean
         }
         Update: {
           birth_date?: string | null
@@ -1788,8 +1796,8 @@ export type Database = {
           supervisor_id?: string | null
           travel_bonus_enabled?: boolean
           updated_at?: string
-          vt_enabled?: boolean
           vt_always_full?: boolean
+          vt_enabled?: boolean
         }
         Relationships: [
           {
@@ -3186,66 +3194,6 @@ export type Database = {
           },
         ]
       }
-      mars_sync_items: {
-        Row: {
-          key: string
-          ref_month: string
-          source: string
-          quote: string | null
-          order_number: string | null
-          description: string
-          value: number
-          requester: string | null
-          category: string | null
-          sheet_status: string | null
-          notes: string | null
-          action: string
-          work_id: string | null
-          synced_order: string | null
-          synced_value: number | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          key: string
-          ref_month: string
-          source: string
-          quote?: string | null
-          order_number?: string | null
-          description: string
-          value?: number
-          requester?: string | null
-          category?: string | null
-          sheet_status?: string | null
-          notes?: string | null
-          action: string
-          work_id?: string | null
-          synced_order?: string | null
-          synced_value?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          key?: string
-          ref_month?: string
-          source?: string
-          quote?: string | null
-          order_number?: string | null
-          description?: string
-          value?: number
-          requester?: string | null
-          category?: string | null
-          sheet_status?: string | null
-          notes?: string | null
-          action?: string
-          work_id?: string | null
-          synced_order?: string | null
-          synced_value?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       lodging_stays: {
         Row: {
           collaborator_id: string
@@ -3280,6 +3228,74 @@ export type Database = {
             columns: ["collaborator_id"]
             isOneToOne: false
             referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mars_sync_items: {
+        Row: {
+          action: string
+          category: string | null
+          created_at: string
+          description: string
+          key: string
+          notes: string | null
+          order_number: string | null
+          quote: string | null
+          ref_month: string
+          requester: string | null
+          sheet_status: string | null
+          source: string
+          synced_order: string | null
+          synced_value: number | null
+          updated_at: string
+          value: number
+          work_id: string | null
+        }
+        Insert: {
+          action: string
+          category?: string | null
+          created_at?: string
+          description: string
+          key: string
+          notes?: string | null
+          order_number?: string | null
+          quote?: string | null
+          ref_month: string
+          requester?: string | null
+          sheet_status?: string | null
+          source: string
+          synced_order?: string | null
+          synced_value?: number | null
+          updated_at?: string
+          value?: number
+          work_id?: string | null
+        }
+        Update: {
+          action?: string
+          category?: string | null
+          created_at?: string
+          description?: string
+          key?: string
+          notes?: string | null
+          order_number?: string | null
+          quote?: string | null
+          ref_month?: string
+          requester?: string | null
+          sheet_status?: string | null
+          source?: string
+          synced_order?: string | null
+          synced_value?: number | null
+          updated_at?: string
+          value?: number
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mars_sync_items_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
             referencedColumns: ["id"]
           },
         ]
@@ -3390,6 +3406,55 @@ export type Database = {
           },
         ]
       }
+      purchase_approvers: {
+        Row: {
+          approver_id: string | null
+          created_at: string
+          needs_approval: boolean
+          requester_id: string
+          self_approve: boolean
+          substitute_id: string | null
+        }
+        Insert: {
+          approver_id?: string | null
+          created_at?: string
+          needs_approval?: boolean
+          requester_id: string
+          self_approve?: boolean
+          substitute_id?: string | null
+        }
+        Update: {
+          approver_id?: string | null
+          created_at?: string
+          needs_approval?: boolean
+          requester_id?: string
+          self_approve?: boolean
+          substitute_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_approvers_approver_id_fkey"
+            columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "users_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_approvers_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: true
+            referencedRelation: "users_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_approvers_substitute_id_fkey"
+            columns: ["substitute_id"]
+            isOneToOne: false
+            referencedRelation: "users_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_asset_decisions: {
         Row: {
           category: string
@@ -3459,228 +3524,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      purchase_approvers: {
-        Row: {
-          substitute_id: string | null
-          self_approve: boolean
-          needs_approval: boolean
-          approver_id: string | null
-          created_at: string
-          requester_id: string
-        }
-        Insert: {
-          substitute_id?: string | null
-          self_approve?: boolean
-          needs_approval?: boolean
-          approver_id?: string | null
-          created_at?: string
-          requester_id: string
-        }
-        Update: {
-          substitute_id?: string | null
-          self_approve?: boolean
-          needs_approval?: boolean
-          approver_id?: string
-          created_at?: string
-          requester_id?: string
-        }
-        Relationships: []
-      }
-      purchase_request_items: {
-        Row: {
-          created_at: string
-          cc_code: string | null
-          description: string
-          id: string
-          item_no: number
-          notes: string | null
-          order_number: string | null
-          order_file_path: string | null
-          status_at: string | null
-          photo_path: string | null
-          quote_path: string | null
-          quantity: number
-          request_id: string
-          status: string
-          unit: string
-          budget: number | null
-          work_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          cc_code?: string | null
-          description: string
-          id?: string
-          item_no: number
-          notes?: string | null
-          order_number?: string | null
-          order_file_path?: string | null
-          status_at?: string | null
-          photo_path?: string | null
-          quote_path?: string | null
-          quantity: number
-          request_id: string
-          status?: string
-          unit: string
-          budget?: number | null
-          work_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          cc_code?: string | null
-          description?: string
-          id?: string
-          item_no?: number
-          notes?: string | null
-          order_number?: string | null
-          order_file_path?: string | null
-          status_at?: string | null
-          photo_path?: string | null
-          quote_path?: string | null
-          quantity?: number
-          request_id?: string
-          status?: string
-          unit?: string
-          budget?: number | null
-          work_id?: string | null
-        }
-        Relationships: []
-      }
-      purchase_requests: {
-        Row: {
-          cancelled_at: string | null
-          decided_by: string | null
-          substitute_id: string | null
-          approver_collab_id: string | null
-          approved_at: string | null
-          approver_id: string | null
-          approver_notes: string | null
-          buyer_notes: string | null
-          category: string | null
-          client_id: string | null
-          created_at: string
-          delivery_kind: string
-          delivery_place: string | null
-          due_date: string | null
-          id: string
-          nature: string | null
-          notes: string | null
-          justification: string | null
-          validator_open_by: string | null
-          validator_open_at: string | null
-          number: string
-          priority: string | null
-          request_date: string
-          requester_id: string
-          requester_name: string
-          sent_at: string | null
-          seq: number
-          stage: string
-          status: string
-          status_at: string
-          system: string
-          total_budget: number | null
-          observer_ids: string[]
-          return_notes: string | null
-          returned_by: string | null
-          photo_path: string | null
-          quote_path: string | null
-        }
-        Insert: {
-          cancelled_at?: string | null
-          decided_by?: string | null
-          substitute_id?: string | null
-          approver_collab_id?: string | null
-          approved_at?: string | null
-          approver_id?: string | null
-          approver_notes?: string | null
-          buyer_notes?: string | null
-          category?: string | null
-          client_id?: string | null
-          created_at?: string
-          delivery_kind?: string
-          delivery_place?: string | null
-          due_date?: string | null
-          id?: string
-          nature?: string | null
-          notes?: string | null
-          justification?: string | null
-          validator_open_by?: string | null
-          validator_open_at?: string | null
-          number: string
-          priority?: string | null
-          request_date?: string
-          requester_id?: string
-          requester_name: string
-          sent_at?: string | null
-          seq: number
-          stage?: string
-          status?: string
-          status_at?: string
-          system: string
-          total_budget?: number | null
-          observer_ids?: string[]
-          return_notes?: string | null
-          returned_by?: string | null
-          photo_path?: string | null
-          quote_path?: string | null
-        }
-        Update: {
-          cancelled_at?: string | null
-          decided_by?: string | null
-          substitute_id?: string | null
-          approver_collab_id?: string | null
-          approved_at?: string | null
-          approver_id?: string | null
-          approver_notes?: string | null
-          buyer_notes?: string | null
-          category?: string | null
-          client_id?: string | null
-          created_at?: string
-          delivery_kind?: string
-          delivery_place?: string | null
-          due_date?: string | null
-          id?: string
-          nature?: string | null
-          notes?: string | null
-          justification?: string | null
-          validator_open_by?: string | null
-          validator_open_at?: string | null
-          number?: string
-          priority?: string | null
-          request_date?: string
-          requester_id?: string
-          requester_name?: string
-          sent_at?: string | null
-          seq?: number
-          stage?: string
-          status?: string
-          status_at?: string
-          system?: string
-          total_budget?: number | null
-          observer_ids?: string[]
-          return_notes?: string | null
-          returned_by?: string | null
-          photo_path?: string | null
-          quote_path?: string | null
-        }
-        Relationships: []
-      }
-      purchase_sc_seq: {
-        Row: {
-          last_number: number
-          requester_key: string
-        }
-        Insert: {
-          last_number?: number
-          requester_key: string
-        }
-        Update: {
-          last_number?: number
-          requester_key?: string
-        }
-        Relationships: []
       }
       purchase_cc_lines: {
         Row: {
@@ -3802,6 +3645,231 @@ export type Database = {
           match_type?: string
           reason?: string
           value?: string
+        }
+        Relationships: []
+      }
+      purchase_request_items: {
+        Row: {
+          budget: number | null
+          cc_code: string | null
+          created_at: string
+          description: string
+          id: string
+          item_no: number
+          notes: string | null
+          order_file_path: string | null
+          order_number: string | null
+          photo_path: string | null
+          quantity: number
+          quote_path: string | null
+          request_id: string
+          status: string
+          status_at: string | null
+          unit: string
+          work_id: string | null
+        }
+        Insert: {
+          budget?: number | null
+          cc_code?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          item_no: number
+          notes?: string | null
+          order_file_path?: string | null
+          order_number?: string | null
+          photo_path?: string | null
+          quantity: number
+          quote_path?: string | null
+          request_id: string
+          status?: string
+          status_at?: string | null
+          unit: string
+          work_id?: string | null
+        }
+        Update: {
+          budget?: number | null
+          cc_code?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          item_no?: number
+          notes?: string | null
+          order_file_path?: string | null
+          order_number?: string | null
+          photo_path?: string | null
+          quantity?: number
+          quote_path?: string | null
+          request_id?: string
+          status?: string
+          status_at?: string | null
+          unit?: string
+          work_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_request_items_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_items_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_requests: {
+        Row: {
+          approved_at: string | null
+          approver_collab_id: string | null
+          approver_id: string | null
+          approver_notes: string | null
+          buyer_notes: string | null
+          cancelled_at: string | null
+          category: string | null
+          client_id: string | null
+          created_at: string
+          decided_by: string | null
+          delivery_kind: string
+          delivery_place: string | null
+          due_date: string | null
+          id: string
+          justification: string | null
+          nature: string | null
+          notes: string | null
+          number: string
+          observer_ids: string[]
+          photo_path: string | null
+          priority: string | null
+          quote_path: string | null
+          request_date: string
+          requester_id: string
+          requester_name: string
+          return_notes: string | null
+          returned_by: string | null
+          sent_at: string | null
+          seq: number
+          stage: string
+          status: string
+          status_at: string
+          substitute_id: string | null
+          system: string
+          total_budget: number | null
+          validator_open_at: string | null
+          validator_open_by: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approver_collab_id?: string | null
+          approver_id?: string | null
+          approver_notes?: string | null
+          buyer_notes?: string | null
+          cancelled_at?: string | null
+          category?: string | null
+          client_id?: string | null
+          created_at?: string
+          decided_by?: string | null
+          delivery_kind?: string
+          delivery_place?: string | null
+          due_date?: string | null
+          id?: string
+          justification?: string | null
+          nature?: string | null
+          notes?: string | null
+          number: string
+          observer_ids?: string[]
+          photo_path?: string | null
+          priority?: string | null
+          quote_path?: string | null
+          request_date?: string
+          requester_id?: string
+          requester_name: string
+          return_notes?: string | null
+          returned_by?: string | null
+          sent_at?: string | null
+          seq: number
+          stage?: string
+          status?: string
+          status_at?: string
+          substitute_id?: string | null
+          system: string
+          total_budget?: number | null
+          validator_open_at?: string | null
+          validator_open_by?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approver_collab_id?: string | null
+          approver_id?: string | null
+          approver_notes?: string | null
+          buyer_notes?: string | null
+          cancelled_at?: string | null
+          category?: string | null
+          client_id?: string | null
+          created_at?: string
+          decided_by?: string | null
+          delivery_kind?: string
+          delivery_place?: string | null
+          due_date?: string | null
+          id?: string
+          justification?: string | null
+          nature?: string | null
+          notes?: string | null
+          number?: string
+          observer_ids?: string[]
+          photo_path?: string | null
+          priority?: string | null
+          quote_path?: string | null
+          request_date?: string
+          requester_id?: string
+          requester_name?: string
+          return_notes?: string | null
+          returned_by?: string | null
+          sent_at?: string | null
+          seq?: number
+          stage?: string
+          status?: string
+          status_at?: string
+          substitute_id?: string | null
+          system?: string
+          total_budget?: number | null
+          validator_open_at?: string | null
+          validator_open_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_requests_approver_collab_id_fkey"
+            columns: ["approver_collab_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_sc_seq: {
+        Row: {
+          last_number: number
+          requester_key: string
+        }
+        Insert: {
+          last_number?: number
+          requester_key: string
+        }
+        Update: {
+          last_number?: number
+          requester_key?: string
         }
         Relationships: []
       }
@@ -5130,7 +5198,15 @@ export type Database = {
           pending?: boolean
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_profiles_access_group_id_fkey"
+            columns: ["access_group_id"]
+            isOneToOne: false
+            referencedRelation: "access_groups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       va_overrides: {
         Row: {
@@ -5314,20 +5390,19 @@ export type Database = {
       }
       vehicle_schedules: {
         Row: {
+          adm_place: string | null
           client_id: string | null
           created_at: string
           driver_bonus: boolean
           driver_id: string | null
-          requester_id: string | null
-          adm_place: string | null
           driver_toggle: boolean
-          extra_requester_ids: string[]
-          extra_driver_toggles: boolean[]
           external_place: string | null
           extra_client_ids: string[]
           extra_driver_ids: string[]
+          extra_driver_toggles: boolean[]
           extra_km: number
           extra_places: string[]
+          extra_requester_ids: string[]
           extra_work_ids: string[]
           id: string
           is_external: boolean
@@ -5336,6 +5411,7 @@ export type Database = {
           km: number
           notes: string | null
           place_toll: number | null
+          requester_id: string | null
           schedule_date: string
           trips: number
           updated_at: string
@@ -5343,20 +5419,19 @@ export type Database = {
           work_id: string | null
         }
         Insert: {
+          adm_place?: string | null
           client_id?: string | null
           created_at?: string
           driver_bonus?: boolean
           driver_id?: string | null
-          requester_id?: string | null
-          adm_place?: string | null
           driver_toggle?: boolean
-          extra_requester_ids?: string[]
-          extra_driver_toggles?: boolean[]
           external_place?: string | null
           extra_client_ids?: string[]
           extra_driver_ids?: string[]
+          extra_driver_toggles?: boolean[]
           extra_km?: number
           extra_places?: string[]
+          extra_requester_ids?: string[]
           extra_work_ids?: string[]
           id?: string
           is_external?: boolean
@@ -5365,6 +5440,7 @@ export type Database = {
           km?: number
           notes?: string | null
           place_toll?: number | null
+          requester_id?: string | null
           schedule_date: string
           trips?: number
           updated_at?: string
@@ -5372,20 +5448,19 @@ export type Database = {
           work_id?: string | null
         }
         Update: {
+          adm_place?: string | null
           client_id?: string | null
           created_at?: string
           driver_bonus?: boolean
           driver_id?: string | null
-          requester_id?: string | null
-          adm_place?: string | null
           driver_toggle?: boolean
-          extra_requester_ids?: string[]
-          extra_driver_toggles?: boolean[]
           external_place?: string | null
           extra_client_ids?: string[]
           extra_driver_ids?: string[]
+          extra_driver_toggles?: boolean[]
           extra_km?: number
           extra_places?: string[]
+          extra_requester_ids?: string[]
           extra_work_ids?: string[]
           id?: string
           is_external?: boolean
@@ -5394,6 +5469,7 @@ export type Database = {
           km?: number
           notes?: string | null
           place_toll?: number | null
+          requester_id?: string | null
           schedule_date?: string
           trips?: number
           updated_at?: string
@@ -5889,7 +5965,6 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           manager_id: string | null
-          substitute_manager_id: string | null
           monthly_enabled: boolean
           name: string
           neighborhood: string | null
@@ -5905,6 +5980,7 @@ export type Database = {
           start_date: string | null
           state: string | null
           status: Database["public"]["Enums"]["work_status"]
+          substitute_manager_id: string | null
           supervisor_id: string | null
           updated_at: string
           zip_code: string | null
@@ -5934,7 +6010,6 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           manager_id?: string | null
-          substitute_manager_id?: string | null
           monthly_enabled?: boolean
           name: string
           neighborhood?: string | null
@@ -5950,6 +6025,7 @@ export type Database = {
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]
+          substitute_manager_id?: string | null
           supervisor_id?: string | null
           updated_at?: string
           zip_code?: string | null
@@ -5979,7 +6055,6 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           manager_id?: string | null
-          substitute_manager_id?: string | null
           monthly_enabled?: boolean
           name?: string
           neighborhood?: string | null
@@ -5995,6 +6070,7 @@ export type Database = {
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]
+          substitute_manager_id?: string | null
           supervisor_id?: string | null
           updated_at?: string
           zip_code?: string | null
@@ -6015,6 +6091,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "works_substitute_manager_id_fkey"
+            columns: ["substitute_manager_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "works_supervisor_id_fkey"
             columns: ["supervisor_id"]
             isOneToOne: false
@@ -6028,17 +6111,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      purchase_request_create: { Args: { _p: Json }; Returns: string }
-      purchase_request_send: { Args: { _id: string }; Returns: string }
-      purchase_item_set_file: { Args: { _item: string; _path: string }; Returns: undefined }
-      purchase_request_return: { Args: { _id: string; _notes: string }; Returns: undefined }
-      purchase_request_recall: { Args: { _id: string }; Returns: undefined }
-      purchase_request_validator_open: { Args: { _id: string; _open: boolean }; Returns: undefined }
-      purchase_request_create_totvs: { Args: { _number: string; _photo: string; _observers?: string[]; _p?: Json }; Returns: string }
-      purchase_request_cancel: { Args: { _id: string }; Returns: undefined }
-      purchase_request_decide: { Args: { _id: string; _approve: boolean; _notes: string }; Returns: undefined }
-      purchase_request_set_status: { Args: { _id: string; _status: string; _notes: string; _date?: string }; Returns: undefined }
-      purchase_item_set: { Args: { _item: string; _status: string; _order: string; _date?: string }; Returns: undefined }
       _andam_move: {
         Args: {
           _fc: string
@@ -6054,6 +6126,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      access_group_by_cargo: { Args: { _user: string }; Returns: string }
       andam_adjust: {
         Args: {
           _client: string
@@ -6219,6 +6292,43 @@ export type Database = {
         Args: { _entries: Json; _line: string; _summary: Json }
         Returns: number
       }
+      purchase_can_edit: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: boolean
+      }
+      purchase_can_see: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: boolean
+      }
+      purchase_client_manager: { Args: { _client: string }; Returns: string }
+      purchase_client_substitute: {
+        Args: { _client: string; _manager: string }
+        Returns: string
+      }
+      purchase_effective_approver: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: string
+      }
+      purchase_fixed_observers: { Args: never; Returns: string[] }
+      purchase_is_approver_of: {
+        Args: { _requester: string }
+        Returns: boolean
+      }
+      purchase_is_buyer: { Args: never; Returns: boolean }
+      purchase_item_set: {
+        Args: { _date?: string; _item: string; _order: string; _status: string }
+        Returns: undefined
+      }
+      purchase_item_set_file: {
+        Args: { _item: string; _path: string }
+        Returns: undefined
+      }
+      purchase_my_pending_validation: {
+        Args: never
+        Returns: {
+          due_date: string
+        }[]
+      }
       purchase_replace_entries: {
         Args: {
           _entries: Json
@@ -6227,6 +6337,40 @@ export type Database = {
           _status: string
         }
         Returns: number
+      }
+      purchase_request_cancel: { Args: { _id: string }; Returns: undefined }
+      purchase_request_create: { Args: { _p: Json }; Returns: string }
+      purchase_request_create_totvs: {
+        Args: {
+          _number: string
+          _observers?: string[]
+          _p?: Json
+          _photo: string
+        }
+        Returns: string
+      }
+      purchase_request_decide: {
+        Args: { _approve: boolean; _id: string; _notes: string }
+        Returns: undefined
+      }
+      purchase_request_recall: { Args: { _id: string }; Returns: undefined }
+      purchase_request_return: {
+        Args: { _id: string; _notes: string }
+        Returns: undefined
+      }
+      purchase_request_send: { Args: { _id: string }; Returns: string }
+      purchase_request_set_status: {
+        Args: { _date?: string; _id: string; _notes: string; _status: string }
+        Returns: undefined
+      }
+      purchase_request_validator_open: {
+        Args: { _id: string; _open: boolean }
+        Returns: undefined
+      }
+      purchase_requester_key: { Args: { _name: string }; Returns: string }
+      purchase_user_of_collaborator: {
+        Args: { _collab: string }
+        Returns: string
       }
       rdo_add_worker: {
         Args: {
