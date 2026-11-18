@@ -67,6 +67,8 @@ export type VehicleScheduleRow = {
   is_suzano_local?: boolean;
   work_id?: string | null;
   external_place?: string | null;
+  /** Cliente ADM: local digitado no lugar do serviço (só nome, não muda km nem prêmio). */
+  adm_place?: string | null;
 };
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -304,7 +306,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_work_ids, extra_km, trips, is_suzano_local, work_id, external_place, requester_id, driver_toggle, extra_requester_ids, extra_driver_toggles")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_work_ids, extra_km, trips, is_suzano_local, work_id, external_place, requester_id, driver_toggle, extra_requester_ids, extra_driver_toggles, adm_place")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -439,7 +441,7 @@ export function VehicleTimeline() {
 
   function extraName(id: string, place?: string | null) {
     // Indústria com local digitado (viagem fora): aparece só o local, como era o Externo.
-    if (place && isIndustryClient(id)) return place.toUpperCase();
+    if (place && (isIndustryClient(id) || isAdmClient(id))) return place.toUpperCase();
     if (id === EXTERNAL_KEY) return "EXTERNO";
     if (id === MAINTENANCE_KEY) return "MANUTENÇÃO";
     if (id === SUZANO_LOCAL_KEY) return "SUZANO LOCAL";
@@ -476,6 +478,7 @@ export function VehicleTimeline() {
       is_suzano_local?: boolean | undefined;
       work_id?: string | null | undefined;
       external_place?: string | null | undefined;
+      adm_place?: string | null | undefined;
       km?: number | null | undefined;
       requester_id?: string | null | undefined;
       driver_toggle?: boolean | undefined;
@@ -487,8 +490,10 @@ export function VehicleTimeline() {
     if (workId) f = { ...f, client_id: workById.get(workId)?.client_id ?? f.client_id };
     const special = f.is_external || f.is_maintenance || !!f.is_suzano_local;
     const industryPlace = !special && isIndustryClient(f.client_id) ? (f.external_place ?? "").trim() : "";
+    // ADM: o local digitado é só o nome que aparece (fica em adm_place; external_place é o da Indústria, que tira o prêmio).
+    const admPlace = !special && isAdmClient(f.client_id) ? ((f.external_place ?? "").trim() || (f.adm_place ?? "").trim()) : "";
     const pairs = (f.extra_client_ids ?? [])
-          .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "", place: isIndustryClient(c) ? (f.extra_places?.[i] ?? "").trim() : "", w: f.extra_work_ids?.[i] ?? "",
+          .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "", place: isIndustryClient(c) || isAdmClient(c) ? (f.extra_places?.[i] ?? "").trim() : "", w: f.extra_work_ids?.[i] ?? "",
             r: f.extra_requester_ids?.[i] ?? "", t: !!f.extra_driver_toggles?.[i] }))
           .filter((p) => p.c && p.c !== NONE);
     const extras = pairs.map((p) => p.c);
@@ -514,9 +519,10 @@ export function VehicleTimeline() {
       extra_places: pairs.map((p) => p.place),
       extra_work_ids: pairs.map((p) => (p.w && workById.get(p.w)?.client_id === p.c ? p.w : "")),
       // Indústria com local: km de ida do cliente Indústria × 2; sem km cadastrado, 100 km como antes.
-      extra_km: pairs.reduce((s, p) => s + (p.place ? placeExtraKm(p.place) : extraKm(p.c)), 0),
+      extra_km: pairs.reduce((s, p) => s + (p.place && isIndustryClient(p.c) ? placeExtraKm(p.place) : extraKm(p.c)), 0),
       work_id: special ? null : workId,
       external_place: f.is_external ? (f.external_place ?? "").trim() || null : industryPlace || null,
+      adm_place: admPlace || null,
       // Pedágio (ida) do local Indústria cadastrado; substitui o do cliente nos custos. Sem cadastro, segue o do cliente.
       place_toll: industryPlace ? industryToll(industryCustomers.data, industryPlace) : null,
     };
@@ -556,7 +562,7 @@ export function VehicleTimeline() {
       extraPlaces: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_places?.[i] ?? ""),
       extraWorks: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_work_ids?.[i] ?? ""),
       trips: String(current?.trips ?? 1),
-      external_place: current?.external_place ?? "",
+      external_place: current?.external_place ?? current?.adm_place ?? "",
       km: current && isAdmClient(current.client_id) ? String(current.km ?? "") : "",
     });
     setDriverSearch("");
@@ -627,7 +633,7 @@ export function VehicleTimeline() {
           trips: src.trips,
           is_suzano_local: src.is_suzano_local,
           work_id: src.work_id,
-          external_place: src.external_place,
+          external_place: src.external_place, adm_place: src.adm_place,
           km: src.km,
           requester_id: src.requester_id, driver_toggle: src.driver_toggle, extra_requester_ids: src.extra_requester_ids, extra_driver_toggles: src.extra_driver_toggles,
         }),
@@ -666,7 +672,7 @@ export function VehicleTimeline() {
             trips: s.trips,
             is_suzano_local: s.is_suzano_local,
             work_id: s.work_id,
-            external_place: s.external_place,
+            external_place: s.external_place, adm_place: s.adm_place,
             km: s.km,
             requester_id: s.requester_id, driver_toggle: s.driver_toggle, extra_requester_ids: s.extra_requester_ids, extra_driver_toggles: s.extra_driver_toggles,
           }),
@@ -923,7 +929,7 @@ export function VehicleTimeline() {
             </SelectContent>
           </Select>
         </div>
-        {byWork && base !== NONE && !SPECIAL_KEYS.has(base) && (
+        {byWork && base !== NONE && !SPECIAL_KEYS.has(base) && !isAdmClient(base) && (
           <div className="space-y-1">
             <Label>Serviço</Label>
             <Select value={fr.client.startsWith(WORK_PREFIX) ? fr.client : ALL_WORKS} onValueChange={(v) => patchFreight(i, { client: v === ALL_WORKS ? base : v })}>
@@ -935,6 +941,12 @@ export function VehicleTimeline() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+        {isAdmClient(base) && (
+          <div className="space-y-1">
+            <Label htmlFor={`freight-adm-place-${i}`}>Local</Label>
+            <Input id={`freight-adm-place-${i}`} placeholder="Ex.: Banco, Cartório, Fornecedor X" value={fr.place} onChange={(e) => patchFreight(i, { place: e.target.value })} />
           </div>
         )}
         {(fr.client === EXTERNAL_KEY || isIndustryClient(base)) && (
@@ -1150,6 +1162,8 @@ export function VehicleTimeline() {
                                     ? "SUZANO LOCAL"
                                   : row.external_place && isIndustryClient(row.client_id)
                                     ? row.external_place.toUpperCase()
+                                  : row.adm_place && isAdmClient(row.client_id)
+                                    ? row.adm_place.toUpperCase()
                                   : clientName.get(row.client_id ?? "") ?? "—"}
                               {(row.extra_client_ids ?? []).length > 0 && (
                                 <span className="font-semibold text-primary"> +{row.extra_client_ids!.length}</span>

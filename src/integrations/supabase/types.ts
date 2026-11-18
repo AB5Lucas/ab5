@@ -5319,6 +5319,7 @@ export type Database = {
           driver_bonus: boolean
           driver_id: string | null
           requester_id: string | null
+          adm_place: string | null
           driver_toggle: boolean
           extra_requester_ids: string[]
           extra_driver_toggles: boolean[]
@@ -5347,6 +5348,7 @@ export type Database = {
           driver_bonus?: boolean
           driver_id?: string | null
           requester_id?: string | null
+          adm_place?: string | null
           driver_toggle?: boolean
           extra_requester_ids?: string[]
           extra_driver_toggles?: boolean[]
@@ -5375,6 +5377,7 @@ export type Database = {
           driver_bonus?: boolean
           driver_id?: string | null
           requester_id?: string | null
+          adm_place?: string | null
           driver_toggle?: boolean
           extra_requester_ids?: string[]
           extra_driver_toggles?: boolean[]
