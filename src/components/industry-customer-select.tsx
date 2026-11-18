@@ -57,7 +57,7 @@ export function IndustryCustomerSelect({ value, onChange, ariaLabel, disabled }:
   const match = findIndustryCustomer(customers.data, value);
   const selected = match ? match.id : value.trim() ? LEGACY : "";
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex min-w-0 items-center gap-1">
       <Select
         value={selected}
         disabled={!!disabled}
@@ -68,7 +68,7 @@ export function IndustryCustomerSelect({ value, onChange, ariaLabel, disabled }:
           if (c) onChange(c.name);
         }}
       >
-        <SelectTrigger aria-label={ariaLabel ?? "Local"}><SelectValue placeholder="Selecione o cliente Indústria" /></SelectTrigger>
+        <SelectTrigger className="min-w-0 flex-1" aria-label={ariaLabel ?? "Local"}><SelectValue placeholder="Selecione o cliente Indústria" /></SelectTrigger>
         <SelectContent>
           <SelectItem value={ADD} className="font-medium text-primary">
             <span className="flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Adicionar cliente</span>

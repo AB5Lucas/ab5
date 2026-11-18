@@ -908,17 +908,6 @@ export function VehicleTimeline() {
             <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={driverOptions} placeholder="Selecione o motorista" searchPlaceholder="Buscar motorista" />
           </div>
         )}
-        {byWork && (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Switch id={`freight-driver-${i}`} checked={fr.toggle} onCheckedChange={(v) => patchFreight(i, { toggle: v, driver: v ? fr.driver : NONE })} />
-              <Label htmlFor={`freight-driver-${i}`}>Motorista</Label>
-            </div>
-            {fr.toggle
-              ? <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={pickDriverOptions} placeholder="Definir" searchPlaceholder="Buscar motorista" />
-              : <p className="pt-1 text-xs text-muted-foreground">Sem marcar, vale o solicitante (prêmio e CNH).</p>}
-          </div>
-        )}
         <div className="space-y-1">
           <Label>{byWork ? "Cliente" : "Obra / Cliente"}</Label>
           {/* Caminhão: primeiro o cliente, depois (opcional) o serviço. Só o cliente = rateio pelas horas dos serviços dele. */}
@@ -958,6 +947,17 @@ export function VehicleTimeline() {
             <Input id="vehicle-adm-km" inputMode="decimal" placeholder="Ex.: 35" value={form.km}
               onChange={(e) => setForm((f) => ({ ...f, km: e.target.value.replace(/[^\d,.]/g, "") }))} />
           </div>
+        )}
+        {/* Caminhão/pickup: toggle Motorista embaixo dos seletores; ligado, a lista fica na 2ª coluna. */}
+        {byWork && (
+          <div className="flex min-h-10 items-center gap-2 sm:col-start-1">
+            <Switch id={`freight-driver-${i}`} checked={fr.toggle} onCheckedChange={(v) => patchFreight(i, { toggle: v, driver: v ? fr.driver : NONE })} />
+            <Label htmlFor={`freight-driver-${i}`}>Motorista</Label>
+            {!fr.toggle && <span className="text-xs text-muted-foreground">(sem marcar, vale o solicitante)</span>}
+          </div>
+        )}
+        {byWork && fr.toggle && (
+          <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={pickDriverOptions} placeholder="Definir" searchPlaceholder="Buscar motorista" />
         )}
         </div>
         <p className="text-xs text-muted-foreground">{freightKmText(fr, i) || "A quilometragem vem da distância cadastrada do cliente."}</p>
