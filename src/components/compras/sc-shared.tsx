@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchSelect } from "@/components/search-select";
-import { Camera, Lock, X } from "lucide-react";
+import { Camera, Lock, Send, X } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
@@ -352,7 +352,7 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
             : <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>}
           {isTotvs && !totvsStep
             ? <Button onClick={() => { try { checkHeader(); setTotvsStep(true); } catch (e) { toast.error((e as Error).message); } }}>Continuar</Button>
-            : <Button disabled={save.isPending} onClick={() => save.mutate()}>{editing ? "Salvar" : isTotvs ? "Enviar" : "Criar e incluir itens"}</Button>}
+            : <Button disabled={save.isPending} onClick={() => save.mutate()}>{editing ? "Salvar" : isTotvs ? <><Send className="h-4 w-4" /> Enviar</> : "Criar e incluir itens"}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
