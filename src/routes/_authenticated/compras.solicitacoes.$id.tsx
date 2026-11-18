@@ -271,6 +271,7 @@ function Page() {
             </dl>
           ))}
         </div>
+        {r.justification && <p className="mt-3 rounded-md bg-muted p-2 text-xs"><b>Justificativa:</b> {r.justification}</p>}
         {r.notes && <p className="mt-3 rounded-md bg-muted p-2 text-xs"><b>Observações:</b> {r.notes}</p>}
         {r.stage === "rascunho" && r.return_notes && <p className="mt-2 rounded-md bg-destructive/10 p-2 text-xs text-destructive"><b>Devolvida</b> · {r.return_notes}</p>}
         {r.approver_notes && r.stage !== "rascunho" && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Validador:</b> {r.approver_notes}</p>}

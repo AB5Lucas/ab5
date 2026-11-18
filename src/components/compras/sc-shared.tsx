@@ -140,10 +140,10 @@ export const statusCounts = (rows: ScRow[]) => {
 
 type HeaderForm = {
   system: string; category: string; nature: string; priority: string; client_id: string; due_date: string;
-  delivery_kind: "ab5" | "cliente" | "outro" | "retirar"; delivery_place: string; notes: string; observer_ids: string[];
+  delivery_kind: "ab5" | "cliente" | "outro" | "retirar"; delivery_place: string; justification: string; notes: string; observer_ids: string[];
 };
 const EMPTY: HeaderForm = {
-  system: "PLANILHA", category: "", nature: "", priority: "", client_id: "", due_date: "", delivery_kind: "ab5", delivery_place: "", notes: "",
+  system: "PLANILHA", category: "", nature: "", priority: "", client_id: "", due_date: "", delivery_kind: "ab5", delivery_place: "", justification: "", notes: "",
   observer_ids: FIXED_OBSERVERS,
 };
 
@@ -207,7 +207,7 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
       setF(editing ? {
         system: editing.system, category: editing.category ?? "", nature: editing.nature ?? "", priority: editing.priority ?? "", client_id: editing.client_id ?? "",
         due_date: editing.due_date ?? "", delivery_kind: editing.delivery_kind as HeaderForm["delivery_kind"], delivery_place: editing.delivery_place ?? "",
-        notes: editing.notes ?? "", observer_ids: editing.observer_ids ?? [],
+        justification: editing.justification ?? "", notes: editing.notes ?? "", observer_ids: editing.observer_ids ?? [],
       } : EMPTY);
     }
   }
@@ -226,15 +226,15 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
         return data as string;
       }
       const miss = [!f.category && "categoria", !f.nature && "natureza", !f.priority && "prioridade", !f.client_id && "cliente", !f.due_date && "data prazo",
-        f.delivery_kind === "outro" && !f.delivery_place.trim() && "local de entrega"].filter(Boolean);
+        f.delivery_kind === "outro" && !f.delivery_place.trim() && "local de entrega", !f.justification.trim() && "justificativa"].filter(Boolean);
       if (miss.length) throw new Error(`Preencha: ${miss.join(", ")}.`);
       if (f.due_date < todayISO()) throw new Error("A data prazo não pode ser antes de hoje.");
-      const payload = { ...f, delivery_place: f.delivery_kind === "outro" ? f.delivery_place.trim() : "" };
+      const payload = { ...f, justification: f.justification.trim(), delivery_place: f.delivery_kind === "outro" ? f.delivery_place.trim() : "" };
       if (editing) {
         const { error } = await supabase.from("purchase_requests").update({
           category: payload.category, nature: payload.nature, priority: payload.priority, client_id: payload.client_id,
           due_date: payload.due_date, delivery_kind: payload.delivery_kind, delivery_place: payload.delivery_place || null, notes: payload.notes.trim() || null,
-          observer_ids: payload.observer_ids,
+          justification: payload.justification, observer_ids: payload.observer_ids,
         }).eq("id", editing.id);
         if (error) throw error;
         return editing.id;
@@ -320,6 +320,10 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
                 <Input id="sc-place" value={f.delivery_place} onChange={(e) => set("delivery_place", e.target.value)} />
               </div>
             )}
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="sc-just">Justificativa <span className="text-destructive">*</span></Label>
+              <Textarea id="sc-just" rows={3} value={f.justification} onChange={(e) => set("justification", e.target.value)} placeholder="Por que esta compra é necessária" />
+            </div>
             <div className="space-y-1 sm:col-span-2">
               <Label htmlFor="sc-notes">Observações</Label>
               <Textarea id="sc-notes" rows={3} value={f.notes} onChange={(e) => set("notes", e.target.value)} />

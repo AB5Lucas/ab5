@@ -3563,6 +3563,7 @@ export type Database = {
           id: string
           nature: string | null
           notes: string | null
+          justification: string | null
           number: string
           priority: string | null
           request_date: string
@@ -3599,6 +3600,7 @@ export type Database = {
           id?: string
           nature?: string | null
           notes?: string | null
+          justification?: string | null
           number: string
           priority?: string | null
           request_date?: string
@@ -3635,6 +3637,7 @@ export type Database = {
           id?: string
           nature?: string | null
           notes?: string | null
+          justification?: string | null
           number?: string
           priority?: string | null
           request_date?: string
