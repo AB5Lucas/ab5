@@ -500,14 +500,14 @@ function ClientsPage() {
               <div>
                 <Label htmlFor="needs-company-transport">Necessita de transporte da empresa?</Label>
                 <p className="text-xs text-muted-foreground">
-                  Gera necessidade de vagas na frota.
+                  Gera necessidade de vagas na frota. Desligado: quem for escalado recebe VT automaticamente.
                 </p>
               </div>
               <Switch
                 id="needs-company-transport"
                 checked={form.needs_company_transport}
                 onCheckedChange={(v) =>
-                  setForm((f) => ({ ...f, needs_company_transport: v, needs_transport_voucher: false }))
+                  setForm((f) => ({ ...f, needs_company_transport: v, needs_transport_voucher: !v }))
                 }
               />
             </div>
