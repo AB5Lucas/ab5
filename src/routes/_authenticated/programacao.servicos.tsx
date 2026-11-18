@@ -292,15 +292,15 @@ function ServicesPage() {
     setManualShown(s);
     try { localStorage.setItem(manualKey, JSON.stringify([...s])); } catch { /* ignora */ }
   };
-  /** Aparecem só os serviços com MO escalada, mais os vazios exibidos à mão; escondido à mão fica escondido. */
-  const visible = useMemo(() => shown.filter((w) => !hidden.has(w.id) && (withMO.has(w.id) || manualShown.has(w.id))), [shown, hidden, withMO, manualShown]);
+  /** Serviço com efetivo alocado aparece sempre (não dá para esconder); os vazios só se exibidos à mão e não escondidos. */
+  const visible = useMemo(() => shown.filter((w) => withMO.has(w.id) || (!hidden.has(w.id) && manualShown.has(w.id))), [shown, hidden, withMO, manualShown]);
   const toggleVisible = (id: string) => {
     const isOn = visible.some((w) => w.id === id);
     const manual = new Set(manualShown);
     if (isOn) {
+      if (withMO.has(id)) { toast.info("Serviço com efetivo alocado fica sempre visível"); return; }
       manual.delete(id);
       saveManual(manual);
-      if (withMO.has(id)) toggleHidden(id);
     } else {
       if (!withMO.has(id)) { manual.add(id); saveManual(manual); }
       if (hidden.has(id)) toggleHidden(id);
@@ -614,10 +614,11 @@ function ServicesPage() {
               <DropdownMenuCheckboxItem
                 key={w.id}
                 checked={visible.some((v) => v.id === w.id)}
+                disabled={withMO.has(w.id)}
                 onCheckedChange={() => toggleVisible(w.id)}
                 onSelect={(e) => e.preventDefault()}
               >
-                {w.name}
+                {w.name}{withMO.has(w.id) && <span className="ml-1 text-[10px] text-muted-foreground">(com efetivo)</span>}
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
