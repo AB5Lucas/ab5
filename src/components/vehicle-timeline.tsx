@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { SearchSelect } from "@/components/search-select";
 import { IndustryCustomerSelect, industryKmOneWay, industryToll, useIndustryCustomers } from "@/components/industry-customer-select";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -781,6 +782,127 @@ export function VehicleTimeline() {
     return (drivers.data ?? []).filter((d) => !q || d.full_name.toLowerCase().includes(q));
   }, [drivers.data, driverSearch]);
 
+  // ---- Fretes do dia no editor: o principal (form.client_id/driver_id/external_place) + obras adicionais, como uma lista ----
+  type Freight = { client: string; driver: string; place: string };
+  function getFreights(f: CellForm): Freight[] {
+    const main: Freight = { client: f.client_id, driver: f.driver_id, place: f.external_place };
+    const extras = f.extras.map((c, i) => ({ client: f.extraWorks[i] ? WORK_PREFIX + f.extraWorks[i] : c, driver: f.extraDrivers[i] ?? NONE, place: f.extraPlaces[i] ?? "" }));
+    return [main, ...extras];
+  }
+  function setFreights(f: CellForm, list: Freight[]): CellForm {
+    const [main, ...rest] = list.length ? list : [{ client: NONE, driver: NONE, place: "" }];
+    const baseOf = (c: string) => (c.startsWith(WORK_PREFIX) ? workById.get(c.slice(WORK_PREFIX.length))?.client_id ?? NONE : c);
+    return {
+      ...f,
+      client_id: main!.client, driver_id: main!.driver, external_place: main!.place,
+      // O km digitado (ADM) é do frete principal: some se outro frete passar a ser o principal.
+      km: main!.client === f.client_id ? f.km : "",
+      extras: rest.map((x) => baseOf(x.client)),
+      extraWorks: rest.map((x) => (x.client.startsWith(WORK_PREFIX) ? x.client.slice(WORK_PREFIX.length) : "")),
+      extraDrivers: rest.map((x) => x.driver),
+      extraPlaces: rest.map((x) => x.place),
+    };
+  }
+  const patchFreight = (i: number, patch: Partial<Freight>) => setForm((f) => setFreights(f, getFreights(f).map((x, j) => (j === i ? { ...x, ...patch } : x))));
+  const [dragFreight, setDragFreight] = useState<number | null>(null);
+  const moveFreight = (from: number, to: number) => setForm((f) => {
+    const list = getFreights(f);
+    const [item] = list.splice(from, 1);
+    list.splice(to, 0, item!);
+    return setFreights(f, list);
+  });
+  const driverOptions = useMemo(() => [{ value: NONE, label: "Sem motorista" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
+
+  function freightKmText(fr: Freight, i: number) {
+    const base = fr.client.startsWith(WORK_PREFIX) ? workById.get(fr.client.slice(WORK_PREFIX.length))?.client_id ?? "" : fr.client;
+    if (fr.client === NONE) return "";
+    if (fr.client === MAINTENANCE_KEY) return "Manutenção: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem.";
+    if (fr.client === SUZANO_LOCAL_KEY) return `Suzano Local: ${KM_SUZANO_LOCAL} km de ida por viagem (${KM_SUZANO_LOCAL * 2} km ida e volta).`;
+    if (fr.client === EXTERNAL_KEY) return `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`;
+    if (isAdmClient(base)) return i === 0 ? "ADM: digite o km de ida do dia; é ele que define a faixa do Prêmio Motorista." : `${extraKm(base)} km (ADM)`;
+    if (isIndustryClient(base) && fr.place.trim()) {
+      const known = industryKmOneWay(industryCustomers.data, fr.place) != null;
+      return i === 0
+        ? `Indústria com local: ${known ? `${placeKmOneWay(fr.place)} km de ida (× 2)` : `${KM_EXTERNAL} km (local sem km cadastrado)`}, sem prêmio de motorista. O combustível vai para o CC da Indústria.`
+        : `${placeExtraKm(fr.place.trim())} km`;
+    }
+    return i === 0 ? `${clientKm.get(base) ?? 0} km no dia (distância cadastrada do cliente).` : `${extraKm(base)} km`;
+  }
+
+  function renderFreight(fr: Freight, i: number, total: number) {
+    const base = fr.client.startsWith(WORK_PREFIX) ? workById.get(fr.client.slice(WORK_PREFIX.length))?.client_id ?? NONE : fr.client;
+    return (
+      <div key={i}
+        onDragOver={(e) => { if (dragFreight !== null) e.preventDefault(); }}
+        onDrop={(e) => { e.preventDefault(); if (dragFreight !== null && dragFreight !== i) moveFreight(dragFreight, i); setDragFreight(null); }}
+        className={`space-y-2 rounded-md border p-3 ${dragFreight === i ? "border-primary opacity-60" : "border-border"}`}>
+        <div className="flex items-center gap-2">
+          {total > 1 && (
+            <span draggable onDragStart={(e) => { setDragFreight(i); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => setDragFreight(null)}
+              className="cursor-grab text-muted-foreground active:cursor-grabbing" title="Arraste para mudar a ordem" aria-label="Arrastar frete">
+              <GripVertical className="h-4 w-4" />
+            </span>
+          )}
+          <span className="text-sm font-semibold">Frete {i + 1}{i === 0 && total > 1 ? " (principal)" : ""}</span>
+          {total > 1 && (
+            <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-destructive" title="Excluir este frete"
+              onClick={() => setForm((f) => setFreights(f, getFreights(f).filter((_, j) => j !== i)))}>
+              <Trash2 className="h-3.5 w-3.5" /> Excluir frete
+            </Button>
+          )}
+        </div>
+        <div className="space-y-1">
+          <Label>Motorista</Label>
+          <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={driverOptions} placeholder="Selecione o motorista" searchPlaceholder="Buscar motorista" />
+        </div>
+        <div className="space-y-1">
+          <Label>{byWork ? "Cliente" : "Obra / Cliente"}</Label>
+          {/* Caminhão: primeiro o cliente, depois (opcional) o serviço. Só o cliente = rateio pelas horas dos serviços dele. */}
+          <Select value={byWork ? base : fr.client} onValueChange={(v) => patchFreight(i, { client: v, place: "" })}>
+            <SelectTrigger><SelectValue placeholder={byWork ? "Selecione o cliente" : "Selecione a obra"} /></SelectTrigger>
+            <SelectContent>
+              {clientOptions()}
+              <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {byWork && base !== NONE && !SPECIAL_KEYS.has(base) && (
+          <div className="space-y-1">
+            <Label>Serviço</Label>
+            <Select value={fr.client.startsWith(WORK_PREFIX) ? fr.client : ALL_WORKS} onValueChange={(v) => patchFreight(i, { client: v === ALL_WORKS ? base : v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_WORKS}>Todos os serviços do cliente (rateio por horas)</SelectItem>
+                {(worksQ.data ?? []).filter((w) => w.client_id === base).map((w) => (
+                  <SelectItem key={w.id} value={WORK_PREFIX + w.id}>{w.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {(fr.client === EXTERNAL_KEY || isIndustryClient(base)) && (
+          <div className="space-y-1">
+            <Label>Local</Label>
+            {byWork && fr.client !== EXTERNAL_KEY
+              ? <IndustryCustomerSelect value={fr.place} onChange={(name) => patchFreight(i, { place: name })} />
+              : <Input placeholder="Ex.: Campinas, São Paulo, Bahia" value={fr.place} onChange={(e) => patchFreight(i, { place: e.target.value })} />}
+          </div>
+        )}
+        {i === 0 && isAdmClient(base) && (
+          <div className="space-y-1">
+            <Label htmlFor="vehicle-adm-km">Km do dia (ida)</Label>
+            <Input id="vehicle-adm-km" className="w-40" inputMode="decimal" placeholder="Ex.: 35" value={form.km}
+              onChange={(e) => setForm((f) => ({ ...f, km: e.target.value.replace(/[^\d,.]/g, "") }))} />
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">{freightKmText(fr, i) || "A quilometragem vem da distância cadastrada do cliente."}</p>
+        {byWork && i === 0 && base !== NONE && !SPECIAL_KEYS.has(base) && !fr.client.startsWith(WORK_PREFIX) && (
+          <p className="text-xs text-muted-foreground">O custo do caminhão no dia é dividido entre os serviços do cliente pelas horas trabalhadas em cada um.</p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -1016,99 +1138,18 @@ export function VehicleTimeline() {
             <DialogTitle>Programação do veículo</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Motorista</Label>
-              <Input placeholder="Buscar motorista" value={driverSearch} onChange={(e) => setDriverSearch(e.target.value)} />
-              <Select value={form.driver_id} onValueChange={(v) => setForm((f) => ({ ...f, driver_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Selecione o motorista" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Sem motorista</SelectItem>
-                  {filteredDrivers.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Cada frete do dia é uma caixa igual (motorista, cliente, serviço, local, km); o 1º é o principal.
+                Dá para excluir qualquer um e arrastar pela alça para mudar a ordem. */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label>{byWork ? "Cliente" : "Obra / Cliente"}</Label>
-                {/* Mais de um frete no dia: exclui o de cima e a 1ª obra adicional passa a ser a principal. */}
-                {form.extras.length > 0 && (
-                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-destructive" title="Excluir este frete e deixar só as obras adicionais"
-                    onClick={() => setForm((f) => {
-                      const c = f.extras[0] ?? NONE;
-                      const w = f.extraWorks[0] ?? "";
-                      return {
-                        ...f,
-                        client_id: w ? WORK_PREFIX + w : c,
-                        driver_id: f.extraDrivers[0] && f.extraDrivers[0] !== NONE ? f.extraDrivers[0] : f.driver_id,
-                        external_place: f.extraPlaces[0] ?? "",
-                        km: "",
-                        trips: "1",
-                        extras: f.extras.slice(1), extraDrivers: f.extraDrivers.slice(1), extraPlaces: f.extraPlaces.slice(1), extraWorks: f.extraWorks.slice(1),
-                      };
-                    })}>
-                    <Trash2 className="h-3.5 w-3.5" /> Excluir este frete
-                  </Button>
-                )}
+                <Label>Fretes do dia</Label>
+                <Button variant="outline" size="sm" onClick={() => setForm((f) => setFreights(f, [...getFreights(f), { client: NONE, driver: f.driver_id, place: "" }]))}>
+                  <Plus className="h-4 w-4" /> Adicionar frete
+                </Button>
               </div>
-              {/* Caminhão: primeiro o cliente, depois (opcional) o serviço. Só o cliente = rateio pelas horas dos serviços dele. */}
-              <Select value={byWork ? truckClient : form.client_id} onValueChange={(v) => setForm((f) => ({ ...f, client_id: v }))}>
-                <SelectTrigger><SelectValue placeholder={byWork ? "Selecione o cliente" : "Selecione a obra"} /></SelectTrigger>
-                <SelectContent>
-                  {clientOptions()}
-                  <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
-                </SelectContent>
-              </Select>
-              {byWork && truckClient !== NONE && !SPECIAL_KEYS.has(truckClient) && (
-                <div className="space-y-1">
-                  <Label>Serviço</Label>
-                  <Select
-                    value={form.client_id.startsWith(WORK_PREFIX) ? form.client_id : ALL_WORKS}
-                    onValueChange={(v) => setForm((f) => ({ ...f, client_id: v === ALL_WORKS ? truckClient : v }))}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ALL_WORKS}>Todos os serviços do cliente (rateio por horas)</SelectItem>
-                      {(worksQ.data ?? []).filter((w) => w.client_id === truckClient).map((w) => (
-                        <SelectItem key={w.id} value={WORK_PREFIX + w.id}>{w.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {!form.client_id.startsWith(WORK_PREFIX) && (
-                    <p className="text-xs text-muted-foreground">O custo do caminhão no dia é dividido entre os serviços do cliente pelas horas trabalhadas em cada um.</p>
-                  )}
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {form.client_id === MAINTENANCE_KEY
-                  ? "Manutenção: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem."
-                  : form.client_id === SUZANO_LOCAL_KEY
-                    ? `Suzano Local: ${KM_SUZANO_LOCAL} km de ida por viagem (${KM_SUZANO_LOCAL * 2} km ida e volta).`
-                  : form.client_id === EXTERNAL_KEY
-                    ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
-                  : isAdmClient(truckClient)
-                    ? "ADM: digite o km de ida do dia (como a distância de um cliente); é ele que define a faixa do Prêmio Motorista."
-                  : isIndustryClient(truckClient) && form.external_place.trim()
-                    ? `Indústria com local: ${industryKmOneWay(industryCustomers.data, form.external_place) != null ? `${placeKmOneWay(form.external_place)} km de ida (× 2)` : `${KM_EXTERNAL} km (local sem km cadastrado)`}, sem prêmio de motorista. O combustível vai para o CC da Indústria.`
-                    : form.client_id && form.client_id !== NONE
-                      ? `${clientKm.get(form.client_id.startsWith(WORK_PREFIX) ? workById.get(form.client_id.slice(WORK_PREFIX.length))?.client_id ?? "" : form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
-                      : "A quilometragem vem da distância cadastrada do cliente."}
-              </p>
-              {isAdmClient(truckClient) && (
-                <div className="space-y-1">
-                  <Label htmlFor="vehicle-adm-km">Km do dia (ida)</Label>
-                  <Input id="vehicle-adm-km" className="w-40" inputMode="decimal" placeholder="Ex.: 35" value={form.km}
-                    onChange={(e) => setForm((f) => ({ ...f, km: e.target.value.replace(/[^\d,.]/g, "") }))} />
-                </div>
-              )}
-              {(form.client_id === EXTERNAL_KEY || isIndustryClient(truckClient)) && (
-                <div className="space-y-1">
-                  <Label htmlFor="vehicle-place">Local</Label>
-                  {byWork && form.client_id !== EXTERNAL_KEY
-                    ? <IndustryCustomerSelect value={form.external_place} onChange={(name) => setForm((f) => ({ ...f, external_place: name }))} />
-                    : <Input id="vehicle-place" placeholder="Ex.: Campinas, São Paulo, Bahia" value={form.external_place} onChange={(e) => setForm((f) => ({ ...f, external_place: e.target.value }))} />}
-                </div>
+              {getFreights(form).map((fr, i, list) => renderFreight(fr, i, list.length))}
+              {getFreights(form).length > 1 && (
+                <p className="text-xs text-muted-foreground">O 1º frete é o principal (prêmios e viagens); o km dos outros é somado no relatório da frota.</p>
               )}
             </div>
             <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
@@ -1127,92 +1168,6 @@ export function VehicleTimeline() {
                 onChange={(e) => setForm((f) => ({ ...f, trips: e.target.value }))}
               />
             </div>
-            {(
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label>Obras adicionais no dia</Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setForm((f) => ({ ...f, extras: [...f.extras, NONE], extraDrivers: [...f.extraDrivers, f.driver_id], extraPlaces: [...f.extraPlaces, ""], extraWorks: [...f.extraWorks, ""] }))}
-                  >
-                    <Plus className="h-4 w-4" /> Adicionar obra
-                  </Button>
-                </div>
-                {form.extras.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Nenhuma obra adicional.</p>
-                )}
-                {form.extras.map((cid, i) => (
-                  <div key={i} className="space-y-1 rounded-md border border-border p-2">
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={cid}
-                      onValueChange={(v) =>
-                        setForm((f) => ({ ...f, extras: f.extras.map((x, j) => (j === i ? v : x)), extraWorks: f.extraWorks.map((x, j) => (j === i ? "" : x)) }))
-                      }
-                    >
-                      <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione a obra" /></SelectTrigger>
-                      <SelectContent>
-                        {clientOptions()}
-                              <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <span className="w-14 text-right text-xs text-muted-foreground">
-                      {cid !== NONE ? `${isIndustryClient(cid) && (form.extraPlaces[i] ?? "").trim() ? placeExtraKm((form.extraPlaces[i] ?? "").trim()) : extraKm(cid)} km` : ""}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Remover obra adicional"
-                      onClick={() => setForm((f) => ({ ...f, extras: f.extras.filter((_, j) => j !== i), extraDrivers: f.extraDrivers.filter((_, j) => j !== i), extraPlaces: f.extraPlaces.filter((_, j) => j !== i), extraWorks: f.extraWorks.filter((_, j) => j !== i) }))}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {/* Caminhão/pickup: cada obra adicional também escolhe o serviço do cliente (CC do abastecimento). */}
-                  {byWork && cid !== NONE && !SPECIAL_KEYS.has(cid) && (
-                    <Select value={form.extraWorks[i] || ALL_WORKS}
-                      onValueChange={(v) => setForm((f) => { const ws = [...f.extraWorks]; ws[i] = v === ALL_WORKS ? "" : v; return { ...f, extraWorks: ws }; })}>
-                      <SelectTrigger aria-label="Serviço da obra adicional"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ALL_WORKS}>Todos os serviços do cliente</SelectItem>
-                        {(worksQ.data ?? []).filter((w) => w.client_id === cid).map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {isIndustryClient(cid) && (
-                    byWork
-                      ? <IndustryCustomerSelect ariaLabel="Local da obra adicional" value={form.extraPlaces[i] ?? ""}
-                          onChange={(name) => setForm((f) => { const pl = [...f.extraPlaces]; pl[i] = name; return { ...f, extraPlaces: pl }; })} />
-                      : <Input placeholder="Local" aria-label="Local da obra adicional" value={form.extraPlaces[i] ?? ""}
-                          onChange={(e) => setForm((f) => { const pl = [...f.extraPlaces]; pl[i] = e.target.value; return { ...f, extraPlaces: pl }; })} />
-                  )}
-                  <Select
-                    value={form.extraDrivers[i] ?? NONE}
-                    onValueChange={(v) =>
-                      setForm((f) => {
-                        const d = [...f.extraDrivers];
-                        d[i] = v;
-                        return { ...f, extraDrivers: d };
-                      })
-                    }
-                  >
-                    <SelectTrigger><SelectValue placeholder="Motorista desta obra" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>Sem motorista</SelectItem>
-                      {(drivers.data ?? []).map((d) => (
-                        <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  </div>
-                ))}
-                <p className="text-xs text-muted-foreground">
-                  Para quando o carro atende mais de uma demanda no dia. O KM das obras adicionais é somado no
-                  relatório da frota; os prêmios continuam pela obra principal.
-                </p>
-              </div>
-            )}
             <div className="flex items-center justify-between rounded-md border border-border p-3">
               <div>
                 <Label>Recebe Prêmio de Motorista</Label>
