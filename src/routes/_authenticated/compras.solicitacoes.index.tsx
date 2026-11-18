@@ -61,7 +61,8 @@ function Page() {
       }
       return r;
     },
-    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["menu-badges"] }); setEditing(r); },
+    // Lápis abre a própria SC já em edição (cabeçalho e itens).
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["menu-badges"] }); navigate({ to: "/compras/solicitacoes/$id", params: { id: r.id }, search: { edit: true } }); },
     onError: (e: Error) => toast.error(e.message),
   });
   // Copiar: SC nova (rascunho, número novo, minha) com o mesmo cabeçalho e itens; status, pedidos e datas ficam de fora.
@@ -130,15 +131,15 @@ function Page() {
         <Button className="ml-auto" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nova</Button>
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
-        <ScTable rows={rows} clientName={clientName} showRequester={scope !== "minhas"} actions={(r) => r.requester_id !== uid ? <div className="flex justify-end">{copyBtn(r)}</div> : r.stage === "rascunho" ? (
-          <div className="flex justify-end gap-1">
+        <ScTable rows={rows} clientName={clientName} showRequester={scope !== "minhas"} actions={(r) => r.requester_id !== uid ? <div className="flex">{copyBtn(r)}</div> : r.stage === "rascunho" ? (
+          <div className="flex gap-1">
             <Button size="sm" disabled={send.isPending} onClick={() => send.mutate(r.id)}><Send className="h-3.5 w-3.5" /> Enviar</Button>
             {editBtn(r)}
             {copyBtn(r)}
             <Button size="icon" variant="ghost" className="h-8 w-8" title="Apagar" aria-label="Apagar solicitação" onClick={() => setRemoving(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
           </div>
         ) : (
-          <div className="flex justify-end gap-1">
+          <div className="flex gap-1">
             {r.stage === "aprovacao" && editBtn(r)}
             {copyBtn(r)}
             {(r.stage === "aprovacao" || r.stage === "compras") && <Button size="sm" variant="outline" onClick={() => setRemoving(r)}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}

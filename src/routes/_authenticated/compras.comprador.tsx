@@ -77,7 +77,7 @@ function Page() {
           </div>
           {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
             <ScTable rows={rows} clientName={clientName} actions={(r) => (
-              <div className="flex justify-end gap-1">
+              <div className="flex gap-1">
                 <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "", date: r.status_at }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
                 <Button size="sm" variant="ghost" title="Devolver ao solicitante para corrigir" onClick={() => { setReturning(r); setReason(""); }}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
               </div>

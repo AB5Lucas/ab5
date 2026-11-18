@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -117,8 +117,12 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
-              {cols.map((c) => <FilterHead key={c.key} column={c} rows={rowsForColumn(rows, cols, filters, c.key)} filters={filters} setFilters={setFilters} sort={sort} setSort={setSort} />)}
-              {actions && <TableHead className="text-right">Ações</TableHead>}
+              {cols.map((c) => (
+                <Fragment key={c.key}>
+                  <FilterHead column={c} rows={rowsForColumn(rows, cols, filters, c.key)} filters={filters} setFilters={setFilters} sort={sort} setSort={setSort} />
+                  {actions && c.key === "date" && <TableHead>Ações</TableHead>}
+                </Fragment>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -128,8 +132,12 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
               const dl = deadlineControl(r, today);
               return (
                 <TableRow key={r.id}>
-                  {cols.map((c) => <TableCell key={c.key} className={c.className} title={c.key === "buyer" ? r.buyer_notes ?? undefined : c.key === "stage" ? r.return_notes ?? r.approver_notes ?? undefined : undefined}>{c.cell(r, dl)}</TableCell>)}
-                  {actions && <TableCell className="text-right">{actions(r)}</TableCell>}
+                  {cols.map((c) => (
+                    <Fragment key={c.key}>
+                      <TableCell className={c.className} title={c.key === "buyer" ? r.buyer_notes ?? undefined : c.key === "stage" ? r.return_notes ?? r.approver_notes ?? undefined : undefined}>{c.cell(r, dl)}</TableCell>
+                      {actions && c.key === "date" && <TableCell className="whitespace-nowrap">{actions(r)}</TableCell>}
+                    </Fragment>
+                  ))}
                 </TableRow>
               );
             })}

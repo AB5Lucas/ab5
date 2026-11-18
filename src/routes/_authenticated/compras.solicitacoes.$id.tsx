@@ -24,6 +24,8 @@ import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")({
   head: () => ({ meta: [{ title: "Solicitação de Compra | AB5 Hub" }, { name: "description", content: "Itens da solicitação de compra (modelo FR-CPS-SC)." }] }),
+  // Aberta pelo número = só visualizar; ?edit=1 (lápis em Ações) abre já em edição.
+  validateSearch: (s: Record<string, unknown>): { edit?: boolean } => (s["edit"] === true || s["edit"] === 1 || s["edit"] === "1" || s["edit"] === "true" ? { edit: true } : {}),
   component: Page,
 });
 
@@ -89,7 +91,10 @@ function Page() {
   const isDraftOwner = !!r && r.requester_id === user?.id && r.stage === "rascunho";
   // O validador (gestor ou substituto) também pode editar a SC enquanto ela está com ele, antes de validar.
   const isValidator = !!r && !!user?.id && r.stage === "aprovacao" && (r.approver_id === user.id || r.substitute_id === user.id);
-  const editable = isDraftOwner || isValidator;
+  const { edit: editParam } = Route.useSearch();
+  const [editMode, setEditMode] = useState(!!editParam);
+  const canEdit = isDraftOwner || isValidator;
+  const editable = canEdit && editMode;
   // Validador com a SC aberta: avisa o banco a cada 30 s (vale 90 s); enquanto isso o solicitante não puxa de volta.
   useEffect(() => {
     if (!isValidator) return;
@@ -107,7 +112,7 @@ function Page() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("SC puxada de volta. Agora você pode editar e enviar de novo.");
+      toast.success("SC puxada de volta. Agora você pode editar e enviar de novo."); setEditMode(true);
       qc.invalidateQueries({ queryKey: ["sc-request", id] }); qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["menu-badges"] });
     },
     onError: (e: Error) => { toast.error(e.message); qc.invalidateQueries({ queryKey: ["sc-request", id] }); },
@@ -269,6 +274,7 @@ function Page() {
         <span className={`inline-block h-3 w-3 rounded-full ${statusDot(r.status)}`} title={r.status} aria-label={`Status: ${r.status}`} />
         <h1 className="font-display text-xl font-semibold uppercase tracking-wide">{r.number}</h1>
         <div className="ml-auto flex gap-2">
+          {canEdit && !editMode && <Button variant="outline" size="sm" onClick={() => setEditMode(true)}><Pencil className="h-4 w-4" /> Editar</Button>}
           {editable && <Button variant="outline" size="sm" onClick={() => setEditingHeader(true)}><Pencil className="h-4 w-4" /> Editar cabeçalho</Button>}
           {editable && <Button variant="outline" size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}><Save className="h-4 w-4" /> Salvar itens</Button>}
           {isDraftOwner && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
