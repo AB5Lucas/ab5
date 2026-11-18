@@ -5318,6 +5318,10 @@ export type Database = {
           created_at: string
           driver_bonus: boolean
           driver_id: string | null
+          requester_id: string | null
+          driver_toggle: boolean
+          extra_requester_ids: string[]
+          extra_driver_toggles: boolean[]
           external_place: string | null
           extra_client_ids: string[]
           extra_driver_ids: string[]
@@ -5342,6 +5346,10 @@ export type Database = {
           created_at?: string
           driver_bonus?: boolean
           driver_id?: string | null
+          requester_id?: string | null
+          driver_toggle?: boolean
+          extra_requester_ids?: string[]
+          extra_driver_toggles?: boolean[]
           external_place?: string | null
           extra_client_ids?: string[]
           extra_driver_ids?: string[]
@@ -5366,6 +5374,10 @@ export type Database = {
           created_at?: string
           driver_bonus?: boolean
           driver_id?: string | null
+          requester_id?: string | null
+          driver_toggle?: boolean
+          extra_requester_ids?: string[]
+          extra_driver_toggles?: boolean[]
           external_place?: string | null
           extra_client_ids?: string[]
           extra_driver_ids?: string[]

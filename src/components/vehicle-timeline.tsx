@@ -53,6 +53,11 @@ export type VehicleScheduleRow = {
   km: number;
   extra_client_ids?: string[];
   extra_driver_ids?: string[];
+  /** Caminhão/pickup: quem pediu o frete (Solicitante) e se o Motorista foi marcado; driver_id = motorista que vale (o marcado, senão o solicitante). */
+  requester_id?: string | null;
+  driver_toggle?: boolean;
+  extra_requester_ids?: string[];
+  extra_driver_toggles?: boolean[];
   /** Local digitado por obra adicional (Indústria = viagem fora); mesma posição de extra_client_ids. */
   extra_places?: string[];
   /** Serviço de cada obra adicional (caminhão/pickup); vazio = rateio do cliente. Mesma posição de extra_client_ids. */
@@ -122,6 +127,11 @@ type CellForm = {
   external_place: string;
   /** Km de ida digitado (só cliente ADM). */
   km: string;
+  /** Caminhão/pickup: Solicitante e toggle Motorista (driver_id = motorista marcado; NONE = Definir). */
+  requester_id: string;
+  driver_toggle: boolean;
+  extraRequesters: string[];
+  extraToggles: boolean[];
 };
 
 const NONE = "__none__";
@@ -136,7 +146,7 @@ export function VehicleTimeline() {
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [driverSearch, setDriverSearch] = useState("");
   const [cell, setCell] = useState<{ vehicleId: string; date: string } | null>(null);
-  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], extraPlaces: [], extraWorks: [], trips: "1", external_place: "", km: "" });
+  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], extraPlaces: [], extraWorks: [], trips: "1", external_place: "", km: "", requester_id: NONE, driver_toggle: false, extraRequesters: [], extraToggles: [] });
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
@@ -294,7 +304,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_work_ids, extra_km, trips, is_suzano_local, work_id, external_place")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_work_ids, extra_km, trips, is_suzano_local, work_id, external_place, requester_id, driver_toggle, extra_requester_ids, extra_driver_toggles")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -467,6 +477,10 @@ export function VehicleTimeline() {
       work_id?: string | null | undefined;
       external_place?: string | null | undefined;
       km?: number | null | undefined;
+      requester_id?: string | null | undefined;
+      driver_toggle?: boolean | undefined;
+      extra_requester_ids?: string[] | undefined;
+      extra_driver_toggles?: boolean[] | undefined;
     },
   ) {
     const workId = f.work_id ?? null;
@@ -474,7 +488,8 @@ export function VehicleTimeline() {
     const special = f.is_external || f.is_maintenance || !!f.is_suzano_local;
     const industryPlace = !special && isIndustryClient(f.client_id) ? (f.external_place ?? "").trim() : "";
     const pairs = (f.extra_client_ids ?? [])
-          .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "", place: isIndustryClient(c) ? (f.extra_places?.[i] ?? "").trim() : "", w: f.extra_work_ids?.[i] ?? "" }))
+          .map((c, i) => ({ c, d: f.extra_driver_ids?.[i] ?? "", place: isIndustryClient(c) ? (f.extra_places?.[i] ?? "").trim() : "", w: f.extra_work_ids?.[i] ?? "",
+            r: f.extra_requester_ids?.[i] ?? "", t: !!f.extra_driver_toggles?.[i] }))
           .filter((p) => p.c && p.c !== NONE);
     const extras = pairs.map((p) => p.c);
     return {
@@ -492,6 +507,10 @@ export function VehicleTimeline() {
         : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
       extra_client_ids: extras,
       extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
+      requester_id: f.requester_id ?? null,
+      driver_toggle: !!f.driver_toggle,
+      extra_requester_ids: pairs.map((p) => (p.r === NONE ? "" : p.r)),
+      extra_driver_toggles: pairs.map((p) => p.t),
       extra_places: pairs.map((p) => p.place),
       extra_work_ids: pairs.map((p) => (p.w && workById.get(p.w)?.client_id === p.c ? p.w : "")),
       // Indústria com local: km de ida do cliente Indústria × 2; sem km cadastrado, 100 km como antes.
@@ -506,8 +525,17 @@ export function VehicleTimeline() {
   function openCell(vehicleId: string, date: string) {
     if (!canWrite) return;
     const current = byCell.get(`${vehicleId}|${date}`);
+    // Caminhão/pickup: a linha de cima é o Solicitante (antes era o motorista); o Motorista marcado fica no toggle.
+    const bw = byWorkVehicle(vehicleId);
+    const req = current?.requester_id ?? current?.driver_id ?? NONE;
+    const chosen = (d: string | null | undefined, r: string, on: boolean) => (on && d && d !== r ? d : NONE);
+    const extraReq = (current?.extra_client_ids ?? []).map((_, i) => current?.extra_requester_ids?.[i] || current?.extra_driver_ids?.[i] || NONE);
     setForm({
-      driver_id: current?.driver_id ?? NONE,
+      requester_id: bw ? req : NONE,
+      driver_toggle: bw ? !!current?.driver_toggle : false,
+      extraRequesters: bw ? extraReq : (current?.extra_client_ids ?? []).map(() => NONE),
+      extraToggles: (current?.extra_client_ids ?? []).map((_, i) => bw && !!current?.extra_driver_toggles?.[i]),
+      driver_id: bw ? chosen(current?.driver_id, req, !!current?.driver_toggle) : current?.driver_id ?? NONE,
       client_id: current
         ? current.is_maintenance
           ? MAINTENANCE_KEY
@@ -522,7 +550,9 @@ export function VehicleTimeline() {
       driver_bonus: current?.driver_bonus ?? false,
       repeat_until: "",
       extras: [...(current?.extra_client_ids ?? [])],
-      extraDrivers: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_driver_ids?.[i] || NONE),
+      extraDrivers: (current?.extra_client_ids ?? []).map((_, i) => bw
+        ? chosen(current?.extra_driver_ids?.[i], extraReq[i]!, !!current?.extra_driver_toggles?.[i])
+        : current?.extra_driver_ids?.[i] || NONE),
       extraPlaces: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_places?.[i] ?? ""),
       extraWorks: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_work_ids?.[i] ?? ""),
       trips: String(current?.trips ?? 1),
@@ -543,9 +573,17 @@ export function VehicleTimeline() {
     const isMaintenance = form.client_id === MAINTENANCE_KEY;
     const isLocal = form.client_id === SUZANO_LOCAL_KEY;
     const workId = form.client_id.startsWith(WORK_PREFIX) ? form.client_id.slice(WORK_PREFIX.length) : null;
+    // Caminhão/pickup: o motorista que vale (prêmio, CNH, ranking) é o marcado no toggle; sem ele, o solicitante.
+    const bw = byWorkVehicle(cell.vehicleId);
+    const eff = (on: boolean, d: string, r: string) => (bw ? (on && d !== NONE ? d : r) : d);
+    const mainDriver = eff(form.driver_toggle, form.driver_id, form.requester_id);
     const base = {
       work_id: workId,
-      driver_id: form.driver_id === NONE ? null : form.driver_id,
+      driver_id: mainDriver === NONE ? null : mainDriver,
+      requester_id: bw && form.requester_id !== NONE ? form.requester_id : null,
+      driver_toggle: bw && form.driver_toggle,
+      extra_requester_ids: form.extras.map((_, i) => (bw && form.extraRequesters[i] && form.extraRequesters[i] !== NONE ? form.extraRequesters[i]! : "")),
+      extra_driver_toggles: form.extras.map((_, i) => bw && !!form.extraToggles[i]),
       client_id: isExternal || isMaintenance || isLocal ? null : workId ? workById.get(workId)?.client_id ?? null : form.client_id,
       is_suzano_local: isLocal,
       trips: Number(form.trips) || 1,
@@ -553,7 +591,7 @@ export function VehicleTimeline() {
       is_maintenance: isMaintenance,
       driver_bonus: form.driver_bonus,
       extra_client_ids: form.extras,
-      extra_driver_ids: form.extraDrivers,
+      extra_driver_ids: form.extras.map((_, i) => eff(!!form.extraToggles[i], form.extraDrivers[i] ?? NONE, form.extraRequesters[i] ?? NONE)),
       extra_places: form.extraPlaces,
       extra_work_ids: form.extraWorks,
       external_place: form.external_place,
@@ -591,6 +629,7 @@ export function VehicleTimeline() {
           work_id: src.work_id,
           external_place: src.external_place,
           km: src.km,
+          requester_id: src.requester_id, driver_toggle: src.driver_toggle, extra_requester_ids: src.extra_requester_ids, extra_driver_toggles: src.extra_driver_toggles,
         }),
       ]);
     } catch {
@@ -629,6 +668,7 @@ export function VehicleTimeline() {
             work_id: s.work_id,
             external_place: s.external_place,
             km: s.km,
+            requester_id: s.requester_id, driver_toggle: s.driver_toggle, extra_requester_ids: s.extra_requester_ids, extra_driver_toggles: s.extra_driver_toggles,
           }),
         );
       }
@@ -783,18 +823,21 @@ export function VehicleTimeline() {
   }, [drivers.data, driverSearch]);
 
   // ---- Fretes do dia no editor: o principal (form.client_id/driver_id/external_place) + obras adicionais, como uma lista ----
-  type Freight = { client: string; driver: string; place: string };
+  type Freight = { client: string; driver: string; place: string; requester: string; toggle: boolean };
   function getFreights(f: CellForm): Freight[] {
-    const main: Freight = { client: f.client_id, driver: f.driver_id, place: f.external_place };
-    const extras = f.extras.map((c, i) => ({ client: f.extraWorks[i] ? WORK_PREFIX + f.extraWorks[i] : c, driver: f.extraDrivers[i] ?? NONE, place: f.extraPlaces[i] ?? "" }));
+    const main: Freight = { client: f.client_id, driver: f.driver_id, place: f.external_place, requester: f.requester_id, toggle: f.driver_toggle };
+    const extras = f.extras.map((c, i) => ({ client: f.extraWorks[i] ? WORK_PREFIX + f.extraWorks[i] : c, driver: f.extraDrivers[i] ?? NONE, place: f.extraPlaces[i] ?? "",
+      requester: f.extraRequesters[i] ?? NONE, toggle: !!f.extraToggles[i] }));
     return [main, ...extras];
   }
   function setFreights(f: CellForm, list: Freight[]): CellForm {
-    const [main, ...rest] = list.length ? list : [{ client: NONE, driver: NONE, place: "" }];
+    const [main, ...rest] = list.length ? list : [{ client: NONE, driver: NONE, place: "", requester: NONE, toggle: false }];
     const baseOf = (c: string) => (c.startsWith(WORK_PREFIX) ? workById.get(c.slice(WORK_PREFIX.length))?.client_id ?? NONE : c);
     return {
       ...f,
-      client_id: main!.client, driver_id: main!.driver, external_place: main!.place,
+      client_id: main!.client, driver_id: main!.driver, external_place: main!.place, requester_id: main!.requester, driver_toggle: main!.toggle,
+      extraRequesters: rest.map((x) => x.requester),
+      extraToggles: rest.map((x) => x.toggle),
       // O km digitado (ADM) é do frete principal: some se outro frete passar a ser o principal.
       km: main!.client === f.client_id ? f.km : "",
       extras: rest.map((x) => baseOf(x.client)),
@@ -812,6 +855,8 @@ export function VehicleTimeline() {
     return setFreights(f, list);
   });
   const driverOptions = useMemo(() => [{ value: NONE, label: "Sem motorista" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
+  const requesterOptions = useMemo(() => [{ value: NONE, label: "Sem solicitante" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
+  const pickDriverOptions = useMemo(() => [{ value: NONE, label: "Definir" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
 
   function freightKmText(fr: Freight, i: number) {
     const base = fr.client.startsWith(WORK_PREFIX) ? workById.get(fr.client.slice(WORK_PREFIX.length))?.client_id ?? "" : fr.client;
@@ -852,10 +897,28 @@ export function VehicleTimeline() {
           )}
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label>Motorista</Label>
-          <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={driverOptions} placeholder="Selecione o motorista" searchPlaceholder="Buscar motorista" />
-        </div>
+        {byWork ? (
+          <div className="space-y-1">
+            <Label>Solicitante</Label>
+            <SearchSelect value={fr.requester} onChange={(v) => patchFreight(i, { requester: v })} options={requesterOptions} placeholder="Selecione o solicitante" searchPlaceholder="Buscar solicitante" />
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <Label>Motorista</Label>
+            <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={driverOptions} placeholder="Selecione o motorista" searchPlaceholder="Buscar motorista" />
+          </div>
+        )}
+        {byWork && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Switch id={`freight-driver-${i}`} checked={fr.toggle} onCheckedChange={(v) => patchFreight(i, { toggle: v, driver: v ? fr.driver : NONE })} />
+              <Label htmlFor={`freight-driver-${i}`}>Motorista</Label>
+            </div>
+            {fr.toggle
+              ? <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={pickDriverOptions} placeholder="Definir" searchPlaceholder="Buscar motorista" />
+              : <p className="pt-1 text-xs text-muted-foreground">Sem marcar, vale o solicitante (prêmio e CNH).</p>}
+          </div>
+        )}
         <div className="space-y-1">
           <Label>{byWork ? "Cliente" : "Obra / Cliente"}</Label>
           {/* Caminhão: primeiro o cliente, depois (opcional) o serviço. Só o cliente = rateio pelas horas dos serviços dele. */}
@@ -1145,7 +1208,9 @@ export function VehicleTimeline() {
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label>Fretes do dia</Label>
-                <Button variant="outline" size="sm" onClick={() => setForm((f) => setFreights(f, [...getFreights(f), { client: NONE, driver: f.driver_id, place: "" }]))}>
+                <Button variant="outline" size="sm" onClick={() => setForm((f) => setFreights(f, [...getFreights(f), byWork
+                  ? { client: NONE, driver: NONE, place: "", requester: f.requester_id, toggle: false }
+                  : { client: NONE, driver: f.driver_id, place: "", requester: NONE, toggle: false }]))}>
                   <Plus className="h-4 w-4" /> Adicionar frete
                 </Button>
               </div>
