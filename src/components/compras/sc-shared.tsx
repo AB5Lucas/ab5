@@ -207,11 +207,13 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
   const [f, setF] = useState<HeaderForm>(EMPTY);
   const [totvs, setTotvs] = useState<{ number: string; file: File | null }>({ number: "", file: null });
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [totvsStep, setTotvsStep] = useState(false);
   const key = open ? editing?.id ?? "new" : null;
   if (key !== loadedFor) {
     setLoadedFor(key);
     if (open) {
       setTotvs({ number: "", file: null });
+      setTotvsStep(false);
       setF(editing ? {
         system: editing.system, category: editing.category ?? "", nature: editing.nature ?? "", priority: editing.priority ?? "", client_id: editing.client_id ?? "",
         due_date: editing.due_date ?? "", delivery_kind: editing.delivery_kind as HeaderForm["delivery_kind"], delivery_place: editing.delivery_place ?? "",
@@ -220,23 +222,28 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
     }
   }
   const isTotvs = !editing && f.system === "TOTVS";
+  // Cabeçalho igual para planilha e TOTVS (no TOTVS, depois vem a tela do nº + foto).
+  const checkHeader = () => {
+    const miss = [!f.category && "categoria", !f.nature && "natureza", !f.priority && "prioridade", !f.client_id && "cliente", !f.due_date && "data prazo",
+      f.delivery_kind === "outro" && !f.delivery_place.trim() && "local de entrega", !f.justification.trim() && "justificativa"].filter(Boolean);
+    if (miss.length) throw new Error(`Preencha: ${miss.join(", ")}.`);
+    if (!editing && f.due_date < todayISO()) throw new Error("A data prazo não pode ser antes de hoje.");
+  };
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
   const save = useMutation({
     mutationFn: async () => {
+      checkHeader();
       if (isTotvs) {
         if (!totvs.number.trim()) throw new Error("Informe o número da SC do TOTVS.");
         if (!totvs.file) throw new Error("Anexe a foto da SC do TOTVS.");
         const path = `totvs/${crypto.randomUUID()}-${totvs.file.name.replace(/[^\w.-]/g, "_")}`;
         const up = await supabase.storage.from("purchase-photos").upload(path, totvs.file);
         if (up.error) throw up.error;
-        const { data, error } = await supabase.rpc("purchase_request_create_totvs", { _number: totvs.number, _photo: path, _observers: f.observer_ids });
+        const header = { ...f, justification: f.justification.trim(), delivery_place: f.delivery_kind === "outro" ? f.delivery_place.trim() : "" };
+        const { data, error } = await supabase.rpc("purchase_request_create_totvs", { _number: totvs.number, _photo: path, _observers: f.observer_ids, _p: header as never });
         if (error) throw error;
         return data as string;
       }
-      const miss = [!f.category && "categoria", !f.nature && "natureza", !f.priority && "prioridade", !f.client_id && "cliente", !f.due_date && "data prazo",
-        f.delivery_kind === "outro" && !f.delivery_place.trim() && "local de entrega", !f.justification.trim() && "justificativa"].filter(Boolean);
-      if (miss.length) throw new Error(`Preencha: ${miss.join(", ")}.`);
-      if (f.due_date < todayISO()) throw new Error("A data prazo não pode ser antes de hoje.");
       const payload = { ...f, justification: f.justification.trim(), delivery_place: f.delivery_kind === "outro" ? f.delivery_place.trim() : "" };
       if (editing) {
         const { error } = await supabase.from("purchase_requests").update({
@@ -273,16 +280,16 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("max-h-[92vh] overflow-y-auto", isTotvs ? "max-w-md" : "max-w-2xl")}>
+      <DialogContent className={cn("max-h-[92vh] overflow-y-auto", isTotvs && totvsStep ? "max-w-md" : "max-w-2xl")}>
         <DialogHeader>
-          <DialogTitle>{editing ? `Editar ${editing.number}` : isTotvs ? "SC do TOTVS" : "Nova solicitação de compra"}</DialogTitle>
+          <DialogTitle>{editing ? `Editar ${editing.number}` : isTotvs && totvsStep ? "SC do TOTVS" : "Nova solicitação de compra"}</DialogTitle>
           <DialogDescription>
-            {editing ? "Controle da solicitação." : isTotvs ? "Informe o número da SC aberta no TOTVS e a foto. Ela vai direto para o Comprador."
+            {editing ? "Controle da solicitação." : isTotvs && totvsStep ? "Informe o número da SC aberta no TOTVS e a foto. Ela vai direto para o Comprador."
               : "Data, solicitante e número (SC-NOME-001) são preenchidos sozinhos. Depois de salvar, você inclui os itens."}
           </DialogDescription>
         </DialogHeader>
-        {!editing && sel("Planilha ou TOTVS", "system", SC_SYSTEMS)}
-        {isTotvs ? (
+        {!editing && !(isTotvs && totvsStep) && sel("Planilha ou TOTVS", "system", SC_SYSTEMS)}
+        {isTotvs && totvsStep ? (
           <div className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="sc-totvs">Nº da SC no TOTVS</Label>
@@ -338,10 +345,14 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
             </div>
           </div>
         )}
-        <ObserversField value={f.observer_ids} onChange={(v) => set("observer_ids", v)} requesterId={editing?.requester_id} />
+        {!(isTotvs && totvsStep) && <ObserversField value={f.observer_ids} onChange={(v) => set("observer_ids", v)} requesterId={editing?.requester_id} />}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button disabled={save.isPending} onClick={() => save.mutate()}>{editing ? "Salvar" : isTotvs ? "Enviar" : "Criar e incluir itens"}</Button>
+          {isTotvs && totvsStep
+            ? <Button variant="outline" onClick={() => setTotvsStep(false)}>Voltar</Button>
+            : <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>}
+          {isTotvs && !totvsStep
+            ? <Button onClick={() => { try { checkHeader(); setTotvsStep(true); } catch (e) { toast.error((e as Error).message); } }}>Continuar</Button>
+            : <Button disabled={save.isPending} onClick={() => save.mutate()}>{editing ? "Salvar" : isTotvs ? "Enviar" : "Criar e incluir itens"}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

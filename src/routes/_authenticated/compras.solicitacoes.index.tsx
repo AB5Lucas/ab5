@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SC_DONE_STATUSES } from "@/lib/purchase-requests";
 import { ScHeaderDialog, ScRemoveDialog, ScTable, StatusFilter, statusCounts, useClientsList, useScRemove, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 
 export const Route = createFileRoute("/_authenticated/compras/solicitacoes/")({
@@ -31,9 +32,13 @@ function Page() {
   const [removing, setRemoving] = useState<ScRow | null>(null);
   const uid = user?.id ?? "00000000-0000-0000-0000-000000000000";
   const list = useScRequests(`mine-${uid}-${isAdmin}`, (q) => (isAdmin ? q : q.or(`requester_id.eq.${uid},observer_ids.cs.{${uid}}`)));
-  const mine = (list.data ?? []).filter((r) => r.requester_id === uid);
-  const copied = (list.data ?? []).filter((r) => r.requester_id !== uid && (r.observer_ids ?? []).includes(uid));
-  const scoped = scope === "minhas" ? mine : scope === "copia" ? copied : list.data ?? [];
+  const [show, setShow] = useState<"abertas" | "concluidas" | "todas">("abertas");
+  const done = (r: ScRow) => SC_DONE_STATUSES.includes(r.status);
+  const all = list.data ?? [];
+  const shownAll = all.filter((r) => show === "todas" || (show === "concluidas" ? done(r) : !done(r)));
+  const mine = shownAll.filter((r) => r.requester_id === uid);
+  const copied = shownAll.filter((r) => r.requester_id !== uid && (r.observer_ids ?? []).includes(uid));
+  const scoped = scope === "minhas" ? mine : scope === "copia" ? copied : shownAll;
   const clients = useClientsList();
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
   const rows = scoped.filter((r) => status === "all" || r.status === status);
@@ -100,11 +105,22 @@ function Page() {
       <PageHeader title="Solicitações" description="Suas solicitações e as que você acompanha em cópia. Enviar manda para o validador (gestor do cliente); depois de validada, vai para o Comprador. Antes da validação você pode puxar de volta pelo lápis (fica bloqueado enquanto o validador está com ela aberta); depois, só se o validador ou o Comprador devolver. O botão de copiar cria uma SC nova igual." />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
+          <Label className="block text-xs">Mostrar</Label>
+          <Select value={show} onValueChange={(v) => setShow(v as typeof show)}>
+            <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="abertas">Em aberto ({all.filter((r) => !done(r)).length})</SelectItem>
+              <SelectItem value="concluidas">Compradas/encerradas ({all.filter(done).length})</SelectItem>
+              <SelectItem value="todas">Todas ({all.length})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
           <Label className="block text-xs">Acompanhar</Label>
           <Select value={scope} onValueChange={(v) => setScope(v as Scope)}>
             <SelectTrigger className="w-60"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="todas">{isAdmin ? "Todas do sistema" : "Todas"} ({(list.data ?? []).length})</SelectItem>
+              <SelectItem value="todas">{isAdmin ? "Todas do sistema" : "Todas"} ({shownAll.length})</SelectItem>
               <SelectItem value="minhas">Feitas por mim ({mine.length})</SelectItem>
               <SelectItem value="copia">Em cópia (observador) ({copied.length})</SelectItem>
             </SelectContent>

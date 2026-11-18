@@ -6019,7 +6019,7 @@ export type Database = {
       purchase_request_return: { Args: { _id: string; _notes: string }; Returns: undefined }
       purchase_request_recall: { Args: { _id: string }; Returns: undefined }
       purchase_request_validator_open: { Args: { _id: string; _open: boolean }; Returns: undefined }
-      purchase_request_create_totvs: { Args: { _number: string; _photo: string; _observers?: string[] }; Returns: string }
+      purchase_request_create_totvs: { Args: { _number: string; _photo: string; _observers?: string[]; _p?: Json }; Returns: string }
       purchase_request_cancel: { Args: { _id: string }; Returns: undefined }
       purchase_request_decide: { Args: { _id: string; _approve: boolean; _notes: string }; Returns: undefined }
       purchase_request_set_status: { Args: { _id: string; _status: string; _notes: string; _date?: string }; Returns: undefined }
