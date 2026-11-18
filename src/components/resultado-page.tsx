@@ -736,7 +736,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         {(() => {
           const keyOf = groupKey;
           const clientMap = new Map<string, string>();
@@ -748,7 +748,8 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
           const services = visibleWorks.filter((x) => keyOf(x) === ck);
           return (
             <>
-              <div className="w-full max-w-xs">
+              <div className="w-full max-w-xs space-y-1">
+                <Label className="block">Cliente</Label>
                 <Select
                   value={ck}
                   onValueChange={(v) => {
@@ -768,7 +769,8 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                   </SelectContent>
                 </Select>
               </div>
-              <div className="w-full max-w-xs">
+              <div className="w-full max-w-xs space-y-1">
+                <Label className="block">Serviço</Label>
                 <Select value={workId} onValueChange={selectWork} disabled={!ck}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o serviço" />
