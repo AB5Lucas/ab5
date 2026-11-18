@@ -953,6 +953,13 @@
       "when": 1795400032000,
       "tag": "0135_vehicle_requester",
       "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1795400033000,
+      "tag": "0136_purchase_my_pending_validation",
+      "breakpoints": true
     }
   ]
 }

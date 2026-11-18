@@ -59,10 +59,10 @@ function useBadgeData() {
             .then((r: { data: unknown; error: unknown }) => (r.error ? empty : (r.data as Counts) ?? empty), () => empty)
           : Promise.resolve(empty),
         when(can.fleet, () => fetchFleetBalanceParts().then((p) => [p])),
-        when(can.scApproval && !!uid, async () => ((await supabase.from("purchase_requests").select("due_date, approver_id, substitute_id").eq("stage", "aprovacao")).data ?? [])
-          .filter((r) => r.approver_id === uid || r.substitute_id === uid)),
-        // SCs em Compras ainda não compradas (as que a RLS deixa ver: próprias, em cópia, validadas; Comprador/admin veem todas).
-        when(can.scOpen, async () => (await supabase.from("purchase_requests").select("due_date, requester_id, observer_ids").eq("stage", "compras")
+        // Validação: só as que estão com a pessoa agora (gestor; o substituto só enquanto o gestor está de férias).
+        when(can.scApproval && !!uid, async () => ((await supabase.rpc("purchase_my_pending_validation" as never)).data as { due_date: string | null }[] | null) ?? []),
+        // Enviadas e ainda não compradas (em validação ou em Compras); rascunho e canceladas ficam de fora.
+        when(can.scOpen, async () => (await supabase.from("purchase_requests").select("due_date, requester_id, stage").in("stage", ["aprovacao", "compras"])
           .not("status", "in", '("COMPRA EFETIVADA","ALMOXARIFADO","CANCELADA","RECUSADA")')).data ?? []),
         // Usuários novos aguardando liberação (bolinha no rodapé do menu).
         when(can.users, async () => (await supabase.from("users_profiles").select("id").eq("pending", true)).data ?? []),
@@ -78,12 +78,23 @@ function useBadgeData() {
       // Vermelho: alguma com prazo em até 5 dias; laranja: todas com mais de 5 dias.
       const soon = addDays(today, 5);
       const scApproval = { count: scPend.length, urgent: scPend.filter((r: any) => r.due_date <= soon).length };
-      const isAdmin = can.scOpen && !!uid && ((await supabase.from("user_roles").select("role").eq("user_id", uid)).data ?? []).some((r) => r.role === "admin");
-      // Solicitações: as que aparecem na lista (próprias e em cópia; admin vê todas). Comprador: todas as de Compras em aberto.
       const late = (rows: any[]) => rows.filter((r) => r.due_date && r.due_date < today).length;
-      const mineRows = isAdmin || can.scBuyer ? scOpenRows : scOpenRows.filter((r: any) => r.requester_id === uid || (r.observer_ids ?? []).includes(uid));
+      // Solicitações: só as do próprio solicitante (enviadas e pendentes), para todos, inclusive admin e comprador.
+      const mineRows = scOpenRows.filter((r: any) => r.requester_id === uid);
       const scOpen = { count: mineRows.length, late: late(mineRows) };
-      const scBuy = { count: scOpenRows.length, late: late(scOpenRows) };
+      // Comprador: só para quem compra (grupo Compras ou acesso liberado na pessoa), não para quem só enxerga a página (admin/diretoria).
+      const isBuyer = can.scBuyer && !!uid && await (async () => {
+        const [{ data: exc }, { data: me }] = await Promise.all([
+          supabase.from("user_page_access").select("allowed").eq("user_id", uid).eq("path", "/compras/comprador").maybeSingle(),
+          supabase.from("users_profiles").select("access_group_id").eq("id", uid).maybeSingle(),
+        ]);
+        if (exc) return !!exc.allowed;
+        if (!me?.access_group_id) return false;
+        const { data: g } = await supabase.from("access_groups").select("name").eq("id", me.access_group_id).maybeSingle();
+        return /^compras$/i.test((g?.name ?? "").trim());
+      })();
+      const buyRows = isBuyer ? scOpenRows.filter((r: any) => r.stage === "compras") : [];
+      const scBuy = { count: buyRows.length, late: late(buyRows) };
       return { pendingUsers: pendingUsers.length, scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
     },
   });
@@ -134,7 +145,7 @@ export function useMenuBadges() {
     if (d.pendingUsers) out["/admin/usuarios"] = { count: d.pendingUsers, tone: "red", detail: `${d.pendingUsers} usuário(s) novo(s) aguardando liberação de acesso` };
     if (d.scOpen?.count) out["/compras/solicitacoes"] = {
       count: d.scOpen.count, tone: d.scOpen.late ? "red" : "orange",
-      detail: `${d.scOpen.count} SC(s) pendente(s) em Compras${d.scOpen.late ? ` · ${d.scOpen.late} com prazo vencido` : ""}`,
+      detail: `${d.scOpen.count} SC(s) sua(s) enviada(s) e ainda não comprada(s)${d.scOpen.late ? ` · ${d.scOpen.late} com prazo vencido` : ""}`,
     };
     // Comprador: mesmas SCs em aberto (o comprador vê todas as de Compras pela RLS).
     if (d.scBuyer && d.scBuy?.count) out["/compras/comprador"] = {
