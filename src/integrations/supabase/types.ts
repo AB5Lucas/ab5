@@ -3448,6 +3448,7 @@ export type Database = {
           notes: string | null
           order_number: string | null
           order_file_path: string | null
+          status_at: string | null
           photo_path: string | null
           quote_path: string | null
           quantity: number
@@ -3465,6 +3466,7 @@ export type Database = {
           notes?: string | null
           order_number?: string | null
           order_file_path?: string | null
+          status_at?: string | null
           photo_path?: string | null
           quote_path?: string | null
           quantity: number
@@ -3482,6 +3484,7 @@ export type Database = {
           notes?: string | null
           order_number?: string | null
           order_file_path?: string | null
+          status_at?: string | null
           photo_path?: string | null
           quote_path?: string | null
           quantity?: number
@@ -5949,7 +5952,7 @@ export type Database = {
       purchase_request_cancel: { Args: { _id: string }; Returns: undefined }
       purchase_request_decide: { Args: { _id: string; _approve: boolean; _notes: string }; Returns: undefined }
       purchase_request_set_status: { Args: { _id: string; _status: string; _notes: string; _date?: string }; Returns: undefined }
-      purchase_item_set: { Args: { _item: string; _status: string; _order: string }; Returns: undefined }
+      purchase_item_set: { Args: { _item: string; _status: string; _order: string; _date?: string }; Returns: undefined }
       _andam_move: {
         Args: {
           _fc: string

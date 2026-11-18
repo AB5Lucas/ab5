@@ -159,8 +159,8 @@ function Page() {
     onError: (e: Error) => toast.error(e.message),
   });
   const setItem = useMutation({
-    mutationFn: async ({ item, status, order }: { item: string; status: string; order: string }) => {
-      const { error } = await supabase.rpc("purchase_item_set", { _item: item, _status: status, _order: order });
+    mutationFn: async ({ item, status, order, date }: { item: string; status: string; order: string; date?: string }) => {
+      const { error } = await supabase.rpc("purchase_item_set", { _item: item, _status: status, _order: order, ...(date ? { _date: date } : {}) });
       if (error) throw error;
     },
     onSuccess: (_d, v) => {
@@ -168,7 +168,7 @@ function Page() {
       qc.invalidateQueries({ queryKey: ["sc-items", id] });
       // Procura o arquivo quando o nº muda ou ainda não há arquivo ligado.
       const prev = (items.data ?? []).find((it) => it.id === v.item);
-      if (v.order.trim() && (prev?.order_number !== v.order.trim() || !prev?.order_file_path)) findOrder.mutate({ item: v.item, order: v.order.trim() });
+      if (!v.date && v.order.trim() && (prev?.order_number !== v.order.trim() || !prev?.order_file_path)) findOrder.mutate({ item: v.item, order: v.order.trim() });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -349,11 +349,22 @@ function Page() {
                   </TableCell>
                   <TableCell>
                     {isBuyer && saved ? (
-                      <Select value={saved.status} onValueChange={(v) => setItem.mutate({ item: saved.id, status: v, order: orders[saved.id] ?? saved.order_number ?? "" })}>
-                        <SelectTrigger className="h-8 w-44"><SelectValue /></SelectTrigger>
-                        <SelectContent>{SC_ITEM_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : <span className="whitespace-nowrap">{saved?.status ?? (r.stage === "rascunho" ? "—" : "SOLICITAÇÃO ENVIADA")}</span>}
+                      <div className="space-y-1">
+                        <Select value={saved.status} onValueChange={(v) => setItem.mutate({ item: saved.id, status: v, order: orders[saved.id] ?? saved.order_number ?? "" })}>
+                          <SelectTrigger className="h-8 w-44"><SelectValue /></SelectTrigger>
+                          <SelectContent>{SC_ITEM_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                        {/* Data real do status (pode ter acontecido em outro dia). */}
+                        <Input type="date" className="h-7 w-44 text-xs" aria-label="Data do status" title="Data real do status"
+                          value={saved.status_at ?? ""}
+                          onChange={(e) => e.target.value && setItem.mutate({ item: saved.id, status: saved.status, order: orders[saved.id] ?? saved.order_number ?? "", date: e.target.value })} />
+                      </div>
+                    ) : (
+                      <span className="whitespace-nowrap">
+                        {saved?.status ?? (r.stage === "rascunho" ? "—" : "SOLICITAÇÃO ENVIADA")}
+                        {saved?.status_at && <span className="block text-[11px] text-muted-foreground">{brDate(saved.status_at)}</span>}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {isBuyer && saved ? (
