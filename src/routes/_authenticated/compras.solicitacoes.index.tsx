@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Ban, Plus, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { useAccess } from "@/hooks/use-access";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -19,14 +20,16 @@ export const Route = createFileRoute("/_authenticated/compras/solicitacoes/")({
 /** Visão do solicitante: as SCs dele e as que tem em cópia (observador), filtro de status, Enviar, Apagar (não enviada) e Cancelar (enviada). */
 type Scope = "todas" | "minhas" | "copia";
 function Page() {
-  const { user, isAdmin } = useCurrentUser();
+  const { user, isAdmin: admin } = useCurrentUser();
+  const { canAccess } = useAccess();
+  // Administrador e comprador veem todas as SCs (a RLS libera).
+  const isAdmin = admin || canAccess("/compras/comprador");
   const qc = useQueryClient();
   const [status, setStatus] = useState("all");
   const [scope, setScope] = useState<Scope>("todas");
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<ScRow | null>(null);
   const uid = user?.id ?? "00000000-0000-0000-0000-000000000000";
-  // Administrador vê todas as SCs (a RLS libera); os demais, as próprias e as em cópia.
   const list = useScRequests(`mine-${uid}-${isAdmin}`, (q) => (isAdmin ? q : q.or(`requester_id.eq.${uid},observer_ids.cs.{${uid}}`)));
   const mine = (list.data ?? []).filter((r) => r.requester_id === uid);
   const copied = (list.data ?? []).filter((r) => r.requester_id !== uid && (r.observer_ids ?? []).includes(uid));

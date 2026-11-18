@@ -78,7 +78,7 @@ function useBadgeData() {
       const isAdmin = can.scOpen && !!uid && ((await supabase.from("user_roles").select("role").eq("user_id", uid)).data ?? []).some((r) => r.role === "admin");
       // Solicitações: as que aparecem na lista (próprias e em cópia; admin vê todas). Comprador: todas as de Compras em aberto.
       const late = (rows: any[]) => rows.filter((r) => r.due_date && r.due_date < today).length;
-      const mineRows = isAdmin ? scOpenRows : scOpenRows.filter((r: any) => r.requester_id === uid || (r.observer_ids ?? []).includes(uid));
+      const mineRows = isAdmin || can.scBuyer ? scOpenRows : scOpenRows.filter((r: any) => r.requester_id === uid || (r.observer_ids ?? []).includes(uid));
       const scOpen = { count: mineRows.length, late: late(mineRows) };
       const scBuy = { count: scOpenRows.length, late: late(scOpenRows) };
       return { scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
