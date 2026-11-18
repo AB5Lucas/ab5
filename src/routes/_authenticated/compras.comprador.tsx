@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, Undo2 } from "lucide-react";
+import { Ban, Pencil, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,17 @@ function Page() {
     onSuccess: () => { toast.success("Devolvida ao solicitante"); setReturning(null); setReason(""); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
+  // Cancelar a SC inteira (com motivo).
+  const [cancelling, setCancelling] = useState<ScRow | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const cancelSc = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("purchase_request_buyer_cancel" as never, { _id: cancelling!.id, _notes: cancelReason } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("SC cancelada"); setCancelling(null); setCancelReason(""); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const save = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc("purchase_request_set_status", { _id: edit!.id, _status: form.status, _notes: form.notes, ...(form.date ? { _date: form.date } : {}) });
@@ -80,6 +91,7 @@ function Page() {
               <div className="flex gap-1">
                 <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "", date: r.status_at }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
                 <Button size="sm" variant="ghost" title="Devolver ao solicitante para corrigir" onClick={() => { setReturning(r); setReason(""); }}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
+                {r.stage === "compras" && <Button size="sm" variant="ghost" className="text-destructive" title="Cancelar a SC inteira" onClick={() => { setCancelling(r); setCancelReason(""); }}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}
               </div>
             )} />
           )}
@@ -99,6 +111,22 @@ function Page() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setReturning(null)}>Cancelar</Button>
             <Button disabled={giveBack.isPending || !reason.trim()} onClick={() => giveBack.mutate()}>Devolver</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!cancelling} onOpenChange={(o) => !o && setCancelling(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar a SC inteira</DialogTitle>
+            <DialogDescription>{cancelling?.number}. A SC fica CANCELADA e sai das pendências; o motivo vai para as observações do comprador.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <Label htmlFor="cancel-notes">Motivo do cancelamento</Label>
+            <Textarea id="cancel-notes" rows={3} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelling(null)}>Voltar</Button>
+            <Button variant="destructive" disabled={cancelSc.isPending || !cancelReason.trim()} onClick={() => cancelSc.mutate()}>Cancelar SC</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

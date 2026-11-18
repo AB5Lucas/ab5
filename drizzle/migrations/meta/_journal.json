@@ -988,6 +988,13 @@
       "when": 1795400037000,
       "tag": "0140_holidays_auto",
       "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "7",
+      "when": 1795400038000,
+      "tag": "0141_purchase_auto_status",
+      "breakpoints": true
     }
   ]
 }
