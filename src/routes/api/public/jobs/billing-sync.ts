@@ -17,6 +17,10 @@ export const Route = createFileRoute("/api/public/jobs/billing-sync")({
     const lovableKey = process.env["LOVABLE_API_KEY"];
     const excelKey = process.env["MICROSOFT_EXCEL_API_KEY"];
     if (!lovableKey || !excelKey) return Response.json({ error: "Excel connection missing" }, { status: 503 });
+    // Feriados nacionais e de Mogi Guaçu do ano atual e do seguinte (holidays_sync_year não recria os removidos/trocados).
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const year = new Date().getFullYear();
+    await Promise.all([year, year + 1].map((y) => supabaseAdmin.rpc("holidays_sync_year", { y }))).catch((e) => console.error("Holiday sync failed", e));
     const { executeBillingSync } = await import("@/lib/billing-sync.server");
     const { deferBilling } = await import("@/lib/billing-background.server");
     const { executeIndustrySync } = await import("@/lib/industry-sync.server");

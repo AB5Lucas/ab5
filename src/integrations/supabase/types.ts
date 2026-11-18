@@ -2957,18 +2957,129 @@ export type Database = {
           date: string
           id: string
           name: string
+          kind: string
+          city: string | null
+          moved_from: string | null
         }
         Insert: {
           created_at?: string
           date: string
           id?: string
           name: string
+          kind?: string
+          city?: string | null
+          moved_from?: string | null
         }
         Update: {
           created_at?: string
           date?: string
           id?: string
           name?: string
+          kind?: string
+          city?: string | null
+          moved_from?: string | null
+        }
+        Relationships: []
+      }
+      holiday_skips: {
+        Row: {
+          date: string
+          created_at: string
+        }
+        Insert: {
+          date: string
+          created_at?: string
+        }
+        Update: {
+          date?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      client_holidays: {
+        Row: {
+          client_id: string
+          date: string
+          is_holiday: boolean
+          name: string | null
+          moved_from: string | null
+          created_at: string
+        }
+        Insert: {
+          client_id: string
+          date: string
+          is_holiday?: boolean
+          name?: string | null
+          moved_from?: string | null
+          created_at?: string
+        }
+        Update: {
+          client_id?: string
+          date?: string
+          is_holiday?: boolean
+          name?: string | null
+          moved_from?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      city_holiday_catalog: {
+        Row: {
+          id: string
+          city: string
+          month: number | null
+          day: number | null
+          easter_offset: number | null
+          name: string
+          auto: boolean
+          from_year: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          city: string
+          month?: number | null
+          day?: number | null
+          easter_offset?: number | null
+          name: string
+          auto?: boolean
+          from_year?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          city?: string
+          month?: number | null
+          day?: number | null
+          easter_offset?: number | null
+          name?: string
+          auto?: boolean
+          from_year?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      holiday_alert_decisions: {
+        Row: {
+          date: string
+          client_id: string
+          decision: string
+          decided_by: string | null
+          created_at: string
+        }
+        Insert: {
+          date: string
+          client_id: string
+          decision: string
+          decided_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          date?: string
+          client_id?: string
+          decision?: string
+          decided_by?: string | null
+          created_at?: string
         }
         Relationships: []
       }
@@ -6360,6 +6471,9 @@ export type Database = {
         Returns: undefined
       }
       purchase_request_recall: { Args: { _id: string }; Returns: undefined }
+      holidays_sync_year: { Args: { y: number }; Returns: number }
+      holiday_remove: { Args: { _id: string }; Returns: undefined }
+      holiday_move: { Args: { _date: string; _new_date: string; _client_id?: string | null }; Returns: undefined }
       purchase_request_return: {
         Args: { _id: string; _notes: string }
         Returns: undefined

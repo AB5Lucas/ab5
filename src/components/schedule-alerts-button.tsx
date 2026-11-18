@@ -1,4 +1,8 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import type { AlertAction } from "@/lib/schedule-alerts";
 import { AlertTriangle, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,6 +20,21 @@ export function ScheduleAlertsButton({ date }: { date: string }) {
   const tone = worstAlertTone(pending);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const reds = pending.filter((a) => a.tone === "red").length, oranges = pending.length - reds;
+  // Feriado municipal: cadastrar só para o cliente (client_holidays) ou ignorar; a decisão fica gravada e o aviso some.
+  const qc = useQueryClient();
+  const decide = useMutation({
+    mutationFn: async ({ action, register }: { action: AlertAction; register: boolean }) => {
+      if (register) {
+        const { error } = await supabase.from("client_holidays").upsert({ client_id: action.clientId, date: action.date, is_holiday: true, name: action.name }, { onConflict: "client_id,date" });
+        if (error) throw error;
+      }
+      const { error } = await supabase.from("holiday_alert_decisions").upsert({ client_id: action.clientId, date: action.date, decision: register ? "cadastrado" : "ignorado" }, { onConflict: "date,client_id" });
+      if (error) throw error;
+      return register;
+    },
+    onSuccess: (register) => { toast.success(register ? "Feriado cadastrado para o cliente" : "Aviso ignorado"); qc.invalidateQueries({ queryKey: ["schedule-alerts"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -42,6 +61,12 @@ export function ScheduleAlertsButton({ date }: { date: string }) {
                     <span className={`flex-1 text-sm ${isSeen(date, a) ? "text-muted-foreground" : ""}`}>{a.title}</span>
                     {a.people.length > 0 && <ChevronDown className={`mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open[a.key] ? "rotate-180" : ""}`} />}
                   </button>
+                  {a.action && (
+                    <div className="mt-1.5 flex gap-1.5 pl-4">
+                      <Button size="sm" className="h-7 px-2 text-xs" disabled={decide.isPending} onClick={() => decide.mutate({ action: a.action!, register: true })}>Cadastrar feriado para o cliente</Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={decide.isPending} onClick={() => decide.mutate({ action: a.action!, register: false })}>Ignorar</Button>
+                    </div>
+                  )}
                   {open[a.key] && (
                     <ul className="mt-1 space-y-0.5 pl-4 text-xs text-muted-foreground">
                       {a.people.map((p, i) => <li key={i}>{p}</li>)}

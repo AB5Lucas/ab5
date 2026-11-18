@@ -14,6 +14,7 @@ const EMBED_FK: Record<string, Record<string, string>> = {
   rdo_workforce: { collaborators: "collaborator_id", rdos: "rdo_id" },
   vehicle_schedules: { vehicles: "vehicle_id", collaborators: "driver_id" },
   works: { clients: "client_id" },
+  collaborators: { positions: "position_id" },
 };
 
 function splitTop(s: string) {

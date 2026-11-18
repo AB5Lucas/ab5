@@ -82,6 +82,14 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
 
 
   const holiday = new Map((holidays.data ?? []).map((h) => [h.date, h.name]));
+  // Exceções por cliente (Configurações › Feriados): feriado só do cliente ou feriado geral trabalhado no cliente.
+  const { data: clientHol } = await supabase.from("client_holidays").select("client_id, date, is_holiday, name").gte("date", start).lt("date", end);
+  const clientHolBy = new Map((clientHol ?? []).map((h) => [`${h.client_id}|${h.date}`, h]));
+  const holidayName = (date: string, clientId: string | null | undefined): string | null => {
+    const o = clientId ? clientHolBy.get(`${clientId}|${date}`) : undefined;
+    if (o) return o.is_holiday ? o.name ?? "feriado do cliente" : null;
+    return holiday.get(date) ?? null;
+  };
   const inRange = (d: string, s: string, e: string | null) => d >= s && d <= (e ?? s);
   const personAbsence = (cid: string, d: string): string | null => {
     if ((leaves.data ?? []).some((l) => l.collaborator_id === cid && inRange(d, l.start_date, l.end_date))) return "Atestado";
@@ -130,7 +138,8 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     r.seen.add(date);
     const work = a.works?.clients?.name ? `${a.works.clients.name} - ${a.works.name}` : a.works?.name ?? "—";
     const st = statusByKey.get(`${a.schedule_id}|${a.collaborator_id}`);
-    const reason = personAbsence(a.collaborator_id, date) ?? (holiday.has(date) ? `Feriado (${holiday.get(date)})`
+    const hol = holidayName(date, a.works?.client_id);
+    const reason = personAbsence(a.collaborator_id, date) ?? (hol ? `Feriado (${hol})`
       : st ? statusLabel(st)
       : rdoAbsent.get(`${a.collaborator_id}|${date}`) ?? null);
     r.days.push({ date, work, status: reason ?? "Trabalhado", counted: !reason, reason: reason ?? undefined });

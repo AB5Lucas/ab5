@@ -7,7 +7,9 @@
  * (L4, manutenção de veículo, aguarda a aba Manutenção estar alimentada.)
  */
 export type AlertTone = "red" | "orange";
-export type ScheduleAlert = { key: string; tone: AlertTone; title: string; people: string[] };
+/** Ação do aviso: feriado municipal de um cliente com equipe escalada (cadastrar só para o cliente ou ignorar). */
+export type AlertAction = { kind: "municipal_holiday"; clientId: string; date: string; name: string };
+export type ScheduleAlert = { key: string; tone: AlertTone; title: string; people: string[]; action?: AlertAction };
 
 const plain = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
 export const addDaysIso = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
@@ -57,6 +59,8 @@ export type AlertData = {
   accounted: Set<string>;
   /** Quem trabalhou nos 14 dias anteriores. */
   recent: Set<string>;
+  /** Feriados municipais (catálogo, não automáticos) nas cidades dos clientes com equipe, ainda sem decisão. */
+  municipal?: { clientId: string; clientName: string; city: string; name: string }[];
 };
 
 const br = (d: string) => d.split("-").reverse().join("/");
@@ -70,6 +74,12 @@ export function scheduleAlerts(d: AlertData): ScheduleAlert[] {
   // V11: programação do próximo dia útil não criada (ou sem ninguém) depois do horário de corte.
   if (d.date === nextBusinessDay(d.today, d.holidays) && pastCutoff(d.now) && (!d.scheduleExists || !d.allocations.length)) {
     out.push({ key: "v11", tone: "red", title: `Programação de ${br(d.date)} ainda não foi criada`, people: [] });
+  }
+
+  // V12: feriado municipal na cidade de um cliente com equipe escalada (cadastrar para o cliente ou ignorar).
+  for (const m of d.municipal ?? []) {
+    if (!d.allocations.some((a) => clientOf(a.work_id) === m.clientId)) continue;
+    out.push({ key: `v12:${m.clientId}`, tone: "orange", title: `Feriado em ${m.city}: ${m.name} — equipe escalada na ${m.clientName}`, people: [], action: { kind: "municipal_holiday", clientId: m.clientId, date: d.date, name: m.name } });
   }
 
   // V1: treinamento agendado no dia sem TST escalado no ADM.

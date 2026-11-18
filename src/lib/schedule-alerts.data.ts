@@ -3,6 +3,7 @@ import { fetchAll } from "@/lib/results-engine";
 import { todayISO } from "@/lib/scheduling";
 import { workVtDefault } from "@/lib/transport-rules";
 import { addDaysIso, scheduleAlerts, type AlertData, type AlertWork } from "@/lib/schedule-alerts";
+import { cityHolidaysOn, type CityHoliday } from "@/lib/holidays";
 
 const safe = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
 
@@ -14,7 +15,7 @@ export async function fetchScheduleAlerts(date: string) {
     safe(fetchAll<any>((a, b) => supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", addDaysIso(date, -14)).lte("schedule_date", date).range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("holidays").select("date").gte("date", addDaysIso(today, -1)).lte("date", addDaysIso(date, 40)).range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, night_shift").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("clients").select("id, name, needs_company_transport, needs_transport_voucher").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("clients").select("id, name, city, needs_company_transport, needs_transport_voucher").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("collaborators").select("id, full_name, status, contract_type, driver_license_expiry, vt_enabled, city, notice_end, positions(name)").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("driver_id, extra_driver_ids, client_id, extra_client_ids, is_maintenance, is_external, is_suzano_local, vehicles(plate, model)").eq("schedule_date", date).range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, status, client_booked, training_id, client_id, trainings(name), clients(name)").eq("scheduled_date", date).neq("status", "cancelado").range(a, b))),
@@ -34,6 +35,14 @@ export async function fetchScheduleAlerts(date: string) {
     sched ? safe(fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", sched.id).range(a, b))) : [],
     safe(fetchAll<any>((a, b) => supabase.from("transport_passengers").select("client_id").eq("schedule_date", date).range(a, b))),
   ]);
+  const [catalog, decisions, clientHol] = await Promise.all([
+    safe(fetchAll<any>((a, b) => supabase.from("city_holiday_catalog").select("*").range(a, b))) as Promise<CityHoliday[]>,
+    safe(fetchAll<any>((a, b) => supabase.from("holiday_alert_decisions").select("client_id").eq("date", date).range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("client_holidays").select("client_id").eq("date", date).range(a, b))),
+  ]);
+  const decided = new Set([...decisions.map((x: any) => x.client_id), ...clientHol.map((x: any) => x.client_id)]);
+  const municipal = clients.filter((c) => !decided.has(c.id)).flatMap((c) =>
+    cityHolidaysOn(catalog, c.city, date).slice(0, 1).map((h) => ({ clientId: c.id as string, clientName: c.name as string, city: h.city, name: h.name })));
   // VT de cada escalado, como no Fechamento: desligado no cadastro = não; senão o ajuste da pessoa no dia, o do serviço no dia,
   // o padrão do cliente ou cidade Pouso Alegre.
   const workVtBy = new Map(workVt.map((v: any) => [v.work_id, v.pays_vt as boolean | null]));
@@ -89,6 +98,7 @@ export async function fetchScheduleAlerts(date: string) {
       ...daysOff.filter((x: any) => (x.end_date ?? x.date) >= date).map((x: any) => x.collaborator_id), ...appts.map((x: any) => x.collaborator_id),
     ]),
     recent: new Set(recentAllocs.map((x: any) => x.collaborator_id)),
+    municipal,
   };
   return { alerts: scheduleAlerts(data), holidays: data.holidays };
 }

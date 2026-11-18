@@ -7,6 +7,7 @@ import { resplitClient } from "@/lib/resplit";
 import { laborCost, nightHours, ENCARGOS } from "@/lib/labor-cost";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { workVtDefault } from "@/lib/transport-rules";
+import { holidaysForClient, type ClientHoliday } from "@/lib/holidays";
 import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingIndex, type LodgingStay } from "@/lib/lodging";
 
 /** Motor de cálculo de Resultados — usado pela página Resultados e pelo Financeiro (mesma lógica). */
@@ -181,10 +182,13 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         return out;
       })();
       // Alojamentos (regras de VT e prêmio viagem: lib/lodging.ts).
+      // Feriados por cliente (exceções de Configurações › Feriados): ajustam a lista geral no custo de mão de obra.
+      const clientHolidays = w.client_id ? ((await supabase.from("client_holidays").select("client_id, date, is_holiday, name").eq("client_id", w.client_id)).data ?? []) : [];
       const lodgingStays = shared ? shared.lodgingStays : await fetchAll<any>((a, b) => supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").order("id").range(a, b)).catch(() => [] as any[]);
       const supportResult = supportRows as { data: { collaborator_id: string }[] | null; error?: unknown };
       if (supportResult.error) throw supportResult.error;
       return {
+        clientHolidays,
         clientRdos, otherClientRdos: ((own) => otherRdo.filter((r: any) => !own.has(r.work_id)))(new Set<string>([...workIds, ...sibIds])), supportIds: (supportResult.data ?? []).map((r) => r.collaborator_id),
         allocs,
         sibAllocs,
@@ -397,7 +401,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       laborBy.set(id, l);
     };
     const nightWorks = new Set<string>([...((d.nightIds ?? []) as string[]), ...((opts.allWorks ?? []) as any[]).filter((x) => x.night_shift).map((x) => x.id), ...(work?.night_shift ? [work.id] : [])]);
-    const hol = new Set<string>((opts.holidays ?? []) as string[]);
+    const hol = new Set<string>(holidaysForClient((opts.holidays ?? []) as string[], work?.client_id, (d.clientHolidays ?? []) as ClientHoliday[]));
     // Rateio: dia sem divisão na aba Serviços (todos num só serviço) ou pessoa do RDO sem escalação
     // → custo dividido pela média de pessoas por serviço nos dias já divididos. Ao dividir, o rateio sai.
     const dayWorks = new Map<string, Map<string, number>>();

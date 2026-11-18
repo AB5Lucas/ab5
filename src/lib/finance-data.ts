@@ -73,11 +73,13 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
   const allIds = [...new Set(batches.flatMap((b) => b.ids))];
   const clientIds = [...new Set(batches.map((b) => b.work.client_id).filter(Boolean))] as string[];
   // Recorrências precisam existir antes de ler os lançamentos; rodam junto com serviços/clientes.
-  const [generated, siblingRows, clientRows] = await Promise.all([
+  const [generated, siblingRows, clientRows, clientHolRows] = await Promise.all([
     supabase.rpc("generate_recurring_entries", { _work_ids: allIds }),
     clientIds.length ? supabase.from("works").select("id, client_id, monthly_enabled, night_shift").in("client_id", clientIds) : Promise.resolve({ data: [], error: null }),
     clientIds.length ? supabase.from("clients").select("id, name, has_toll, toll_amount, city, distance_km, needs_transport_voucher").in("id", clientIds) : Promise.resolve({ data: [], error: null }),
+    clientIds.length ? supabase.from("client_holidays").select("client_id, date, is_holiday, name").in("client_id", clientIds) : Promise.resolve({ data: [], error: null }),
   ]);
+  const clientHolBy = groupBy(((clientHolRows as any)?.data ?? []) as any[], (r) => r.client_id);
   if (generated.error) throw generated.error;
   const siblingsByClient = groupBy((must(siblingRows as any) ?? []) as any[], (r) => r.client_id);
   const clientById = new Map(((must(clientRows as any) ?? []) as any[]).map((c) => [c.id, c]));
@@ -166,6 +168,7 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
       daysOff: shared.daysOff,
       vacations: shared.vacations,
       lodgingStays: shared.lodgingStays,
+      clientHolidays: w.client_id ? clientHolBy.get(w.client_id) ?? [] : [],
       vtRules: shared.vtRules.data ?? [],
       dbRules: shared.dbRules.data ?? [],
       tbRules: shared.tbRules.data ?? [],
