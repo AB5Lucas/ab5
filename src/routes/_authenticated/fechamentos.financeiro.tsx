@@ -1,4 +1,5 @@
 import { marginPercent, meanMarginPercent } from "@/lib/result-labor";
+import { useWorkScope } from "@/hooks/use-work-scope";
 import { MarginPercent } from "@/components/margin-percent";
 import { Fragment, Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -68,7 +69,9 @@ function FinanceiroPage() {
     queryFn: () => loadFinanceActive(start, end),
   });
   // Qualquer serviço (inclusive concluído/inativo) com movimento ou pedido datado no período
-  const list = useMemo(() => financeList(works.data ?? [], active.data, start, end), [works.data, active.data, start, end]);
+  // Só os clientes/serviços liberados para a pessoa (coordenador: clientes vinculados; encarregado/cliente: obras vinculadas).
+  const scope = useWorkScope();
+  const list = useMemo(() => financeList(works.data ?? [], active.data, start, end).filter((w: any) => scope.allowWork(w)), [works.data, active.data, start, end, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
   const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 60_000, queryFn: loadResultShared });
   const clientBatches = useMemo(() => financeBatches(list), [list]);
   // Um carregamento em lote para todos os clientes do período (antes: ~17 consultas por cliente)
@@ -80,7 +83,7 @@ function FinanceiroPage() {
     queryFn: () => loadFinanceRaws(clientBatches, shared.data!),
   });
   const rawByWork = raws.data ?? EMPTY_RAWS;
-  const loading = works.isLoading || active.isLoading || shared.isLoading || (list.length > 0 && raws.isPending);
+  const loading = !scope.ready || works.isLoading || active.isLoading || shared.isLoading || (list.length > 0 && raws.isPending);
 
   const groups = useMemo(() => buildFinanceGroups(list, rawByWork, yms, year, holidays.data ?? [], works.data ?? []), [list, rawByWork, yms, year, holidays.data, works.data]);
 

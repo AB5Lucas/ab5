@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useWorkScope } from "@/hooks/use-work-scope";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -68,8 +69,11 @@ function ComprasPage() {
   const [selClient, setSelClient] = useState<string>("");
   const [selWork, setSelWork] = useState<string>(ALL);
 
+  // Coordenador/encarregado/cliente: só as compras dos clientes liberados (pelo prefixo do CC do cliente).
+  const scope = useWorkScope();
   const data = useQuery({
-    queryKey: ["purchase-lines"],
+    queryKey: ["purchase-lines", scope.scoped, [...scope.clientIds].join(",")],
+    enabled: scope.ready,
     queryFn: async () => {
       const [l, c, w, decisions] = await Promise.all([
         supabase.from("purchase_cc_lines").select("*").order("ref_month", { ascending: false }).order("cc_code"),
@@ -91,7 +95,13 @@ function ComprasPage() {
           if (!e || e.length < 1000) break;
         }
       }
-      return { lines: l.data as Line[], clients: c.data, works: w.data, entries, decisions: decisions.data };
+      const prefOk = (cc: string | null | undefined) => {
+        if (!scope.scoped) return true;
+        const cl = c.data.find((x) => x.cc_prefix && String(cc ?? "").startsWith(x.cc_prefix));
+        return !!cl && scope.allowClient(cl.id);
+      };
+      const lines = (l.data as Line[]).filter((x) => prefOk((x as { cc_code?: string | null }).cc_code));
+      return { lines, clients: scope.scoped ? c.data.filter((x) => scope.allowClient(x.id)) : c.data, works: w.data.filter((x) => scope.allowWork(x)), entries, decisions: decisions.data };
     },
   });
 

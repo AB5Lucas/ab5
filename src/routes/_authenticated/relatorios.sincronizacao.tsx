@@ -1,4 +1,5 @@
 import { syncPoll } from "@/components/industry-billing";
+import { useWorkScope } from "@/hooks/use-work-scope";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -30,7 +31,11 @@ export const Route = createFileRoute("/_authenticated/relatorios/sincronizacao")
   { property: "og:title", content: "Faturamento | AB5 Hub" }, { property: "og:description", content: "Acompanhamento da integração de faturamentos, pedidos e orçamentos." },
   { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
 ] }), component: SynchronizationPage });
-function SynchronizationPage(){const bb=useBillingBadges();return <div className="space-y-5"><PageHeader title="Faturamento"/><Tabs pageTabs defaultValue="servicos" className="w-full"><TabsList><TabsTrigger value="servicos">Serviços<BadgeDot b={bb["servicos"]}/></TabsTrigger><TabsTrigger value="industria">Indústria<BadgeDot b={bb["industria"]}/></TabsTrigger></TabsList><TabsContent value="servicos"><ServicesBilling/></TabsContent><TabsContent value="industria"><IndustryBilling/></TabsContent></Tabs></div>;}
+function SynchronizationPage(){const bb=useBillingBadges();
+  // Aba Indústria só para quem vê o cliente Indústria (coordenador/encarregado só os vinculados).
+  const scope=useWorkScope();const clients=useQuery({queryKey:["sync-tab-clients"],enabled:scope.scoped,queryFn:async()=>(await supabase.from("clients").select("id, name")).data??[]});
+  const showInd=!scope.scoped||scope.allowClient((clients.data??[]).find((c)=>/^ind[uú]stria$/i.test(c.name??""))?.id);
+  return <div className="space-y-5"><PageHeader title="Faturamento"/><Tabs pageTabs defaultValue="servicos" className="w-full"><TabsList><TabsTrigger value="servicos">Serviços<BadgeDot b={bb["servicos"]}/></TabsTrigger>{showInd&&<TabsTrigger value="industria">Indústria<BadgeDot b={bb["industria"]}/></TabsTrigger>}</TabsList><TabsContent value="servicos"><ServicesBilling/></TabsContent>{showInd&&<TabsContent value="industria"><IndustryBilling/></TabsContent>}</Tabs></div>;}
 const brl = (n: number | null) => n === null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const sheetRow = (n: { original: unknown }) => String((n.original as Record<string, unknown> | null)?.["row"] ?? "—");
 const date = (s: string | null) => s ? new Date(s.includes("T") ? s : `${s}T12:00:00Z`).toLocaleString("pt-BR", s.includes("T") ? { dateStyle: "short", timeStyle: "short" } : { dateStyle: "short" }) : "—";
@@ -54,7 +59,14 @@ function ServicesBilling() {
   const history=useQuery({queryKey:["billing-sync","history",detail?.id],enabled:!!detail,queryFn:async()=>{if(!detail)return [];return fetchAll((a,b)=>supabase.from("billing_sync_history").select("*").eq("note_id",detail.id).order("happened_at",{ascending:false}).range(a,b));}});
   const execute=useMutation({mutationFn:()=>sync(),onSuccess:async result=>{toast.success(result.status==="running"?"Já existe uma sincronização em andamento":"Sincronização concluída");await refresh();},onError:async(e:Error)=>{toast.error(e.message);await refresh();}});
   const saveTolerance=useMutation({mutationFn:async()=>{const cents=moneyCents(tolerance);if(cents===null||cents<0||cents>10000)throw new Error("Informe uma tolerância entre R$ 0,00 e R$ 100,00");const {error}=await supabase.from("billing_sync_settings").update({tolerance_cents:cents,updated_at:new Date().toISOString()}).eq("id",true);if(error)throw error;},onSuccess:async()=>{toast.success("Tolerância atualizada");setTolerance("");await refresh();},onError:(e:Error)=>toast.error(e.message)});
-  const all=notes.data??[];const last=runs.data?.[0];
+  // Coordenador/encarregado/cliente: só notas dos serviços liberados (pendentes sem serviço: pelo nome do cliente).
+  const scope=useWorkScope();
+  const scopeWorks=useQuery({queryKey:["billing-scope-works"],enabled:scope.scoped,queryFn:async()=>(await supabase.from("works").select("id, client_id, clients(name)")).data??[]});
+  const nk=(t:string|null|undefined)=>(t??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
+  const allowedWork=new Map((scopeWorks.data??[]).map((w:any)=>[w.id,scope.allowWork(w)]));
+  const allowedNames=[...new Set((scopeWorks.data??[]).filter((w:any)=>scope.allowWork(w)).map((w:any)=>nk(w.clients?.name)).filter(Boolean))];
+  const noteAllowed=(n:Note)=>!scope.scoped||(n.work_id?allowedWork.get(n.work_id)===true:allowedNames.some((c)=>nk(n.client_name).startsWith(c)||c.startsWith(nk(n.client_name))));
+  const all=(notes.data??[]).filter(noteAllowed);const last=runs.data?.[0];
   const filtered=useMemo(()=>all.filter(n=>n.issued_at>=start&&(!end||n.issued_at<=end)&&(client==="all"||n.client_name===client)&&(state==="all"||(state==="open"?n.status!=="posted"&&n.status!=="cancelled":n.status===state))&&(method==="all"||n.method===method)&&`${n.invoice_number} ${n.client_name} ${n.order_number??""} ${n.quote_number??""} ${n.reason??""}`.toLocaleLowerCase("pt-BR").includes(search.toLocaleLowerCase("pt-BR"))).sort((a,b)=>sort==="amount-desc"?Number(b.amount)-Number(a.amount):sort==="amount-asc"?Number(a.amount)-Number(b.amount):sort==="date-asc"?a.issued_at.localeCompare(b.issued_at):b.issued_at.localeCompare(a.issued_at)),[all,start,end,client,state,method,search,sort]);
   const pages=Math.max(1,Math.ceil(filtered.length/25));const currentPage=Math.min(page,pages-1);const visible=filtered.slice(currentPage*25,currentPage*25+25);
   const counts=[{label:"Notas",value:all.length,Icon:CheckCircle2},{label:"Lançadas",value:all.filter(n=>n.status==="posted").length,Icon:CheckCircle2},{label:"Pendentes",value:all.filter(n=>n.status!=="posted"&&n.status!=="cancelled").length,Icon:CircleHelp},{label:"Total faturado",value:brl(filtered.filter(n=>n.status!=="cancelled").reduce((a,n)=>a+Number(n.amount),0)),Icon:CheckCircle2}];

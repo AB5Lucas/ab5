@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useWorkScope } from "@/hooks/use-work-scope";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -48,7 +49,16 @@ function useFilters() {
 }
 
 function SuzanoPage() {
-  return <div className="space-y-6"><PageHeader title="Pedidos" description="Pedidos e faturamentos do cliente selecionado." /><Tabs pageTabs defaultValue="servicos"><TabsList><TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="industria">Indústria</TabsTrigger><TabsTrigger value="mars">MARS MM</TabsTrigger></TabsList><TabsContent value="servicos"><ServicesOrders /></TabsContent><TabsContent value="industria"><IndustryOrders /></TabsContent><TabsContent value="mars" className="mt-4"><MarsOrders /></TabsContent></Tabs></div>;
+  // Abas Indústria e MARS MM só para quem vê esses clientes (coordenador/encarregado só os vinculados).
+  const scope = useWorkScope();
+  const clients = useQuery({
+    queryKey: ["suzano-tab-clients"],
+    queryFn: async () => (await supabase.from("clients").select("id, name")).data ?? [],
+  });
+  const idOf = (re: RegExp) => (clients.data ?? []).find((c) => re.test(c.name ?? ""))?.id;
+  const showInd = !scope.scoped || scope.allowClient(idOf(/^ind[uú]stria$/i));
+  const showMars = !scope.scoped || scope.allowClient(idOf(/^mars mm$/i));
+  return <div className="space-y-6"><PageHeader title="Pedidos" description="Pedidos e faturamentos do cliente selecionado." /><Tabs pageTabs defaultValue="servicos"><TabsList><TabsTrigger value="servicos">Serviços</TabsTrigger>{showInd && <TabsTrigger value="industria">Indústria</TabsTrigger>}{showMars && <TabsTrigger value="mars">MARS MM</TabsTrigger>}</TabsList><TabsContent value="servicos"><ServicesOrders /></TabsContent>{showInd && <TabsContent value="industria"><IndustryOrders /></TabsContent>}{showMars && <TabsContent value="mars" className="mt-4"><MarsOrders /></TabsContent>}</Tabs></div>;
 }
 
 function ServicesOrders() {
@@ -57,10 +67,12 @@ function ServicesOrders() {
     queryKey: ["suzano-works"],
     queryFn: async () => (await supabase.from("works").select("id, name, client_id, clients(name)").order("name")).data ?? [],
   });
+  const scope = useWorkScope();
+  const scopedWorks = (works.data ?? []).filter((w: any) => scope.allowWork(w));
   const ym = `${f.year}-${f.month.padStart(2, "0")}`;
   const start = `${ym}-01`;
   const end = monthEnd(ym);
-  const clientOpts = [...new Map((works.data ?? []).filter((w: any) => w.clients?.name).map((w: any) => [w.client_id, w.clients.name] as [string, string])).entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+  const clientOpts = [...new Map(scopedWorks.filter((w: any) => w.clients?.name).map((w: any) => [w.client_id, w.clients.name] as [string, string])).entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
   const wid = f.workId === "all" ? "" : f.workId;
   const years = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 3 + i));
 
@@ -97,7 +109,7 @@ function ServicesOrders() {
             <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {(works.data ?? []).filter((w: any) => !f.clientId || f.clientId === "all" || w.client_id === f.clientId).map((w: any) => (
+              {scopedWorks.filter((w: any) => !f.clientId || f.clientId === "all" || w.client_id === f.clientId).map((w: any) => (
                 <SelectItem key={w.id} value={w.id}>{w.clients?.name ? `${w.clients.name} - ${w.name}` : w.name}</SelectItem>
               ))}
             </SelectContent>
@@ -114,10 +126,14 @@ const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 const norm = (t: string) => t.replace(/\s+/g, "").toLowerCase();
 
 function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
+  // Só os pedidos dos clientes/serviços liberados para a pessoa.
+  const scope = useWorkScope();
   const q = useQuery({
-    queryKey: ["orders-all-v3"],
+    queryKey: ["orders-all-v3", scope.scoped, [...scope.workIds].join(","), [...scope.clientIds].join(",")],
+    enabled: scope.ready,
     queryFn: async () => {
-      const { data: ws } = await supabase.from("works").select("id, name, orders, client_id, clients(name)");
+      const { data: wsAll } = await supabase.from("works").select("id, name, orders, client_id, clients(name)");
+      const ws = (wsAll ?? []).filter((w: any) => scope.allowWork(w));
       const ids = (ws ?? []).map((w: any) => w.id);
       const fat = ids.length ? (await supabase.from("work_entries").select("work_id, description, amount, entry_date").eq("sync_cancelled", false).eq("category", "faturamento").in("work_id", ids)).data ?? [] : [];
       // Pedidos com o mesmo número viram uma linha só: valores somados e meses listados

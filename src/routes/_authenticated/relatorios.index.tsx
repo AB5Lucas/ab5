@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useWorkScope } from "@/hooks/use-work-scope";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Copy, Download, FileDown } from "lucide-react";
@@ -203,7 +204,9 @@ function Page() {
     queryFn: () => fetchHours(from, to),
   });
 
-  const data = allocations.data ?? [];
+  // Coordenador/encarregado/cliente: só as alocações dos clientes/serviços liberados.
+  const scope = useWorkScope();
+  const data = (allocations.data ?? []).filter((a) => scope.allowWork(a.works ? { id: a.works.id, client_id: a.works.client_id } : null));
   const hourRows = useMemo(() => allocationHours(data, hours.data?.records ?? [], hours.data?.reports ?? []), [data, hours.data]);
   const [detail, setDetail] = useState<Detail | null>(null);
 
@@ -652,12 +655,13 @@ function LaborShareTab() {
   const [by, setBy] = useState<LaborShareBy>("cliente");
   const [month, setMonth] = useState(firstDayOfMonth().slice(0, 7));
   const { from, to } = monthRange(month);
+  const scope = useWorkScope();
   const allocations = useQuery({ queryKey: ["report-allocations", from, to], queryFn: () => fetchAllocations(from, to), enabled: !!month });
   const hours = useQuery({ queryKey: ["report-hours-with-defaults", from, to], queryFn: () => fetchHours(from, to), enabled: !!month });
   const rows = useMemo(() => {
-    const data = allocations.data ?? [];
+    const data = (allocations.data ?? []).filter((a) => scope.allowWork(a.works ? { id: a.works.id, client_id: a.works.client_id } : null));
     return laborShare(allocationHours(data, hours.data?.records ?? [], hours.data?.reports ?? []), workInfoOf(data), by);
-  }, [allocations.data, hours.data, by]);
+  }, [allocations.data, hours.data, by, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
   const total = rows.reduce((s, r) => s + r.hours, 0);
   const loading = allocations.isLoading || hours.isLoading;
   const error = (allocations.error ?? hours.error) as Error | null;
