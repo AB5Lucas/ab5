@@ -119,6 +119,8 @@ type CellForm = {
   extraWorks: string[];
   trips: string;
   external_place: string;
+  /** Km de ida digitado (só cliente ADM). */
+  km: string;
 };
 
 const NONE = "__none__";
@@ -133,7 +135,7 @@ export function VehicleTimeline() {
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [driverSearch, setDriverSearch] = useState("");
   const [cell, setCell] = useState<{ vehicleId: string; date: string } | null>(null);
-  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], extraPlaces: [], extraWorks: [], trips: "1", external_place: "" });
+  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], extraPlaces: [], extraWorks: [], trips: "1", external_place: "", km: "" });
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
@@ -337,6 +339,9 @@ export function VehicleTimeline() {
   // Indústria com local escrito (antigo "Externo"): 100 km fixos no dia e sem prêmio de motorista.
   const industryIds = useMemo(() => new Set((clients.data ?? []).filter((c) => /ind[uú]stria/i.test(c.name ?? "")).map((c) => c.id)), [clients.data]);
   const isIndustryClient = (id: string | null | undefined) => !!id && industryIds.has(id);
+  // ADM: o km do dia é digitado na escala (vale para o Prêmio Motorista), não vem da distância do cliente.
+  const admIds = useMemo(() => new Set((clients.data ?? []).filter((c) => /^adm$/i.test((c.name ?? "").trim())).map((c) => c.id)), [clients.data]);
+  const isAdmClient = (id: string | null | undefined) => !!id && admIds.has(id);
 
   const industryCustomers = useIndustryCustomers();
   const clientKm = useMemo(() => {
@@ -460,6 +465,7 @@ export function VehicleTimeline() {
       is_suzano_local?: boolean | undefined;
       work_id?: string | null | undefined;
       external_place?: string | null | undefined;
+      km?: number | null | undefined;
     },
   ) {
     const workId = f.work_id ?? null;
@@ -480,7 +486,9 @@ export function VehicleTimeline() {
       driver_bonus: f.is_external || f.is_maintenance || industryPlace ? false : f.driver_bonus,
       trips: Math.max(1, Math.floor(Number(f.trips ?? 1)) || 1),
       is_suzano_local: !!f.is_suzano_local,
-      km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : industryPlace ? placeKmOneWay(industryPlace) : f.is_suzano_local ? KM_SUZANO_LOCAL : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
+      km: f.is_maintenance ? 0 : f.is_external ? KM_EXTERNAL : industryPlace ? placeKmOneWay(industryPlace) : f.is_suzano_local ? KM_SUZANO_LOCAL
+        : !special && isAdmClient(f.client_id) && f.km != null && Number.isFinite(Number(f.km)) ? Math.max(0, Number(f.km))
+        : f.client_id ? clientKm.get(f.client_id) ?? 0 : 0,
       extra_client_ids: extras,
       extra_driver_ids: pairs.map((p) => (p.d === NONE ? "" : p.d)),
       extra_places: pairs.map((p) => p.place),
@@ -518,6 +526,7 @@ export function VehicleTimeline() {
       extraWorks: (current?.extra_client_ids ?? []).map((_, i) => current?.extra_work_ids?.[i] ?? ""),
       trips: String(current?.trips ?? 1),
       external_place: current?.external_place ?? "",
+      km: current && isAdmClient(current.client_id) ? String(current.km ?? "") : "",
     });
     setDriverSearch("");
     setCell({ vehicleId, date });
@@ -547,6 +556,7 @@ export function VehicleTimeline() {
       extra_places: form.extraPlaces,
       extra_work_ids: form.extraWorks,
       external_place: form.external_place,
+      km: form.km.trim() === "" ? null : Number(form.km.replace(",", ".")),
     };
     const targets: string[] = [cell.date];
     if (form.repeat_until && form.repeat_until > cell.date) {
@@ -579,6 +589,7 @@ export function VehicleTimeline() {
           is_suzano_local: src.is_suzano_local,
           work_id: src.work_id,
           external_place: src.external_place,
+          km: src.km,
         }),
       ]);
     } catch {
@@ -616,6 +627,7 @@ export function VehicleTimeline() {
             is_suzano_local: s.is_suzano_local,
             work_id: s.work_id,
             external_place: s.external_place,
+            km: s.km,
           }),
         );
       }
@@ -1054,12 +1066,21 @@ export function VehicleTimeline() {
                     ? `Suzano Local: ${KM_SUZANO_LOCAL} km de ida por viagem (${KM_SUZANO_LOCAL * 2} km ida e volta).`
                   : form.client_id === EXTERNAL_KEY
                     ? `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`
+                  : isAdmClient(truckClient)
+                    ? "ADM: digite o km de ida do dia (como a distância de um cliente); é ele que define a faixa do Prêmio Motorista."
                   : isIndustryClient(truckClient) && form.external_place.trim()
                     ? `Indústria com local: ${industryKmOneWay(industryCustomers.data, form.external_place) != null ? `${placeKmOneWay(form.external_place)} km de ida (× 2)` : `${KM_EXTERNAL} km (local sem km cadastrado)`}, sem prêmio de motorista. O combustível vai para o CC da Indústria.`
                     : form.client_id && form.client_id !== NONE
                       ? `${clientKm.get(form.client_id.startsWith(WORK_PREFIX) ? workById.get(form.client_id.slice(WORK_PREFIX.length))?.client_id ?? "" : form.client_id) ?? 0} km no dia (distância cadastrada do cliente).`
                       : "A quilometragem vem da distância cadastrada do cliente."}
               </p>
+              {isAdmClient(truckClient) && (
+                <div className="space-y-1">
+                  <Label htmlFor="vehicle-adm-km">Km do dia (ida)</Label>
+                  <Input id="vehicle-adm-km" className="w-40" inputMode="decimal" placeholder="Ex.: 35" value={form.km}
+                    onChange={(e) => setForm((f) => ({ ...f, km: e.target.value.replace(/[^\d,.]/g, "") }))} />
+                </div>
+              )}
               {(form.client_id === EXTERNAL_KEY || isIndustryClient(truckClient)) && (
                 <div className="space-y-1">
                   <Label htmlFor="vehicle-place">Local</Label>
