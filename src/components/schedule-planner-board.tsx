@@ -1439,6 +1439,7 @@ export function SchedulePlannerBoard({
         .filter((r) => !appointmentByCollaborator.has(r.collaborator_id))
         .filter((r) => !workRequiresIntegration(c as ScheduleContext, r.work_id) || checkAso(c as ScheduleContext, r.collaborator_id, date, r.work_id).status !== "expired")
         .filter((r) => !existing.has(r.collaborator_id))
+        .filter((r) => !entryByCollaborator.has(r.collaborator_id)) // quem já está num quadro (treinamento, folga…) fica só nele
         .filter((r) => { const n = noticeOf(r.collaborator_id); return !(n?.end && date > n.end); })
         .map((r, i) => ({
           schedule_id: id,
