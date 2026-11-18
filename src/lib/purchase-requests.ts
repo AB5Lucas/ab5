@@ -38,7 +38,21 @@ export const SC_STATUSES = [
 ] as const;
 
 /** Status de cada item (coluna STATUS do modelo FR-CPS-SC). */
-export const SC_ITEM_STATUSES = ["SOLICITAÇÃO ENVIADA", "EM ANÁLISE", "COTAR", "COTANDO", "APROVAÇÃO PENDENTE", "RECUSADO", "APROVADO", "COMPRADO", "ALMOXARIFADO"] as const;
+export const SC_ITEM_STATUSES = ["SOLICITAÇÃO ENVIADA", "EM ANÁLISE", "COTAR", "COTANDO", "APROVAÇÃO PENDENTE", "RECUSADO", "APROVADO", "COMPRADO", "ALMOXARIFADO", "CANCELADO"] as const;
+/** Cores do status do item = formatação condicional da planilha verde FR-CPS-SC (texto em negrito). */
+const ITEM_STATUS_CLS: Record<string, string> = {
+  "SOLICITAÇÃO ENVIADA": "bg-[#BDD7EE] text-[#203864]",
+  "EM ANÁLISE": "bg-[#FFFFCC] text-black",
+  COTAR: "bg-[#FFA7A7] text-[#960000]",
+  COTANDO: "bg-[#162A64] text-white",
+  "APROVAÇÃO PENDENTE": "bg-[#F8CBAD] text-[#FF3300]",
+  RECUSADO: "bg-black text-white",
+  APROVADO: "bg-[#D1FFF0] text-[#009A67]",
+  COMPRADO: "bg-[#E2EFDA] text-[#385723]",
+  ALMOXARIFADO: "bg-[#E2EFA3] text-[#535C00]",
+  CANCELADO: "bg-black text-white",
+};
+export const itemStatusClass = (s: string | null | undefined) => `${ITEM_STATUS_CLS[s ?? ""] ?? "bg-muted text-muted-foreground"} font-bold`;
 
 export const SC_UNITS = ["UN", "PC", "CX", "KG", "M", "M²", "M³", "L", "PAR", "JG", "RL", "SC", "GL", "TB", "KIT", "SERV"] as const;
 

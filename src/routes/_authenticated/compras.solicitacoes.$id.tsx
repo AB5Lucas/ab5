@@ -18,7 +18,7 @@ import { SearchSelect } from "@/components/search-select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pill, ScHeaderDialog, ScRemoveDialog, todayISO, useClientsList, useScRemove, useScUsers, type ScRow } from "@/components/compras/sc-shared";
 import {
-  SC_ITEM_STATUSES, SC_UNITS, STAGE_LABEL, brDate, brl, budgetMissing, deadlineControl, deliveryLabel, priorityClass, statusClass, statusDot, type ScStage,
+  SC_ITEM_STATUSES, SC_UNITS, itemStatusClass, STAGE_LABEL, brDate, brl, budgetMissing, deadlineControl, deliveryLabel, priorityClass, statusClass, statusDot, type ScStage,
 } from "@/lib/purchase-requests";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -404,8 +404,8 @@ function Page() {
                     {isBuyer && saved ? (
                       <div className="space-y-1">
                         <Select value={saved.status} onValueChange={(v) => setItem.mutate({ item: saved.id, status: v, order: orders[saved.id] ?? saved.order_number ?? "" })}>
-                          <SelectTrigger className="h-8 w-44"><SelectValue /></SelectTrigger>
-                          <SelectContent>{SC_ITEM_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                          <SelectTrigger className={`h-8 w-44 ${itemStatusClass(saved.status)}`}><SelectValue /></SelectTrigger>
+                          <SelectContent>{SC_ITEM_STATUSES.map((s) => <SelectItem key={s} value={s}><Pill className={itemStatusClass(s)}>{s}</Pill></SelectItem>)}</SelectContent>
                         </Select>
                         {/* Data real do status (pode ter acontecido em outro dia). */}
                         <Input type="date" className="h-7 w-44 text-xs" aria-label="Data do status" title="Data real do status"
@@ -414,7 +414,9 @@ function Page() {
                       </div>
                     ) : (
                       <span className="whitespace-nowrap">
-                        {saved?.status ?? (r.stage === "rascunho" ? "—" : "SOLICITAÇÃO ENVIADA")}
+                        {saved?.status || r.stage !== "rascunho"
+                          ? <Pill className={itemStatusClass(saved?.status ?? "SOLICITAÇÃO ENVIADA")}>{saved?.status ?? "SOLICITAÇÃO ENVIADA"}</Pill>
+                          : "—"}
                         {saved?.status_at && <span className="block text-[11px] text-muted-foreground">{brDate(saved.status_at)}</span>}
                       </span>
                     )}

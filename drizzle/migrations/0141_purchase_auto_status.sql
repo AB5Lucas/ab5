@@ -1,5 +1,5 @@
 -- Status da SC pelos itens (Comprador): algum item COMPRADO (ou ALMOXARIFADO), mas não todos = COMPRA PARCIAL;
--- todos = COMPRA EFETIVADA. Itens RECUSADO não contam no total. A data do status = a mais recente entre os itens comprados.
+-- todos = COMPRA EFETIVADA. Itens RECUSADO e CANCELADO não contam no total. A data do status = a mais recente entre os itens comprados.
 -- Não mexe em SC cancelada, recusada ou já no almoxarifado, nem fora de Compras.
 CREATE OR REPLACE FUNCTION public.purchase_request_status_from_items() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -7,7 +7,7 @@ DECLARE r purchase_requests; _total int; _bought int; _last date; _new text;
 BEGIN
   SELECT * INTO r FROM purchase_requests WHERE id = NEW.request_id;
   IF r.id IS NULL OR r.stage <> 'compras' OR r.status IN ('CANCELADA', 'RECUSADA', 'ALMOXARIFADO') THEN RETURN NEW; END IF;
-  SELECT count(*) FILTER (WHERE status <> 'RECUSADO'), count(*) FILTER (WHERE status IN ('COMPRADO', 'ALMOXARIFADO')),
+  SELECT count(*) FILTER (WHERE status NOT IN ('RECUSADO', 'CANCELADO')), count(*) FILTER (WHERE status IN ('COMPRADO', 'ALMOXARIFADO')),
     max(status_at) FILTER (WHERE status IN ('COMPRADO', 'ALMOXARIFADO'))
     INTO _total, _bought, _last FROM purchase_request_items WHERE request_id = NEW.request_id;
   IF _bought = 0 THEN RETURN NEW; END IF;
