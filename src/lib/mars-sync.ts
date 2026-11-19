@@ -128,7 +128,7 @@ export function rowsToSync(rows: MarsRow[], firstRun: boolean): MarsRow[] {
   const sorted = [...ordens, ...rows.filter((r) => r.table === "faturamento")];
   return sorted.filter((r) => {
     if (r.contract || r.cancelled || !(r.value > 0)) return false;
-    if (r.table === "faturamento" && !firstRun && ((isQuote(r.quote) && quotes.has(r.quote)) || (r.order && orders.has(r.order)) || !r.order)) return false;
+    if (r.table === "faturamento" && !firstRun && ((isQuote(r.quote) && quotes.has(r.quote)) || (r.order && orders.has(r.order)) || (!r.order && !isQuote(r.quote)))) return false;
     if (seen.has(r.key)) return false;
     seen.add(r.key);
     return true;
