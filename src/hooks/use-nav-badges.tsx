@@ -66,8 +66,8 @@ function useBadgeData() {
           .not("status", "in", '("COMPRA EFETIVADA","ALMOXARIFADO","CANCELADA","RECUSADA")')).data ?? []),
         // Usuários novos aguardando liberação (bolinha no rodapé do menu).
         when(can.users, async () => (await supabase.from("users_profiles").select("id").eq("pending", true)).data ?? []),
-        // Novos Clientes: documentação completa, liberados para integrar (aviso laranja em Documentação).
-        when(can.docs, async () => (await supabase.from("client_onboardings").select("id").eq("status", "liberado")).data ?? []),
+        // Novos Clientes: como a Conferência, pela próxima conferência (hoje = laranja, vencida = vermelho).
+        when(can.docs, async () => (await supabase.from("client_onboardings").select("next_check_date").eq("status", "pendente").lte("next_check_date", today)).data ?? []),
       ]);
       // Saldo do posto: faturas em aberto + abastecimentos ainda não faturados (mesma conta da aba Abastecimento).
       const fp = fleetParts[0] as { open: number; unbilled: number } | undefined;
@@ -97,7 +97,8 @@ function useBadgeData() {
       })();
       const buyRows = isBuyer ? scOpenRows.filter((r: any) => r.stage === "compras") : [];
       const scBuy = { count: buyRows.length, late: late(buyRows) };
-      return { releasedOnboarding: released.length, pendingUsers: pendingUsers.length, scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
+      const onboarding = { expired: released.filter((r: any) => r.next_check_date < today).length, expiring: released.filter((r: any) => r.next_check_date === today).length };
+      return { onboarding, pendingUsers: pendingUsers.length, scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
     },
   });
 }
@@ -112,11 +113,10 @@ const conferenceBadge = (v?: { expired: number; expiring: number }): MenuBadge |
 export function useControlBadges() {
   const data = useBadgeData().data;
   const k = data?.byKind;
-  const released = data?.releasedOnboarding ?? 0;
   return {
     agendamentos: toBadge(k?.["agendamentos"]), asos: toBadge(k?.["aso"]), integracoes: toBadge(k?.["int"]), treinamentos: toBadge(k?.["trn"]), epi: toBadge(k?.["epi"]),
-    // Novos Clientes: liberados para integrar (laranja).
-    "novos-clientes": released ? { count: released, tone: "orange" } : undefined,
+    // Novos Clientes: conferência do dia (laranja) ou vencida (vermelho), como a Conferência.
+    "novos-clientes": conferenceBadge(data?.onboarding),
   } as Record<string, MenuBadge | undefined>;
 }
 
@@ -143,13 +143,14 @@ export function useMenuBadges() {
         .map(([k, v]) => `${names[k] ?? k}: ${[v.expired ? `${v.expired} vencido(s)` : "", v.expiring ? `${v.expiring} a vencer` : ""].filter(Boolean).join(", ")}`);
       out["/agendamentos"] = { ...docs, detail: parts.join(" · ") };
     }
-    // Novos Clientes liberados para integrar: soma no aviso de Documentação (laranja se não houver vermelho).
-    if (d.releasedOnboarding) {
+    // Novos Clientes: conferência do dia (laranja) ou vencida (vermelho) soma no aviso de Documentação.
+    const ob = conferenceBadge(d.onboarding);
+    if (ob) {
       const cur = out["/agendamentos"];
-      const part = `Novos clientes: ${d.releasedOnboarding} liberado(s) para integrar`;
+      const part = `Novos clientes: ${ob.count} ${ob.tone === "red" ? "conferência(s) vencida(s)" : "conferência(s) para hoje"}`;
       out["/agendamentos"] = cur
-        ? { ...cur, count: cur.count + d.releasedOnboarding, detail: [cur.detail, part].filter(Boolean).join(" · ") }
-        : { count: d.releasedOnboarding, tone: "orange", detail: part };
+        ? { ...cur, count: cur.count + ob.count, tone: cur.tone === "red" || ob.tone === "red" ? "red" : "orange", detail: [cur.detail, part].filter(Boolean).join(" · ") }
+        : { ...ob, detail: part };
     }
     const c = conferenceBadge(d.conference); if (c) out["/conferencia"] = { ...c, detail: c.tone === "red" ? `${c.count} conferência(s) com prazo vencido` : `${c.count} conferência(s) para hoje` };
     const ft = balanceBadgeTone(d.fleetSaldo);
