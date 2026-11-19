@@ -209,7 +209,7 @@ async function applyMars(parsed: MarsRow[], ym: string) {
   }
   await Promise.all([...suffixFor].map(async ([id, cc_suffix]) => {
     const { error } = await supabaseAdmin.from("works").update({ cc_suffix }).eq("id", id);
-    if (error) throw dbError("sufixo do CC", error);
+    if (error) notes.push(`Sufixo ${cc_suffix} não gravado: ${error.message}`);
   }));
   if (suffixFor.size) notes.push(`Sufixo preenchido em ${suffixFor.size} serviço(s)`);
   if (itemRows.length) {

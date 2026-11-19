@@ -80,3 +80,16 @@ describe("sufixo do CC (coluna B)", () => {
     expect(parseMarsSheet(old)[0]!.suffix).toBe("");
   });
 });
+
+describe("ccSuffix", () => {
+  it("normaliza para 3 dígitos ou descarta", async () => {
+    const { ccSuffix } = await import("./mars-sync");
+    expect(ccSuffix("12")).toBe("012");
+    expect(ccSuffix(5)).toBe("005");
+    expect(ccSuffix("221")).toBe("221");
+    expect(ccSuffix("2004221")).toBe("221");
+    expect(ccSuffix("221.0")).toBe("221");
+    expect(ccSuffix("PEDIDO 4500777910")).toBe("");
+    expect(ccSuffix("")).toBe("");
+  });
+});

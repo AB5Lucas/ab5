@@ -43,6 +43,16 @@ export function rowKey(r: Pick<MarsRow, "quote" | "order" | "description">) {
  * Coluna do sufixo do CC: título com "SUFIXO"/"SULFIXO"/"CC"/"CENTRO DE CUSTO"; sem título assim, a coluna B
  * quando ela não é nenhuma das outras (Nº Orç., pedido, cliente…).
  */
+/** Sufixo do CC com 3 dígitos (regra do cadastro de serviços): "12" → "012"; CC inteiro ("2004221") → os 3 últimos;
+ * outra coisa (texto, número longo) → vazio, para não gravar valor inválido. */
+export function ccSuffix(raw: unknown): string {
+  const d = String(raw ?? "").trim().replace(/\.0+$/, "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.length <= 3) return d.padStart(3, "0");
+  if (d.length <= 7) return d.slice(-3);
+  return "";
+}
+
 export function suffixCol(cells: string[]): number {
   const byName = cells.findIndex((c) => /SU?L?FIXO|^CC$|CENTRO DE CUSTO/.test(c));
   if (byName >= 0) return byName;
@@ -81,7 +91,7 @@ export function parseMarsSheet(rows: unknown[][]): MarsRow[] {
     const order = orderOf(get("order"));
     const status = String(get("status") ?? "").trim();
     const notes = String(get("notes") ?? "").trim();
-    const suffix = String(get("suffix") ?? "").replace(/\D/g, "");
+    const suffix = ccSuffix(get("suffix"));
     const r = {
       table, quote, order, description, value, status, notes, suffix,
       requester: String(get("requester") ?? "").trim(), category: String(get("category") ?? "").trim(),
