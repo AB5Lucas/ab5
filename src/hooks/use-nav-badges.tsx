@@ -110,8 +110,14 @@ const conferenceBadge = (v?: { expired: number; expiring: number }): MenuBadge |
 
 /** Contadores das subabas de Documentação. */
 export function useControlBadges() {
-  const k = useBadgeData().data?.byKind;
-  return { agendamentos: toBadge(k?.["agendamentos"]), asos: toBadge(k?.["aso"]), integracoes: toBadge(k?.["int"]), treinamentos: toBadge(k?.["trn"]), epi: toBadge(k?.["epi"]) } as Record<string, MenuBadge | undefined>;
+  const data = useBadgeData().data;
+  const k = data?.byKind;
+  const released = data?.releasedOnboarding ?? 0;
+  return {
+    agendamentos: toBadge(k?.["agendamentos"]), asos: toBadge(k?.["aso"]), integracoes: toBadge(k?.["int"]), treinamentos: toBadge(k?.["trn"]), epi: toBadge(k?.["epi"]),
+    // Novos Clientes: liberados para integrar (laranja).
+    "novos-clientes": released ? { count: released, tone: "orange" } : undefined,
+  } as Record<string, MenuBadge | undefined>;
 }
 
 export function useMenuBadges() {
