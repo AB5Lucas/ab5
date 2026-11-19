@@ -17,6 +17,12 @@ const EMPTY_BUDGET = { mo: 0, materiais: 0, ferramentas: 0, andaimes: 0, transpo
  * Lê a aba do mês da planilha da MARS e cria/atualiza os serviços (lib/mars-sync.ts tem as regras).
  * 1ª leitura (tabela de controle vazia): também a tabela de faturamento; depois só a de ordens de serviço.
  */
+/** Erro do banco com a etapa e a mensagem legível (o objeto do Supabase virava "[object Object]" no histórico). */
+function dbError(step: string, e: { message?: string; details?: string | null; hint?: string | null; code?: string } | unknown) {
+  const x = (e ?? {}) as { message?: string; details?: string | null; hint?: string | null; code?: string };
+  return new Error(`${step}: ${[x.message, x.details, x.hint, x.code ? `(${x.code})` : ""].filter(Boolean).join(" · ") || JSON.stringify(e)}`);
+}
+
 export async function executeMarsSync(c: Credentials, kind: string, month?: string) {
   const ym = month ?? curMonth();
   // Leitura antiga parada em "running" (servidor interrompido): fecha como erro para não confundir.
@@ -49,7 +55,7 @@ export async function executeMarsSync(c: Credentials, kind: string, month?: stri
     await finish({ status: "completed", ref_month: sheetYm, analyzed: parsed.length, inserted: res.created, updated: res.updated, ignored: res.ignored, error_message: res.message || null });
     return { status: "completed", ...res };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = err instanceof Error ? err.message : dbError("leitura", err).message;
     await finish({ status: "error", errors: 1, error_message: msg });
     return { status: "error", message: msg };
   }
@@ -57,14 +63,14 @@ export async function executeMarsSync(c: Credentials, kind: string, month?: stri
 
 async function applyMars(parsed: MarsRow[], ym: string) {
   const { data: client, error: ce } = await supabaseAdmin.from("clients").select("id").eq("name", MARS_CLIENT).maybeSingle();
-  if (ce) throw ce;
+  if (ce) throw dbError("clientes", ce);
   if (!client) throw new Error(`Cliente ${MARS_CLIENT} não encontrado`);
   const { data: mgr } = await supabaseAdmin.from("collaborators").select("id").eq("full_name", MARS_MANAGER).maybeSingle();
   const { data: worksData, error: we } = await supabaseAdmin.from("works").select("id, name, quote_number, orders, active, order_number, order_value, cc_suffix").eq("client_id", client.id);
-  if (we) throw we;
+  if (we) throw dbError("serviços da MARS", we);
   const works = (worksData ?? []) as (MarsWork & { order_number: string | null; order_value: number | null; cc_suffix?: string | null })[];
   const { data: mapped, error: me } = await supabaseAdmin.from("mars_sync_items").select("*");
-  if (me) throw me;
+  if (me) throw dbError("controle da leitura", me);
   const byKey = new Map((mapped ?? []).map((m) => [m.key, m]));
   // 1ª leitura = a tabela de faturamento ainda não foi lida (nenhum item dela registrado); depois só a de ordens.
   const firstRun = !(mapped ?? []).some((m) => m.source === "faturamento");
@@ -149,7 +155,7 @@ async function applyMars(parsed: MarsRow[], ym: string) {
     const { data: noteRows, error: ne } = await supabaseAdmin.from("billing_sync_notes").select("order_number, amount, issued_at")
       .ilike("client_name", "%MARS%").eq("cancelled", false).gte("issued_at", `${ym}-01`).lt("issued_at", `${nextMonth(ym)}-01`)
       .gte("amount", total - 1).lte("amount", total + 1).not("order_number", "is", null);
-    if (ne) throw ne;
+    if (ne) throw dbError("notas da medição", ne);
     const realOrder = (noteRows ?? []).map((n) => String(n.order_number ?? "").trim()).find((o) => /^\d{6,}$/.test(o) && (!used.has(o) || byKey.get(ckey)?.synced_order === o));
     const m = byKey.get(ckey);
     if (!m) {
@@ -177,10 +183,10 @@ async function applyMars(parsed: MarsRow[], ym: string) {
   }
   if (newWorks.length) {
     const { error } = await supabaseAdmin.from("works").insert(newWorks as never);
-    if (error) throw error;
+    if (error) throw dbError("criar serviços", error);
     const { error: pe } = await supabaseAdmin.from("work_progress")
       .upsert(newWorks.map((w) => ({ work_id: w["id"] as string, month: date, percent: 100 })), { onConflict: "work_id,month" });
-    if (pe) throw pe;
+    if (pe) throw dbError("andamento dos serviços novos", pe);
   }
   await Promise.all([...changedOrders.values()].filter((w) => !newWorks.some((n) => n["id"] === w.id)).map(async (w) => {
     const orders = w.orders ?? [];
@@ -188,7 +194,7 @@ async function applyMars(parsed: MarsRow[], ym: string) {
     const { error } = await supabaseAdmin.from("works").update({
       orders: orders as never, order_number: nums.join(" / ") || null, order_value: orders.reduce((a, o) => a + Number(o.value ?? 0), 0),
     }).eq("id", w.id);
-    if (error) throw error;
+    if (error) throw dbError("pedidos dos serviços", error);
   }));
   // Sufixo do CC (coluna B): serviço do item ainda sem sufixo recebe o da planilha (todas as linhas das duas tabelas,
   // inclusive itens já lidos antes); nunca troca um sufixo já preenchido. Medição do contrato não mexe.
@@ -203,12 +209,12 @@ async function applyMars(parsed: MarsRow[], ym: string) {
   }
   await Promise.all([...suffixFor].map(async ([id, cc_suffix]) => {
     const { error } = await supabaseAdmin.from("works").update({ cc_suffix }).eq("id", id);
-    if (error) throw error;
+    if (error) throw dbError("sufixo do CC", error);
   }));
   if (suffixFor.size) notes.push(`Sufixo preenchido em ${suffixFor.size} serviço(s)`);
   if (itemRows.length) {
-    const { error } = await supabaseAdmin.from("mars_sync_items").upsert(itemRows as never, { onConflict: "key" });
-    if (error) throw error;
+    const { error } = await supabaseAdmin.from("mars_sync_items").upsert([...new Map(itemRows.map((x) => [String(x["key"]), x])).values()] as never, { onConflict: "key" });
+    if (error) throw dbError("controle da leitura (gravar)", error);
   }
   return { created, updated, ignored, firstRun, message: notes.join(" · ") };
 }
