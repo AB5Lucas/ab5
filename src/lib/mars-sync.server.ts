@@ -202,8 +202,9 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
   // inclusive itens já lidos antes); nunca troca um sufixo já preenchido. Medição do contrato não mexe.
   const itemWork = new Map(itemRows.map((x) => [String(x["key"]), x["work_id"] as string | null]));
   const suffixFor = new Map<string, string>();
-  for (const r of parsed) {
-    if (!r.suffix || r.contract || r.cancelled) continue;
+  // Ordens primeiro (o faturamento repete o item com outro CC às vezes); Contrato Andaimes junta vários itens e não recebe sufixo.
+  for (const r of [...parsed.filter((x) => x.table === "ordens"), ...parsed.filter((x) => x.table !== "ordens")]) {
+    if (!r.suffix || r.contract || r.cancelled || isScaffoldRow(r)) continue;
     const wid = itemWork.get(r.key) ?? byKey.get(r.key)?.work_id ?? matchWork(r, works)?.id ?? null;
     const w = wid ? works.find((x) => x.id === wid) : undefined;
     const cur = (w?.cc_suffix ?? "").trim();
