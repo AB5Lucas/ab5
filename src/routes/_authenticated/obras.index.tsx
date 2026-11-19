@@ -201,7 +201,9 @@ function WorksPage() {
       if (statusFilter !== "all" && w.status !== statusFilter) return false;
       if (!q) return true;
       const clientName = w.client_id ? (clientById.get(w.client_id)?.name ?? "") : "";
-      return [w.name, clientName].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
+      // Também pelo pedido (número da lista de pedidos ou o pedido principal) e pelo Nº Orç.
+      const orders = Array.isArray(w.orders) ? (w.orders as { number?: unknown }[]).map((o) => String(o?.number ?? "")) : [];
+      return [w.name, clientName, w.order_number, w.quote_number, ...orders].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
     });
   }, [works.data, search, statusFilter, clientById]);
 
@@ -292,7 +294,7 @@ function WorksPage() {
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-8"
-            placeholder="Buscar por serviço ou cliente"
+            placeholder="Buscar por serviço, cliente, pedido ou Nº Orç."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
