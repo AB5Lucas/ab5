@@ -333,14 +333,14 @@ function Page() {
       </div>
 
       <div className="panel overflow-x-auto">
-        <Table className="text-xs">
+        <Table className="text-sm">
           <TableHeader>
             <TableRow>
               <TableHead className="w-10">Item</TableHead>
               <TableHead className="w-20">Qtd</TableHead>
               <TableHead className="w-24">Un. medida</TableHead>
-              <TableHead className="min-w-64">Descrição</TableHead>
-              <TableHead className="w-28">Verba (R$)</TableHead>
+              <TableHead className="min-w-72">Descrição</TableHead>
+              <TableHead className="min-w-36">Verba (R$)</TableHead>
               <TableHead className="min-w-40">Observações</TableHead>
               <TableHead className="min-w-48">Centro de custo</TableHead>
               <TableHead className="w-28">CC</TableHead>
@@ -357,7 +357,7 @@ function Page() {
               return (
                 <TableRow key={x.id ?? `new-${i}`}>
                   <TableCell>{i + 1}</TableCell>
-                  <TableCell>{editable ? <Input className="h-8" inputMode="decimal" value={x.quantity} onChange={(e) => change(i, { quantity: e.target.value })} /> : x.quantity}</TableCell>
+                  <TableCell>{editable ? <Input className="h-8 min-w-14 text-sm" inputMode="decimal" value={x.quantity} onChange={(e) => change(i, { quantity: e.target.value })} /> : x.quantity}</TableCell>
                   <TableCell>
                     {editable ? (
                       <>
@@ -366,10 +366,13 @@ function Page() {
                       </>
                     ) : x.unit}
                   </TableCell>
-                  <TableCell>{editable ? <Input className="h-8" value={x.description} onChange={(e) => change(i, { description: e.target.value })} /> : x.description}</TableCell>
+                  <TableCell className="align-top">{editable
+                    // A descrição quebra em várias linhas e a caixa cresce com o texto.
+                    ? <Textarea rows={1} className="min-h-8 resize-none py-1.5 text-sm [field-sizing:content]" value={x.description} onChange={(e) => change(i, { description: e.target.value })} />
+                    : <span className="whitespace-pre-wrap break-words">{x.description}</span>}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {editable ? <Input className="h-8 min-w-20" inputMode="decimal" placeholder="0,00" value={x.budget} onChange={(e) => change(i, { budget: e.target.value })} /> : <span className="whitespace-nowrap">{brl(num(x.budget))}</span>}
+                      {editable ? <Input className="h-8 min-w-24 text-sm" inputMode="decimal" placeholder="0,00" value={x.budget} onChange={(e) => change(i, { budget: e.target.value })} /> : <span className="whitespace-nowrap">{brl(num(x.budget))}</span>}
                       {x.quote_path && <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Ver cotação/orçamento" onClick={() => openPhoto(x.quote_path!)}><FileText className="h-4 w-4 text-primary" /></Button>}
                       {editable && (
                         <label className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-accent" title="Anexar cotação ou orçamento (foto ou PDF)">
@@ -380,7 +383,9 @@ function Page() {
                       <ItemLink value={x.link} editable={editable} onChange={(v) => change(i, { link: v })} />
                     </div>
                   </TableCell>
-                  <TableCell>{editable ? <Input className="h-8" value={x.notes} onChange={(e) => change(i, { notes: e.target.value })} /> : x.notes || "—"}</TableCell>
+                  <TableCell className="align-top">{editable
+                    ? <Textarea rows={1} className="min-h-8 resize-none py-1.5 text-sm [field-sizing:content]" value={x.notes} onChange={(e) => change(i, { notes: e.target.value })} />
+                    : <span className="whitespace-pre-wrap break-words">{x.notes || "—"}</span>}</TableCell>
                   <TableCell>
                     {editable ? (
                       <SearchSelect className="h-8" value={x.work_id} onChange={(v) => change(i, { work_id: v, cc: "" })} searchPlaceholder="Digite o pedido, serviço ou CC"
