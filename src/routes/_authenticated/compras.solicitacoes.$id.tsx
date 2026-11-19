@@ -321,7 +321,7 @@ function Page() {
         )}
         {r.justification && <p className="mt-3 rounded-md bg-muted p-2 text-xs"><b>Justificativa:</b> {r.justification}</p>}
         {r.notes && <p className="mt-3 rounded-md bg-muted p-2 text-xs"><b>Observações:</b> {r.notes}</p>}
-        {r.stage === "rascunho" && r.return_notes && <p className="mt-2 rounded-md bg-destructive/10 p-2 text-xs text-destructive"><b>Devolvida</b> · {r.return_notes}</p>}
+        {r.return_notes && (r.stage === "rascunho" || (r.stage === "aprovacao" && r.return_notes.startsWith("Comprador (ao validador)"))) && <p className="mt-2 rounded-md bg-destructive/10 p-2 text-xs text-destructive"><b>Devolvida</b> · {r.return_notes}</p>}
         {r.approver_notes && r.stage !== "rascunho" && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Validador:</b> {r.approver_notes}</p>}
         {r.photo_path && <Button variant="outline" size="sm" className="mt-2" onClick={() => openPhoto(r.photo_path!)}><ImageIcon className="h-4 w-4" /> Foto da SC do TOTVS</Button>}
         <p className="mt-2 text-xs text-muted-foreground"><b>Observadores:</b> {(r.observer_ids ?? []).map((u) => userName.get(u) ?? "…").join(", ") || "—"}</p>

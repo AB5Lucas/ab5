@@ -95,7 +95,7 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
     { key: "stage", label: "Etapa", values: (r) => [STAGE_LABEL[r.stage as ScStage] ?? r.stage], className: "whitespace-nowrap",
       cell: (r) => <>
         {STAGE_LABEL[r.stage as ScStage] ?? r.stage}
-        {r.stage === "rascunho" && r.return_notes && <div className="max-w-56 truncate text-[11px] text-destructive">devolvida · {r.return_notes}</div>}
+        {r.return_notes && (r.stage === "rascunho" || (r.stage === "aprovacao" && r.return_notes.startsWith("Comprador (ao validador)"))) && <div className="max-w-56 truncate text-[11px] text-destructive">devolvida · {r.return_notes}</div>}
       </> },
     { key: "status", label: "Status", values: (r) => [r.status], className: "whitespace-nowrap",
       cell: (r) => <>

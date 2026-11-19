@@ -1023,6 +1023,13 @@
       "when": 1795400042000,
       "tag": "0145_logistics_calendar",
       "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1795400043000,
+      "tag": "0146_purchase_return_target",
+      "breakpoints": true
     }
   ]
 }

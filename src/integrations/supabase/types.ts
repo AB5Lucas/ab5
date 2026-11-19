@@ -6727,7 +6727,7 @@ export type Database = {
       holiday_remove: { Args: { _id: string }; Returns: undefined }
       holiday_move: { Args: { _date: string; _new_date: string; _client_id?: string | null }; Returns: undefined }
       purchase_request_return: {
-        Args: { _id: string; _notes: string }
+        Args: { _id: string; _notes: string; _target?: string }
         Returns: undefined
       }
       purchase_request_send: { Args: { _id: string }; Returns: string }

@@ -37,12 +37,13 @@ function Page() {
   const [form, setForm] = useState({ status: "", notes: "", date: "" });
   const [returning, setReturning] = useState<ScRow | null>(null);
   const [reason, setReason] = useState("");
+  const [target, setTarget] = useState<"validador" | "solicitante">("validador");
   const giveBack = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("purchase_request_return", { _id: returning!.id, _notes: reason });
+      const { error } = await supabase.rpc("purchase_request_return", { _id: returning!.id, _notes: reason, _target: target });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Devolvida ao solicitante"); setReturning(null); setReason(""); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
+    onSuccess: () => { toast.success(target === "validador" ? "Devolvida ao validador" : "Devolvida ao solicitante"); setReturning(null); setReason(""); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   // Cancelar a SC inteira (com motivo).
@@ -92,7 +93,7 @@ function Page() {
             <ScTable rows={rows} clientName={clientName} actions={(r) => (
               <div className="flex gap-1">
                 <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "", date: r.status_at }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
-                <Button size="sm" variant="ghost" title="Devolver ao solicitante para corrigir" onClick={() => { setReturning(r); setReason(""); }}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
+                <Button size="sm" variant="ghost" title="Devolver ao validador ou ao solicitante" onClick={() => { setReturning(r); setReason(""); setTarget("validador"); }}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
                 {r.stage === "compras" && <Button size="sm" variant="ghost" className="text-destructive" title="Cancelar a SC inteira" onClick={() => { setCancelling(r); setCancelReason(""); }}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}
               </div>
             )} />
@@ -103,9 +104,18 @@ function Page() {
       <Dialog open={!!returning} onOpenChange={(o) => !o && setReturning(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Devolver ao solicitante</DialogTitle>
-            <DialogDescription>{returning?.number}. Ela volta para o solicitante editar e enviar de novo.</DialogDescription>
+            <DialogTitle>Devolver a SC</DialogTitle>
+            <DialogDescription>{returning?.number}. Para quem ela volta?</DialogDescription>
           </DialogHeader>
+          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Devolver para">
+            {([["validador", "Validador", "Volta para a Validação: o validador revisa e valida de novo."], ["solicitante", "Solicitante", "Volta para rascunho: o solicitante edita e envia de novo."]] as const).map(([v, l, d]) => (
+              <button key={v} type="button" role="radio" aria-checked={target === v} onClick={() => setTarget(v)}
+                className={`rounded-md border p-3 text-left text-sm ${target === v ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}>
+                <div className="font-medium">{l}</div>
+                <div className="text-xs text-muted-foreground">{d}</div>
+              </button>
+            ))}
+          </div>
           <div className="space-y-1">
             <Label htmlFor="ret-notes">Motivo da devolução</Label>
             <Textarea id="ret-notes" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
