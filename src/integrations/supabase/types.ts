@@ -3083,6 +3083,219 @@ export type Database = {
         }
         Relationships: []
       }
+      log_materials: {
+        Row: {
+          id: string
+          name: string
+          unit: string
+          weight_kg: number
+          length_m: number | null
+          volume_m3: number | null
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          unit?: string
+          weight_kg?: number
+          length_m?: number | null
+          volume_m3?: number | null
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          unit?: string
+          weight_kg?: number
+          length_m?: number | null
+          volume_m3?: number | null
+          active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      log_addresses: {
+        Row: {
+          id: string
+          name: string
+          client_id: string | null
+          street: string | null
+          city: string
+          uf: string
+          receive_from: string | null
+          receive_to: string | null
+          needs_booking: boolean
+          notes: string | null
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          client_id?: string | null
+          street?: string | null
+          city: string
+          uf?: string
+          receive_from?: string | null
+          receive_to?: string | null
+          needs_booking?: boolean
+          notes?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          client_id?: string | null
+          street?: string | null
+          city?: string
+          uf?: string
+          receive_from?: string | null
+          receive_to?: string | null
+          needs_booking?: boolean
+          notes?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      log_demands: {
+        Row: {
+          id: string
+          kind: string
+          title: string
+          client_id: string | null
+          work_id: string | null
+          origin_id: string | null
+          dest_id: string | null
+          due_date: string | null
+          contact: string | null
+          notes: string | null
+          status: string
+          scheduled_date: string | null
+          departure_time: string | null
+          vehicle_id: string | null
+          driver_id: string | null
+          trips: number
+          message_sent_at: string | null
+          requested_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          kind?: string
+          title: string
+          client_id?: string | null
+          work_id?: string | null
+          origin_id?: string | null
+          dest_id?: string | null
+          due_date?: string | null
+          contact?: string | null
+          notes?: string | null
+          status?: string
+          scheduled_date?: string | null
+          departure_time?: string | null
+          vehicle_id?: string | null
+          driver_id?: string | null
+          trips?: number
+          message_sent_at?: string | null
+          requested_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          kind?: string
+          title?: string
+          client_id?: string | null
+          work_id?: string | null
+          origin_id?: string | null
+          dest_id?: string | null
+          due_date?: string | null
+          contact?: string | null
+          notes?: string | null
+          status?: string
+          scheduled_date?: string | null
+          departure_time?: string | null
+          vehicle_id?: string | null
+          driver_id?: string | null
+          trips?: number
+          message_sent_at?: string | null
+          requested_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      log_demand_items: {
+        Row: {
+          id: string
+          demand_id: string
+          material_id: string | null
+          description: string
+          qty: number
+          unit_weight_kg: number
+          length_m: number | null
+          unit_volume_m3: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          demand_id: string
+          material_id?: string | null
+          description: string
+          qty?: number
+          unit_weight_kg?: number
+          length_m?: number | null
+          unit_volume_m3?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          demand_id?: string
+          material_id?: string | null
+          description?: string
+          qty?: number
+          unit_weight_kg?: number
+          length_m?: number | null
+          unit_volume_m3?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      log_city_restrictions: {
+        Row: {
+          id: string
+          city: string
+          weekday: number
+          plate_endings: string
+          windows: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          city: string
+          weekday: number
+          plate_endings: string
+          windows: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          city?: string
+          weekday?: number
+          plate_endings?: string
+          windows?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       industry_customers: {
         Row: {
           active: boolean
@@ -5660,6 +5873,12 @@ export type Database = {
           fuel_type: string | null
           id: string
           km_rate: number | null
+          cargo_capacity_kg: number | null
+          bed_length_m: number | null
+          bed_width_m: number | null
+          cargo_volume_m3: number | null
+          cnh_category: string | null
+          has_crane: boolean
           model: string | null
           monthly_rent: number
           notes: string | null
@@ -5679,6 +5898,12 @@ export type Database = {
           fuel_type?: string | null
           id?: string
           km_rate?: number | null
+          cargo_capacity_kg?: number | null
+          bed_length_m?: number | null
+          bed_width_m?: number | null
+          cargo_volume_m3?: number | null
+          cnh_category?: string | null
+          has_crane?: boolean
           model?: string | null
           monthly_rent?: number
           notes?: string | null
@@ -5698,6 +5923,12 @@ export type Database = {
           fuel_type?: string | null
           id?: string
           km_rate?: number | null
+          cargo_capacity_kg?: number | null
+          bed_length_m?: number | null
+          bed_width_m?: number | null
+          cargo_volume_m3?: number | null
+          cnh_category?: string | null
+          has_crane?: boolean
           model?: string | null
           monthly_rent?: number
           notes?: string | null

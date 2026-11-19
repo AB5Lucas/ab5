@@ -19,6 +19,7 @@ import { Route as AuthenticatedConferenciaRouteImport } from './routes/_authenti
 import { Route as AuthenticatedConsultaRouteImport } from './routes/_authenticated/consulta'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedFechamentoRouteImport } from './routes/_authenticated/fechamento'
+import { Route as AuthenticatedLogisticaRouteImport } from './routes/_authenticated/logistica'
 import { Route as AuthenticatedTreinamentosRouteImport } from './routes/_authenticated/treinamentos'
 import { Route as AuthenticatedAdminAcessosRouteImport } from './routes/_authenticated/admin.acessos'
 import { Route as AuthenticatedAdminConfiguracoesRouteImport } from './routes/_authenticated/admin.configuracoes'
@@ -120,6 +121,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
 const AuthenticatedFechamentoRoute = AuthenticatedFechamentoRouteImport.update({
   id: '/fechamento',
   path: '/fechamento',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLogisticaRoute = AuthenticatedLogisticaRouteImport.update({
+  id: '/logistica',
+  path: '/logistica',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTreinamentosRoute =
@@ -437,6 +443,7 @@ export interface FileRoutesByFullPath {
   '/consulta': typeof AuthenticatedConsultaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
+  '/logistica': typeof AuthenticatedLogisticaRoute
   '/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
@@ -499,6 +506,7 @@ export interface FileRoutesByTo {
   '/consulta': typeof AuthenticatedConsultaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
+  '/logistica': typeof AuthenticatedLogisticaRoute
   '/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
@@ -563,6 +571,7 @@ export interface FileRoutesById {
   '/_authenticated/consulta': typeof AuthenticatedConsultaRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/fechamento': typeof AuthenticatedFechamentoRoute
+  '/_authenticated/logistica': typeof AuthenticatedLogisticaRoute
   '/_authenticated/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/_authenticated/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/_authenticated/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
@@ -627,6 +636,7 @@ export interface FileRouteTypes {
     | '/consulta'
     | '/dashboard'
     | '/fechamento'
+    | '/logistica'
     | '/treinamentos'
     | '/admin/acessos'
     | '/admin/configuracoes'
@@ -689,6 +699,7 @@ export interface FileRouteTypes {
     | '/consulta'
     | '/dashboard'
     | '/fechamento'
+    | '/logistica'
     | '/treinamentos'
     | '/admin/acessos'
     | '/admin/configuracoes'
@@ -752,6 +763,7 @@ export interface FileRouteTypes {
     | '/_authenticated/consulta'
     | '/_authenticated/dashboard'
     | '/_authenticated/fechamento'
+    | '/_authenticated/logistica'
     | '/_authenticated/treinamentos'
     | '/_authenticated/admin/acessos'
     | '/_authenticated/admin/configuracoes'
@@ -884,6 +896,13 @@ declare module '@tanstack/react-router' {
       path: '/fechamento'
       fullPath: '/fechamento'
       preLoaderRoute: typeof AuthenticatedFechamentoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/logistica': {
+      id: '/_authenticated/logistica'
+      path: '/logistica'
+      fullPath: '/logistica'
+      preLoaderRoute: typeof AuthenticatedLogisticaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/treinamentos': {
@@ -1253,6 +1272,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedConsultaRoute: typeof AuthenticatedConsultaRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFechamentoRoute: typeof AuthenticatedFechamentoRoute
+  AuthenticatedLogisticaRoute: typeof AuthenticatedLogisticaRoute
   AuthenticatedTreinamentosRoute: typeof AuthenticatedTreinamentosRoute
   AuthenticatedAdminAcessosRoute: typeof AuthenticatedAdminAcessosRoute
   AuthenticatedAdminConfiguracoesRoute: typeof AuthenticatedAdminConfiguracoesRoute
@@ -1311,6 +1331,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConsultaRoute: AuthenticatedConsultaRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFechamentoRoute: AuthenticatedFechamentoRoute,
+  AuthenticatedLogisticaRoute: AuthenticatedLogisticaRoute,
   AuthenticatedTreinamentosRoute: AuthenticatedTreinamentosRoute,
   AuthenticatedAdminAcessosRoute: AuthenticatedAdminAcessosRoute,
   AuthenticatedAdminConfiguracoesRoute: AuthenticatedAdminConfiguracoesRoute,

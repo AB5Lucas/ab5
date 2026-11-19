@@ -1009,6 +1009,13 @@
       "when": 1795400040000,
       "tag": "0143_onboarding_released",
       "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1795400041000,
+      "tag": "0144_logistics",
+      "breakpoints": true
     }
   ]
 }
