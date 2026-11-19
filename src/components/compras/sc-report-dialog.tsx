@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Eye, FileSpreadsheet, FileText, ListChecks } from "lucide-react";
+import { ArrowLeft, Eye, FileSpreadsheet, FileText, ListChecks } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { Button } from "@/components/ui/button";
@@ -111,6 +111,11 @@ export function ScReportButton() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className={preview ? "flex max-h-[94vh] max-w-[96vw] flex-col" : "max-w-xl"}>
           <DialogHeader>
+            {preview && (
+              <Button variant="ghost" size="sm" className="absolute right-12 top-3" onClick={() => setPreview(false)}>
+                <ArrowLeft className="h-4 w-4" /> Voltar aos parâmetros
+              </Button>
+            )}
             <DialogTitle>{preview ? "Relação de SCs" : "Relação de SCs · Parâmetros"}</DialogTitle>
             <DialogDescription>{preview ? `${subtitle} · ${total} linha(s)` : "Uma linha por item da SC (SC do TOTVS = uma linha). Em aberto lista os itens ainda pendentes."}</DialogDescription>
           </DialogHeader>
@@ -152,7 +157,7 @@ export function ScReportButton() {
             </div>
           )}
           <DialogFooter className="flex-wrap gap-2 sm:justify-between">
-            {preview ? <Button variant="ghost" onClick={() => setPreview(false)}>Voltar aos parâmetros</Button> : <span />}
+            <span />
             <div className="flex flex-wrap gap-2">
               {!preview && <Button variant="outline" disabled={data.isLoading} onClick={() => setPreview(true)}><Eye className="h-4 w-4" /> Visualizar</Button>}
               <Button variant="outline" disabled={data.isLoading} onClick={() => void exportPdf()}><FileText className="h-4 w-4" /> Exportar PDF</Button>
