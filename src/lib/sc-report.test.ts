@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildScReport, type ScReportParams } from "./sc-report";
 
-const base: ScReportParams = { from: "", to: "", show: "abertas", requester: "all", category: "all", system: "all", group: "nenhum", sort: "prazo_asc" };
+const base: ScReportParams = { from: "", to: "", show: "abertas", requesters: [], categories: [], system: "all", group: "nenhum", sort: "prazo_asc" };
 const req = (id: string, extra: Record<string, unknown> = {}) => ({ id, number: `SC-${id}`, request_date: "2026-11-10", requester_id: "u1", requester_name: "ALEX", system: "PLANILHA", category: "EPI", nature: "PONTUAL", client_id: "c", due_date: "2026-11-30", status: "SOLICITAÇÃO ENVIADA", status_at: "2026-11-10", sent_at: "2026-11-10", ...extra });
 const ctx = { clientName: () => "MARS", workName: () => "Serviço", ccOf: () => "2004999" };
 

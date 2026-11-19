@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { SearchSelect } from "@/components/search-select";
+import { MultiSearchSelect } from "@/components/search-select";
 import { todayISO } from "@/components/compras/sc-shared";
 import { SC_CATEGORIES, brDate } from "@/lib/purchase-requests";
 import { buildScReport, SC_REPORT_COLUMNS, type ScReportItem, type ScReportParams, type ScReportRequest } from "@/lib/sc-report";
@@ -23,7 +23,7 @@ const SORT_LABEL = { prazo_desc: "Prazo (decrescente)", prazo_asc: "Prazo (cresc
 export function ScReportButton() {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [p, setP] = useState<ScReportParams>({ from: "", to: "", show: "abertas", requester: "all", category: "all", system: "all", group: "nenhum", sort: "prazo_asc" });
+  const [p, setP] = useState<ScReportParams>({ from: "", to: "", show: "abertas", requesters: [], categories: [], system: "all", group: "nenhum", sort: "prazo_asc" });
   const set = <K extends keyof ScReportParams>(k: K, v: ScReportParams[K]) => setP((s) => ({ ...s, [k]: v }));
 
   const data = useQuery({
@@ -73,8 +73,8 @@ export function ScReportButton() {
   const total = groups.reduce((s, g) => s + g.rows.length, 0);
   const subtitle = [
     `Emissão: ${p.from ? brDate(p.from) : "início"} a ${p.to ? brDate(p.to) : "hoje"}`, SHOW_LABEL[p.show],
-    p.requester !== "all" ? `Solicitante: ${requesters.find(([id]) => id === p.requester)?.[1] ?? ""}` : "",
-    p.category !== "all" ? `Categoria: ${p.category}` : "", p.system !== "all" ? `Tipo: ${p.system}` : "",
+    p.requesters.length ? `Solicitante: ${p.requesters.map((id) => requesters.find(([x]) => x === id)?.[1] ?? "").join(", ")}` : "",
+    p.categories.length ? `Categoria: ${p.categories.join(", ")}` : "", p.system !== "all" ? `Tipo: ${p.system}` : "",
     p.group !== "nenhum" ? `Agrupado por ${GROUP_LABEL[p.group].toLowerCase()}` : "", `Ordem: ${SORT_LABEL[p.sort].toLowerCase()}`,
   ].filter(Boolean).join(" · ");
   const fileBase = `Relação de SCs ${todayISO().split("-").reverse().join("-")}`;
@@ -126,10 +126,14 @@ export function ScReportButton() {
               {sel("Mostrar", p.show, (v) => set("show", v), Object.entries(SHOW_LABEL))}
               <div className="space-y-1">
                 <Label className="block">Solicitante</Label>
-                <SearchSelect value={p.requester} onChange={(v) => set("requester", v)} searchPlaceholder="Digite o nome"
-                  options={[{ value: "all", label: "Todos" }, ...requesters.map(([id, n]) => ({ value: id, label: n }))]} />
+                <MultiSearchSelect values={p.requesters} onChange={(v) => set("requesters", v)} searchPlaceholder="Digite o nome" allLabel="Todos"
+                  options={requesters.map(([id, n]) => ({ value: id, label: n }))} />
               </div>
-              {sel("Categoria", p.category, (v) => set("category", v), [["all", "Todas"], ...SC_CATEGORIES.map((c) => [c, c] as [string, string])])}
+              <div className="space-y-1">
+                <Label className="block">Categoria</Label>
+                <MultiSearchSelect values={p.categories} onChange={(v) => set("categories", v)} searchPlaceholder="Digite a categoria" allLabel="Todas"
+                  options={SC_CATEGORIES.map((c) => ({ value: c, label: c }))} />
+              </div>
               {sel("Tipo", p.system, (v) => set("system", v), [["all", "Todas"], ["PLANILHA", "Planilha"], ["TOTVS", "TOTVS"]])}
               {sel("Agrupamento", p.group, (v) => set("group", v), Object.entries(GROUP_LABEL))}
               {sel("Ordenar", p.sort, (v) => set("sort", v), Object.entries(SORT_LABEL))}

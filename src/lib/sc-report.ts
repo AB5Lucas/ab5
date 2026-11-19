@@ -8,7 +8,7 @@ export type ScReportShow = "abertas" | "concluidas" | "todas";
 export type ScReportGroup = "nenhum" | "solicitante" | "cliente" | "categoria";
 export type ScReportSort = "prazo_desc" | "prazo_asc" | "natureza";
 export type ScReportParams = {
-  from: string; to: string; show: ScReportShow; requester: string; category: string; system: string; group: ScReportGroup; sort: ScReportSort;
+  from: string; to: string; show: ScReportShow; requesters: string[]; categories: string[]; system: string; group: ScReportGroup; sort: ScReportSort;
 };
 export type ScReportRequest = {
   id: string; number: string; request_date: string; requester_id: string; requester_name: string; system: string; category: string | null;
@@ -46,8 +46,9 @@ export function buildScReport(
   for (const r of requests) {
     if (p.from && r.request_date < p.from) continue;
     if (p.to && r.request_date > p.to) continue;
-    if (p.requester !== "all" && r.requester_id !== p.requester) continue;
-    if (p.category !== "all" && (r.category ?? "") !== p.category) continue;
+    // Vários solicitantes/categorias; nenhum marcado = todos.
+    if (p.requesters.length && !p.requesters.includes(r.requester_id)) continue;
+    if (p.categories.length && !p.categories.includes(r.category ?? "")) continue;
     if (p.system !== "all" && r.system !== p.system) continue;
     const scDone = SC_DONE_STATUSES.includes(r.status);
     const dl = deadlineControl(r, today).label;
