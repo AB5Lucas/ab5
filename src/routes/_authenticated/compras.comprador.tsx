@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApproversPanel } from "@/components/compras/approvers";
+import { ScReportButton } from "@/components/compras/sc-report-dialog";
 import { Pill, ScTable, todayISO, StatusFilter, statusCounts, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 import { SC_DONE_STATUSES, SC_STATUSES, statusClass } from "@/lib/purchase-requests";
 
@@ -85,6 +86,7 @@ function Page() {
               </Select>
             </div>
             <StatusFilter value={status} onChange={setStatus} counts={statusCounts(scoped)} exclude={["EM PREPARAÇÃO"]} />
+            <div className="ml-auto"><ScReportButton /></div>
           </div>
           {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
             <ScTable rows={rows} clientName={clientName} actions={(r) => (
