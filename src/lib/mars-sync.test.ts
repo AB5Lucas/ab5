@@ -96,3 +96,20 @@ describe("ccSuffix", () => {
     expect(ccSuffix("")).toBe("");
   });
 });
+
+describe("pedido só no faturamento", () => {
+  it("item das ordens sem pedido recebe o pedido do faturamento com o mesmo Nº Orç.", () => {
+    const rows = parseMarsSheet([
+      ["GESTÃO DE FATURAMENTO"],
+      ["Nº Orç.", "N° PEDIDO", "CLIENTE", "CATEGORIA", "DESCRIÇÃO", "VALOR"],
+      ["26/580", 4500781230, "A", "F", "LOCAÇÃO DE ANDAIME", 10935.67],
+      ["GESTÃO DE ORDENS DE SERVIÇOS"],
+      ["Nº ORÇ.", "N° PEDIDO", "CLIENTE", "CATEGORIA", "DESCRIÇÃO", "VALOR", "STATUS"],
+      ["26/580", "", "A", "F", "LOCAÇÃO DE ANDAIME", 10935.67, "Em execução"],
+    ]);
+    const out = rowsToSync(rows, false);
+    expect(out.length).toBe(1);
+    expect(out[0]!.order).toBe("4500781230");
+    expect(out[0]!.table).toBe("ordens");
+  });
+});

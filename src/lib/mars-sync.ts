@@ -122,7 +122,9 @@ export function matchWork(r: MarsRow, works: MarsWork[]): MarsWork | undefined {
 export function rowsToSync(rows: MarsRow[], firstRun: boolean): MarsRow[] {
   const seen = new Set<string>();
   // A tabela de ordens vale mais (valor do pedido; no faturamento o mesmo orçamento pode vir em parcelas).
-  const ordens = rows.filter((r) => r.table === "ordens");
+  // Item das ordens ainda sem pedido: o pedido que já aparece no faturamento (mesmo Nº Orç.) vale para ele.
+  const billedOrder = new Map(rows.filter((r) => r.table === "faturamento" && isQuote(r.quote) && r.order).map((r) => [r.quote, r.order]));
+  const ordens = rows.filter((r) => r.table === "ordens").map((r) => (!r.order && isQuote(r.quote) && billedOrder.has(r.quote) ? { ...r, order: billedOrder.get(r.quote)! } : r));
   const quotes = new Set(ordens.map((r) => r.quote).filter((q) => isQuote(q)));
   const orders = new Set(ordens.map((r) => r.order).filter(Boolean));
   const sorted = [...ordens, ...rows.filter((r) => r.table === "faturamento")];
