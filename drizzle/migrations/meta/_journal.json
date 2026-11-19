@@ -1030,6 +1030,13 @@
       "when": 1795400043000,
       "tag": "0146_purchase_return_target",
       "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1795400044000,
+      "tag": "0147_purchase_admin_powers",
+      "breakpoints": true
     }
   ]
 }

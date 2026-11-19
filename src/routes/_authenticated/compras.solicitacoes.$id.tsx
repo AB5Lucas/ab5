@@ -47,7 +47,9 @@ const emptyDraft = (): Draft => ({ quantity: "", unit: "UN", description: "", bu
  */
 function Page() {
   const { id } = Route.useParams();
-  const { user } = useCurrentUser();
+  const { user, role } = useCurrentUser();
+  // Diretoria / administração do sistema (perfil administrador): valida, edita em validação e age como comprador.
+  const isAdmin = role === "admin";
   const { canAccess } = useAccess();
   const qc = useQueryClient();
   const req = useQuery({
@@ -91,7 +93,7 @@ function Page() {
   const workName = useMemo(() => new Map((works.data ?? []).map((w) => [w.id, workLabel(w)])), [works.data]);
   const isDraftOwner = !!r && r.requester_id === user?.id && r.stage === "rascunho";
   // O validador (gestor ou substituto) também pode editar a SC enquanto ela está com ele, antes de validar.
-  const isValidator = !!r && !!user?.id && r.stage === "aprovacao" && (r.approver_id === user.id || r.substitute_id === user.id);
+  const isValidator = !!r && !!user?.id && r.stage === "aprovacao" && (isAdmin || r.approver_id === user.id || r.substitute_id === user.id);
   const { edit: editParam } = Route.useSearch();
   const [editMode, setEditMode] = useState(!!editParam);
   const canEdit = isDraftOwner || isValidator;
@@ -118,7 +120,7 @@ function Page() {
     },
     onError: (e: Error) => { toast.error(e.message); qc.invalidateQueries({ queryKey: ["sc-request", id] }); },
   });
-  const isBuyer = !!r && r.stage === "compras" && canAccess("/compras/comprador");
+  const isBuyer = !!r && r.stage === "compras" && (isAdmin || canAccess("/compras/comprador"));
 
   const [rows, setRows] = useState<Draft[]>([]);
   const [total, setTotal] = useState("");
@@ -280,7 +282,7 @@ function Page() {
           {editable && <Button variant="outline" size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}><Save className="h-4 w-4" /> Salvar itens</Button>}
           {isDraftOwner && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
           {isDraftOwner && <Button variant="ghost" size="sm" onClick={() => setRemoving(r)}><Trash2 className="h-4 w-4 text-destructive" /> Apagar</Button>}
-          {r.stage === "aprovacao" && !!user?.id && (r.approver_id === user.id || r.substitute_id === user.id) && (
+          {isValidator && (
             <>
               <Button size="sm" onClick={() => setDeciding(true)}><Check className="h-4 w-4" /> Validar</Button>
               <Button variant="outline" size="sm" onClick={() => setDeciding(false)}><Undo2 className="h-4 w-4" /> Devolver</Button>
