@@ -49,6 +49,8 @@ export function NewClientDocsPage() {
 
   const onboardings = useQuery({
     queryKey: ["client-onboarding", "items"],
+    // Sempre relê ao abrir: a integração agendada em outra tela tira o liberado da lista.
+    refetchOnMount: "always",
     queryFn: () => fetchAll<Onboarding>((a, b) => supabase.from("client_onboardings")
       .select("id, client_id, collaborator_id, status, sent_at, next_check_date, notes, completed_at, completed_by, created_at").order("created_at", { ascending: false }).range(a, b)),
   });
