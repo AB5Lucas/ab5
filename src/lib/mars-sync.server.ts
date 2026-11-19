@@ -53,6 +53,24 @@ export async function executeMarsSync(c: Credentials, kind: string, month?: stri
     }
     const parsed = parseMarsSheet(XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "" }));
     const res = await applyMars(parsed, sheetYm, !!opts.overwriteSuffix);
+    // Faturamentos da MARS pendentes: diz onde o pedido está na planilha (ou que não está) e por que não virou serviço.
+    try {
+      const { data: pend } = await supabaseAdmin.from("billing_sync_notes").select("order_number").eq("status", "pending").eq("cancelled", false).ilike("client_name", "%MARS%").not("order_number", "is", null);
+      for (const o of [...new Set((pend ?? []).map((x) => String(x.order_number ?? "").replace(/\D/g, "")).filter((x) => x.length >= 6))]) {
+        const row = parsed.find((r) => (r.order ?? "").replace(/\D/g, "") === o);
+        if (row) {
+          const why = row.cancelled ? "cancelado na planilha" : !(row.value > 0) ? "sem valor na planilha" : row.contract ? "linha do contrato" : "já tratado (confira o Nº Orç./serviço)";
+          res.message = [res.message, `Pedido ${o} na aba ${marsSheetName(sheetYm)}: ${why}`].filter(Boolean).join(" · ");
+          continue;
+        }
+        const where: string[] = [];
+        for (const name of wb.SheetNames) {
+          const grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name]!, { header: 1, raw: false, defval: "" });
+          grid.forEach((line, i) => { if ((line ?? []).some((c) => String(c ?? "").replace(/\D/g, "").includes(o))) where.push(`${name} linha ${i + 1}`); });
+        }
+        res.message = [res.message, where.length ? `Pedido ${o} fora da tabela lida: ${where.slice(0, 3).join(", ")}` : `Pedido ${o} não está na planilha`].filter(Boolean).join(" · ");
+      }
+    } catch { /* diagnóstico é opcional */ }
     await finish({ status: "completed", ref_month: sheetYm, analyzed: parsed.length, inserted: res.created, updated: res.updated, ignored: res.ignored, error_message: res.message || null });
     return { status: "completed", ...res };
   } catch (err) {
@@ -203,13 +221,16 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
   const itemWork = new Map(itemRows.map((x) => [String(x["key"]), x["work_id"] as string | null]));
   const suffixFor = new Map<string, string>();
   // Ordens primeiro (o faturamento repete o item com outro CC às vezes); Contrato Andaimes junta vários itens e não recebe sufixo.
+  const seenSuffix = new Set<string>();
   for (const r of [...parsed.filter((x) => x.table === "ordens"), ...parsed.filter((x) => x.table !== "ordens")]) {
     if (!r.suffix || r.contract || r.cancelled || isScaffoldRow(r)) continue;
     const wid = itemWork.get(r.key) ?? byKey.get(r.key)?.work_id ?? matchWork(r, works)?.id ?? null;
     const w = wid ? works.find((x) => x.id === wid) : undefined;
     const cur = (w?.cc_suffix ?? "").trim();
-    if (!w || (cur && !overwriteSuffix) || cur === r.suffix || suffixFor.has(w.id) || newWorks.some((n) => n["id"] === w.id)) continue;
+    if (!w || suffixFor.has(w.id) || seenSuffix.has(w.id) || newWorks.some((n) => n["id"] === w.id)) continue;
+    // A 1ª linha do serviço decide (mesmo igual ao atual), para outra linha com outro CC não ficar trocando a cada leitura.
     suffixFor.set(w.id, r.suffix);
+    if ((cur && !overwriteSuffix) || cur === r.suffix) { suffixFor.delete(w.id); seenSuffix.add(w.id); continue; }
     if (cur) notes.push(`Sufixo trocado: ${w.name} ${cur} → ${r.suffix}`);
   }
   await Promise.all([...suffixFor].map(async ([id, cc_suffix]) => {
