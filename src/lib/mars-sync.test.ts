@@ -32,9 +32,10 @@ describe("planilha da MARS", () => {
     expect(rows.find((r) => r.quote === "26/506")?.cancelled).toBe(true);
     expect(rows.find((r) => r.quote === "26/580")?.order).toBeNull();
   });
-  it("só ordens no dia a dia; na 1ª leitura também o faturamento, sem repetir o orçamento", () => {
+  it("ordens + faturamento que não está nas ordens; sem repetir o orçamento", () => {
     const rows = parseMarsSheet(sheet);
-    expect(rowsToSync(rows, false).map((r) => r.key)).toEqual(["Q:26/540", "Q:26/580"]);
+    // 26/540 está nas ordens (não repete pelo faturamento); 26/553 só foi faturado: entra.
+    expect(rowsToSync(rows, false).map((r) => r.key)).toEqual(["Q:26/540", "Q:26/580", "Q:26/553"]);
     const first = rowsToSync(rows, true);
     expect(first.map((r) => r.key)).toEqual(["Q:26/540", "Q:26/580", "Q:26/553"]);
     expect(first[0]!.value).toBe(30000);

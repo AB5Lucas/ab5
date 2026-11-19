@@ -142,6 +142,7 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
     works.push({ id, name: r.description, quote_number: r.quote || null, orders: [], order_number: r.order, order_value: r.value, cc_suffix: r.suffix || null });
     await upsertItem({ key: r.key, ...base(r), action: "created", work_id: id, synced_order: r.order, synced_value: r.value });
     created++;
+    if (r.table === "faturamento" && !firstRun) notes.push(`Serviço criado pelo faturamento (pedido ${r.order}): ${r.description}`);
   }
 
   // Medição do contrato (só a tabela de ordens): novas linhas nos serviços do contrato. Cada medição tem pedido novo

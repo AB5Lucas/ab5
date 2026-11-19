@@ -114,14 +114,21 @@ export function matchWork(r: MarsRow, works: MarsWork[]): MarsWork | undefined {
   return undefined;
 }
 
-/** Itens a tratar: só a tabela de ordens (e, na 1ª leitura, também a de faturamento); um por chave; sem cancelados e sem valor. */
+/**
+ * Itens a tratar: a tabela de ordens e, da de faturamento, só o que não está nas ordens (mesmo Nº Orç. ou pedido):
+ * pedido faturado que nunca passou pela tabela de ordens também precisa existir. Na 1ª leitura, o faturamento inteiro.
+ * Um por chave; sem cancelados e sem valor.
+ */
 export function rowsToSync(rows: MarsRow[], firstRun: boolean): MarsRow[] {
   const seen = new Set<string>();
   // A tabela de ordens vale mais (valor do pedido; no faturamento o mesmo orçamento pode vir em parcelas).
-  const sorted = [...rows.filter((r) => r.table === "ordens"), ...rows.filter((r) => r.table === "faturamento")];
+  const ordens = rows.filter((r) => r.table === "ordens");
+  const quotes = new Set(ordens.map((r) => r.quote).filter((q) => isQuote(q)));
+  const orders = new Set(ordens.map((r) => r.order).filter(Boolean));
+  const sorted = [...ordens, ...rows.filter((r) => r.table === "faturamento")];
   return sorted.filter((r) => {
     if (r.contract || r.cancelled || !(r.value > 0)) return false;
-    if (r.table === "faturamento" && !firstRun) return false;
+    if (r.table === "faturamento" && !firstRun && ((isQuote(r.quote) && quotes.has(r.quote)) || (r.order && orders.has(r.order)) || !r.order)) return false;
     if (seen.has(r.key)) return false;
     seen.add(r.key);
     return true;
