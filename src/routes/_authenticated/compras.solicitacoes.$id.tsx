@@ -338,7 +338,7 @@ function Page() {
             <TableRow>
               <TableHead className="w-10">Item</TableHead>
               <TableHead className="w-20">Qtd</TableHead>
-              <TableHead className="w-24">Un. medida</TableHead>
+              <TableHead className="min-w-24">Un. medida</TableHead>
               <TableHead className="min-w-72">Descrição</TableHead>
               <TableHead className="min-w-36">Verba (R$)</TableHead>
               <TableHead className="min-w-40">Observações</TableHead>
@@ -361,7 +361,7 @@ function Page() {
                   <TableCell>
                     {editable ? (
                       <>
-                        <Input className="h-8" list="sc-units" value={x.unit} onChange={(e) => change(i, { unit: e.target.value.toUpperCase() })} />
+                        <Input className="h-8 min-w-20 text-sm" list="sc-units" value={x.unit} onChange={(e) => change(i, { unit: e.target.value.toUpperCase() })} />
                         <datalist id="sc-units">{SC_UNITS.map((u) => <option key={u} value={u} />)}</datalist>
                       </>
                     ) : x.unit}
