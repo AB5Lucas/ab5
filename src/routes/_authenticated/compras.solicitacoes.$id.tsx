@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { linkPurchaseOrderFile } from "@/lib/purchase-orders.functions";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Camera, Check, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Link2, Camera, Check, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchSelect } from "@/components/search-select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -30,14 +31,14 @@ export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")
 });
 
 type Item = Tables<"purchase_request_items">;
-type Draft = { id?: string; quantity: string; unit: string; description: string; budget: string; notes: string; work_id: string; cc: string; photo_path: string | null; quote_path: string | null };
+type Draft = { id?: string; quantity: string; unit: string; description: string; budget: string; notes: string; work_id: string; cc: string; photo_path: string | null; quote_path: string | null; link: string };
 const RATEIO = "__rateio__";
 const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(/\./g, "").replace(",", ".")));
 const toDraft = (i: Item): Draft => ({
   id: i.id, quantity: String(i.quantity).replace(".", ","), unit: i.unit, description: i.description, budget: i.budget == null ? "" : String(i.budget).replace(".", ","),
-  notes: i.notes ?? "", work_id: i.work_id ?? RATEIO, cc: i.cc_code ?? "", photo_path: i.photo_path, quote_path: i.quote_path,
+  notes: i.notes ?? "", work_id: i.work_id ?? RATEIO, cc: i.cc_code ?? "", photo_path: i.photo_path, quote_path: i.quote_path, link: i.link_url ?? "",
 });
-const emptyDraft = (): Draft => ({ quantity: "", unit: "UN", description: "", budget: "", notes: "", work_id: RATEIO, cc: "", photo_path: null, quote_path: null });
+const emptyDraft = (): Draft => ({ quantity: "", unit: "UN", description: "", budget: "", notes: "", work_id: RATEIO, cc: "", photo_path: null, quote_path: null, link: "" });
 
 /**
  * Página da solicitação (modelo FR-CPS-SC): cabeçalho já preenchido pelo controle e a tabela de itens
@@ -165,7 +166,7 @@ function Page() {
     for (const [i, x] of filled.entries()) {
       const payload = {
         request_id: id, item_no: i + 1, quantity: num(x.quantity)!, unit: x.unit.trim() || "UN", description: x.description.trim(),
-        budget: num(x.budget), notes: x.notes.trim() || null, work_id: x.work_id === RATEIO ? null : x.work_id, cc_code: x.cc.trim() || null, photo_path: x.photo_path, quote_path: x.quote_path,
+        budget: num(x.budget), notes: x.notes.trim() || null, work_id: x.work_id === RATEIO ? null : x.work_id, cc_code: x.cc.trim() || null, photo_path: x.photo_path, quote_path: x.quote_path, link_url: x.link.trim() || null,
       };
       const { error } = x.id ? await supabase.from("purchase_request_items").update(payload).eq("id", x.id) : await supabase.from("purchase_request_items").insert(payload);
       if (error) throw error;
@@ -372,6 +373,7 @@ function Page() {
                           <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadQuote(i, f); e.target.value = ""; }} />
                         </label>
                       )}
+                      <ItemLink value={x.link} editable={editable} onChange={(v) => change(i, { link: v })} />
                     </div>
                   </TableCell>
                   <TableCell>{editable ? <Input className="h-8" value={x.notes} onChange={(e) => change(i, { notes: e.target.value })} /> : x.notes || "—"}</TableCell>
@@ -502,5 +504,40 @@ function Page() {
       <ScHeaderDialog open={editingHeader} onOpenChange={setEditingHeader} editing={r} />
       <ScRemoveDialog row={removing} onClose={() => setRemoving(null)} pending={remove.isPending} onConfirm={(x) => remove.mutate(x)} />
     </div>
+  );
+}
+
+/** Link de referência do produto (ex.: anúncio): ícone ao lado do clipe; editando abre um campo, senão abre o link. */
+function ItemLink({ value, editable, onChange }: { value: string; editable: boolean; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const href = /^https?:\/\//i.test(value) ? value : value ? `https://${value}` : "";
+  if (!editable) {
+    return value ? (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-accent" title={`Abrir link de referência: ${value}`}>
+        <Link2 className="h-4 w-4 text-primary" />
+      </a>
+    ) : null;
+  }
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setDraft(value); }}>
+      <PopoverTrigger asChild>
+        <button type="button" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-accent" title={value ? `Link de referência: ${value}` : "Incluir link de referência do produto"}>
+          <Link2 className={`h-4 w-4 ${value ? "text-primary" : "text-muted-foreground"}`} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 space-y-2" align="start">
+        <Label htmlFor="item-link">Link de referência do produto</Label>
+        <Input id="item-link" autoFocus placeholder="https://…" value={draft} onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { onChange(draft.trim()); setOpen(false); } }} />
+        <div className="flex justify-between gap-2">
+          {value ? <a href={href} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Abrir</a> : <span />}
+          <div className="flex gap-2">
+            {value && <Button size="sm" variant="ghost" onClick={() => { onChange(""); setOpen(false); }}>Remover</Button>}
+            <Button size="sm" onClick={() => { onChange(draft.trim()); setOpen(false); }}>OK</Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

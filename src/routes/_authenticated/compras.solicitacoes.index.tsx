@@ -81,7 +81,7 @@ function Page() {
       if (items?.length) {
         const { error: ce } = await supabase.from("purchase_request_items").insert(items.map((i) => ({
           request_id: newId as string, item_no: i.item_no, quantity: i.quantity, unit: i.unit, description: i.description, budget: i.budget,
-          notes: i.notes, work_id: i.work_id, cc_code: i.cc_code, photo_path: i.photo_path, quote_path: i.quote_path,
+          notes: i.notes, work_id: i.work_id, cc_code: i.cc_code, photo_path: i.photo_path, quote_path: i.quote_path, link_url: i.link_url,
         })));
         if (ce) throw ce;
       }

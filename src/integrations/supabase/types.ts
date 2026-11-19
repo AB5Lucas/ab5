@@ -3773,6 +3773,7 @@ export type Database = {
           photo_path: string | null
           quantity: number
           quote_path: string | null
+          link_url: string | null
           request_id: string
           status: string
           status_at: string | null
@@ -3792,6 +3793,7 @@ export type Database = {
           photo_path?: string | null
           quantity: number
           quote_path?: string | null
+          link_url?: string | null
           request_id: string
           status?: string
           status_at?: string | null
@@ -3811,6 +3813,7 @@ export type Database = {
           photo_path?: string | null
           quantity?: number
           quote_path?: string | null
+          link_url?: string | null
           request_id?: string
           status?: string
           status_at?: string | null
