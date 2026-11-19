@@ -346,6 +346,8 @@ function AddOnboarding({ open, onOpenChange, clients, people, trainings, openKey
   trainings: { id: string; label: string }[];
   openKeys: Set<string>; onDone: () => void;
 }) {
+  // "docs" = acompanhar documentos; "integrar" = já liberado, só falta integrar (sem documentos).
+  const [mode, setMode] = useState<"docs" | "integrar">("docs");
   const [clientId, setClientId] = useState("");
   const [who, setWho] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
@@ -356,7 +358,7 @@ function AddOnboarding({ open, onOpenChange, clients, people, trainings, openKey
   const [other, setOther] = useState("");
   const [sentAt, setSentAt] = useState(todayISO());
   const [next, setNext] = useState("");
-  const reset = () => { setClientId(""); setWho(new Set()); setQ(""); setAso(true); setTrn(new Set()); setTq(""); setOthers([]); setOther(""); setSentAt(todayISO()); setNext(""); };
+  const reset = () => { setMode("docs"); setClientId(""); setWho(new Set()); setQ(""); setAso(true); setTrn(new Set()); setTq(""); setOthers([]); setOther(""); setSentAt(todayISO()); setNext(""); };
 
   const found = useMemo(() => {
     const t = normText(q.trim());
@@ -378,21 +380,25 @@ function AddOnboarding({ open, onOpenChange, clients, people, trainings, openKey
         ...[...trn].map((id) => ({ kind: "treinamento" as const, training_id: id, label: null })),
         ...extra.map((l) => ({ kind: "outro" as const, training_id: null, label: l })),
       ];
-      if (!newDocs.length) throw new Error("Marque ao menos um documento.");
+      if (mode === "docs" && !newDocs.length) throw new Error("Marque ao menos um documento.");
       const ids = [...who].filter((id) => !openKeys.has(`${clientId}|${id}`));
       const skipped = who.size - ids.length;
       if (!ids.length) throw new Error("Todos já têm acompanhamento aberto neste cliente.");
       const { data, error } = await supabase.from("client_onboardings")
-        .insert(ids.map((collaborator_id) => ({ client_id: clientId, collaborator_id, sent_at: sentAt || null, next_check_date: next || null })))
+        .insert(ids.map((collaborator_id) => mode === "integrar"
+          ? { client_id: clientId, collaborator_id, sent_at: sentAt || null, status: "liberado", completed_at: new Date().toISOString() }
+          : { client_id: clientId, collaborator_id, sent_at: sentAt || null, next_check_date: next || null }))
         .select("id");
       if (error) throw new Error(error.code === "23505" ? "Alguém já tem acompanhamento aberto neste cliente." : error.message);
-      const rows = (data ?? []).flatMap((o) => newDocs.map((d) => ({ ...d, onboarding_id: o.id })));
-      const { error: dErr } = await supabase.from("client_onboarding_docs").insert(rows);
-      if (dErr) throw dErr;
+      if (mode === "docs") {
+        const rows = (data ?? []).flatMap((o) => newDocs.map((d) => ({ ...d, onboarding_id: o.id })));
+        const { error: dErr } = await supabase.from("client_onboarding_docs").insert(rows);
+        if (dErr) throw dErr;
+      }
       return { created: ids.length, skipped };
     },
     onSuccess: (r) => {
-      toast.success(`${r.created} acompanhamento(s) incluído(s)${r.skipped ? `; ${r.skipped} já tinha(m) acompanhamento aberto` : ""}`);
+      toast.success(`${r.created} ${mode === "integrar" ? "liberado(s) para integrar" : "acompanhamento(s) incluído(s)"}${r.skipped ? `; ${r.skipped} já tinha(m) acompanhamento aberto` : ""}`);
       onDone(); reset(); onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -402,10 +408,14 @@ function AddOnboarding({ open, onOpenChange, clients, people, trainings, openKey
     <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Incluir documentação em novo cliente</DialogTitle>
-          <DialogDescription>Escolha o cliente, as pessoas e os documentos enviados. Não precisa ter integração cadastrada.</DialogDescription>
+          <DialogTitle>Incluir em novo cliente</DialogTitle>
+          <DialogDescription>{mode === "docs" ? "Escolha o cliente, as pessoas e os documentos enviados." : "A pessoa entra como liberada para integrar, sem conferir documentos."}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="inline-flex rounded-md border border-border p-0.5">
+            <Button type="button" size="sm" variant={mode === "docs" ? "default" : "ghost"} onClick={() => setMode("docs")}>Documentação</Button>
+            <Button type="button" size="sm" variant={mode === "integrar" ? "default" : "ghost"} onClick={() => setMode("integrar")}>Só integrar</Button>
+          </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1">
               <Label>Cliente</Label>
@@ -418,10 +428,12 @@ function AddOnboarding({ open, onOpenChange, clients, people, trainings, openKey
               <Label htmlFor="onb-sent">Enviado em</Label>
               <Input id="onb-sent" type="date" value={sentAt} onChange={(e) => setSentAt(e.target.value)} />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="onb-next">Próxima conferência</Label>
-              <Input id="onb-next" type="date" value={next} onChange={(e) => setNext(e.target.value)} />
-            </div>
+            {mode === "docs" && (
+              <div className="space-y-1">
+                <Label htmlFor="onb-next">Próxima conferência</Label>
+                <Input id="onb-next" type="date" value={next} onChange={(e) => setNext(e.target.value)} />
+              </div>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -455,7 +467,7 @@ function AddOnboarding({ open, onOpenChange, clients, people, trainings, openKey
             )}
           </div>
 
-          <div className="space-y-2">
+          {mode === "docs" && <div className="space-y-2">
             <Label>Documentos enviados</Label>
             <label className="flex items-center gap-2 text-sm"><Checkbox checked={aso} onCheckedChange={(v) => setAso(!!v)} /> Exame ASO</label>
             <div className="space-y-1">
@@ -488,7 +500,7 @@ function AddOnboarding({ open, onOpenChange, clients, people, trainings, openKey
                 </div>
               )}
             </div>
-          </div>
+          </div>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
