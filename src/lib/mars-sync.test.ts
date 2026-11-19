@@ -68,8 +68,8 @@ describe("planilha da MARS", () => {
   });
 });
 
-describe("sufixo do CC (coluna B)", () => {
-  it("lê a coluna B como sufixo quando ela não é outra coluna", () => {
+describe("sufixo do CC (coluna C)", () => {
+  it("lê a coluna pelo título ou, sem título, a coluna C", () => {
     const rows = [
       ["GESTÃO DE ORDENS DE SERVIÇOS"],
       ["Nº ORÇ.", "SUFIXO", "N° PEDIDO", "CLIENTE", "CATEGORIA", "DESCRIÇÃO", "VALOR", "STATUS"],
@@ -78,6 +78,8 @@ describe("sufixo do CC (coluna B)", () => {
     expect(parseMarsSheet(rows)[0]!.suffix).toBe("224");
     const old = [["GESTÃO DE ORDENS DE SERVIÇOS"], ["Nº ORÇ.", "N° PEDIDO", "CLIENTE", "CATEGORIA", "DESCRIÇÃO", "VALOR"], ["26/600", "4500780144", "A", "F", "REPAROS", 1]];
     expect(parseMarsSheet(old)[0]!.suffix).toBe("");
+    const noTitle = [["GESTÃO DE ORDENS DE SERVIÇOS"], ["Nº ORÇ.", "N° PEDIDO", "", "CLIENTE", "CATEGORIA", "DESCRIÇÃO", "VALOR"], ["26/600", "4500780144", "223", "A", "F", "REPAROS", 1]];
+    expect(parseMarsSheet(noTitle)[0]!.suffix).toBe("223");
   });
 });
 

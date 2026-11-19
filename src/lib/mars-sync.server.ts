@@ -196,7 +196,7 @@ async function applyMars(parsed: MarsRow[], ym: string) {
     }).eq("id", w.id);
     if (error) throw dbError("pedidos dos serviços", error);
   }));
-  // Sufixo do CC (coluna B): serviço do item ainda sem sufixo recebe o da planilha (todas as linhas das duas tabelas,
+  // Sufixo do CC (coluna C): serviço do item ainda sem sufixo recebe o da planilha (todas as linhas das duas tabelas,
   // inclusive itens já lidos antes); nunca troca um sufixo já preenchido. Medição do contrato não mexe.
   const itemWork = new Map(itemRows.map((x) => [String(x["key"]), x["work_id"] as string | null]));
   const suffixFor = new Map<string, string>();

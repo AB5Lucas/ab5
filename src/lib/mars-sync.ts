@@ -24,7 +24,7 @@ export type MarsTable = "faturamento" | "ordens";
 export type MarsRow = {
   table: MarsTable; key: string; quote: string; order: string | null; requester: string; category: string;
   description: string; value: number; status: string; notes: string; contract: boolean; cancelled: boolean;
-  /** Sufixo do CC do serviço (coluna B da planilha); vazio = sem sufixo informado. */
+  /** Sufixo do CC do serviço (coluna C da planilha); vazio = sem sufixo informado. */
   suffix: string;
 };
 
@@ -40,7 +40,7 @@ export function rowKey(r: Pick<MarsRow, "quote" | "order" | "description">) {
 }
 
 /**
- * Coluna do sufixo do CC: título com "SUFIXO"/"SULFIXO"/"CC"/"CENTRO DE CUSTO"; sem título assim, a coluna B
+ * Coluna do sufixo do CC: título com "SUFIXO"/"SULFIXO"/"CC"/"CENTRO DE CUSTO"; sem título assim, a coluna C
  * quando ela não é nenhuma das outras (Nº Orç., pedido, cliente…).
  */
 /** Sufixo do CC com 3 dígitos (regra do cadastro de serviços): "12" → "012"; CC inteiro ("2004221") → os 3 últimos;
@@ -56,8 +56,8 @@ export function ccSuffix(raw: unknown): string {
 export function suffixCol(cells: string[]): number {
   const byName = cells.findIndex((c) => /SU?L?FIXO|^CC$|CENTRO DE CUSTO/.test(c));
   if (byName >= 0) return byName;
-  const b = cells[1] ?? "";
-  return !b || !/ORC|PEDIDO|CLIENTE|CATEGORIA|DESCRI|VALOR|STATUS|OBSERVA|NF|DATA|RESPONS|PRAZO/.test(b) ? 1 : -1;
+  const c = cells[2] ?? "";
+  return !c || !/ORC|PEDIDO|CLIENTE|CATEGORIA|DESCRI|VALOR|STATUS|OBSERVA|NF|DATA|RESPONS|PRAZO/.test(c) ? 2 : -1;
 }
 
 /** Lê as duas tabelas da aba do mês pelos títulos e cabeçalhos (colunas achadas pelo nome). */
