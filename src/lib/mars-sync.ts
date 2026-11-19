@@ -170,6 +170,10 @@ const contractWorks = (works: MarsWork[], order: string) => works.filter((w) => 
 export const contractMeasured = (works: MarsWork[], ym: string, order = MARS_CONTRACT_ORDER) =>
   contractWorks(works, order).some((w) => (w.orders ?? []).some((o) => String(o.number ?? "") === order && String(o.date ?? "").slice(0, 7) === ym));
 
-/** Item de andaime (vai para o Contrato Andaimes em vez de criar serviço). */
-export const isScaffoldRow = (r: Pick<MarsRow, "description">) => /ANDAIME/.test(norm(r.description));
+/** Item de andaime pela Categoria (coluna B; sem categoria, pela descrição): vai para o Contrato Andaimes em vez de criar serviço. */
+export const isScaffoldRow = (r: Pick<MarsRow, "description"> & { category?: string }) =>
+  (r.category ?? "").trim() ? /ANDAIME/.test(norm(r.category)) : /ANDAIME/.test(norm(r.description));
 export const findScaffoldWork = (works: MarsWork[]) => works.find((w) => norm(w.name) === norm(MARS_SCAFFOLD_WORK));
+/** Item de caldeiraria pela Categoria (CALDEIRARIA/MECANICA…): vai para a Base Calderaria em vez de criar serviço. */
+export const isBoilerRow = (r: { category?: string }) => /CALDE?I?RARIA|CALDERARIA/.test(norm(r.category ?? ""));
+export const findBoilerWork = (works: MarsWork[]) => works.find((w) => /^BASE CALDE?I?RARIA/.test(norm(w.name)));

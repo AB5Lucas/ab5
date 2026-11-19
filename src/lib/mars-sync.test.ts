@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contractMeasured, findScaffoldWork, isScaffoldRow, marsFile, marsSheetName, matchWork, parseMarsSheet, rowsToSync, splitContract, type MarsWork } from "./mars-sync";
+import { contractMeasured, findBoilerWork, findScaffoldWork, isBoilerRow, isScaffoldRow, marsFile, marsSheetName, matchWork, parseMarsSheet, rowsToSync, splitContract, type MarsWork } from "./mars-sync";
 
 const sheet: unknown[][] = [
   ["FATURAMENTO MARS 2026"],
@@ -111,5 +111,17 @@ describe("pedido só no faturamento", () => {
     expect(out.length).toBe(1);
     expect(out[0]!.order).toBe("4500781230");
     expect(out[0]!.table).toBe("ordens");
+  });
+});
+
+describe("categoria (coluna B)", () => {
+  it("andaime e caldeiraria pela categoria", () => {
+    expect(isScaffoldRow({ description: "LDV PROVISÓRIA", category: "ANDAIMES" })).toBe(true);
+    expect(isScaffoldRow({ description: "MONTAGEM DE ANDAIME", category: "ALPINISMO" })).toBe(false);
+    expect(isScaffoldRow({ description: "MONTAGEM DE ANDAIME", category: "" })).toBe(true);
+    expect(isBoilerRow({ category: "CALDEIRARIA/MECANICA" })).toBe(true);
+    expect(isBoilerRow({ category: "Calderaria" })).toBe(true);
+    expect(isBoilerRow({ category: "Engenharia" })).toBe(false);
+    expect(findBoilerWork([{ id: "b", name: "Base Calderaria", quote_number: null, orders: [] }])?.id).toBe("b");
   });
 });

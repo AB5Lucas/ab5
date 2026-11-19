@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
 import {
   MARS_CLIENT, MARS_CONTRACT_ORDER, MARS_CONTRACT_VALUE, MARS_MANAGER, contractMeasured, marsFile, marsSheetName, matchWork,
-  findScaffoldWork, isScaffoldRow, parseMarsSheet, prevMonth, rowsToSync, splitContract, type MarsOrder, type MarsRow, type MarsWork,
+  findBoilerWork, findScaffoldWork, isBoilerRow, isScaffoldRow, parseMarsSheet, prevMonth, rowsToSync, splitContract, type MarsOrder, type MarsRow, type MarsWork,
 } from "./mars-sync";
 
 type Credentials = { lovableKey: string; excelKey: string };
@@ -98,6 +98,7 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
   let created = 0; let updated = 0; const notes: string[] = [];
   const items = rowsToSync(parsed, firstRun);
   const scaffold = findScaffoldWork(works);
+  const boiler = findBoilerWork(works);
   const ignored = parsed.filter((r) => !r.contract).length - items.length;
 
   // Tudo é juntado na memória e gravado em lote no fim (uma linha por vez estourava o tempo do servidor).
@@ -118,7 +119,7 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
       // Serviço criado pela leitura: o pedido que chegou depois ("SEM" → número) ou o valor novo troca a linha que a leitura gravou.
       const w = m.work_id ? works.find((x) => x.id === m.work_id) : undefined;
       // Também no Contrato Andaimes, onde a leitura acrescenta as linhas dos pedidos de andaime.
-      if (w && (m.action === "created" || w.id === scaffold?.id) && ((r.order ?? null) !== (m.synced_order ?? null) || r.value !== Number(m.synced_value ?? 0))) {
+      if (w && (m.action === "created" || w.id === scaffold?.id || w.id === boiler?.id) && ((r.order ?? null) !== (m.synced_order ?? null) || r.value !== Number(m.synced_value ?? 0))) {
         const orders = (w.orders ?? []).slice();
         const i = orders.findIndex((o) => String(o.number ?? "") === (m.synced_order ?? "") && Number(o.value ?? 0) === Number(m.synced_value ?? 0));
         if (i >= 0) {
@@ -142,11 +143,12 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
       await upsertItem({ key: r.key, ...base(r), action: "existing", work_id: hit.id, synced_order: r.order, synced_value: r.value });
       continue;
     }
-    // Andaime: entra como linha nova do Contrato Andaimes (não cria serviço).
-    if (scaffold && isScaffoldRow(r)) {
-      await saveOrders(scaffold, [...(scaffold.orders ?? []), { number: r.order ?? "", value: r.value, date }]);
+    // Andaime → Contrato Andaimes; Caldeiraria → Base Calderaria (pela Categoria): entra como linha nova, não cria serviço.
+    const pool = scaffold && isScaffoldRow(r) ? scaffold : boiler && isBoilerRow(r) ? boiler : null;
+    if (pool) {
+      await saveOrders(pool, [...(pool.orders ?? []), { number: r.order ?? "", value: r.value, date }]);
       updated++;
-      await upsertItem({ key: r.key, ...base(r), action: "existing", work_id: scaffold.id, synced_order: r.order, synced_value: r.value });
+      await upsertItem({ key: r.key, ...base(r), action: "existing", work_id: pool.id, synced_order: r.order, synced_value: r.value });
       continue;
     }
     const id = crypto.randomUUID();
@@ -224,7 +226,7 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
   // Ordens primeiro (o faturamento repete o item com outro CC às vezes); Contrato Andaimes junta vários itens e não recebe sufixo.
   const seenSuffix = new Set<string>();
   for (const r of [...parsed.filter((x) => x.table === "ordens"), ...parsed.filter((x) => x.table !== "ordens")]) {
-    if (!r.suffix || r.contract || r.cancelled || isScaffoldRow(r)) continue;
+    if (!r.suffix || r.contract || r.cancelled || isScaffoldRow(r) || isBoilerRow(r)) continue;
     const wid = itemWork.get(r.key) ?? byKey.get(r.key)?.work_id ?? matchWork(r, works)?.id ?? null;
     const w = wid ? works.find((x) => x.id === wid) : undefined;
     const cur = (w?.cc_suffix ?? "").trim();
