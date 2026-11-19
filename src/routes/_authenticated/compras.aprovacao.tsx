@@ -25,7 +25,9 @@ type View = "pendentes" | "aprovadas" | "devolvidas" | "todas";
  * Pendentes para validar/devolver; validadas e devolvidas por ele para consulta.
  */
 function Page() {
-  const { user } = useCurrentUser();
+  const { user, role } = useCurrentUser();
+  // Diretoria / administração do sistema (perfil administrador): veem todas as SCs em validação e podem validar/devolver.
+  const seesAll = role === "admin";
   const uid = user?.id ?? "";
   const qc = useQueryClient();
   const [view, setView] = useState<View>("pendentes");
@@ -34,7 +36,7 @@ function Page() {
   const clients = useClientsList();
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
   const all = list.data ?? [];
-  const pending = all.filter((r) => r.stage === "aprovacao" && (r.approver_id === uid || r.substitute_id === uid));
+  const pending = all.filter((r) => r.stage === "aprovacao" && (seesAll || r.approver_id === uid || r.substitute_id === uid));
   const approved = all.filter((r) => r.decided_by === uid && r.stage !== "rascunho");
   const returned = all.filter((r) => r.decided_by === uid && r.stage === "rascunho");
   const base = view === "pendentes" ? pending : view === "aprovadas" ? approved : view === "devolvidas" ? returned : [...new Map([...pending, ...approved, ...returned].map((r) => [r.id, r])).values()];
@@ -61,7 +63,7 @@ function Page() {
           <Select value={view} onValueChange={(v) => setView(v as View)}>
             <SelectTrigger className="w-60"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="pendentes">Para validar ({pending.length})</SelectItem>
+              <SelectItem value="pendentes">{seesAll ? "Em validação (todas)" : "Para validar"} ({pending.length})</SelectItem>
               <SelectItem value="aprovadas">Validadas por mim ({approved.length})</SelectItem>
               <SelectItem value="devolvidas">Devolvidas por mim ({returned.length})</SelectItem>
               <SelectItem value="todas">Todas</SelectItem>
