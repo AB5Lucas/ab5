@@ -23,7 +23,8 @@ function dbError(step: string, e: { message?: string; details?: string | null; h
   return new Error(`${step}: ${[x.message, x.details, x.hint, x.code ? `(${x.code})` : ""].filter(Boolean).join(" · ") || JSON.stringify(e)}`);
 }
 
-export async function executeMarsSync(c: Credentials, kind: string, month?: string) {
+/** opts.overwriteSuffix: troca o sufixo do CC dos serviços pelo da planilha mesmo se já preenchido (correção pontual). */
+export async function executeMarsSync(c: Credentials, kind: string, month?: string, opts: { overwriteSuffix?: boolean } = {}) {
   const ym = month ?? curMonth();
   // Leitura antiga parada em "running" (servidor interrompido): fecha como erro para não confundir.
   await supabaseAdmin.from("billing_sync_runs").update({ status: "error", finished_at: new Date().toISOString(), errors: 1, error_message: "Leitura interrompida antes de terminar" })
@@ -51,7 +52,7 @@ export async function executeMarsSync(c: Credentials, kind: string, month?: stri
       return { status: "waiting" };
     }
     const parsed = parseMarsSheet(XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "" }));
-    const res = await applyMars(parsed, sheetYm);
+    const res = await applyMars(parsed, sheetYm, !!opts.overwriteSuffix);
     await finish({ status: "completed", ref_month: sheetYm, analyzed: parsed.length, inserted: res.created, updated: res.updated, ignored: res.ignored, error_message: res.message || null });
     return { status: "completed", ...res };
   } catch (err) {
@@ -61,7 +62,7 @@ export async function executeMarsSync(c: Credentials, kind: string, month?: stri
   }
 }
 
-async function applyMars(parsed: MarsRow[], ym: string) {
+async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false) {
   const { data: client, error: ce } = await supabaseAdmin.from("clients").select("id").eq("name", MARS_CLIENT).maybeSingle();
   if (ce) throw dbError("clientes", ce);
   if (!client) throw new Error(`Cliente ${MARS_CLIENT} não encontrado`);
@@ -204,8 +205,10 @@ async function applyMars(parsed: MarsRow[], ym: string) {
     if (!r.suffix || r.contract || r.cancelled) continue;
     const wid = itemWork.get(r.key) ?? byKey.get(r.key)?.work_id ?? matchWork(r, works)?.id ?? null;
     const w = wid ? works.find((x) => x.id === wid) : undefined;
-    if (!w || (w.cc_suffix ?? "").trim() || suffixFor.has(w.id) || newWorks.some((n) => n["id"] === w.id)) continue;
+    const cur = (w?.cc_suffix ?? "").trim();
+    if (!w || (cur && !overwriteSuffix) || cur === r.suffix || suffixFor.has(w.id) || newWorks.some((n) => n["id"] === w.id)) continue;
     suffixFor.set(w.id, r.suffix);
+    if (cur) notes.push(`Sufixo trocado: ${w.name} ${cur} → ${r.suffix}`);
   }
   await Promise.all([...suffixFor].map(async ([id, cc_suffix]) => {
     const { error } = await supabaseAdmin.from("works").update({ cc_suffix }).eq("id", id);

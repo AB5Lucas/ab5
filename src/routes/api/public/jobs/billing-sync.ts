@@ -5,7 +5,17 @@ export const Route = createFileRoute("/api/public/jobs/billing-sync")({
     const failure = await authenticateCronRequest(request);
     if (failure) return failure;
     const body = await request.json().catch(() => null);
-    if (!body || !["daily", "industry"].includes(body.kind)) return Response.json({ error: "Invalid request" }, { status: 400 });
+    if (!body || !["daily", "industry", "mars"].includes(body.kind)) return Response.json({ error: "Invalid request" }, { status: 400 });
+    if (body.kind === "mars") {
+      // Reprocessa meses da MARS (cron-secret); overwriteSuffix troca o sufixo do CC pelo da planilha (coluna C).
+      const months = Array.isArray(body.months) ? body.months.filter((m: unknown) => typeof m === "string" && /^\d{4}-\d{2}$/.test(m)) : [];
+      const lk = process.env["LOVABLE_API_KEY"]; const ek = process.env["MICROSOFT_EXCEL_API_KEY"];
+      if (!months.length || !lk || !ek) return Response.json({ error: "Invalid request" }, { status: 400 });
+      const { executeMarsSync } = await import("@/lib/mars-sync.server");
+      const out = [];
+      for (const m of months) out.push({ month: m, ...(await executeMarsSync({ lovableKey: lk, excelKey: ek }, "manual", m, { overwriteSuffix: body.overwriteSuffix === true })) });
+      return Response.json(out);
+    }
     if (body.kind === "industry") {
       // Reprocess specific Indústria months (cron-secret protected).
       const months = Array.isArray(body.months) ? body.months.filter((m: unknown) => typeof m === "string" && /^\d{4}-\d{2}$/.test(m)) : [];
