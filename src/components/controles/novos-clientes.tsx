@@ -131,13 +131,16 @@ export function NewClientDocsPage() {
       return true;
     }).sort((a, b) => history
       ? (b.completed_at ?? "").localeCompare(a.completed_at ?? "")
-      : (a.next_check_date ?? "9999").localeCompare(b.next_check_date ?? "9999")
+      // Liberados para integrar ficam em cima.
+      : Number(b.status === "liberado") - Number(a.status === "liberado")
+        || (a.next_check_date ?? "9999").localeCompare(b.next_check_date ?? "9999")
         || (clientById.get(a.client_id) ?? "").localeCompare(clientById.get(b.client_id) ?? "", "pt-BR")
         || (personById.get(a.collaborator_id)?.full_name ?? "").localeCompare(personById.get(b.collaborator_id)?.full_name ?? "", "pt-BR"));
   }, [onboardings.data, history, fClient, search, personById, clientById]);
 
   const openList = (onboardings.data ?? []).filter((o) => o.status !== "concluido");
-  const lateCount = openList.filter((o) => o.next_check_date && o.next_check_date <= today).length;
+  const lateCount = openList.filter((o) => o.status === "pendente" && o.next_check_date && o.next_check_date <= today).length;
+  const releasedCount = openList.filter((o) => o.status === "liberado").length;
   const usedClients = [...new Set((onboardings.data ?? []).map((o) => o.client_id))].sort((a, b) => (clientById.get(a) ?? "").localeCompare(clientById.get(b) ?? "", "pt-BR"));
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["client-onboarding"] });
@@ -146,10 +149,11 @@ export function NewClientDocsPage() {
   const conclude = useMutation({
     mutationFn: async (o: Onboarding) => {
       if (!allOk(o.id)) throw new Error("Ainda há documentos pendentes neste cliente");
-      const { error } = await supabase.from("client_onboardings").update({ status: "concluido", completed_at: new Date().toISOString(), completed_by: user?.id ?? null }).eq("id", o.id);
+      // Documentação completa = liberado para integrar; vai ao histórico quando a integração no cliente for agendada/realizada.
+      const { error } = await supabase.from("client_onboardings").update({ status: "liberado", completed_at: new Date().toISOString(), completed_by: user?.id ?? null }).eq("id", o.id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Documentação concluída e enviada ao histórico"); invalidate(); },
+    onSuccess: () => { toast.success("Documentação concluída: liberado para integrar"); invalidate(); qc.invalidateQueries({ queryKey: ["menu-badges"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   const reopen = useMutation({
@@ -173,8 +177,9 @@ export function NewClientDocsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Em acompanhamento</p><p className="font-display text-2xl">{openList.length}</p></CardContent></Card>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Em acompanhamento</p><p className="font-display text-2xl">{openList.length - releasedCount}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Liberados para integrar</p><p className={cn("font-display text-2xl", releasedCount > 0 && "text-orange-500")}>{releasedCount}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Conferência para hoje ou atrasada</p><p className={cn("font-display text-2xl", lateCount > 0 && "text-destructive")}>{lateCount}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">No histórico</p><p className="font-display text-2xl">{(onboardings.data ?? []).length - openList.length}</p></CardContent></Card>
       </div>
@@ -244,8 +249,11 @@ export function NewClientDocsPage() {
                       <Badge variant={list.length && ok === list.length ? "default" : "secondary"}>{ok}/{list.length} OK</Badge>
                     </button>
                   </TableCell>
-                  <TableCell className={cn("text-xs", late && "font-medium text-destructive")}>
-                    {history ? (o.completed_at ? formatDateBR(o.completed_at.slice(0, 10)) : "—") : o.next_check_date ? formatDateBR(o.next_check_date) : "—"}
+                  <TableCell className={cn("text-xs", late && o.status === "pendente" && "font-medium text-destructive")}>
+                    {history ? (o.completed_at ? formatDateBR(o.completed_at.slice(0, 10)) : "—")
+                      : o.status === "liberado"
+                        ? <Badge className="bg-orange-500 text-white hover:bg-orange-500" title="Documentação completa: agende a integração (ao agendar, vai para o histórico)">Liberado para integrar</Badge>
+                        : o.next_check_date ? formatDateBR(o.next_check_date) : "—"}
                   </TableCell>
                   <TableCell className="text-right text-xs">
                     {history ? (
@@ -265,9 +273,15 @@ export function NewClientDocsPage() {
                         <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" aria-label="Excluir acompanhamento" onClick={() => setDeleteItem(o)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Concluir (todos os documentos aceitos)" aria-label="Concluir acompanhamento" disabled={!allOk(o.id) || conclude.isPending} onClick={() => conclude.mutate(o)}>
-                          <Check className="h-4 w-4 text-emerald-500" />
-                        </Button>
+                        {o.status === "liberado" ? (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Voltar para conferência" aria-label="Voltar para conferência" disabled={reopen.isPending} onClick={() => reopen.mutate(o)}>
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Concluir documentação (todos aceitos): liberado para integrar" aria-label="Concluir acompanhamento" disabled={!allOk(o.id) || conclude.isPending} onClick={() => conclude.mutate(o)}>
+                            <Check className="h-4 w-4 text-emerald-500" />
+                          </Button>
+                        )}
                       </div>
                     ) : null}
                   </TableCell>
@@ -297,7 +311,7 @@ export function NewClientDocsPage() {
           docLabel={docLabel}
           validity={(d) => validity(checking.collaborator_id, d)}
           trainings={(trainings.data ?? []).map((t) => ({ id: t.id, label: trainingById.get(t.id) ?? t.name }))}
-          editable={canWrite && checking.status !== "concluido"}
+          editable={canWrite && checking.status === "pendente"}
           userId={user?.id ?? null}
           onClose={() => setCheckId(null)}
           onChanged={invalidate}

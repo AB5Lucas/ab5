@@ -53,7 +53,7 @@ function useBadgeData() {
       // (menu_badge_counts, com a RLS do usuário); antes o navegador baixava as tabelas inteiras.
       // SCs aguardando a minha validação (gestor ou substituto; a RLS só devolve as que posso ver).
       const uid = (await supabase.auth.getSession()).data.session?.user.id ?? "";
-      const [counts, fleetParts, scPend, scOpenRows, pendingUsers] = await Promise.all([
+      const [counts, fleetParts, scPend, scOpenRows, pendingUsers, released] = await Promise.all([
         can.docs || can.purchases || can.orders || can.billing
           ? supabase.rpc("menu_badge_counts" as never, { p_today: today, p_docs: can.docs, p_purchases: can.purchases, p_orders: can.orders, p_billing: can.billing } as never)
             .then((r: { data: unknown; error: unknown }) => (r.error ? empty : (r.data as Counts) ?? empty), () => empty)
@@ -66,6 +66,8 @@ function useBadgeData() {
           .not("status", "in", '("COMPRA EFETIVADA","ALMOXARIFADO","CANCELADA","RECUSADA")')).data ?? []),
         // Usuários novos aguardando liberação (bolinha no rodapé do menu).
         when(can.users, async () => (await supabase.from("users_profiles").select("id").eq("pending", true)).data ?? []),
+        // Novos Clientes: documentação completa, liberados para integrar (aviso laranja em Documentação).
+        when(can.docs, async () => (await supabase.from("client_onboardings").select("id").eq("status", "liberado")).data ?? []),
       ]);
       // Saldo do posto: faturas em aberto + abastecimentos ainda não faturados (mesma conta da aba Abastecimento).
       const fp = fleetParts[0] as { open: number; unbilled: number } | undefined;
@@ -95,7 +97,7 @@ function useBadgeData() {
       })();
       const buyRows = isBuyer ? scOpenRows.filter((r: any) => r.stage === "compras") : [];
       const scBuy = { count: buyRows.length, late: late(buyRows) };
-      return { pendingUsers: pendingUsers.length, scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
+      return { releasedOnboarding: released.length, pendingUsers: pendingUsers.length, scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
     },
   });
 }
@@ -134,6 +136,14 @@ export function useMenuBadges() {
       const parts = Object.entries(d.byKind).filter(([, v]) => v.expired + v.expiring)
         .map(([k, v]) => `${names[k] ?? k}: ${[v.expired ? `${v.expired} vencido(s)` : "", v.expiring ? `${v.expiring} a vencer` : ""].filter(Boolean).join(", ")}`);
       out["/agendamentos"] = { ...docs, detail: parts.join(" · ") };
+    }
+    // Novos Clientes liberados para integrar: soma no aviso de Documentação (laranja se não houver vermelho).
+    if (d.releasedOnboarding) {
+      const cur = out["/agendamentos"];
+      const part = `Novos clientes: ${d.releasedOnboarding} liberado(s) para integrar`;
+      out["/agendamentos"] = cur
+        ? { ...cur, count: cur.count + d.releasedOnboarding, detail: [cur.detail, part].filter(Boolean).join(" · ") }
+        : { count: d.releasedOnboarding, tone: "orange", detail: part };
     }
     const c = conferenceBadge(d.conference); if (c) out["/conferencia"] = { ...c, detail: c.tone === "red" ? `${c.count} conferência(s) com prazo vencido` : `${c.count} conferência(s) para hoje` };
     const ft = balanceBadgeTone(d.fleetSaldo);
