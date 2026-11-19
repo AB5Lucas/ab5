@@ -59,14 +59,15 @@ export async function executeMarsSync(c: Credentials, kind: string, month?: stri
       for (const o of [...new Set((pend ?? []).map((x) => String(x.order_number ?? "").replace(/\D/g, "")).filter((x) => x.length >= 6))]) {
         const row = parsed.find((r) => (r.order ?? "").replace(/\D/g, "") === o);
         if (row) {
-          const why = row.cancelled ? "cancelado na planilha" : !(row.value > 0) ? "sem valor na planilha" : row.contract ? "linha do contrato" : "já tratado (confira o Nº Orç./serviço)";
+          const why = row.cancelled ? "cancelado na planilha" : !(row.value > 0) ? "sem valor na planilha" : row.contract ? "linha do contrato"
+            : `lido como ${row.table}, Nº Orç. "${row.quote}", chave ${row.key}, valor ${row.value} (mesma chave de outra linha ou Nº Orç. já usado em outro serviço)`;
           res.message = [res.message, `Pedido ${o} na aba ${marsSheetName(sheetYm)}: ${why}`].filter(Boolean).join(" · ");
           continue;
         }
         const where: string[] = [];
         for (const name of wb.SheetNames) {
           const grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name]!, { header: 1, raw: false, defval: "" });
-          grid.forEach((line, i) => { if ((line ?? []).some((c) => String(c ?? "").replace(/\D/g, "").includes(o))) where.push(`${name} linha ${i + 1}`); });
+          grid.forEach((line, i) => { if ((line ?? []).some((c) => String(c ?? "").replace(/\D/g, "").includes(o))) where.push(`${name} linha ${i + 1} [${(line ?? []).slice(0, 8).map((c) => String(c ?? "").trim()).join(" | ")}]`); });
         }
         res.message = [res.message, where.length ? `Pedido ${o} fora da tabela lida: ${where.slice(0, 3).join(", ")}` : `Pedido ${o} não está na planilha`].filter(Boolean).join(" · ");
       }
