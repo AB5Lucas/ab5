@@ -1037,6 +1037,13 @@
       "when": 1795400044000,
       "tag": "0147_purchase_admin_powers",
       "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1795400045000,
+      "tag": "0148_purchase_admin_send",
+      "breakpoints": true
     }
   ]
 }

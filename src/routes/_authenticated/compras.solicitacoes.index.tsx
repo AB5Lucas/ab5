@@ -131,7 +131,16 @@ function Page() {
         <Button className="ml-auto" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nova</Button>
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
-        <ScTable rows={rows} clientName={clientName} showRequester={scope !== "minhas"} actions={(r) => r.requester_id !== uid ? <div className="flex">{copyBtn(r)}</div> : r.stage === "rascunho" ? (
+        <ScTable rows={rows} clientName={clientName} showRequester={scope !== "minhas"} actions={(r) => r.requester_id !== uid ? (
+          // Emergência: administrador (diretoria) envia e edita o rascunho de outro solicitante.
+          admin && r.stage === "rascunho" ? (
+            <div className="flex gap-1">
+              <Button size="sm" disabled={send.isPending} title={`Enviar pela pessoa (${r.requester_name ?? "solicitante"})`} onClick={() => send.mutate(r.id)}><Send className="h-3.5 w-3.5" /> Enviar</Button>
+              {editBtn(r)}
+              {copyBtn(r)}
+            </div>
+          ) : <div className="flex">{copyBtn(r)}</div>
+        ) : r.stage === "rascunho" ? (
           <div className="flex gap-1">
             <Button size="sm" disabled={send.isPending} onClick={() => send.mutate(r.id)}><Send className="h-3.5 w-3.5" /> Enviar</Button>
             {editBtn(r)}

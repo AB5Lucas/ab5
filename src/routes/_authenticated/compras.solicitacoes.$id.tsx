@@ -92,11 +92,13 @@ function Page() {
   };
   const workName = useMemo(() => new Map((works.data ?? []).map((w) => [w.id, workLabel(w)])), [works.data]);
   const isDraftOwner = !!r && r.requester_id === user?.id && r.stage === "rascunho";
+  // Emergência: administrador envia/edita o rascunho de outro solicitante.
+  const canSendDraft = !!r && r.stage === "rascunho" && (r.requester_id === user?.id || isAdmin);
   // O validador (gestor ou substituto) também pode editar a SC enquanto ela está com ele, antes de validar.
   const isValidator = !!r && !!user?.id && r.stage === "aprovacao" && (isAdmin || r.approver_id === user.id || r.substitute_id === user.id);
   const { edit: editParam } = Route.useSearch();
   const [editMode, setEditMode] = useState(!!editParam);
-  const canEdit = isDraftOwner || isValidator;
+  const canEdit = canSendDraft || isValidator;
   const editable = canEdit && editMode;
   // Validador com a SC aberta: avisa o banco a cada 30 s (vale 90 s); enquanto isso o solicitante não puxa de volta.
   useEffect(() => {
@@ -280,7 +282,7 @@ function Page() {
           {canEdit && !editMode && <Button variant="outline" size="sm" onClick={() => setEditMode(true)}><Pencil className="h-4 w-4" /> Editar</Button>}
           {editable && <Button variant="outline" size="sm" onClick={() => setEditingHeader(true)}><Pencil className="h-4 w-4" /> Editar cabeçalho</Button>}
           {editable && <Button variant="outline" size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}><Save className="h-4 w-4" /> Salvar itens</Button>}
-          {isDraftOwner && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
+          {canSendDraft && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
           {isDraftOwner && <Button variant="ghost" size="sm" onClick={() => setRemoving(r)}><Trash2 className="h-4 w-4 text-destructive" /> Apagar</Button>}
           {isValidator && (
             <>
