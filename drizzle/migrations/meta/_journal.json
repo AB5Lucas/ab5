@@ -1016,6 +1016,13 @@
       "when": 1795400041000,
       "tag": "0144_logistics",
       "breakpoints": true
+    },
+    {
+      "idx": 145,
+      "version": "7",
+      "when": 1795400042000,
+      "tag": "0145_logistics_calendar",
+      "breakpoints": true
     }
   ]
 }

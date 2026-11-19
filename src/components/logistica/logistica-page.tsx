@@ -1,68 +1,40 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, ChevronLeft, ChevronRight, Copy, MessageCircle, Pencil, Plus, Send, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, MessageCircle, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SearchSelect } from "@/components/search-select";
 import { cn } from "@/lib/utils";
-import { demandAlerts, driverMessage, kg, KIND_LABEL, loadSummary, type LogAlert } from "@/lib/logistics";
+import { CARRIER_LABEL, isOwn, kg, KIND_LABEL, loadSummary } from "@/lib/logistics";
 import { DemandDialog } from "./demand-dialog";
-import { LOG_KEY, useLogData, useTransportBusy, type Address, type DemandRow, type Material, type Vehicle } from "./use-log-data";
+import { addDays, AgendaTab, br, MessageDialog, todayISO, toneOf, useAlerts } from "./agenda";
+import { LOG_KEY, useLogData, type Address, type DemandRow, type Material, type Vehicle } from "./use-log-data";
 
-const todayISO = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
-const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
-const mondayOf = (d: string) => { const w = new Date(`${d}T12:00:00Z`).getUTCDay(); return addDays(d, w === 0 ? -6 : 1 - w); };
-const br = (d: string | null | undefined) => (d ? d.split("-").reverse().slice(0, 2).join("/") : "—");
-const DAY = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")) || 0);
 const STATUS_LABEL: Record<string, string> = { pendente: "Na fila", programada: "Programada", concluida: "Concluída", cancelada: "Cancelada" };
-
-/** Alertas de todas as demandas abertas (mesmo cálculo do formulário). */
-function useAlerts(demands: DemandRow[], from: string, to: string) {
-  const { base } = useLogData();
-  const busy = useTransportBusy(from, to);
-  return useMemo(() => {
-    const b = base.data;
-    const map = new Map<string, LogAlert[]>();
-    if (!b) return map;
-    const today = todayISO(), now = new Date();
-    for (const d of demands) {
-      const same = d.vehicle_id && d.scheduled_date ? demands.filter((x) => x.id !== d.id && x.status !== "cancelada" && x.vehicle_id === d.vehicle_id && x.scheduled_date === d.scheduled_date).length : 0;
-      map.set(d.id, demandAlerts(d, {
-        today, now, items: d.items, rules: b.rules, vehicle: b.vehicles.find((v) => v.id === d.vehicle_id), driver: b.drivers.find((x) => x.id === d.driver_id),
-        origin: b.addresses.find((a) => a.id === d.origin_id), dest: b.addresses.find((a) => a.id === d.dest_id), sameDayOther: same,
-        transportBusy: !!(d.vehicle_id && d.scheduled_date && busy.data?.has(`${d.vehicle_id}|${d.scheduled_date}`)),
-      }));
-    }
-    return map;
-  }, [demands, base.data, busy.data]);
-}
-
-const toneOf = (a: LogAlert[] | undefined) => (a?.some((x) => x.tone === "red") ? "red" : a?.length ? "orange" : null);
 
 export function LogisticaPage() {
   return (
     <div className="space-y-4">
-      <PageHeader title="Logística" description="Carga, descarga e busca de material com caminhão. Lance a demanda com os materiais: o sistema soma peso e medidas, sugere o veículo, avisa restrições (peso, carroceria, rodízio, CNH, conflito com a Transporte) e monta a mensagem da véspera para o motorista." />
+      <PageHeader title="Logística" description="Agenda de carga, descarga e busca de material, hora a hora: nossos veículos e também o cliente ou terceiro que vem em determinado horário. Com os materiais, o sistema soma peso e medidas, sugere o veículo, avisa restrições (peso, carroceria, rodízio, CNH, horário batendo, conflito com a Transporte) e monta a mensagem da véspera." />
       <Tabs pageTabs defaultValue="programacao">
         <TabsList>
-          <TabsTrigger value="programacao">Programação</TabsTrigger>
+          <TabsTrigger value="programacao">Agenda</TabsTrigger>
           <TabsTrigger value="demandas">Demandas</TabsTrigger>
           <TabsTrigger value="materiais">Materiais</TabsTrigger>
           <TabsTrigger value="veiculos">Veículos</TabsTrigger>
           <TabsTrigger value="enderecos">Endereços</TabsTrigger>
         </TabsList>
-        <TabsContent value="programacao" className="mt-4"><ScheduleTab /></TabsContent>
+        <TabsContent value="programacao" className="mt-4"><AgendaTab /></TabsContent>
         <TabsContent value="demandas" className="mt-4"><DemandsTab /></TabsContent>
         <TabsContent value="materiais" className="mt-4"><MaterialsTab /></TabsContent>
         <TabsContent value="veiculos" className="mt-4"><VehiclesTab /></TabsContent>
@@ -82,151 +54,6 @@ function useDemandActions() {
     onSuccess: () => qc.invalidateQueries({ queryKey: LOG_KEY }),
     onError: (e: Error) => toast.error(e.message),
   });
-}
-
-function ScheduleTab() {
-  const { base, demands } = useLogData();
-  const [week, setWeek] = useState(() => mondayOf(todayISO()));
-  const days = Array.from({ length: 6 }, (_, i) => addDays(week, i));
-  const all = demands.data ?? [];
-  const open = all.filter((d) => d.status !== "cancelada");
-  const alerts = useAlerts(open, days[0]!, days[5]!);
-  const [edit, setEdit] = useState<{ demand?: DemandRow | null; date?: string } | null>(null);
-  const [msg, setMsg] = useState<DemandRow | null>(null);
-  const queue = open.filter((d) => d.status === "pendente").sort((a, b) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999"));
-  const inWeek = open.filter((d) => d.scheduled_date && d.scheduled_date >= days[0]! && d.scheduled_date <= days[5]! && d.vehicle_id);
-  const vehicleIds = [...new Set(inWeek.map((d) => d.vehicle_id!))];
-  const vehicles = (base.data?.vehicles ?? []).filter((v) => vehicleIds.includes(v.id) || (v.assign_by_work && v.status !== "inactive"));
-  const weekAlerts = open.filter((d) => (d.status === "pendente" || inWeek.includes(d)) && alerts.get(d.id)?.length);
-  const today = todayISO();
-  return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="icon" aria-label="Semana anterior" onClick={() => setWeek(addDays(week, -7))}><ChevronLeft className="h-4 w-4" /></Button>
-          <span className="min-w-40 text-center text-sm font-medium">{br(days[0])} a {br(days[5])}</span>
-          <Button variant="outline" size="icon" aria-label="Próxima semana" onClick={() => setWeek(addDays(week, 7))}><ChevronRight className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="sm" onClick={() => setWeek(mondayOf(todayISO()))}>Hoje</Button>
-          <div className="flex-1" />
-          <Button onClick={() => setEdit({})}><Plus className="h-4 w-4" /> Nova demanda</Button>
-        </div>
-        <div className="overflow-x-auto rounded-md border border-border bg-card">
-          <table className="w-full min-w-[860px] border-collapse text-xs">
-            <thead>
-              <tr className="bg-muted/50 text-muted-foreground">
-                <th scope="col" className="w-40 p-2 text-left font-medium">Veículo</th>
-                {days.map((d) => <th scope="col" key={d} className={cn("p-2 text-left font-medium", d === today && "text-primary")}>{DAY[new Date(`${d}T12:00:00Z`).getUTCDay()]} {br(d)}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {!vehicles.length && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Nenhum caminhão ou pickup cadastrado com carga útil. Preencha na aba Veículos.</td></tr>}
-              {vehicles.map((v) => (
-                <tr key={v.id} className="border-t border-border align-top">
-                  <th scope="row" className="p-2 text-left font-medium">
-                    <div>{v.model ?? v.type}</div>
-                    <div className="font-normal text-muted-foreground">{v.plate}{v.cargo_capacity_kg ? ` · ${kg(Number(v.cargo_capacity_kg))}` : ""}</div>
-                  </th>
-                  {days.map((day) => {
-                    const cards = inWeek.filter((d) => d.vehicle_id === v.id && d.scheduled_date === day).sort((a, b) => (a.departure_time ?? "").localeCompare(b.departure_time ?? ""));
-                    return (
-                      <td key={day} className="group min-w-32 p-1.5">
-                        <div className="space-y-1">
-                          {cards.map((d) => {
-                            const t = toneOf(alerts.get(d.id));
-                            const load = loadSummary(d.items);
-                            return (
-                              <button type="button" key={d.id} onClick={() => setEdit({ demand: d })}
-                                className={cn("w-full rounded-md border-l-4 bg-muted/40 p-1.5 text-left hover:bg-muted", t === "red" ? "border-l-destructive" : t === "orange" ? "border-l-orange-500" : "border-l-emerald-500", d.status === "concluida" && "opacity-60")}>
-                                <div className="truncate font-medium">{d.departure_time ? `${d.departure_time.slice(0, 5)} · ` : ""}{d.title}</div>
-                                <div className="text-muted-foreground">{kg(load.weight)}{d.trips > 1 ? ` · ${d.trips} viagens` : ""}{d.message_sent_at ? " · msg ok" : ""}</div>
-                              </button>
-                            );
-                          })}
-                          <button type="button" onClick={() => setEdit({ date: day })} className="w-full rounded-md border border-dashed border-border py-0.5 text-muted-foreground opacity-0 hover:bg-muted group-hover:opacity-100 focus:opacity-100" aria-label="Nova demanda neste dia">+</button>
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-xs text-muted-foreground">Faixa à esquerda do cartão: vermelho = resolver antes de sair; laranja = atenção; verde = ok. Clique no cartão para abrir, no + para programar no dia.</p>
-      </div>
-      <div className="space-y-4">
-        <section className="rounded-md border border-border bg-card p-3">
-          <h2 className="mb-2 font-display text-sm font-semibold uppercase tracking-wide">Fila para programar ({queue.length})</h2>
-          {!queue.length && <p className="text-xs text-muted-foreground">Nenhuma demanda na fila.</p>}
-          <ul className="max-h-80 space-y-1.5 overflow-y-auto">
-            {queue.map((d) => {
-              const t = toneOf(alerts.get(d.id));
-              return (
-                <li key={d.id}>
-                  <button type="button" onClick={() => setEdit({ demand: d })} className="w-full rounded-md border border-border p-2 text-left text-xs hover:bg-muted/50">
-                    <div className="flex justify-between gap-2 font-medium"><span className="truncate">{d.title}</span>{t && <span aria-hidden="true" className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", t === "red" ? "bg-destructive" : "bg-orange-500")} />}</div>
-                    <div className="text-muted-foreground">{KIND_LABEL[d.kind]} · {kg(loadSummary(d.items).weight)} · prazo {br(d.due_date)}</div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-        <section className="rounded-md border border-border bg-card p-3">
-          <h2 className="mb-2 font-display text-sm font-semibold uppercase tracking-wide">Alertas</h2>
-          {!weekAlerts.length && <p className="text-xs text-emerald-600">Nenhum alerta na semana.</p>}
-          <ul className="max-h-96 space-y-2 overflow-y-auto text-xs">
-            {weekAlerts.map((d) => (
-              <li key={d.id}>
-                <button type="button" className="font-medium hover:underline" onClick={() => setEdit({ demand: d })}>{d.title}{d.scheduled_date ? ` · ${br(d.scheduled_date)}` : ""}</button>
-                <ul className="mt-0.5 space-y-0.5">
-                  {alerts.get(d.id)!.map((a, i) => <li key={i} className="flex gap-1.5"><span aria-hidden="true" className={cn("mt-1 h-1.5 w-1.5 shrink-0 rounded-full", a.tone === "red" ? "bg-destructive" : "bg-orange-500")} />{a.text}</li>)}
-                </ul>
-                {d.scheduled_date === addDays(today, 1) && !d.message_sent_at && (
-                  <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setMsg(d)}>Gerar mensagem</Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
-      <DemandDialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)} demand={edit?.demand} presetDate={edit?.date} />
-      <MessageDialog demand={msg} onClose={() => setMsg(null)} />
-    </div>
-  );
-}
-
-function MessageDialog({ demand, onClose }: { demand: DemandRow | null; onClose: () => void }) {
-  const { base } = useLogData();
-  const act = useDemandActions();
-  const b = base.data;
-  const driver = b?.drivers.find((x) => x.id === demand?.driver_id);
-  const text = demand && b ? driverMessage(demand, {
-    items: demand.items, rules: b.rules, vehicle: b.vehicles.find((v) => v.id === demand.vehicle_id), driver,
-    origin: b.addresses.find((a) => a.id === demand.origin_id), dest: b.addresses.find((a) => a.id === demand.dest_id),
-  }) : "";
-  const phone = (driver?.phone ?? "").replace(/\D/g, "");
-  const wa = `https://wa.me/${phone ? (phone.startsWith("55") ? phone : `55${phone}`) : ""}?text=${encodeURIComponent(text)}`;
-  return (
-    <Dialog open={!!demand} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Mensagem para o motorista</DialogTitle>
-          <DialogDescription>{driver ? `${driver.full_name}${phone ? "" : " (sem telefone no cadastro)"}` : "Sem motorista definido"}. Copie ou abra no WhatsApp e marque como enviada.</DialogDescription>
-        </DialogHeader>
-        <Textarea readOnly value={text} className="min-h-72 font-mono text-xs" />
-        <DialogFooter className="gap-2 sm:justify-between">
-          <Button variant="outline" onClick={() => { void navigator.clipboard.writeText(text); toast.success("Texto copiado"); }}><Copy className="h-4 w-4" /> Copiar</Button>
-          <div className="flex gap-2">
-            <Button variant="outline" asChild><a href={wa} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" /> WhatsApp</a></Button>
-            <Button disabled={act.isPending || !demand} onClick={() => demand && act.mutate({ id: demand.id, patch: { message_sent_at: new Date().toISOString() } }, { onSuccess: () => { toast.success("Envio registrado"); onClose(); } })}>
-              <Send className="h-4 w-4" /> Marcar enviada
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 function DemandsTab() {
@@ -263,7 +90,7 @@ function DemandsTab() {
         <Table className="text-xs">
           <TableHeader><TableRow>
             <TableHead>Demanda</TableHead><TableHead>Ações</TableHead><TableHead>Tipo</TableHead><TableHead>Cliente</TableHead><TableHead>Carregar → Descarregar</TableHead><TableHead className="text-right">Peso</TableHead>
-            <TableHead>Prazo</TableHead><TableHead>Data</TableHead><TableHead>Veículo</TableHead><TableHead>Motorista</TableHead><TableHead>Situação</TableHead><TableHead>Alertas</TableHead>
+            <TableHead>Prazo</TableHead><TableHead>Data</TableHead><TableHead>Veículo / quem vem</TableHead><TableHead>Motorista</TableHead><TableHead>Situação</TableHead><TableHead>Alertas</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {!rows.length && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Nenhuma demanda.</TableCell></TableRow>}
@@ -278,7 +105,7 @@ function DemandsTab() {
                     {d.status === "programada" && <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Mensagem ao motorista" onClick={() => setMsg(d)}><MessageCircle className="h-3.5 w-3.5" /></Button>}
                     {d.status === "programada" && <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Concluir" onClick={() => act.mutate({ id: d.id, patch: { status: "concluida" } })}><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /></Button>}
                     {(d.status === "pendente" || d.status === "programada") && <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Cancelar" onClick={() => confirm("Cancelar a demanda?") && act.mutate({ id: d.id, patch: { status: "cancelada" } })}><XCircle className="h-3.5 w-3.5" /></Button>}
-                    {(d.status === "concluida" || d.status === "cancelada") && <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => act.mutate({ id: d.id, patch: { status: d.vehicle_id && d.scheduled_date ? "programada" : "pendente" } })}>Reabrir</Button>}
+                    {(d.status === "concluida" || d.status === "cancelada") && <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => act.mutate({ id: d.id, patch: { status: d.scheduled_date && (isOwn(d) ? d.vehicle_id : d.departure_time) ? "programada" : "pendente" } })}>Reabrir</Button>}
                     <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Apagar" onClick={() => void del(d)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                   </TableCell>
                   <TableCell>{KIND_LABEL[d.kind]}</TableCell>
@@ -286,9 +113,9 @@ function DemandsTab() {
                   <TableCell>{name(b?.addresses, d.origin_id)} → {name(b?.addresses, d.dest_id)}</TableCell>
                   <TableCell className="text-right tabular-nums">{kg(loadSummary(d.items).weight)}</TableCell>
                   <TableCell>{br(d.due_date)}</TableCell>
-                  <TableCell>{br(d.scheduled_date)}{d.departure_time ? ` ${d.departure_time.slice(0, 5)}` : ""}</TableCell>
-                  <TableCell>{name(b?.vehicles, d.vehicle_id)}</TableCell>
-                  <TableCell>{name(b?.drivers, d.driver_id)}</TableCell>
+                  <TableCell>{br(d.scheduled_date)}{d.departure_time ? ` ${d.departure_time.slice(0, 5)}${d.end_time ? `–${d.end_time.slice(0, 5)}` : ""}` : ""}</TableCell>
+                  <TableCell>{isOwn(d) ? name(b?.vehicles, d.vehicle_id) : `${CARRIER_LABEL[d.carrier ?? "cliente"]}${d.carrier_plate ? ` · ${d.carrier_plate}` : ""}`}</TableCell>
+                  <TableCell>{isOwn(d) ? name(b?.drivers, d.driver_id) : d.carrier_driver || d.carrier_name || "—"}</TableCell>
                   <TableCell>{STATUS_LABEL[d.status]}{d.message_sent_at ? " · msg enviada" : ""}</TableCell>
                   <TableCell title={al.map((a) => a.text).join("\n")}>{t ? <span className={cn("font-medium", t === "red" ? "text-destructive" : "text-orange-600")}>{al.length}</span> : "—"}</TableCell>
                 </TableRow>

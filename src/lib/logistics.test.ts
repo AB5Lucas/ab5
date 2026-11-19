@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cnhCovers, demandAlerts, driverMessage, loadSummary, rodizio, suggestVehicles, type LogDemand, type LogRestriction } from "./logistics";
+import { cnhCovers, demandAlerts, driverMessage, loadSummary, overlapCounts, rodizio, suggestVehicles, timeSpan, type LogDemand, type LogRestriction } from "./logistics";
 
 const rules: LogRestriction[] = [1, 2, 3, 4, 5].map((d, i) => ({ city: "São Paulo", weekday: d, plate_endings: ["1,2", "3,4", "5,6", "7,8", "9,0"][i]!, windows: "07:00-10:00,17:00-20:00" }));
 const items = [{ description: "Tubo 6 m", qty: 300, unit_weight_kg: 23, length_m: 6, unit_volume_m3: 0.01 }, { description: "Braçadeira", qty: 400, unit_weight_kg: 1.1, length_m: 0.2, unit_volume_m3: 0.001 }];
@@ -34,5 +34,24 @@ describe("logística", () => {
     const b = demandAlerts({ ...dem, vehicle_id: "q" }, { today: "2026-11-19", now: new Date(), items, vehicle: tres, rules });
     expect(b.filter((x) => x.tone === "red").length).toBe(2);
     expect(driverMessage(dem, { items, vehicle: toco, dest, rules })).toContain("Rodízio em São Paulo");
+  });
+});
+
+describe("logística · agenda", () => {
+  it("sobreposição de horário no mesmo veículo e no mesmo local", () => {
+    const a: LogDemand = { ...dem, id: "a", departure_time: "08:00", end_time: "10:00", dest_id: "p" };
+    const b: LogDemand = { ...dem, id: "b", departure_time: "09:30", end_time: null, dest_id: "p" };
+    const c: LogDemand = { ...dem, id: "c", departure_time: "10:00", end_time: "11:00", vehicle_id: "x", carrier: "cliente", dest_id: "p" };
+    const o = overlapCounts([a, b, c]);
+    expect(o.get("a")).toEqual({ vehicle: 1, place: 1 });
+    expect(o.get("c")).toEqual({ vehicle: 0, place: 1 });
+    expect(timeSpan(b)).toEqual({ start: 570, end: 630 });
+  });
+  it("cliente que vem: sem alertas de veículo, rodízio pela placa digitada", () => {
+    const d: LogDemand = { ...dem, carrier: "cliente", carrier_plate: "QWE1R24", vehicle_id: null };
+    const dest = { id: "a", name: "SP", street: null, city: "São Paulo", uf: "SP", receive_from: null, receive_to: null, needs_booking: false, notes: null };
+    const a = demandAlerts(d, { today: "2026-11-19", now: new Date("2026-11-19T12:00:00Z"), items, vehicle: tres, dest, rules });
+    expect(a.map((x) => x.text).join()).not.toContain("capacidade");
+    expect(a.some((x) => x.tone === "red" && x.text.startsWith("Rodízio"))).toBe(true);
   });
 });

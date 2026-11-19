@@ -3163,6 +3163,12 @@ export type Database = {
       }
       log_demands: {
         Row: {
+          carrier: string
+          carrier_driver: string | null
+          carrier_name: string | null
+          carrier_phone: string | null
+          carrier_plate: string | null
+          end_time: string | null
           id: string
           kind: string
           title: string
@@ -3185,6 +3191,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          carrier?: string
+          carrier_driver?: string | null
+          carrier_name?: string | null
+          carrier_phone?: string | null
+          carrier_plate?: string | null
+          end_time?: string | null
           id?: string
           kind?: string
           title: string
@@ -3207,6 +3219,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          carrier?: string
+          carrier_driver?: string | null
+          carrier_name?: string | null
+          carrier_phone?: string | null
+          carrier_plate?: string | null
+          end_time?: string | null
           id?: string
           kind?: string
           title?: string

@@ -13,11 +13,21 @@ export type LogDemand = {
   id: string; kind: string; title: string; status: string; due_date: string | null; scheduled_date: string | null; departure_time: string | null;
   vehicle_id: string | null; driver_id: string | null; trips: number; origin_id: string | null; dest_id: string | null; contact: string | null;
   notes: string | null; message_sent_at: string | null;
+  /** Fim previsto no dia (agenda); sem fim = 1 hora. */
+  end_time?: string | null | undefined;
+  /** Quem transporta: veículo nosso (ab5) ou só o cliente/terceiro que vem no horário. */
+  carrier?: string | null | undefined; carrier_name?: string | null | undefined; carrier_plate?: string | null | undefined;
+  carrier_driver?: string | null | undefined; carrier_phone?: string | null | undefined;
 };
 export type LogDriver = { id: string; full_name: string; driver_license_category: string | null; driver_license_expiry: string | null };
 export type LogAlert = { tone: "red" | "orange"; text: string };
 
-export const KIND_LABEL: Record<string, string> = { entregar: "Entregar em obra", buscar: "Buscar material", retirar: "Retirar de obra", transferir: "Transferência" };
+export const KIND_LABEL: Record<string, string> = {
+  entregar: "Entregar em obra", buscar: "Buscar material", retirar: "Retirar de obra", transferir: "Transferência",
+  receber: "Receber (cliente/fornecedor traz)", expedir: "Expedir (cliente retira)",
+};
+export const CARRIER_LABEL: Record<string, string> = { ab5: "Veículo AB5", cliente: "Cliente", terceiro: "Terceiro / fornecedor" };
+export const isOwn = (d: Pick<LogDemand, "carrier">) => (d.carrier ?? "ab5") === "ab5";
 const num = (v: unknown) => Number(v ?? 0) || 0;
 const fmt = (n: number, d = 1) => n.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
 export const kg = (n: number) => (n >= 1000 ? `${fmt(n / 1000, 1)} t` : `${fmt(n, 0)} kg`);
@@ -25,6 +35,33 @@ const plain = (s: string | null | undefined) => (s ?? "").normalize("NFD").repla
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 const weekday = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDay();
 const minutes = (t: string | null | undefined) => { const m = /^(\d{1,2}):(\d{2})/.exec(t ?? ""); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+
+/** Início e fim do evento em minutos do dia (sem fim = 1 hora; sem início = null). */
+export function timeSpan(d: Pick<LogDemand, "departure_time" | "end_time">) {
+  const a = minutes(d.departure_time);
+  if (a == null) return null;
+  const b = minutes(d.end_time);
+  return { start: a, end: b != null && b > a ? b : a + 60 };
+}
+/** Quantas outras demandas do mesmo dia batem no horário: do mesmo veículo (nosso) e no mesmo local (carga ou descarga). */
+export function overlapCounts(list: LogDemand[]) {
+  const out = new Map<string, { vehicle: number; place: number }>();
+  const live = list.filter((d) => d.scheduled_date && d.status !== "cancelada" && d.status !== "concluida");
+  for (const d of live) {
+    const a = timeSpan(d);
+    let vehicle = 0, place = 0;
+    if (a) for (const o of live) {
+      if (o.id === d.id || o.scheduled_date !== d.scheduled_date) continue;
+      const b = timeSpan(o);
+      if (!b || b.start >= a.end || a.start >= b.end) continue;
+      if (isOwn(d) && isOwn(o) && d.vehicle_id && d.vehicle_id === o.vehicle_id) vehicle++;
+      const pd = [d.origin_id, d.dest_id].filter(Boolean), po = [o.origin_id, o.dest_id].filter(Boolean);
+      if (pd.some((x) => po.includes(x))) place++;
+    }
+    out.set(d.id, { vehicle, place });
+  }
+  return out;
+}
 
 /** Peso total, volume total e maior peça da carga. */
 export function loadSummary(items: LogItem[]) {
@@ -82,8 +119,10 @@ export type AlertCtx = {
   origin?: LogAddress | null | undefined; dest?: LogAddress | null | undefined; rules: LogRestriction[];
   /** Veículo já escalado na Transporte no mesmo dia. */
   transportBusy?: boolean | undefined;
-  /** Outras demandas do mesmo veículo no mesmo dia. */
-  sameDayOther?: number | undefined;
+  /** Outras demandas do mesmo veículo no mesmo horário. */
+  overlapVehicle?: number | undefined;
+  /** Outras demandas no mesmo local no mesmo horário. */
+  overlapPlace?: number | undefined;
 };
 
 /** Alertas da demanda: vermelho = resolver antes de sair; laranja = atenção. */
@@ -91,7 +130,8 @@ export function demandAlerts(d: LogDemand, c: AlertCtx): LogAlert[] {
   const out: LogAlert[] = [];
   if (d.status === "cancelada" || d.status === "concluida") return out;
   const load = loadSummary(c.items);
-  const v = c.vehicle;
+  const own = isOwn(d);
+  const v = own ? c.vehicle : null;
   if (d.status === "pendente" && d.due_date && !d.scheduled_date && d.due_date <= addDays(c.today, 2)) {
     out.push({ tone: d.due_date < c.today ? "red" : "orange", text: d.due_date < c.today ? "Prazo vencido sem programação" : "Prazo em até 2 dias sem programação" });
   }
@@ -106,10 +146,16 @@ export function demandAlerts(d: LogDemand, c: AlertCtx): LogAlert[] {
       const r = rodizio(v.plate, d.scheduled_date, [c.origin?.city, c.dest?.city], c.rules);
       if (r) out.push({ tone: inWindows(d.departure_time, r.windows) ? "red" : "orange", text: `Rodízio em ${r.city}: placa final ${plateEnding(v.plate)} não roda das ${windowsLabel(r.windows)}` });
       if (c.transportBusy) out.push({ tone: "orange", text: "Conflito: veículo também escalado na Transporte neste dia" });
-      if (c.sameDayOther) out.push({ tone: "orange", text: `Veículo com mais ${c.sameDayOther} demanda(s) de logística neste dia` });
+      if (c.overlapVehicle) out.push({ tone: "red", text: `Horário batendo com mais ${c.overlapVehicle} demanda(s) do mesmo veículo` });
     }
   }
-  if (c.driver && v) {
+  if (!own && d.carrier_plate && d.scheduled_date) {
+    const r = rodizio(d.carrier_plate, d.scheduled_date, [c.origin?.city, c.dest?.city], c.rules);
+    if (r) out.push({ tone: inWindows(d.departure_time, r.windows) ? "red" : "orange", text: `Rodízio em ${r.city}: placa final ${plateEnding(d.carrier_plate)} não roda das ${windowsLabel(r.windows)}` });
+  }
+  if (c.overlapPlace) out.push({ tone: "orange", text: `Mais ${c.overlapPlace} carga/descarga no mesmo local e horário` });
+  if (d.end_time && d.departure_time && minutes(d.end_time)! <= minutes(d.departure_time)!) out.push({ tone: "orange", text: "Fim antes do início" });
+  if (c.driver && v && own) {
     if (!cnhCovers(c.driver.driver_license_category, v.cnh_category)) out.push({ tone: "red", text: `CNH ${c.driver.driver_license_category ?? "não cadastrada"} não cobre a categoria ${v.cnh_category} do veículo` });
     if (c.driver.driver_license_expiry && d.scheduled_date && c.driver.driver_license_expiry < d.scheduled_date) out.push({ tone: "red", text: "CNH do motorista vencida na data" });
   }
@@ -119,11 +165,11 @@ export function demandAlerts(d: LogDemand, c: AlertCtx): LogAlert[] {
     const dep = minutes(d.departure_time), to = minutes(a.receive_to);
     if (label === "descarga" && dep != null && to != null && dep >= to) out.push({ tone: "orange", text: `Saída ${d.departure_time?.slice(0, 5)} depois da janela de recebimento (até ${a.receive_to?.slice(0, 5)})` });
   }
-  if (d.scheduled_date === addDays(c.today, 1) && !d.message_sent_at) {
+  if (d.scheduled_date === addDays(c.today, 1) && !d.message_sent_at && (own || d.carrier_phone)) {
     const br = new Date(c.now.getTime() - 3 * 3600_000);
     if (br.getUTCHours() >= 16) out.push({ tone: "orange", text: "Mensagem para o motorista ainda não enviada" });
   }
-  if (d.status === "programada" && (!d.vehicle_id || !d.scheduled_date)) out.push({ tone: "orange", text: "Programada sem veículo ou data" });
+  if (own && d.status === "programada" && (!d.vehicle_id || !d.scheduled_date)) out.push({ tone: "orange", text: "Programada sem veículo ou data" });
   return out;
 }
 
@@ -135,9 +181,10 @@ export function driverMessage(d: LogDemand, c: { items: LogItem[]; vehicle?: Log
   const addr = (a?: LogAddress | null) => (a ? `${a.name}${a.street ? `, ${a.street}` : ""} — ${a.city}/${a.uf}` : "—");
   const lines = [
     `*Logística — ${WEEK[weekday(date)] ?? ""} ${date.split("-").reverse().join("/")}*`,
-    c.driver ? `Motorista: ${c.driver.full_name}` : "",
-    c.vehicle ? `Veículo: ${[c.vehicle.model, c.vehicle.plate].filter(Boolean).join(" · ")}` : "",
-    d.departure_time ? `Saída: ${d.departure_time.slice(0, 5)}` : "",
+    isOwn(d) && c.driver ? `Motorista: ${c.driver.full_name}` : "",
+    isOwn(d) && c.vehicle ? `Veículo: ${[c.vehicle.model, c.vehicle.plate].filter(Boolean).join(" · ")}` : "",
+    !isOwn(d) && (d.carrier_name || d.carrier_driver) ? `${[d.carrier_name, d.carrier_driver].filter(Boolean).join(" · ")}${d.carrier_plate ? ` · placa ${d.carrier_plate}` : ""}` : "",
+    d.departure_time ? `Horário: ${d.departure_time.slice(0, 5)}${d.end_time ? ` às ${d.end_time.slice(0, 5)}` : ""}` : "",
     "",
     `*${d.title}* (${KIND_LABEL[d.kind] ?? d.kind})`,
     `Carregar em: ${addr(c.origin)}`,
@@ -151,7 +198,8 @@ export function driverMessage(d: LogDemand, c: { items: LogItem[]; vehicle?: Log
     d.contact ? `\nContato no local: ${d.contact}` : "",
     d.notes ? `Obs.: ${d.notes}` : "",
   ];
-  const r = c.vehicle && date ? rodizio(c.vehicle.plate, date, [c.origin?.city, c.dest?.city], c.rules) : null;
+  const plate = isOwn(d) ? c.vehicle?.plate : d.carrier_plate;
+  const r = plate && date ? rodizio(plate, date, [c.origin?.city, c.dest?.city], c.rules) : null;
   if (r) lines.push(`\n⚠ Rodízio em ${r.city}: não rodar das ${windowsLabel(r.windows)}.`);
   return lines.filter((l, i, a) => l !== "" || (i > 0 && a[i - 1] !== "")).join("\n").trim();
 }
