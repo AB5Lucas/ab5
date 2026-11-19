@@ -31,5 +31,5 @@ export const syncMarsNow = createServerFn({ method: "POST" }).middleware([requir
   const excelKey = process.env["MICROSOFT_EXCEL_API_KEY"];
   if (!lovableKey || !excelKey) throw new Error("Conexão do Excel indisponível");
   const { executeMarsSync } = await import("./mars-sync.server");
-  return executeMarsSync({ lovableKey, excelKey }, "manual", data.month);
+  return executeMarsSync({ lovableKey, excelKey }, "manual", data.month, { overwriteSuffix: true });
 });
