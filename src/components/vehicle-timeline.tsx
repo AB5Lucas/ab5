@@ -252,6 +252,17 @@ export function VehicleTimeline() {
     },
   });
 
+  // Solicitante do frete (caminhão/pickup): qualquer colaborador ativo, não só motorista.
+  const people = useQuery({
+    queryKey: ["timeline-people"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("collaborators").select("id, full_name").eq("status", "active").order("full_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const personName = useMemo(() => new Map((people.data ?? []).map((p) => [p.id, p.full_name])), [people.data]);
+
   const clients = useQuery({
     queryKey: ["timeline-clients"],
     queryFn: async () => {
@@ -581,7 +592,9 @@ export function VehicleTimeline() {
     const workId = form.client_id.startsWith(WORK_PREFIX) ? form.client_id.slice(WORK_PREFIX.length) : null;
     // Caminhão/pickup: o motorista que vale (prêmio, CNH, ranking) é o marcado no toggle; sem ele, o solicitante.
     const bw = byWorkVehicle(cell.vehicleId);
-    const eff = (on: boolean, d: string, r: string) => (bw ? (on && d !== NONE ? d : r) : d);
+    // Sem motorista marcado, o solicitante só vale como motorista se for motorista (senão fica a definir).
+    const isDriver = new Set((drivers.data ?? []).map((d) => d.id));
+    const eff = (on: boolean, d: string, r: string) => (bw ? (on && d !== NONE ? d : isDriver.has(r) ? r : NONE) : d);
     const mainDriver = eff(form.driver_toggle, form.driver_id, form.requester_id);
     const base = {
       work_id: workId,
@@ -863,9 +876,10 @@ export function VehicleTimeline() {
   // Toggle Motorista ligado e ainda em "Definir" (sem motorista escolhido, ou igual ao solicitante) em algum frete do dia.
   const driverUndefined = (r: VehicleScheduleRow) =>
     (!!r.driver_toggle && (!r.driver_id || r.driver_id === r.requester_id))
+    || (!!r.requester_id && !r.driver_id)
     || (r.extra_client_ids ?? []).some((_, i) => !!r.extra_driver_toggles?.[i] && (!r.extra_driver_ids?.[i] || r.extra_driver_ids[i] === r.extra_requester_ids?.[i]));
   const driverOptions = useMemo(() => [{ value: NONE, label: "Sem motorista" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
-  const requesterOptions = useMemo(() => [{ value: NONE, label: "Sem solicitante" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
+  const requesterOptions = useMemo(() => [{ value: NONE, label: "Sem solicitante" }, ...(people.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [people.data]);
   const pickDriverOptions = useMemo(() => [{ value: NONE, label: "Definir" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
 
   function freightKmText(fr: Freight, i: number) {
@@ -1142,7 +1156,7 @@ export function VehicleTimeline() {
                                 title={driverUndefined(row) ? "Motorista a definir" : row.driver_bonus ? "Com prêmio de motorista" : "Sem prêmio de motorista"}
                               />
                               <span className="truncate text-[10px] font-medium">
-                                {row.driver_id ? shortName(driverName.get(row.driver_id) ?? "—") : "Sem motorista"}
+                                {row.driver_id ? shortName(driverName.get(row.driver_id) ?? "—") : row.requester_id ? `${shortName(personName.get(row.requester_id) ?? "—")} · solic.` : "Sem motorista"}
                               </span>
                             </div>
                             <div
