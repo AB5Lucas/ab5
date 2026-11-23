@@ -1286,7 +1286,16 @@ export function SchedulePlannerBoard({
         if (error) throw error;
       }
       const targetRows = rows.filter((r) => r.work_id === workId && r.collaborator_id !== collaboratorId);
-      const sort = beforeSort ?? (targetRows.length ? Math.max(...targetRows.map((r) => r.sort_order)) + 1 : 0);
+      // Solto em cima de alguém: entra no lugar dele e quem está dali para baixo desce uma posição (sort_order é inteiro).
+      let sort: number;
+      if (beforeSort != null) {
+        sort = Math.ceil(beforeSort);
+        const below = targetRows.filter((r) => r.sort_order >= sort);
+        for (const r of below) {
+          const { error } = await supabase.from("daily_allocations").update({ sort_order: r.sort_order + 1 }).eq("id", r.id);
+          if (error) throw error;
+        }
+      } else sort = targetRows.length ? Math.max(...targetRows.map((r) => r.sort_order)) + 1 : 0;
 
       // Ao mudar de obra, VT e prêmio viagem voltam à regra da obra nova (as exceções marcadas na obra antiga saem).
       const resetIfMoved = (fromWork: string | null | undefined) =>
