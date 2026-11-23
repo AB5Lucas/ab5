@@ -226,35 +226,27 @@ export function useWorkflowBadges() {
       const { data: auth } = await supabase.auth.getSession();
       const uid = auth.session?.user?.id;
       if (!uid) return { andaimes: 0, hiring: 0 };
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", uid);
-      const rh = (roles ?? []).some((r: any) => r.role === "admin" || r.role === "programmer");
+      // Aviso de Contratações só para o grupo RH / Pessoal e o Marcelo Barrella (pedido do usuário).
+      const { data: me } = can.hiring
+        ? await supabase.from("users_profiles").select("full_name, access_groups(name)").eq("id", uid).maybeSingle()
+        : { data: null };
+      const plain = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      const hiringWatcher = /\bRH\b/.test(plain((me as any)?.access_groups?.name)) || /MARCELO BARRELLA/.test(plain((me as any)?.full_name));
       const { flowPendingFor } = await import("@/lib/andaimes");
       const [flowRoles, reqs, hires] = await Promise.all([
         can.andaimes ? supabase.from("andam_flow_roles").select("key, user_id").then((r) => r.data ?? []) : Promise.resolve([]),
         can.andaimes ? supabase.from("andam_requests").select("flow_stage, user_id").neq("flow_stage", "encerrada").then((r) => (r.data ?? []) as any[]) : Promise.resolve([] as any[]),
-        can.hiring ? supabase.from("hiring_requests").select("id, status, requester_id").then((r) => (r.data ?? []) as any[]) : Promise.resolve([] as any[]),
+        can.hiring && hiringWatcher ? supabase.from("hiring_requests").select("id, status, requester_id").then((r) => (r.data ?? []) as any[]) : Promise.resolve([] as any[]),
       ]);
       const ids: any = {};
       for (const f of flowRoles as any[]) ids[f.key] = f.user_id;
       const andaimes = reqs.filter((r) => flowPendingFor(r.flow_stage, { ...ids, solicitante: r.user_id }) === uid).length;
       let hiring = 0;
       let hiringTone: "red" | "orange" = "orange";
-      if (rh) {
+      if (hiringWatcher) {
         const badge = hiringBadge(hires);
         hiring = badge?.count ?? 0;
         hiringTone = badge?.tone ?? "orange";
-      }
-      else {
-        const mine = hires.filter((h) => h.requester_id === uid).map((h) => h.id);
-        if (mine.length) {
-          const seen = readHiringSeen(uid);
-          if (!seen["__base"]) { seen["__base"] = new Date().toISOString(); localStorage.setItem(SEEN_KEY(uid), JSON.stringify(seen)); }
-          const { data: ev } = await supabase.from("hiring_request_events").select("request_id, user_id, created_at").in("request_id", mine).neq("user_id", uid);
-          const unread = (ev ?? []).filter((e: any) => e.created_at > (seen[e.request_id] ?? seen["__base"] ?? ""));
-          hiring = unread.length;
-          const unreadIds = new Set(unread.map((e) => e.request_id));
-          hiringTone = hiringBadge(hires.filter((h) => unreadIds.has(h.id)))?.tone ?? "orange";
-        }
       }
       return { andaimes, hiring, hiringTone };
     },
