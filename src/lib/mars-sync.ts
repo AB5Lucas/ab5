@@ -32,7 +32,7 @@ export const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[�
 const toNum = (v: unknown) => (typeof v === "number" ? v : Number(String(v ?? "").replace(/\./g, "").replace(",", ".")) || 0);
 /** Nº do pedido só quando é número (Medição, SEM, "Enviar dia 15/10" = sem pedido). */
 export const orderOf = (v: unknown) => { const s = String(v ?? "").replace(/\s/g, ""); return /^\d{6,}$/.test(s) ? s : null; };
-const isQuote = (s: string) => /^\d{2}\/\d+/.test(s);
+export const isQuote = (s: string) => /^\d{2}\/\d+/.test(s);
 
 export function rowKey(r: Pick<MarsRow, "quote" | "order" | "description">) {
   if (isQuote(r.quote)) return `Q:${r.quote}`;

@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
 import {
   MARS_CLIENT, MARS_CONTRACT_ORDER, MARS_CONTRACT_VALUE, MARS_MANAGER, contractMeasured, marsFile, marsSheetName, matchWork,
-  findBoilerWork, findScaffoldWork, isBoilerRow, isScaffoldRow, parseMarsSheet, prevMonth, rowsToSync, splitContract, type MarsOrder, type MarsRow, type MarsWork,
+  findBoilerWork, findScaffoldWork, isBoilerRow, isQuote, isScaffoldRow, norm, parseMarsSheet, prevMonth, rowsToSync, splitContract, type MarsOrder, type MarsRow, type MarsWork,
 } from "./mars-sync";
 
 type Credentials = { lovableKey: string; excelKey: string };
@@ -113,13 +113,25 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
     updated_at: new Date().toISOString(),
   });
 
+  // Trava contra planilha desencontrada (ex.: coluna do Nº Orç. ordenada sozinha): a linha com a mesma chave precisa ter
+  // a mesma descrição gravada antes; senão nada dessa linha é mexido, e com várias assim a leitura inteira é recusada.
+  const mismatch: string[] = [];
+  const mismatchKeys = new Set<string>();
   for (const r of items) {
     const m = byKey.get(r.key);
+    if (m && m.description && norm(m.description) !== norm(r.description)) {
+      mismatch.push(`${r.quote || r.key}: gravado "${String(m.description).slice(0, 40)}", planilha "${r.description.slice(0, 40)}"`);
+      mismatchKeys.add(r.key);
+      continue;
+    }
     if (m) {
       // Serviço criado pela leitura: o pedido que chegou depois ("SEM" → número) ou o valor novo troca a linha que a leitura gravou.
       const w = m.work_id ? works.find((x) => x.id === m.work_id) : undefined;
       // Também no Contrato Andaimes, onde a leitura acrescenta as linhas dos pedidos de andaime.
-      if (w && (m.action === "created" || w.id === scaffold?.id || w.id === boiler?.id) && ((r.order ?? null) !== (m.synced_order ?? null) || r.value !== Number(m.synced_value ?? 0))) {
+      // Só quando o pedido chega (antes sem número) ou o valor muda com o mesmo pedido; pedido já gravado nunca é trocado por outro.
+      const numberOk = !(m.synced_order ?? "") || (r.order ?? "") === (m.synced_order ?? "");
+      if (!numberOk && ((r.order ?? null) !== (m.synced_order ?? null))) notes.push(`Pedido não trocado (${r.quote || r.key}): gravado ${m.synced_order}, planilha ${r.order ?? "sem número"}`);
+      if (w && numberOk && (m.action === "created" || w.id === scaffold?.id || w.id === boiler?.id) && ((r.order ?? null) !== (m.synced_order ?? null) || r.value !== Number(m.synced_value ?? 0))) {
         const orders = (w.orders ?? []).slice();
         const i = orders.findIndex((o) => String(o.number ?? "") === (m.synced_order ?? "") && Number(o.value ?? 0) === Number(m.synced_value ?? 0));
         if (i >= 0) {
@@ -151,6 +163,8 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
       await upsertItem({ key: r.key, ...base(r), action: "existing", work_id: pool.id, synced_order: r.order, synced_value: r.value });
       continue;
     }
+    // Serviço novo só com Nº Orç. de verdade (linhas como "SALDO" ou de controle não viram serviço).
+    if (!isQuote(r.quote)) { notes.push(`Linha sem Nº Orç. não virou serviço: ${r.description.slice(0, 60)}`); continue; }
     const id = crypto.randomUUID();
     const orders = [{ number: r.order ?? "", value: r.value, date }];
     newWorks.push({
@@ -165,6 +179,11 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
     created++;
     if (r.table === "faturamento" && !firstRun) notes.push(`Serviço criado pelo faturamento (pedido ${r.order}): ${r.description}`);
   }
+
+  if (mismatch.length >= 3) {
+    throw new Error(`Planilha com Nº Orç. e descrições desencontrados em ${mismatch.length} linhas; nada foi gravado. Confira se a coluna do Nº Orç. não foi ordenada sozinha. Ex.: ${mismatch.slice(0, 3).join(" · ")}`);
+  }
+  if (mismatch.length) notes.push(`Não alterado (descrição diferente da gravada): ${mismatch.join(" · ")}`);
 
   // Medição do contrato (só a tabela de ordens): novas linhas nos serviços do contrato. Cada medição tem pedido novo
   // (na planilha vem "Medição"): usa o pedido do faturamento da MARS no mês com o valor do contrato; sem ele, um
@@ -226,7 +245,7 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
   // Ordens primeiro (o faturamento repete o item com outro CC às vezes); Contrato Andaimes junta vários itens e não recebe sufixo.
   const seenSuffix = new Set<string>();
   for (const r of [...parsed.filter((x) => x.table === "ordens"), ...parsed.filter((x) => x.table !== "ordens")]) {
-    if (!r.suffix || r.contract || r.cancelled || isScaffoldRow(r) || isBoilerRow(r)) continue;
+    if (!r.suffix || r.contract || r.cancelled || isScaffoldRow(r) || isBoilerRow(r) || mismatchKeys.has(r.key)) continue;
     const wid = itemWork.get(r.key) ?? byKey.get(r.key)?.work_id ?? matchWork(r, works)?.id ?? null;
     const w = wid ? works.find((x) => x.id === wid) : undefined;
     const cur = (w?.cc_suffix ?? "").trim();
