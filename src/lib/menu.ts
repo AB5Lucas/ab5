@@ -4,7 +4,6 @@ import {
   Calculator,
   ChartPie,
   ClipboardCheck,
-  Clock,
   FileCheck,
   CalendarClock,
   FileText,
@@ -85,7 +84,6 @@ const RAW_GROUPS: MenuGroup[] = [
     label: "Remuneração",
     icon: Wallet,
     items: [
-      { title: "Ajuste de Ponto", url: "/relatorios/ajuste-ponto", icon: Clock },
       { title: "Premiações", url: "/fechamento", icon: Award },
       { title: "Vale Alimentação", url: "/relatorios/vale-alimentacao", icon: Utensils },
       { title: "Alocações", url: "/relatorios", icon: ChartPie },

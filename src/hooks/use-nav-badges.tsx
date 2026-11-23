@@ -132,7 +132,6 @@ export function useMenuBadges() {
   const nt = worstAlertTone(nextPending);
   if (next && nt) out["/programacao/diaria"] = { count: nextPending.length, label: "!", tone: nt, detail: `${next.date.split("-").reverse().join("/")}: ${nextPending.map((x) => x.title).join(" · ")}` };
   if (distribution?.pendingClients) out["/programacao/servicos"] = { count: distribution.pendingClients, tone: "red", detail: `${distribution.pendingClients} cliente(s) com distribuição de serviço pendente` };
-  if (w?.ponto) out["/relatorios/ajuste-ponto"] = { count: w.ponto, tone: "red", detail: `${w.ponto} ocorrência(s) de ponto sem tratamento` };
   if (w?.andaimes) out["/andaimes/solicitacoes"] = { count: w.andaimes, tone: "red", detail: `${w.andaimes} solicitação(ões) aguardando você` };
   if (w?.hiring) out["/demandas/contratacoes"] = { count: w.hiring, tone: w.hiringTone ?? "red", detail: `${w.hiring} contratação(ões) com novidade` };
   if (d) {
@@ -212,10 +211,10 @@ export function markHiringSeen(uid: string | undefined, reqId: string) {
   window.dispatchEvent(new Event("hiring-seen"));
 }
 
-/** Avisos individuais: Ajuste de Ponto, Solicitações de andaimes e Contratações. */
+/** Avisos individuais: Solicitações de andaimes e Contratações. */
 export function useWorkflowBadges() {
   const { canAccess, loading } = useAccess();
-  const can = { ponto: canAccess("/relatorios/ajuste-ponto"), andaimes: canAccess("/andaimes/solicitacoes"), hiring: canAccess("/demandas/contratacoes") };
+  const can = { andaimes: canAccess("/andaimes/solicitacoes"), hiring: canAccess("/demandas/contratacoes") };
   return useQuery({
     queryKey: ["workflow-badges", can],
     enabled: !loading,
@@ -226,19 +225,15 @@ export function useWorkflowBadges() {
       // Sessão local (sem ir ao servidor de login a cada atualização).
       const { data: auth } = await supabase.auth.getSession();
       const uid = auth.session?.user?.id;
-      if (!uid) return { ponto: 0, andaimes: 0, hiring: 0 };
+      if (!uid) return { andaimes: 0, hiring: 0 };
       const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", uid);
       const rh = (roles ?? []).some((r: any) => r.role === "admin" || r.role === "programmer");
-      const { computeOccurrences, fetchTimeclockData, timeclockDefaultFrom } = await import("@/lib/timeclock");
       const { flowPendingFor } = await import("@/lib/andaimes");
-      const [tc, flowRoles, reqs, hires] = await Promise.all([
-        can.ponto ? fetchTimeclockData(timeclockDefaultFrom(), todayISO()).catch(() => undefined) : Promise.resolve(undefined),
+      const [flowRoles, reqs, hires] = await Promise.all([
         can.andaimes ? supabase.from("andam_flow_roles").select("key, user_id").then((r) => r.data ?? []) : Promise.resolve([]),
         can.andaimes ? supabase.from("andam_requests").select("flow_stage, user_id").neq("flow_stage", "encerrada").then((r) => (r.data ?? []) as any[]) : Promise.resolve([] as any[]),
         can.hiring ? supabase.from("hiring_requests").select("id, status, requester_id").then((r) => (r.data ?? []) as any[]) : Promise.resolve([] as any[]),
       ]);
-      let ponto = 0;
-      if (tc) { const { occs, treated } = computeOccurrences(tc); ponto = occs.filter((o) => !treated.has(o.key)).length; }
       const ids: any = {};
       for (const f of flowRoles as any[]) ids[f.key] = f.user_id;
       const andaimes = reqs.filter((r) => flowPendingFor(r.flow_stage, { ...ids, solicitante: r.user_id }) === uid).length;
@@ -261,7 +256,7 @@ export function useWorkflowBadges() {
           hiringTone = hiringBadge(hires.filter((h) => unreadIds.has(h.id)))?.tone ?? "orange";
         }
       }
-      return { ponto, andaimes, hiring, hiringTone };
+      return { andaimes, hiring, hiringTone };
     },
   });
 }

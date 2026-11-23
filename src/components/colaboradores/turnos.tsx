@@ -46,7 +46,6 @@ export function TurnosPage() {
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["work-shifts"] });
     qc.invalidateQueries({ queryKey: ["collabs-shift"] });
-    qc.invalidateQueries({ queryKey: ["ajuste-ponto"] });
   };
 
   const save = async () => {

@@ -61,7 +61,6 @@ import { Route as AuthenticatedProgramacaoHistoricoRouteImport } from './routes/
 import { Route as AuthenticatedProgramacaoHojeRouteImport } from './routes/_authenticated/programacao.hoje'
 import { Route as AuthenticatedProgramacaoServicosRouteImport } from './routes/_authenticated/programacao.servicos'
 import { Route as AuthenticatedRelatoriosIndexRouteImport } from './routes/_authenticated/relatorios.index'
-import { Route as AuthenticatedRelatoriosAjustePontoRouteImport } from './routes/_authenticated/relatorios.ajuste-ponto'
 import { Route as AuthenticatedRelatoriosSincronizacaoRouteImport } from './routes/_authenticated/relatorios.sincronizacao'
 import { Route as AuthenticatedRelatoriosValeAlimentacaoRouteImport } from './routes/_authenticated/relatorios.vale-alimentacao'
 import { Route as AuthenticatedVeiculosIndexRouteImport } from './routes/_authenticated/veiculos.index'
@@ -373,12 +372,6 @@ const AuthenticatedRelatoriosIndexRoute =
     path: '/relatorios/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedRelatoriosAjustePontoRoute =
-  AuthenticatedRelatoriosAjustePontoRouteImport.update({
-    id: '/relatorios/ajuste-ponto',
-    path: '/relatorios/ajuste-ponto',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedRelatoriosSincronizacaoRoute =
   AuthenticatedRelatoriosSincronizacaoRouteImport.update({
     id: '/relatorios/sincronizacao',
@@ -488,7 +481,6 @@ export interface FileRoutesByFullPath {
   '/programacao/historico': typeof AuthenticatedProgramacaoHistoricoRoute
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
-  '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
@@ -552,7 +544,6 @@ export interface FileRoutesByTo {
   '/programacao/historico': typeof AuthenticatedProgramacaoHistoricoRoute
   '/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
-  '/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
@@ -618,7 +609,6 @@ export interface FileRoutesById {
   '/_authenticated/programacao/historico': typeof AuthenticatedProgramacaoHistoricoRoute
   '/_authenticated/programacao/hoje': typeof AuthenticatedProgramacaoHojeRoute
   '/_authenticated/programacao/servicos': typeof AuthenticatedProgramacaoServicosRoute
-  '/_authenticated/relatorios/ajuste-ponto': typeof AuthenticatedRelatoriosAjustePontoRoute
   '/_authenticated/relatorios/sincronizacao': typeof AuthenticatedRelatoriosSincronizacaoRoute
   '/_authenticated/relatorios/vale-alimentacao': typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   '/_authenticated/veiculos/motoristas': typeof AuthenticatedVeiculosMotoristasRoute
@@ -684,7 +674,6 @@ export interface FileRouteTypes {
     | '/programacao/historico'
     | '/programacao/hoje'
     | '/programacao/servicos'
-    | '/relatorios/ajuste-ponto'
     | '/relatorios/sincronizacao'
     | '/relatorios/vale-alimentacao'
     | '/veiculos/motoristas'
@@ -748,7 +737,6 @@ export interface FileRouteTypes {
     | '/programacao/historico'
     | '/programacao/hoje'
     | '/programacao/servicos'
-    | '/relatorios/ajuste-ponto'
     | '/relatorios/sincronizacao'
     | '/relatorios/vale-alimentacao'
     | '/veiculos/motoristas'
@@ -813,7 +801,6 @@ export interface FileRouteTypes {
     | '/_authenticated/programacao/historico'
     | '/_authenticated/programacao/hoje'
     | '/_authenticated/programacao/servicos'
-    | '/_authenticated/relatorios/ajuste-ponto'
     | '/_authenticated/relatorios/sincronizacao'
     | '/_authenticated/relatorios/vale-alimentacao'
     | '/_authenticated/veiculos/motoristas'
@@ -1205,13 +1192,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRelatoriosIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/relatorios/ajuste-ponto': {
-      id: '/_authenticated/relatorios/ajuste-ponto'
-      path: '/relatorios/ajuste-ponto'
-      fullPath: '/relatorios/ajuste-ponto'
-      preLoaderRoute: typeof AuthenticatedRelatoriosAjustePontoRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/relatorios/sincronizacao': {
       id: '/_authenticated/relatorios/sincronizacao'
       path: '/relatorios/sincronizacao'
@@ -1330,7 +1310,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProgramacaoHistoricoRoute: typeof AuthenticatedProgramacaoHistoricoRoute
   AuthenticatedProgramacaoHojeRoute: typeof AuthenticatedProgramacaoHojeRoute
   AuthenticatedProgramacaoServicosRoute: typeof AuthenticatedProgramacaoServicosRoute
-  AuthenticatedRelatoriosAjustePontoRoute: typeof AuthenticatedRelatoriosAjustePontoRoute
   AuthenticatedRelatoriosSincronizacaoRoute: typeof AuthenticatedRelatoriosSincronizacaoRoute
   AuthenticatedRelatoriosValeAlimentacaoRoute: typeof AuthenticatedRelatoriosValeAlimentacaoRoute
   AuthenticatedVeiculosMotoristasRoute: typeof AuthenticatedVeiculosMotoristasRoute
@@ -1402,8 +1381,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedProgramacaoHistoricoRoute,
   AuthenticatedProgramacaoHojeRoute: AuthenticatedProgramacaoHojeRoute,
   AuthenticatedProgramacaoServicosRoute: AuthenticatedProgramacaoServicosRoute,
-  AuthenticatedRelatoriosAjustePontoRoute:
-    AuthenticatedRelatoriosAjustePontoRoute,
   AuthenticatedRelatoriosSincronizacaoRoute:
     AuthenticatedRelatoriosSincronizacaoRoute,
   AuthenticatedRelatoriosValeAlimentacaoRoute:
