@@ -43,6 +43,7 @@
 - Vale Alimentação reads the month's ponto sheets live (va.functions.ts, paths in vaPaths); rules in src/lib/vale-alimentacao.ts; only parameters in va_settings. Why: no report without the month's sheets.
 - Collaborator copy uses filtered rows via collaborator-list.ts to match the list.
 - HP uses prize_hours with role RLS and rate trigger. Why: payouts stay protected, separate from MO.
+- Login vencido ("JWT expired", aba aberta muito tempo/computador dormiu): router.tsx renova a sessão (refreshSession, uma por vez) e repete a consulta ou gravação até 2 vezes (retry/retryDelay padrão do QueryClient); a gravação recusada por JWT não gravou nada, então repetir é seguro. Por quê: erro ao lançar folga.
 - Never cancel vite:preloadError in recovery. Why: it breaks lazy routes.
 - Filtros e campos: o título (Label) fica sempre em cima do campo, nunca ao lado: envolva em <div className="space-y-1"> e use campos de bloco (Input/Select do ui; um <select> nativo precisa da classe "block"; antes de um Button (inline-flex), o Label precisa de className="block"). Por quê: padrão visual pedido pelo usuário para todas as abas.
 - Purchases: persist exclusions, CC redirects and item asset decisions; replace summaries/costs atomically; preserve manual targets and exclude generic resplit. Why: reconcile totals and installment competencies.
