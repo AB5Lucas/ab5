@@ -1065,6 +1065,13 @@
       "when": 1795400048000,
       "tag": "0151_vehicle_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1795463074217,
+      "tag": "0152_drop_timeclock_adjustments",
+      "breakpoints": true
     }
   ]
 }
