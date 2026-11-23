@@ -5,7 +5,7 @@ import { futureSameKind, replacedText } from "@/lib/appointment-replace";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarClock, Check, Minus, Plus, X } from "lucide-react";
+import { CalendarClock, Check, Copy, Minus, Plus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/page-header";
@@ -297,6 +297,14 @@ export function AppointmentsPage() {
     });
   }, [appointments.data, fPeriod, fType, fWork, fTraining, personById, search, showHistory, today]);
 
+  // Nomes dos agendamentos filtrados, um por linha, sem repetir (mesma ordem da tabela).
+  const copyNames = async () => {
+    const names = [...new Set(rows.map((r) => personById.get(r.collaborator_id)?.full_name).filter((n): n is string => !!n))];
+    if (!names.length) { toast.error("Nenhum agendamento na lista"); return; }
+    await navigator.clipboard.writeText(names.join("\n"));
+    toast.success(`${names.length} ${names.length === 1 ? "nome copiado" : "nomes copiados"}`);
+  };
+
   const pendingCount = (appointments.data ?? []).filter((r) => r.status === "agendado").length;
   const lateCount = (appointments.data ?? []).filter(
     (r) => r.status === "agendado" && r.scheduled_date < today,
@@ -514,11 +522,16 @@ export function AppointmentsPage() {
         title="Agendamentos"
         description="Pendências de ASO, treinamento e integração. Confirme a realização (✓) ou informe uma nova data (X)."
         actions={
-          canWrite ? (
-            <Button size="sm" onClick={() => setOpenNew(true)}>
-              <Plus className="h-4 w-4" /> Novo Agendamento
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => void copyNames()} disabled={!rows.length}>
+              <Copy className="h-4 w-4" /> Copiar nomes
             </Button>
-          ) : null
+            {canWrite ? (
+              <Button size="sm" onClick={() => setOpenNew(true)}>
+                <Plus className="h-4 w-4" /> Novo Agendamento
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
