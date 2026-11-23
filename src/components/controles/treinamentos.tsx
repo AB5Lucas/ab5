@@ -8,6 +8,7 @@ import { copyNameList } from "@/lib/copy-names";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { MultiFilter } from "@/components/multi-filter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +17,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 
 
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
@@ -423,40 +422,14 @@ export function TrainingsPage() {
               <Label>Colaborador</Label>
               <Input value={personSearch} onChange={(e) => setPersonSearch(e.target.value)} placeholder="Buscar colaborador" />
             </div>
-            <div className="space-y-1">
-              <Label>Treinamento</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-between font-normal">
-                    <span className="truncate">
-                      {trainingIds.length === 0
-                        ? "Todos os treinamentos"
-                        : trainingIds.length === 1
-                          ? nameById.get(trainingIds[0] ?? "") ?? "1 selecionado"
-                          : `${trainingIds.length} selecionados`}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="max-h-72 w-72 overflow-y-auto p-2">
-                  {(trainings.data ?? []).filter((t) => t.active).map((t) => (
-                    <label key={t.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-                      <Checkbox
-                        checked={trainingIds.includes(t.id)}
-                        onCheckedChange={(c) =>
-                          setTrainingIds((prev) => (c ? [...prev, t.id] : prev.filter((x) => x !== t.id)))
-                        }
-                      />
-                      <span className="truncate">{t.name}{t.description ? ` · ${t.description}` : ""}</span>
-                    </label>
-                  ))}
-                  {trainingIds.length > 0 && (
-                    <Button variant="ghost" size="sm" className="mt-1 w-full" onClick={() => setTrainingIds([])}>
-                      Limpar seleção
-                    </Button>
-                  )}
-                </PopoverContent>
-              </Popover>
-            </div>
+            <MultiFilter
+              title="Treinamento"
+              allLabel="Todos os treinamentos"
+              options={(trainings.data ?? []).filter((t) => t.active).map((t) => ({ value: t.id, label: `${t.name}${t.description ? ` · ${t.description}` : ""}` }))}
+              values={trainingIds}
+              onChange={setTrainingIds}
+              className="w-full"
+            />
             <div className="space-y-1">
               <Label>Situação</Label>
               <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>

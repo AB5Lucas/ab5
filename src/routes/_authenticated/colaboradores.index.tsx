@@ -6,15 +6,14 @@ import { TurnosPage } from "@/components/colaboradores/turnos";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ChevronDown, Copy, Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
+import { Copy, Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { collaboratorNamesText, matchesPositions } from "@/lib/collaborator-list";
 import { supabase } from "@/integrations/supabase/client";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 const TYPE_OPTS = [{ v: "active", l: "Ativos" }, { v: "inactive", l: "Inativos" }, { v: "efetivo", l: "Efetivos" }, { v: "pj", l: "PJs" }, { v: "intermitente", l: "Intermitentes" }];
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { MultiFilter } from "@/components/multi-filter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -499,47 +498,24 @@ function CollaboratorsPage() {
           />
           </div>
         </div>
-        <div className="w-full space-y-1.5 sm:w-52">
-        <Label htmlFor="collaborators-type">Tipo</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button id="collaborators-type" variant="outline" className="w-full justify-between">
-              <span className="truncate">{typeFilter.length ? typeFilter.map((t) => TYPE_OPTS.find((o) => o.v === t)?.l).join(", ") : "Todos"}</span>
-              <ChevronDown className="h-4 w-4 shrink-0" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-56 space-y-1 p-2">
-            {TYPE_OPTS.map((o) => (
-              <label key={o.v} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-                <Checkbox checked={typeFilter.includes(o.v)} onCheckedChange={(v) => setTypeFilter((cur) => (v ? [...cur, o.v] : cur.filter((x) => x !== o.v)))} />
-                {o.l}
-              </label>
-            ))}
-            <Button variant="ghost" size="sm" className="w-full" onClick={() => setTypeFilter([])}>Todos</Button>
-          </PopoverContent>
-        </Popover>
+        <div className="w-full sm:w-52">
+          <MultiFilter
+            title="Tipo"
+            options={TYPE_OPTS.map((o) => ({ value: o.v, label: o.l }))}
+            values={typeFilter}
+            onChange={setTypeFilter}
+            className="w-full"
+          />
         </div>
-        <div className="w-full space-y-1.5 sm:w-64">
-          <Label htmlFor="collaborators-positions">Funções</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button id="collaborators-positions" variant="outline" className="w-full justify-between">
-                <span className="truncate">{positionFilter.length === 0 ? "Todas" : positionFilter.length === 1 ? nameById.get(positionFilter[0] ?? "") ?? "Sem função" : `${positionFilter.length} selecionadas`}</span>
-                <ChevronDown className="h-4 w-4 shrink-0" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-72 p-2">
-              <div className="max-h-72 overflow-y-auto space-y-1">
-                {[...(lookups.data?.positions ?? []), { id: NONE, name: "Sem função" }].map((position) => (
-                  <label key={position.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-                    <Checkbox checked={positionFilter.includes(position.id)} onCheckedChange={(checked) => setPositionFilter((current) => checked ? [...current, position.id] : current.filter((id) => id !== position.id))} />
-                    {position.name}
-                  </label>
-                ))}
-              </div>
-              <Button variant="ghost" size="sm" className="mt-1 w-full" onClick={() => setPositionFilter([])}>Todas</Button>
-            </PopoverContent>
-          </Popover>
+        <div className="w-full sm:w-64">
+          <MultiFilter
+            title="Funções"
+            allLabel="Todas"
+            options={[...(lookups.data?.positions ?? []), { id: NONE, name: "Sem função" }].map((p) => ({ value: p.id, label: p.name }))}
+            values={positionFilter}
+            onChange={setPositionFilter}
+            className="w-full"
+          />
         </div>
       </div>
 

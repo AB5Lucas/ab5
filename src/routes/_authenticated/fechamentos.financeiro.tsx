@@ -7,13 +7,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { MultiFilter } from "@/components/multi-filter";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { contractFraction } from "@/lib/contract";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { loadResultShared, monthEnd } from "@/lib/results-engine";
 import { FIN_TAX, buildFinanceGroups, financeBatches, financeList, loadFinanceActive, loadFinanceRaws, type FinanceLine } from "@/lib/finance-data";
 
@@ -117,33 +116,14 @@ function FinanceiroPage() {
             </Button>
           </div>
         </div>
-        <div>
-          <Label>Clientes</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="block">
-                {hidden.filter((k) => allGroups.some((g) => g.key === k)).length ? `${allGroups.filter((g) => !hidden.includes(g.key)).length} de ${allGroups.length}` : "Todos"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-72 p-2" align="start">
-              <div className="mb-2 flex justify-between">
-                <Button size="sm" variant="ghost" onClick={() => saveHidden([])}>Todos</Button>
-                <Button size="sm" variant="ghost" onClick={() => saveHidden([...new Set([...hidden, ...allGroups.map((g) => g.key)])])}>Nenhum</Button>
-              </div>
-              <div className="max-h-72 space-y-1 overflow-y-auto">
-                {allGroups.map((g) => (
-                  <label key={g.key} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
-                    <Checkbox
-                      checked={!hidden.includes(g.key)}
-                      onCheckedChange={(c) => saveHidden(c ? hidden.filter((k) => k !== g.key) : [...hidden, g.key])}
-                    />
-                    {g.name}
-                  </label>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <MultiFilter
+          title="Clientes"
+          mode="show"
+          hint="Marque os clientes exibidos."
+          options={allGroups.map((g) => ({ value: g.key, label: g.name }))}
+          values={allGroups.filter((g) => !hidden.includes(g.key)).map((g) => g.key)}
+          onChange={(vis) => saveHidden([...hidden.filter((k) => !allGroups.some((g) => g.key === k)), ...allGroups.filter((g) => !vis.includes(g.key)).map((g) => g.key)])}
+        />
       </div>
 
       <div className="panel max-h-[calc(100vh-13rem)] overflow-auto">

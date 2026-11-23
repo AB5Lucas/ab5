@@ -3,16 +3,16 @@ import { useWorkScope } from "@/hooks/use-work-scope";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CornerDownRight, Filter, RefreshCw, Landmark } from "lucide-react";
+import { CornerDownRight, RefreshCw, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { MultiFilter } from "@/components/multi-filter";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -212,23 +212,15 @@ function ComprasPage() {
         <div className="space-y-1"><Label>Status</Label>
           <Select value={status} onValueChange={setStatus}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value={ALL}>Todos</SelectItem><SelectItem value="launched">Lançados</SelectItem><SelectItem value="pending">Pendentes</SelectItem><SelectItem value="excluded">Excluídos</SelectItem></SelectContent></Select></div>
-        <div className="flex flex-col gap-1"><Label>Categorias</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline"><Filter className="h-4 w-4" /> {hiddenCats.size > 0 ? `${PURCHASE_CATEGORIES.length - hiddenCats.size} selecionadas` : "Todas"}</Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-60">
-              <p className="mb-2 text-xs text-muted-foreground">Marque as categorias exibidas.</p>
-              <div className="space-y-2">
-                {PURCHASE_CATEGORIES.map((c) => (
-                  <label key={c.key} className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={!hiddenCats.has(c.key)} onCheckedChange={(v) => setHiddenCats((s) => { const n = new Set(s); if (v) n.delete(c.key); else n.add(c.key); return n; })} />
-                    {c.key === "andaimes" ? "Insumos / Andaimes" : c.label}
-                  </label>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover></div>
+        <MultiFilter
+          title="Categorias"
+          mode="show"
+          allLabel="Todas"
+          hint="Marque as categorias exibidas."
+          options={PURCHASE_CATEGORIES.map((c) => ({ value: c.key, label: c.key === "andaimes" ? "Insumos / Andaimes" : c.label }))}
+          values={PURCHASE_CATEGORIES.filter((c) => !hiddenCats.has(c.key)).map((c) => c.key)}
+          onChange={(vis) => setHiddenCats(new Set(PURCHASE_CATEGORIES.filter((c) => !vis.includes(c.key)).map((c) => c.key)))}
+        />
         <div className="space-y-1"><Label>Busca</Label><Input className="w-64" placeholder="Item, código ou centro de custo" value={q} onChange={(e) => setQ(e.target.value)} /></div>
       </div>
       <p className="text-sm text-muted-foreground">{items.length} itens · {brl(items.reduce((a, i) => a + i.amount, 0))}</p>

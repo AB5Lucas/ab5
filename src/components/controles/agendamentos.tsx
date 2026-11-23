@@ -9,7 +9,7 @@ import { CalendarClock, Check, Copy, Minus, Plus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/page-header";
-import { MultiSearchSelect } from "@/components/search-select";
+import { MultiFilter } from "@/components/multi-filter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -588,10 +588,7 @@ export function AppointmentsPage() {
             </Select>
           </div>
           {fType === "treinamento" ? (
-            <div className="space-y-1">
-              <Label className="text-xs">Treinamento</Label>
-              <MultiSearchSelect values={fTrainings} onChange={setFTrainings} options={trainingFilterOptions} allLabel="Todos" searchPlaceholder="Digite a NR" />
-            </div>
+            <MultiFilter title="Treinamento" labelClassName="text-xs" values={fTrainings} onChange={setFTrainings} options={trainingFilterOptions} className="w-full" />
           ) : (
             <div className="space-y-1">
               <Label className="text-xs">Cliente</Label>

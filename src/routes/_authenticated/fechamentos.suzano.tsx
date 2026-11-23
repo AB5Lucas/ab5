@@ -6,17 +6,14 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { MultiFilter } from "@/components/multi-filter";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IndustryOrders } from "@/components/industry-billing";
 import { MarsOrders } from "@/components/mars-orders";
-import { Filter } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { monthEnd } from "@/lib/results-engine";
 import { billingMatchesOrder } from "@/lib/billing-sync";
@@ -190,31 +187,13 @@ function Pedidos({ clientId, workId }: { clientId: string; workId: string }) {
       <div className="flex flex-wrap items-end gap-3 p-3">
         <div><Label>Nº do pedido</Label><input className="flex h-9 w-48 rounded-md border border-input bg-background px-3 text-sm" value={fNum} onChange={(e) => setFNum(e.target.value)} placeholder="Buscar" /></div>
         <div><Label>Mês</Label><input type="month" className="flex h-9 w-44 rounded-md border border-input bg-background px-3 text-sm" value={fMonth} onChange={(e) => setFMonth(e.target.value)} /></div>
-        <div className="flex flex-col">
-          <Label>Status</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-40 justify-start">
-                <Filter className="h-4 w-4" /> Status
-                {fSt.length > 0 && <Badge variant="secondary">{fSt.length}</Badge>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-52">
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={!fSt.length} onCheckedChange={() => setFSt([])} />
-                  <span>Todos</span>
-                </label>
-                {["Em aberto", "Parcial", "Faturado"].map((k) => (
-                  <label key={k} className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={fSt.includes(k)} onCheckedChange={(c) => setFSt(c ? [...fSt, k] : fSt.filter((t) => t !== k))} />
-                    <span>{k}</span>
-                  </label>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <MultiFilter
+          title="Status"
+          options={["Em aberto", "Parcial", "Faturado"].map((k) => ({ value: k, label: k }))}
+          values={fSt}
+          onChange={setFSt}
+          className="w-40"
+        />
         {(fNum || fMonth || fSt.length > 0) && <Button variant="ghost" onClick={() => { setFNum(""); setFMonth(""); setFSt([]); }}>Limpar</Button>}
       </div>
       <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>

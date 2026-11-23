@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
-  Filter,
   GripVertical,
   Search,
   Trash2,
@@ -21,8 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MultiFilter } from "@/components/multi-filter";
 import {
   Dialog,
   DialogContent,
@@ -1010,54 +1008,45 @@ export function VehicleTimeline() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
-        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-
-        <div className="relative min-w-[200px]">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Buscar modelo ou placa"
-            value={vehicleSearch}
-            onChange={(e) => setVehicleSearch(e.target.value)}
-          />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <Label className="block">Mês</Label>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
+            <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline">
-              <Filter className="h-4 w-4" /> Veículos
-              {hidden.size > 0 && <Badge variant="secondary">{hidden.size} ocultos</Badge>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="max-h-80 w-72 overflow-y-auto">
-            <p className="mb-2 text-xs text-muted-foreground">Marque os veículos exibidos na timeline.</p>
-            <div className="space-y-2">
-              {orderedVehicles.map((v) => (
-                <label key={v.id} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={!hidden.has(v.id)}
-                    onCheckedChange={(checked) => {
-                      const next = new Set(hidden);
-                      if (checked) next.delete(v.id);
-                      else next.add(v.id);
-                      savePrefs.mutate({ hidden: [...next] });
-                    }}
-                  />
-                  <span className="truncate">
-                    {[v.brand, v.model].filter(Boolean).join(" ") || "Veículo"} · {v.plate}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+        <div className="space-y-1">
+          <Label className="block">Buscar</Label>
+          <div className="relative min-w-[200px]">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Modelo ou placa"
+              value={vehicleSearch}
+              onChange={(e) => setVehicleSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <MultiFilter
+          title="Veículos"
+          mode="show"
+          hint="Marque os veículos exibidos na timeline."
+          options={orderedVehicles.map((v) => ({ value: v.id, label: `${[v.brand, v.model].filter(Boolean).join(" ") || "Veículo"} · ${v.plate}` }))}
+          values={orderedVehicles.filter((v) => !hidden.has(v.id)).map((v) => v.id)}
+          onChange={(vis) => {
+            const shown = new Set(vis);
+            const listed = new Set(orderedVehicles.map((v) => v.id));
+            savePrefs.mutate({ hidden: [...[...hidden].filter((id) => !listed.has(id)), ...orderedVehicles.filter((v) => !shown.has(v.id)).map((v) => v.id)] });
+          }}
+        />
 
         <Button variant="outline" onClick={() => setCopyOpen(true)} disabled={!canWrite}>
           <Copy className="h-4 w-4" /> Copiar dia

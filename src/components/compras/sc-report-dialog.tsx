@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MultiSearchSelect } from "@/components/search-select";
+import { MultiFilter } from "@/components/multi-filter";
 import { todayISO } from "@/components/compras/sc-shared";
 import { SC_CATEGORIES, brDate } from "@/lib/purchase-requests";
 import { buildScReport, SC_REPORT_COLUMNS, type ScReportItem, type ScReportParams, type ScReportRequest } from "@/lib/sc-report";
@@ -124,16 +124,10 @@ export function ScReportButton() {
               <div className="space-y-1"><Label htmlFor="rel-from">Emissão de</Label><Input id="rel-from" type="date" value={p.from} onChange={(e) => set("from", e.target.value)} /></div>
               <div className="space-y-1"><Label htmlFor="rel-to">Emissão até</Label><Input id="rel-to" type="date" value={p.to} onChange={(e) => set("to", e.target.value)} /></div>
               {sel("Mostrar", p.show, (v) => set("show", v), Object.entries(SHOW_LABEL))}
-              <div className="space-y-1">
-                <Label className="block">Solicitante</Label>
-                <MultiSearchSelect values={p.requesters} onChange={(v) => set("requesters", v)} searchPlaceholder="Digite o nome" allLabel="Todos"
-                  options={requesters.map(([id, n]) => ({ value: id, label: n }))} />
-              </div>
-              <div className="space-y-1">
-                <Label className="block">Categoria</Label>
-                <MultiSearchSelect values={p.categories} onChange={(v) => set("categories", v)} searchPlaceholder="Digite a categoria" allLabel="Todas"
-                  options={SC_CATEGORIES.map((c) => ({ value: c, label: c }))} />
-              </div>
+              <MultiFilter title="Solicitante" values={p.requesters} onChange={(v) => set("requesters", v)} className="w-full"
+                options={requesters.map(([id, n]) => ({ value: id, label: n }))} />
+              <MultiFilter title="Categoria" allLabel="Todas" values={p.categories} onChange={(v) => set("categories", v)} className="w-full"
+                options={SC_CATEGORIES.map((c) => ({ value: c, label: c }))} />
               {sel("Tipo", p.system, (v) => set("system", v), [["all", "Todas"], ["PLANILHA", "Planilha"], ["TOTVS", "TOTVS"]])}
               {sel("Agrupamento", p.group, (v) => set("group", v), Object.entries(GROUP_LABEL))}
               {sel("Ordenar", p.sort, (v) => set("sort", v), Object.entries(SORT_LABEL))}
