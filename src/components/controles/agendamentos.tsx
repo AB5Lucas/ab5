@@ -358,8 +358,8 @@ export function AppointmentsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const complete = useMutation({
-    mutationFn: async ({ row, date }: { row: Row; date: string }) => {
+  /** Confirma a realização e manda para a Conferência (uma linha; o "todos" repete por linha). */
+  const doComplete = async (row: Row, date: string) => {
       if (!date) throw new Error("Informe a data real de realização");
       if (row.type === "integracao" && !row.client_id)
         throw new Error("O agendamento não tem cliente vinculado");
@@ -426,7 +426,9 @@ export function AppointmentsPage() {
         if (checksError) throw checksError;
       }
 
-    },
+  };
+  const complete = useMutation({
+    mutationFn: ({ row, date }: { row: Row; date: string }) => doComplete(row, date),
     onSuccess: () => {
       toast.success("Realização confirmada e enviada para a Conferência");
       setDoneRow(null);
@@ -435,8 +437,7 @@ export function AppointmentsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const reschedule = useMutation({
-    mutationFn: async ({ row, date, time }: { row: Row; date: string; time: string }) => {
+  const doReschedule = async (row: Row, date: string, time: string) => {
       if (!date) throw new Error("Informe a nova data");
       const nextTime = time || row.scheduled_time;
       if (!nextTime) throw new Error("Informe o horário");
@@ -456,7 +457,9 @@ export function AppointmentsPage() {
         })
         .eq("id", row.id);
       if (error) throw error;
-    },
+  };
+  const reschedule = useMutation({
+    mutationFn: ({ row, date, time }: { row: Row; date: string; time: string }) => doReschedule(row, date, time),
     onSuccess: () => {
       toast.success("Agendamento remarcado");
       setRedoRow(null);
@@ -474,14 +477,46 @@ export function AppointmentsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const doRemove = async (row: Row) => {
+    const { error } = await supabase.from("appointments").delete().eq("id", row.id);
+    if (error) throw error;
+  };
   const remove = useMutation({
-    mutationFn: async (row: Row) => {
-      const { error } = await supabase.from("appointments").delete().eq("id", row.id);
-      if (error) throw error;
-    },
+    mutationFn: doRemove,
     onSuccess: () => {
       toast.success("Agendamento excluído");
       setDeleteRow(null);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  /** Ação em todos os agendamentos filtrados (pendentes): confirmar, remarcar ou excluir, um por um. */
+  const [bulk, setBulk] = useState<"done" | "redo" | "delete" | null>(null);
+  const [bulkDate, setBulkDate] = useState(today);
+  const [bulkTime, setBulkTime] = useState("");
+  const runBulk = useMutation({
+    mutationFn: async ({ kind, list }: { kind: "done" | "redo" | "delete"; list: Row[] }) => {
+      if (kind !== "delete" && !bulkDate) throw new Error("Informe a data");
+      const errors: string[] = [];
+      let ok = 0;
+      for (const r of list) {
+        try {
+          if (kind === "done") await doComplete(r, bulkDate);
+          else if (kind === "redo") await doReschedule(r, bulkDate, bulkTime);
+          else await doRemove(r);
+          ok++;
+        } catch (e) {
+          errors.push(`${personById.get(r.collaborator_id)?.full_name ?? "—"}: ${(e as Error).message}`);
+        }
+      }
+      return { ok, errors, kind };
+    },
+    onSuccess: ({ ok, errors, kind }) => {
+      const verb = kind === "done" ? "confirmado(s)" : kind === "redo" ? "remarcado(s)" : "excluído(s)";
+      if (ok) toast.success(`${ok} agendamento(s) ${verb}`);
+      if (errors.length) toast.error(`${errors.length} não ${kind === "delete" ? "excluído(s)" : "alterado(s)"}: ${errors.slice(0, 3).join(" · ")}${errors.length > 3 ? "…" : ""}`, { duration: 10000 });
+      setBulk(null);
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -628,6 +663,21 @@ export function AppointmentsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {canWrite && !showHistory && rows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">{rows.length} filtrado(s):</span>
+          <Button size="sm" variant="outline" onClick={() => { setBulkDate(today); setBulk("done"); }}>
+            <Check className="h-4 w-4" /> Confirmar todos
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => { setBulkDate(addDays(today, 1)); setBulkTime(""); setBulk("redo"); }}>
+            <CalendarClock className="h-4 w-4" /> Remarcar todos
+          </Button>
+          <Button size="sm" variant="outline" className="text-destructive" onClick={() => setBulk("delete")}>
+            <X className="h-4 w-4" /> Excluir todos
+          </Button>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-md border border-border">
         <Table>
@@ -876,6 +926,52 @@ export function AppointmentsPage() {
       </Dialog>
 
       {/* Confirmar realização */}
+      <Dialog open={!!bulk} onOpenChange={(v) => !v && !runBulk.isPending && setBulk(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {bulk === "done" ? "Confirmar realização" : bulk === "redo" ? "Remarcar" : "Excluir"} — {rows.length} agendamento(s) filtrado(s)
+            </DialogTitle>
+            <DialogDescription>
+              {bulk === "done"
+                ? "Todos vão para a Conferência com a data real abaixo."
+                : bulk === "redo"
+                  ? "Todos passam para a nova data. Horário em branco mantém o horário de cada um."
+                  : "Os agendamentos filtrados serão apagados. Esta ação não pode ser desfeita."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-40 overflow-y-auto rounded border border-border p-2 text-xs">
+            {rows.map((r) => (
+              <div key={r.id}>{personById.get(r.collaborator_id)?.full_name ?? "—"} · {detailOf(r)} · {formatDateBR(r.scheduled_date)}</div>
+            ))}
+          </div>
+          {bulk !== "delete" && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>{bulk === "done" ? "Data real de realização" : "Nova data"}</Label>
+                <Input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} />
+              </div>
+              {bulk === "redo" && (
+                <div className="space-y-1">
+                  <Label>Novo horário (opcional)</Label>
+                  <Input type="time" value={bulkTime} onChange={(e) => setBulkTime(e.target.value)} />
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setBulk(null)} disabled={runBulk.isPending}>Cancelar</Button>
+            <Button
+              variant={bulk === "delete" ? "destructive" : "default"}
+              disabled={runBulk.isPending}
+              onClick={() => bulk && runBulk.mutate({ kind: bulk, list: rows })}
+            >
+              {runBulk.isPending ? "Processando…" : bulk === "done" ? "Confirmar todos" : bulk === "redo" ? "Remarcar todos" : "Excluir todos"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!doneRow} onOpenChange={(v) => !v && setDoneRow(null)}>
         <DialogContent>
           <DialogHeader>
