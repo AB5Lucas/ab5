@@ -1051,6 +1051,13 @@
       "when": 1795400046000,
       "tag": "0149_appointments_replace_future_done",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1795400047000,
+      "tag": "0150_adm_default_service",
+      "breakpoints": true
     }
   ]
 }
