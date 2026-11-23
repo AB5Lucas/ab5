@@ -219,7 +219,8 @@ const tokenHit = (w: string, words: string[]) =>
   // (Sidiney, Sideney, Sinei, Sidnei → Sihdnei).
   words.some((x) => {
     if (x === w || (w.length === 1 && x.startsWith(w))) return true;
-    if (w.length < 4 || x.length < 4) return false;
+    // Palavra curta só casa com a mesma pronúncia (Oci → Oki).
+    if (w.length < 4 || x.length < 4) return w.length > 1 && phon(w) === phon(x);
     const max = w.length >= 7 && x.length >= 7 ? 2 : 1;
     return lev(w, x) <= max || lev(phon(w), phon(x)) <= max;
   });

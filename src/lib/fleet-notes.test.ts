@@ -202,6 +202,8 @@ describe("placa e motorista da nota → cadastro", () => {
     expect(matchDriverName("Andre Jesus", liberados)).toBe("ANDRE DE JESUS SANTOS");
     expect(matchDriverName("Andre Jesu", liberados)).toBe("ANDRE DE JESUS SANTOS");
     expect(matchDriverName("Andre", liberados)).toBe("ANDRE DE JESUS SANTOS");
+    expect(matchDriverName("Jessica Oci", ["Jéssica Faustino Castro Oki", "Jessica Souza"])).toBe("Jéssica Faustino Castro Oki");
+    expect(matchDriverName("Jessica Ota", ["Jéssica Faustino Castro Oki", "Jessica Souza"])).toBe(null);
     expect(matchDriverName("Andre", [], ["ANDRE DE JESUS SANTOS", "ANDRE LUIZ"])).toBeNull();
     expect(matchDriverName("Carlos Souza", liberados, ["CARLOS EDUARDO SOUZA"])).toBe("CARLOS EDUARDO SOUZA");
     expect(matchDriverName("Carlos", liberados)).toBeNull();
