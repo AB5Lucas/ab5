@@ -9,6 +9,7 @@ import { CalendarClock, Check, Copy, Minus, Plus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/page-header";
+import { MultiSearchSelect } from "@/components/search-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -118,7 +119,8 @@ export function AppointmentsPage() {
   const [fPeriod, setFPeriod] = useState("all");
   const [fType, setFType] = useState("all");
   const [fWork, setFWork] = useState("all");
-  const [fTraining, setFTraining] = useState("all");
+  /** Treinamentos escolhidos (pelo nome; vazio = todos). */
+  const [fTrainings, setFTrainings] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [showHistory, setShowHistory] = useState(false);
 
@@ -248,10 +250,8 @@ export function AppointmentsPage() {
   }, [listed, clientOptions]);
   /** Filtro Treinamento: só treinamentos com agendamento na lista. */
   const trainingFilterOptions = useMemo(() => {
-    const ids = new Set(listed.filter((r) => r.type === "treinamento" && r.training_id).map((r) => r.training_id as string));
-    return [...ids]
-      .map((id) => ({ id, name: trainingById.get(id)?.label ?? "Treinamento" }))
-      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    const names = new Set(listed.filter((r) => r.type === "treinamento" && r.training_id).map((r) => trainingById.get(r.training_id as string)?.label ?? "Treinamento"));
+    return [...names].sort((a, b) => a.localeCompare(b, "pt-BR")).map((n) => ({ value: n, label: n }));
   }, [listed, trainingById]);
 
   const currentValidity = (collaboratorId: string, trainingId: string | null) => {
@@ -280,7 +280,7 @@ export function AppointmentsPage() {
       if (showHistory ? pending : !pending) return false;
       if (fType !== "all" && r.type !== fType) return false;
       if (fWork !== "all" && r.client_id !== fWork) return false;
-      if (fTraining !== "all" && r.training_id !== fTraining) return false;
+      if (fTrainings.length && !fTrainings.includes(trainingById.get(r.training_id ?? "")?.label ?? "")) return false;
       if (!showHistory) {
         if (fPeriod === "today" && r.scheduled_date !== today) return false;
         if (fPeriod === "tomorrow" && r.scheduled_date !== addDays(today, 1)) return false;
@@ -295,7 +295,7 @@ export function AppointmentsPage() {
       }
       return true;
     });
-  }, [appointments.data, fPeriod, fType, fWork, fTraining, personById, search, showHistory, today]);
+  }, [appointments.data, fPeriod, fType, fWork, fTrainings, trainingById, personById, search, showHistory, today]);
 
   // Nomes dos agendamentos filtrados, um por linha, sem repetir (mesma ordem da tabela).
   const copyNames = async () => {
@@ -575,7 +575,7 @@ export function AppointmentsPage() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Tipo</Label>
-            <Select value={fType} onValueChange={(v) => { setFType(v); setFWork("all"); setFTraining("all"); }}>
+            <Select value={fType} onValueChange={(v) => { setFType(v); setFWork("all"); setFTrainings([]); }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -590,19 +590,7 @@ export function AppointmentsPage() {
           {fType === "treinamento" ? (
             <div className="space-y-1">
               <Label className="text-xs">Treinamento</Label>
-              <Select value={fTraining} onValueChange={setFTraining}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {trainingFilterOptions.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSearchSelect values={fTrainings} onChange={setFTrainings} options={trainingFilterOptions} allLabel="Todos" searchPlaceholder="Digite a NR" />
             </div>
           ) : (
             <div className="space-y-1">
@@ -635,7 +623,7 @@ export function AppointmentsPage() {
               variant={showHistory ? "default" : "outline"}
               size="sm"
               className="w-full"
-              onClick={() => { setShowHistory((v) => !v); setFWork("all"); setFTraining("all"); }}
+              onClick={() => { setShowHistory((v) => !v); setFWork("all"); setFTrainings([]); }}
             >
               <CalendarClock className="h-4 w-4" />
               {showHistory ? "Ver pendentes" : "Histórico"}
