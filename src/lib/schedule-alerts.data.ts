@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { transportNeedsTravel, travelActiveIds } from "@/lib/travel-active";
 import { fetchAll } from "@/lib/results-engine";
 import { todayISO } from "@/lib/scheduling";
 import { workVtDefault } from "@/lib/transport-rules";
@@ -15,7 +16,7 @@ export async function fetchScheduleAlerts(date: string) {
     safe(fetchAll<any>((a, b) => supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", addDaysIso(date, -14)).lte("schedule_date", date).range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("holidays").select("date").gte("date", addDaysIso(today, -1)).lte("date", addDaysIso(date, 40)).range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, night_shift").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("clients").select("id, name, city, needs_company_transport, needs_transport_voucher").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("clients").select("id, name, city, distance_km, needs_company_transport, needs_transport_voucher").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("collaborators").select("id, full_name, status, contract_type, driver_license_expiry, vt_enabled, city, notice_end, positions(name)").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("driver_id, extra_driver_ids, client_id, extra_client_ids, is_maintenance, is_external, is_suzano_local, vehicles(plate, model)").eq("schedule_date", date).range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, status, client_booked, training_id, client_id, trainings(name), clients(name)").eq("scheduled_date", date).neq("status", "cancelado").range(a, b))),
@@ -25,7 +26,7 @@ export async function fetchScheduleAlerts(date: string) {
   const prevSched = schedules.find((s) => s.schedule_date === prev);
   const recentIds = schedules.filter((s) => s.schedule_date < date).map((s) => s.id);
   const [allocs, prevAllocs, recentAllocs, boxes, vacations, daysOff, medical, workVt, passengers] = await Promise.all([
-    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id, work_id, vt_override").eq("schedule_id", sched.id).range(a, b))) : [],
+    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id, work_id, vt_override, travel_bonus_override").eq("schedule_id", sched.id).range(a, b))) : [],
     prevSched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id, work_id").eq("schedule_id", prevSched.id).range(a, b))) : [],
     recentIds.length ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id").in("schedule_id", recentIds).range(a, b))) : [],
     sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).range(a, b))) : [],
@@ -73,11 +74,19 @@ export async function fetchScheduleAlerts(date: string) {
   }
   // Suzano Local (sem cliente na Transporte) atende a Suzano, como nas Necessidades de transporte.
   const suzanoId = (clients.find((c) => /^suzano$/i.test(String(c.name ?? "").trim())) ?? clients.find((c) => /suzano/i.test(String(c.name ?? ""))))?.id ?? null;
+  // Três Corações: só precisa de carro se alguém escalado tem prêmio viagem ativo (transportNeedsTravel).
+  const travelAllocs = allocs.filter((a: any) => transportNeedsTravel(clientBy.get(workBy.get(a.work_id)?.client_id)?.name));
+  const traveling = travelAllocs.length
+    ? await travelActiveIds(date, sched?.id ?? null, travelAllocs, travelAllocs.map((a: any) => {
+        const c = clientBy.get(workBy.get(a.work_id)?.client_id);
+        return { id: a.work_id, client_name: c?.name, client_city: c?.city, client_distance_km: c?.distance_km };
+      })).catch(() => new Set<string>())
+    : new Set<string>();
   const data: AlertData = {
     date, today, now: new Date(),
     holidays: new Set(holidays.map((h) => h.date)),
     scheduleExists: !!sched,
-    allocations: allocs.map((a: any) => ({ collaborator_id: a.collaborator_id, work_id: a.work_id, vt: vtOf(a) })), prevAllocations: prevAllocs,
+    allocations: allocs.map((a: any) => ({ collaborator_id: a.collaborator_id, work_id: a.work_id, vt: vtOf(a), travel: traveling.has(a.collaborator_id) })), prevAllocations: prevAllocs,
     builtTransport: new Set(passengers.map((p: any) => p.client_id)),
     works: new Map(works.map((w) => [w.id, w as AlertWork])),
     clients: new Map(clients.map((c) => [c.id, { name: c.name, needs_company_transport: c.needs_company_transport }])),

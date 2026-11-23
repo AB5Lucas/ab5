@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { MultiFilter } from "@/components/multi-filter";
+import { transportNeedsTravel, travelActiveIds } from "@/lib/travel-active";
 import {
   Dialog,
   DialogContent,
@@ -740,17 +741,25 @@ export function VehicleTimeline() {
             .neq("status", "cancelled"),
           supabase
             .from("daily_allocations")
-            .select("collaborator_id, works(client_id)")
+            .select("collaborator_id, work_id, travel_bonus_override, works(client_id, clients(name, city, distance_km))")
             .eq("schedule_id", sched.id),
         ]);
         const unavailable = new Set<string>();
         [vacations.data, leaves.data, daysOff.data, appts.data].forEach((list) =>
           (list ?? []).forEach((r) => unavailable.add(r.collaborator_id)),
         );
-        (allocs.data ?? []).forEach((a) => {
-          if (unavailable.has(a.collaborator_id)) return;
-          const cid = (a as unknown as { works: { client_id: string | null } | null }).works?.client_id;
-          if (cid) counts[cid] = (counts[cid] ?? 0) + 1;
+        type A = { collaborator_id: string; work_id: string; travel_bonus_override: boolean | null; works: { client_id: string | null; clients: { name: string | null; city: string | null; distance_km: number | null } | null } | null };
+        const list = ((allocs.data ?? []) as unknown as A[]).filter((a) => !unavailable.has(a.collaborator_id));
+        // Três Corações: só conta quem tem prêmio viagem ativo (quem mora perto vai por conta e não pede carro).
+        const travelOnly = list.filter((a) => transportNeedsTravel(a.works?.clients?.name));
+        const traveling = travelOnly.length
+          ? await travelActiveIds(needsDate, sched.id, travelOnly, travelOnly.map((a) => ({ id: a.work_id, client_name: a.works?.clients?.name, client_city: a.works?.clients?.city, client_distance_km: a.works?.clients?.distance_km })))
+          : new Set<string>();
+        list.forEach((a) => {
+          const cid = a.works?.client_id;
+          if (!cid) return;
+          if (transportNeedsTravel(a.works?.clients?.name) && !traveling.has(a.collaborator_id)) return;
+          counts[cid] = (counts[cid] ?? 0) + 1;
         });
       }
       // Integrações agendadas também viajam para o cliente e somam na necessidade.

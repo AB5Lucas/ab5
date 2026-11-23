@@ -41,7 +41,7 @@ export type AlertData = {
   holidays: Set<string>;
   scheduleExists: boolean;
   /** Pessoas escaladas no dia e no dia anterior (data corrida). */
-  allocations: { collaborator_id: string; work_id: string; vt?: boolean }[];
+  allocations: { collaborator_id: string; work_id: string; vt?: boolean; travel?: boolean }[];
   prevAllocations: { collaborator_id: string; work_id: string }[];
   works: Map<string, AlertWork>;
   clients: Map<string, { name: string; needs_company_transport: boolean | null }>;
@@ -62,6 +62,10 @@ export type AlertData = {
   /** Feriados municipais (catálogo, não automáticos) nas cidades dos clientes com equipe, ainda sem decisão. */
   municipal?: { clientId: string; clientName: string; city: string; name: string }[];
 };
+
+/** Três Corações só pede transporte da empresa quando alguém escalado tem prêmio viagem ativo. Por quê: pedido do usuário. */
+export const transportNeedsTravel = (clientName: string | null | undefined) =>
+  String(clientName ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().includes("TRES CORACOES");
 
 const br = (d: string) => d.split("-").reverse().join("/");
 
@@ -104,7 +108,9 @@ export function scheduleAlerts(d: AlertData): ScheduleAlert[] {
   const teamClients = [...new Set(d.allocations.map((a) => clientOf(a.work_id)).filter((x): x is string => !!x))];
   // Cliente em que todos os escalados vão de VT (ex.: Três Corações com 1 pessoa) ou com transporte montado na aba Serviços não precisa de veículo.
   const allVt = (c: string) => d.allocations.filter((a) => clientOf(a.work_id) === c).every((a) => a.vt);
-  const noTransport = teamClients.filter((c) => d.clients.get(c)?.needs_company_transport && !served.has(c) && !d.builtTransport?.has(c) && !allVt(c)).map((c) => d.clients.get(c)!.name).sort();
+  // Três Corações: sem ninguém com prêmio viagem ativo, ninguém precisa de carro.
+  const noTravel = (c: string) => transportNeedsTravel(d.clients.get(c)?.name) && !d.allocations.some((a) => clientOf(a.work_id) === c && a.travel);
+  const noTransport = teamClients.filter((c) => d.clients.get(c)?.needs_company_transport && !served.has(c) && !d.builtTransport?.has(c) && !allVt(c) && !noTravel(c)).map((c) => d.clients.get(c)!.name).sort();
   if (noTransport.length) out.push({ key: "v9", tone: "red", title: `${noTransport.length} cliente(s) com equipe e sem transporte montado`, people: noTransport });
 
   // V10: descanso menor que 11h entre a saída do dia anterior e a entrada do dia.

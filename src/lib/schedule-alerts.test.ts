@@ -38,6 +38,10 @@ describe("avisos da programação", () => {
     expect(keys(d)).toEqual(expect.arrayContaining(["v8a", "v8b"]));
     expect(keys(d)).not.toContain("v9");
     expect(keys(base({ allocations: [{ collaborator_id: "p2", work_id: "w1" }] }))).toContain("v9");
+    // Três Corações: sem prêmio viagem ativo, não pede carro; com alguém viajando, pede.
+    const tc = { clients: new Map([["cADM", { name: "ADM", needs_company_transport: false }], ["c1", { name: "TRÊS CORAÇÕES", needs_company_transport: true }]]) };
+    expect(keys(base({ ...tc, allocations: [{ collaborator_id: "p2", work_id: "w1" }] }))).not.toContain("v9");
+    expect(keys(base({ ...tc, allocations: [{ collaborator_id: "p2", work_id: "w1", travel: true }] }))).toContain("v9");
     expect(keys(base({ allocations: [{ collaborator_id: "p2", work_id: "w1", vt: true }] }))).not.toContain("v9");
     expect(keys(base({ allocations: [{ collaborator_id: "p2", work_id: "w1" }], builtTransport: new Set(["c1"]) }))).not.toContain("v9");
   });
