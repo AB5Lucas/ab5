@@ -117,6 +117,8 @@ export function AppointmentsPage() {
   const [deleteRow, setDeleteRow] = useState<Row | null>(null);
 
   const [fPeriod, setFPeriod] = useState("all");
+  /** Dia escolhido quando o Período é "Dia específico". */
+  const [fDay, setFDay] = useState(todayISO());
   const [fType, setFType] = useState("all");
   const [fWork, setFWork] = useState("all");
   /** Treinamentos escolhidos (pelo nome; vazio = todos). */
@@ -287,6 +289,7 @@ export function AppointmentsPage() {
         if (fPeriod === "week" && (r.scheduled_date < today || r.scheduled_date > addDays(today, 7)))
           return false;
         if (fPeriod === "late" && r.scheduled_date >= today) return false;
+        if (fPeriod === "day" && r.scheduled_date !== fDay) return false;
       }
       if (q) {
         const p = personById.get(r.collaborator_id);
@@ -295,7 +298,7 @@ export function AppointmentsPage() {
       }
       return true;
     });
-  }, [appointments.data, fPeriod, fType, fWork, fTrainings, trainingById, personById, search, showHistory, today]);
+  }, [appointments.data, fPeriod, fType, fWork, fTrainings, trainingById, personById, search, showHistory, today, fDay]);
 
   // Nomes dos agendamentos filtrados, um por linha, sem repetir (mesma ordem da tabela).
   const copyNames = async () => {
@@ -592,7 +595,7 @@ export function AppointmentsPage() {
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 p-4 md:grid-cols-5">
+        <CardContent className="grid gap-3 p-4 md:grid-cols-3 lg:grid-cols-6">
           <div className="space-y-1">
             <Label className="text-xs">Período</Label>
             <Select value={fPeriod} onValueChange={setFPeriod} disabled={showHistory}>
@@ -605,9 +608,16 @@ export function AppointmentsPage() {
                 <SelectItem value="tomorrow">Amanhã</SelectItem>
                 <SelectItem value="week">Próximos 7 dias</SelectItem>
                 <SelectItem value="late">Atrasados</SelectItem>
+                <SelectItem value="day">Dia específico</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {fPeriod === "day" && !showHistory && (
+            <div className="space-y-1">
+              <Label className="text-xs">Dia</Label>
+              <Input type="date" value={fDay} onChange={(e) => setFDay(e.target.value)} />
+            </div>
+          )}
           <div className="space-y-1">
             <Label className="text-xs">Tipo</Label>
             <Select value={fType} onValueChange={(v) => { setFType(v); setFWork("all"); setFTrainings([]); }}>
