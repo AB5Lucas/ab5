@@ -34,6 +34,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export const EXTERNAL_KEY = "__external__";
 export const MAINTENANCE_KEY = "__maintenance__";
+/** Revisão do veículo: igual à Manutenção (0 km, sem prêmios), só muda o nome (maintenance_kind = revisao). */
+export const REVISION_KEY = "__revision__";
 export const SUZANO_LOCAL_KEY = "__suzano_local__";
 export const KM_SUZANO_LOCAL = 6;
 export const KM_WORK = 50;
@@ -49,6 +51,7 @@ export type VehicleScheduleRow = {
   client_id: string | null;
   is_external: boolean;
   is_maintenance: boolean;
+  maintenance_kind?: string | null;
   driver_bonus: boolean;
   km: number;
   extra_client_ids?: string[];
@@ -139,7 +142,7 @@ type CellForm = {
 const NONE = "__none__";
 const WORK_PREFIX = "w:";
 const ALL_WORKS = "__all_works__";
-const SPECIAL_KEYS = new Set([EXTERNAL_KEY, MAINTENANCE_KEY, SUZANO_LOCAL_KEY]);
+const SPECIAL_KEYS = new Set([EXTERNAL_KEY, MAINTENANCE_KEY, REVISION_KEY, SUZANO_LOCAL_KEY]);
 
 export function VehicleTimeline() {
   const { canWrite } = useCurrentUser();
@@ -317,7 +320,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_work_ids, extra_km, trips, is_suzano_local, work_id, external_place, requester_id, driver_toggle, extra_requester_ids, extra_driver_toggles, adm_place")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, maintenance_kind, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_work_ids, extra_km, trips, is_suzano_local, work_id, external_place, requester_id, driver_toggle, extra_requester_ids, extra_driver_toggles, adm_place")
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -445,7 +448,7 @@ export function VehicleTimeline() {
 
   function extraKm(id: string) {
     if (id === EXTERNAL_KEY) return KM_EXTERNAL;
-    if (id === MAINTENANCE_KEY) return 0;
+    if (id === MAINTENANCE_KEY || id === REVISION_KEY) return 0;
     if (id === SUZANO_LOCAL_KEY) return KM_SUZANO_LOCAL;
     return clientKm.get(id) ?? 0;
   }
@@ -455,6 +458,7 @@ export function VehicleTimeline() {
     if (place && (isIndustryClient(id) || isAdmClient(id))) return place.toUpperCase();
     if (id === EXTERNAL_KEY) return "EXTERNO";
     if (id === MAINTENANCE_KEY) return "MANUTENÇÃO";
+    if (id === REVISION_KEY) return "REVISÃO";
     if (id === SUZANO_LOCAL_KEY) return "SUZANO LOCAL";
     return clientName.get(id) ?? "—";
   }
@@ -480,6 +484,7 @@ export function VehicleTimeline() {
       client_id: string | null;
       is_external: boolean;
       is_maintenance: boolean;
+      maintenance_kind?: string | null | undefined;
       driver_bonus: boolean;
       extra_client_ids?: string[] | undefined;
       extra_driver_ids?: string[] | undefined;
@@ -515,6 +520,7 @@ export function VehicleTimeline() {
       client_id: special ? null : f.client_id,
       is_external: f.is_external,
       is_maintenance: f.is_maintenance,
+      maintenance_kind: f.is_maintenance ? (f.maintenance_kind === "revisao" ? "revisao" : "manutencao") : null,
       driver_bonus: f.is_external || f.is_maintenance || industryPlace ? false : f.driver_bonus,
       trips: Math.max(1, Math.floor(Number(f.trips ?? 1)) || 1),
       is_suzano_local: !!f.is_suzano_local,
@@ -555,7 +561,7 @@ export function VehicleTimeline() {
       driver_id: bw ? chosen(current?.driver_id, req, !!current?.driver_toggle) : current?.driver_id ?? NONE,
       client_id: current
         ? current.is_maintenance
-          ? MAINTENANCE_KEY
+          ? current.maintenance_kind === "revisao" ? REVISION_KEY : MAINTENANCE_KEY
           : current.is_external
             ? EXTERNAL_KEY
             : current.is_suzano_local
@@ -587,7 +593,8 @@ export function VehicleTimeline() {
       return;
     }
     const isExternal = form.client_id === EXTERNAL_KEY;
-    const isMaintenance = form.client_id === MAINTENANCE_KEY;
+    const isRevision = form.client_id === REVISION_KEY;
+    const isMaintenance = form.client_id === MAINTENANCE_KEY || isRevision;
     const isLocal = form.client_id === SUZANO_LOCAL_KEY;
     const workId = form.client_id.startsWith(WORK_PREFIX) ? form.client_id.slice(WORK_PREFIX.length) : null;
     // Caminhão/pickup: o motorista que vale (prêmio, CNH, ranking) é o marcado no toggle; sem ele, o solicitante.
@@ -608,6 +615,7 @@ export function VehicleTimeline() {
       trips: Number(form.trips) || 1,
       is_external: isExternal,
       is_maintenance: isMaintenance,
+      maintenance_kind: isRevision ? "revisao" : isMaintenance ? "manutencao" : null,
       driver_bonus: form.driver_bonus,
       extra_client_ids: form.extras,
       extra_driver_ids: form.extras.map((_, i) => eff(!!form.extraToggles[i], form.extraDrivers[i] ?? NONE, form.extraRequesters[i] ?? NONE)),
@@ -637,7 +645,7 @@ export function VehicleTimeline() {
           driver_id: src.driver_id,
           client_id: src.client_id,
           is_external: src.is_external,
-          is_maintenance: src.is_maintenance ?? false,
+          is_maintenance: src.is_maintenance ?? false, maintenance_kind: src.maintenance_kind,
           driver_bonus: src.driver_bonus,
           extra_client_ids: src.extra_client_ids,
           extra_driver_ids: src.extra_driver_ids,
@@ -676,7 +684,7 @@ export function VehicleTimeline() {
             driver_id: s.driver_id,
             client_id: s.client_id,
             is_external: s.is_external,
-            is_maintenance: s.is_maintenance ?? false,
+            is_maintenance: s.is_maintenance ?? false, maintenance_kind: s.maintenance_kind,
             driver_bonus: s.driver_bonus,
             extra_client_ids: s.extra_client_ids,
             extra_driver_ids: s.extra_driver_ids,
@@ -810,7 +818,7 @@ export function VehicleTimeline() {
     placesDone.current = placesSig;
     void (async () => {
       const { data, error } = await supabase.from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_km, trips, is_suzano_local, work_id, external_place, place_toll")
+        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, maintenance_kind, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_km, trips, is_suzano_local, work_id, external_place, place_toll")
         .gte("schedule_date", LOGISTICS_START).or("external_place.not.is.null,extra_places.neq.{}");
       if (error || !data) return;
       let changed = 0;
@@ -886,6 +894,7 @@ export function VehicleTimeline() {
     const base = fr.client.startsWith(WORK_PREFIX) ? workById.get(fr.client.slice(WORK_PREFIX.length))?.client_id ?? "" : fr.client;
     if (fr.client === NONE) return "";
     if (fr.client === MAINTENANCE_KEY) return "Manutenção: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem.";
+    if (fr.client === REVISION_KEY) return "Revisão: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem.";
     if (fr.client === SUZANO_LOCAL_KEY) return `Suzano Local: ${KM_SUZANO_LOCAL} km de ida por viagem (${KM_SUZANO_LOCAL * 2} km ida e volta).`;
     if (fr.client === EXTERNAL_KEY) return `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`;
     if (isAdmClient(base)) return i === 0 ? "ADM: digite o km de ida do dia; é ele que define a faixa do Prêmio Motorista." : `${extraKm(base)} km (ADM)`;
@@ -940,6 +949,7 @@ export function VehicleTimeline() {
             <SelectContent>
               {clientOptions()}
               <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
+              <SelectItem value={REVISION_KEY}>REVISÃO</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1169,7 +1179,7 @@ export function VehicleTimeline() {
                             >
                               {Number(row.km) + Number(row.extra_km ?? 0)}km{" "}
                               {row.is_maintenance
-                                ? "MANUTENÇÃO"
+                                ? row.maintenance_kind === "revisao" ? "REVISÃO" : "MANUTENÇÃO"
                                 : row.is_external
                                   ? (row.external_place || "EXTERNO").toUpperCase()
                                   : row.is_suzano_local
@@ -1260,8 +1270,8 @@ export function VehicleTimeline() {
                 <Label className="block">Prêmio de Motorista</Label>
                 <div className="flex h-10 items-center">
                   <Switch
-                    checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY && form.client_id !== MAINTENANCE_KEY && !(isIndustryClient(truckClient) && form.external_place.trim())}
-                    disabled={form.client_id === EXTERNAL_KEY || form.client_id === MAINTENANCE_KEY || (isIndustryClient(truckClient) && !!form.external_place.trim())}
+                    checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY && form.client_id !== MAINTENANCE_KEY && form.client_id !== REVISION_KEY && !(isIndustryClient(truckClient) && form.external_place.trim())}
+                    disabled={form.client_id === EXTERNAL_KEY || form.client_id === MAINTENANCE_KEY || form.client_id === REVISION_KEY || (isIndustryClient(truckClient) && !!form.external_place.trim())}
                     onCheckedChange={(v) => setForm((f) => ({ ...f, driver_bonus: v }))}
                   />
                 </div>

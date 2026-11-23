@@ -5741,6 +5741,7 @@ export type Database = {
       }
       vehicle_schedules: {
         Row: {
+          maintenance_kind: string | null
           adm_place: string | null
           client_id: string | null
           created_at: string
@@ -5770,6 +5771,7 @@ export type Database = {
           work_id: string | null
         }
         Insert: {
+          maintenance_kind?: string | null
           adm_place?: string | null
           client_id?: string | null
           created_at?: string
@@ -5799,6 +5801,7 @@ export type Database = {
           work_id?: string | null
         }
         Update: {
+          maintenance_kind?: string | null
           adm_place?: string | null
           client_id?: string | null
           created_at?: string
