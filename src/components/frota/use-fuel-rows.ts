@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/results-engine";
 import { normalizePlate, registeredPlate } from "@/lib/fleet-costs";
-import { canonicalDriver, closestPlate, fixedRateio, fuelRateio, isoDay, withDateFix, matchDriverName, nameKey, plateRuleSplit, titleCase, type CcSplitItem, noteStatus, otherPlates, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
+import { canonicalDriver, closestPlate, fixedRateio, scaleRateio, fuelRateio, isoDay, withDateFix, matchDriverName, nameKey, plateRuleSplit, titleCase, type CcSplitItem, noteStatus, otherPlates, type ItemAccount, type Rateio, type RateioClient, type RateioWork } from "@/lib/fleet-notes";
 import { monthsInRange, type DayRange } from "@/components/date-range-picker";
 import { useCnhPeople, useFleetRelease } from "./liberacao";
 import { GUACU_CNPJ } from "@/lib/fleet-balance";
@@ -115,7 +115,7 @@ export function useFuelRows(range: DayRange) {
       const acc = (accounts.data ?? []) as ItemAccount[];
       const split = (Array.isArray(n.cc_split) ? n.cc_split : []) as unknown as CcSplitItem[];
       const plateSplit = plateRuleSplit(p, acc);
-      const rateio = n.approved_at && n.allocation ? (n.allocation as unknown as Rateio)
+      const rateio = n.approved_at && n.allocation ? scaleRateio(n.allocation as unknown as Rateio, Number(n.total ?? 0))
         // CCs informados à mão no Editar (um ou mais, com %): sem rateio pela Transporte.
         : split.length ? fixedRateio(split, Number(n.total ?? 0), day, "CC informado à mão", acc)
         : n.cc_fix ? fixedRateio([{ cc_code: n.cc_fix, item_account: n.item_account_fix, label: n.cc_label_fix, pct: 100 }], Number(n.total ?? 0), day, "CC informado à mão", acc)

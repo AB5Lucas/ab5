@@ -519,3 +519,13 @@ export function maintenanceState(plan: MaintenancePlan | null, last: { km: numbe
   const near = (kmLeft != null && ik != null && kmLeft <= ik * 0.1) || (daysLeft != null && daysLeft <= 30);
   return { lastKm, lastDate, nextKm, nextDate, kmLeft, daysLeft, status: over ? "vencida" : near ? "perto" : "em-dia" };
 }
+
+/** Rateio congelado na aprovação, ajustado ao valor atual da linha (ex.: nota de dois combustíveis dividida depois). Mantém os %; centavos na maior parte. */
+export function scaleRateio(r: Rateio, total: number): Rateio {
+  const sum = r.parts.reduce((s, p) => s + Number(p.value || 0), 0);
+  if (!r.parts.length || Math.abs(sum - total) < 0.005) return r;
+  const parts = r.parts.map((p) => ({ ...p, value: Math.round((sum > 0 ? (Number(p.value || 0) / sum) : p.pct / 100) * total * 100) / 100 }));
+  const diff = Math.round((total - parts.reduce((s, p) => s + p.value, 0)) * 100) / 100;
+  if (diff) { const big = parts.reduce((a, b) => (b.value > a.value ? b : a)); big.value = Math.round((big.value + diff) * 100) / 100; }
+  return { ...r, parts };
+}
