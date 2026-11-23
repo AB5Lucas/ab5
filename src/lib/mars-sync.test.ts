@@ -125,3 +125,16 @@ describe("categoria (coluna B)", () => {
     expect(findBoilerWork([{ id: "b", name: "Base Calderaria", quote_number: null, orders: [] }])?.id).toBe("b");
   });
 });
+
+describe("item só com Nº Orç. (sem pedido)", () => {
+  it("entra na leitura com a chave do orçamento e pedido vazio", () => {
+    const rows = parseMarsSheet([
+      ["GESTÃO DE ORDENS DE SERVIÇOS"],
+      ["Nº ORÇ.", "N° PEDIDO", "CLIENTE", "CATEGORIA", "DESCRIÇÃO", "VALOR", "STATUS"],
+      ["26/700", "", "A", "Limpeza", "LIMPEZA NOVA", 1500, "Em execução"],
+      ["26/701", "SEM PEDIDO", "A", "Limpeza", "OUTRA LIMPEZA", 900, "Em execução"],
+    ]);
+    const out = rowsToSync(rows, false);
+    expect(out.map((r) => [r.key, r.order])).toEqual([["Q:26/700", null], ["Q:26/701", null]]);
+  });
+});
