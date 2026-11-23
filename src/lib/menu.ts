@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   Clock,
   FileCheck,
+  CalendarClock,
   FileText,
   Fuel,
   Gauge,
@@ -74,6 +75,7 @@ const RAW_GROUPS: MenuGroup[] = [
     label: "Documentos",
     icon: ShieldCheck,
     items: [
+      { title: "Agendamentos", url: "/documentos/agendamentos", icon: CalendarClock },
       { title: "Documentação", url: "/agendamentos", icon: FileCheck },
       { title: "Conferência", url: "/conferencia", icon: ClipboardCheck },
       { title: "Certificados", url: "/demandas/certificados", icon: GraduationCap },

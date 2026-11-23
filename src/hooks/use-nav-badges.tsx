@@ -22,7 +22,7 @@ function useBadgeData() {
   // Cada bloco só é lido por quem acessa a página do aviso (antes todos os usuários liam tudo).
   const { canAccess, loading } = useAccess();
   const can = {
-    docs: canAccess("/agendamentos") || canAccess("/conferencia"),
+    docs: canAccess("/agendamentos") || canAccess("/documentos/agendamentos") || canAccess("/conferencia"),
     purchases: canAccess("/obras/compras"),
     orders: canAccess("/fechamentos/suzano"),
     billing: canAccess("/relatorios/sincronizacao"),
@@ -136,10 +136,14 @@ export function useMenuBadges() {
   if (w?.andaimes) out["/andaimes/solicitacoes"] = { count: w.andaimes, tone: "red", detail: `${w.andaimes} solicitação(ões) aguardando você` };
   if (w?.hiring) out["/demandas/contratacoes"] = { count: w.hiring, tone: w.hiringTone ?? "red", detail: `${w.hiring} contratação(ões) com novidade` };
   if (d) {
-    const docs = toBadge(d);
+    // Agendamentos é página própria (Documentos › Agendamentos); a Documentação soma só ASO, integrações, treinamentos e EPI.
+    const ag = toBadge(d.byKind["agendamentos"]);
+    if (ag) out["/documentos/agendamentos"] = { ...ag, detail: `Agendamentos: ${[d.byKind["agendamentos"]!.expired ? `${d.byKind["agendamentos"]!.expired} atrasado(s)` : "", d.byKind["agendamentos"]!.expiring ? `${d.byKind["agendamentos"]!.expiring} a vencer` : ""].filter(Boolean).join(", ")}` };
+    const docKinds = Object.entries(d.byKind).filter(([k]) => k !== "agendamentos");
+    const docs = toBadge({ expired: docKinds.reduce((a, [, v]) => a + Number(v.expired), 0), expiring: docKinds.reduce((a, [, v]) => a + Number(v.expiring), 0) });
     if (docs) {
-      const names: Record<string, string> = { agendamentos: "Agendamentos atrasados", aso: "ASO", int: "Integrações", trn: "Treinamentos", epi: "Fichas de EPI" };
-      const parts = Object.entries(d.byKind).filter(([, v]) => v.expired + v.expiring)
+      const names: Record<string, string> = { aso: "ASO", int: "Integrações", trn: "Treinamentos", epi: "Fichas de EPI" };
+      const parts = docKinds.filter(([, v]) => v.expired + v.expiring)
         .map(([k, v]) => `${names[k] ?? k}: ${[v.expired ? `${v.expired} vencido(s)` : "", v.expiring ? `${v.expiring} a vencer` : ""].filter(Boolean).join(", ")}`);
       out["/agendamentos"] = { ...docs, detail: parts.join(" · ") };
     }
