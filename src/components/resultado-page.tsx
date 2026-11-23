@@ -249,7 +249,28 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   };
   // Tabela de horas por função (serve ao diálogo de valores e ao relatório exportado)
   const hhData = { data: useMemo(() => aggHH("0000-01-01", "9999-12-31"), [hhRaw.data]), isLoading: hhRaw.isLoading };
-  const hhValue = (hhData.data ?? []).reduce((a, r) => a + r.hours * num(hhRates[r.id] ?? ""), 0);
+  // Valor HH por função, sem o nível: "Pedreiro" vale para Pedreiro N1..N4 (gravado em todos os ids da função).
+  const hhFns = useMemo(() => {
+    if (!hhData.data || !hhRaw.data) return [] as { key: string; name: string; hours: number; ids: string[] }[];
+    const labelOf = (id: string) => (id === "none" ? "Sem função" : positionLabel(hhRaw.data!.names.get(id)) ?? "—");
+    const byLabel = new Map<string, { key: string; name: string; hours: number; ids: string[] }>();
+    for (const r of hhData.data) {
+      const name = labelOf(r.id);
+      const key = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      const g = byLabel.get(key) ?? { key, name, hours: 0, ids: [] };
+      g.hours += r.hours;
+      byLabel.set(key, g);
+    }
+    // Todos os níveis cadastrados da função (inclusive os que ainda não apareceram no RDO)
+    for (const [id] of hhRaw.data.names) {
+      const k = labelOf(id).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      byLabel.get(k)?.ids.push(id);
+    }
+    for (const g of byLabel.values()) if (g.name === "Sem função") g.ids.push("none");
+    return [...byLabel.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [hhData.data, hhRaw.data]);
+  const fnRate = (g: { ids: string[] }) => g.ids.map((id) => hhRates[id]).find((v) => v != null && v !== "") ?? "";
+  const hhValue = hhFns.reduce((a, g) => a + g.hours * num(fnRate(g)), 0);
   const hhSavedWork = works.data?.find((x) => x.id === workId) as any;
 
   // HH: custo orçado de MO e transporte proporcional às horas/dias dos RDOs
@@ -1301,12 +1322,13 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
               {hhData.isLoading && <p className="text-sm text-muted-foreground">Carregando horas dos RDOs...</p>}
               {!hhData.isLoading && !(hhData.data ?? []).length && <p className="text-sm text-muted-foreground">Nenhuma hora apontada em RDO neste serviço.</p>}
               <div className="max-h-[60vh] space-y-2 overflow-y-auto">
-                {(hhData.data ?? []).map((r) => (
-                  <div key={r.id} className="grid grid-cols-[1fr_70px_110px_110px] items-center gap-2 text-sm">
-                    <span>{r.name}</span>
-                    <span className="text-right text-muted-foreground">{r.hours.toFixed(1).replace(".", ",")}h</span>
-                    <Input placeholder="R$/h" value={hhRates[r.id] ?? ""} onChange={(e) => setHhRates((m) => ({ ...m, [r.id]: e.target.value }))} />
-                    <span className="text-right">{brl(r.hours * num(hhRates[r.id] ?? ""))}</span>
+                <p className="text-xs text-muted-foreground">Valor por função, sem o nível: vale para todos os níveis (N1 a N4).</p>
+                {hhFns.map((g) => (
+                  <div key={g.key} className="grid grid-cols-[1fr_70px_110px_110px] items-center gap-2 text-sm">
+                    <span>{g.name}</span>
+                    <span className="text-right text-muted-foreground">{g.hours.toFixed(1).replace(".", ",")}h</span>
+                    <Input placeholder="R$/h" value={fnRate(g)} onChange={(e) => { const v = e.target.value; setHhRates((m) => ({ ...m, ...Object.fromEntries(g.ids.map((id) => [id, v])) })); }} />
+                    <span className="text-right">{brl(g.hours * num(fnRate(g)))}</span>
                   </div>
                 ))}
               </div>
