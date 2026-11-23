@@ -1839,7 +1839,8 @@ export function SchedulePlannerBoard({
                       {g.label}
                     </h2>
                     {(() => {
-                      const occ = (pendingOcc.data ?? []).filter((o) => ids.has(o.work_id));
+                      // Só conta quem ainda está no quadro: tirou a pessoa do cliente, o "!" sai.
+                      const occ = (pendingOcc.data ?? []).filter((o) => ids.has(o.work_id) && rows.some((r) => r.collaborator_id === o.collaborator_id && ids.has(r.work_id)));
                       if (!occ.length) return null;
                       return (
                         <button
