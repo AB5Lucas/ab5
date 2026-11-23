@@ -838,7 +838,7 @@ export function SchedulePlannerBoard({
   }, [appointments.data]);
 
   /** Mensagem pronta (WhatsApp) para uma caixa de situação. */
-  const buildBoxMessage = (boxKey: string, boxLabel: string, names: string[]) => {
+  const buildBoxMessage = (boxKey: string, boxLabel: string, names: string[], ids: string[] = []) => {
     const list = names.join("\n");
     const appts = appointmentsByBox.get(boxKey) ?? [];
     const first = appts[0];
@@ -855,14 +855,31 @@ export function SchedulePlannerBoard({
       ].join("\n");
     }
     if (boxKey === "treinamento") {
-      const nr = first?.trainings?.name ?? "";
-      return [
-        `*TREINAMENTO ${nr}*`.replace(" *", "*"),
-        `${dayLine(date)}${hour ? ` as ${hour}` : ""}`,
-        "Local: Sala de Treinamentos AB5",
-        "",
-        list,
-      ].join("\n");
+      // Um bloco por treinamento e horário: no mesmo quadro pode haver NR-33 e NR-35, cada um com a sua turma.
+      const byPerson = new Map(appts.map((a) => [a.collaborator_id, a]));
+      const groups = new Map<string, { nr: string; time: string | null; names: string[] }>();
+      names.forEach((n, i) => {
+        const a = byPerson.get(ids[i] ?? "") ?? first;
+        const nr = a?.trainings?.name ?? "";
+        const time = a?.scheduled_time ?? null;
+        const k = `${nr}|${time ?? ""}`;
+        const g = groups.get(k) ?? { nr, time, names: [] };
+        g.names.push(n);
+        groups.set(k, g);
+      });
+      return [...groups.values()]
+        .sort((x, y) => (x.time ?? "").localeCompare(y.time ?? "") || x.nr.localeCompare(y.nr, "pt-BR", { numeric: true }))
+        .map((g) => {
+          const h = hourLabel(g.time);
+          return [
+            `*TREINAMENTO ${g.nr}*`.replace(" *", "*"),
+            `${dayLine(date)}${h ? ` as ${h}` : ""}`,
+            "Local: Sala de Treinamentos AB5",
+            "",
+            g.names.join("\n"),
+          ].join("\n");
+        })
+        .join("\n\n");
     }
     if (boxKey.startsWith(INTEGRATION_PREFIX) || boxKey === "integracao") {
       const client = first?.clients?.name ?? integrationClientOf(boxKey);
@@ -2190,11 +2207,11 @@ export function SchedulePlannerBoard({
                       aria-label="Copiar mensagem"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const names = [
-                          ...autoRows.map((a) => nameOf(a.id)),
-                          ...boxRows.map((r) => nameOf(r.collaborator_id)),
-                        ].filter(Boolean);
-                        void copyToClipboard(buildBoxMessage(b.key, b.label, names));
+                        const people = [
+                          ...autoRows.map((a) => ({ id: a.id, name: nameOf(a.id) })),
+                          ...boxRows.map((r) => ({ id: r.collaborator_id, name: nameOf(r.collaborator_id) })),
+                        ].filter((x) => x.name);
+                        void copyToClipboard(buildBoxMessage(b.key, b.label, people.map((x) => x.name), people.map((x) => x.id)));
                       }}
                     >
                       <Copy className="h-3 w-3" />
