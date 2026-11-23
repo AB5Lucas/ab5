@@ -58,7 +58,9 @@ export function FilterHead<T>({ column, rows, filters, setFilters, sort, setSort
   const all = useMemo(() => {
     const s = new Set<string>();
     for (const r of rows) for (const v of cellValues(column, r)) s.add(v);
-    return [...s].sort((a, b) => (a === EMPTY_VALUE ? 1 : b === EMPTY_VALUE ? -1 : a.localeCompare(b, "pt-BR", { numeric: true })));
+    // Datas dd/mm/aaaa em ordem de calendário (não pelo dia).
+    const key = (v: string) => v.replace(/^(\d{2})\/(\d{2})\/(\d{4})$/, "$3-$2-$1");
+    return [...s].sort((a, b) => (a === EMPTY_VALUE ? 1 : b === EMPTY_VALUE ? -1 : key(a).localeCompare(key(b), "pt-BR", { numeric: true })));
   }, [rows, column]);
   const current = filters[column.key];
   const list = all.filter((v) => v.toLowerCase().includes(q.trim().toLowerCase()));

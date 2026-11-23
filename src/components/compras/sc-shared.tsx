@@ -98,10 +98,9 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
         {r.return_notes && (r.stage === "rascunho" || (r.stage === "aprovacao" && r.return_notes.startsWith("Comprador (ao validador)"))) && <div className="max-w-56 truncate text-[11px] text-destructive">devolvida · {r.return_notes}</div>}
       </> },
     { key: "status", label: "Status", values: (r) => [r.status], className: "whitespace-nowrap",
-      cell: (r) => <>
-        <Pill className={statusClass(r.status)}>{r.status}</Pill>
-        <div className="text-[11px] text-muted-foreground">{brDate(r.status_at)}</div>
-      </> },
+      cell: (r) => <Pill className={statusClass(r.status)}>{r.status}</Pill> },
+    { key: "status_at", label: "Data do status", values: (r) => [r.status_at ? brDate(r.status_at) : ""], sort: (r) => r.status_at, className: "whitespace-nowrap",
+      cell: (r) => (r.status_at ? brDate(r.status_at) : "—") },
     { key: "buyer", label: "Obs. comprador", values: (r) => [r.buyer_notes ?? ""], className: "max-w-48 truncate", cell: (r) => r.buyer_notes ?? "—" },
   ];
   const shown = applyColumnFilters(rows, cols, filters, sort);
