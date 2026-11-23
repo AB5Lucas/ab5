@@ -1,4 +1,4 @@
-import type { Rateio } from "./fleet-notes";
+import { scaleRateio, type Rateio } from "./fleet-notes";
 
 /** CC fictício para abastecimentos pagos no ticket: escolhido no Editar, fica fora da tabela da subaba Fiscal. */
 export const TICKET_CC = "TICKET";
@@ -12,7 +12,7 @@ type TicketNote = { total: number | null; approved_at?: string | null; allocatio
  */
 export function ticketValue(n: TicketNote): number {
   const total = Number(n.total ?? 0);
-  const alloc = n.approved_at ? (n.allocation as Rateio | null) : null;
+  const alloc = n.approved_at && n.allocation ? scaleRateio(n.allocation as Rateio, total) : null;
   if (alloc?.parts?.length) return alloc.parts.filter((p) => isTicketCc(p.cc)).reduce((s, p) => s + Number(p.value ?? 0), 0);
   const split = (Array.isArray(n.cc_split) ? n.cc_split : []) as { cc_code: string; pct: number }[];
   if (split.length) {

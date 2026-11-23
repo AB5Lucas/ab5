@@ -72,7 +72,7 @@ export function HolidaysSettings({ canWrite }: { canWrite: boolean }) {
   const move = useMutation({
     mutationFn: async () => {
       if (!moving || !moveTo) throw new Error("Escolha o novo dia.");
-      const { error } = await supabase.rpc("holiday_move", { _date: moving.date, _new_date: moveTo, _client_id: moveScope === ALL ? null : moveScope });
+      const { error } = await supabase.rpc("holiday_move", { _date: moving.date, _new_date: moveTo, _client_id: (moveScope === ALL ? null : moveScope) as string });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Feriado trocado"); setMoving(null); setMoveTo(""); setMoveScope(ALL); refresh(); },
