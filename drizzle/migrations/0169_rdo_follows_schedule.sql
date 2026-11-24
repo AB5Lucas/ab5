@@ -101,7 +101,9 @@ BEGIN
   DELETE FROM public.rdo_workforce x
    WHERE x.rdo_id = r.id AND x.planned
      AND NOT (x.collaborator_id = ANY(v_planned))
-     AND ((x.present AND x.occurrence_status = 'none') OR x.collaborator_id = ANY(v_blocked));
+     AND ((x.present AND x.occurrence_status = 'none') OR x.collaborator_id = ANY(v_blocked))
+     -- Só linhas nunca editadas (horário/horas/função mexidos pelo encarregado ficam).
+     AND x.updated_at <= x.created_at + interval '5 seconds' AND x.worked_hours IS NULL;
 END $function$;
 
 -- RDOs em rascunho afetados por alterações de alocação (serviço + dia; RDO Geral do cliente do serviço).
