@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { SearchSelect } from "@/components/search-select";
 import { cn } from "@/lib/utils";
 import { CARRIER_LABEL, cnhCovers, demandAlerts, kg, KIND_LABEL, loadSummary, suggestVehicles } from "@/lib/logistics";
-import { LOG_KEY, useLogData, useTransportBusy, type DemandRow } from "./use-log-data";
+import { LOG_KEY, transportConflict, useLogData, useTransportBusy, type DemandRow } from "./use-log-data";
 
 const NONE = "__none__";
 type ItemDraft = { material_id: string | null; description: string; qty: string; unit_weight_kg: string; length_m: string; unit_volume_m3: string };
@@ -71,7 +71,7 @@ export function DemandDialog({ open, onOpenChange, demand, preset, overlap }: {
       scheduled_date: f.scheduled_date || null, departure_time: f.departure_time || null, vehicle_id: f.vehicle_id === NONE ? null : f.vehicle_id,
       driver_id: f.driver_id === NONE ? null : f.driver_id, trips: Math.max(1, n(f.trips)), origin_id: null, dest_id: null, contact: null, notes: null, message_sent_at: demand?.message_sent_at ?? null },
     { today: todayISO(), now: new Date(), items: logItems, vehicle, driver, origin, dest, rules: b?.rules ?? [],
-      transportBusy: !!(vehicle && f.scheduled_date && busy.data?.has(`${vehicle.id}|${f.scheduled_date}`)), overlapVehicle: overlap?.vehicle, overlapPlace: overlap?.place },
+      ...(vehicle ? transportConflict(busy.data, vehicle.id, f.driver_id === NONE ? null : f.driver_id, f.scheduled_date || null) : {}), overlapVehicle: overlap?.vehicle, overlapPlace: overlap?.place },
   );
   // Ao escolher o veículo, as viagens vêm do cálculo (dá para mudar).
   const pickVehicle = (id: string) => { const sg = suggestions.find((x) => x.vehicle.id === id); setF((x) => ({ ...x, vehicle_id: id, trips: sg ? String(sg.trips) : x.trips })); };

@@ -6,7 +6,8 @@ import { billedUntil, contractValueFraction } from "@/lib/contract";
 import { resplitClient } from "@/lib/resplit";
 import { laborCost, nightHours, ENCARGOS } from "@/lib/labor-cost";
 import { buildDistanceLookup } from "@/lib/city-distance";
-import { workVtDefault } from "@/lib/transport-rules";
+import { buildTransport, driverBonusFor, travelOnFor, vtForDay, type PassengerRow } from "@/lib/transport-rules";
+import { driverBonusDays, freightShares, type BonusFreight } from "@/lib/driver-bonus";
 import { holidaysForClient, type ClientHoliday } from "@/lib/holidays";
 import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingIndex, type LodgingStay } from "@/lib/lodging";
 import { fetchAll } from "./fetch-all";
@@ -53,8 +54,8 @@ const RESPLIT_AT = new Map<string, number>();
 
 /** Query-scoped shared inputs: no singleton cache across users or requests. */
 export async function loadResultShared() {
-  const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations, lodgingStays] = await Promise.all([
-    fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled, positions(name)").order("id").range(a, b)),
+  const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations, lodgingStays, industryIds] = await Promise.all([
+    fetchAll<any>((a, b) => supabase.from("collaborators").select(PEOPLE_COLS).order("id").range(a, b)),
     fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("schedule_id, collaborator_id, daily_schedules(schedule_date)").in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).order("id").range(a, b)),
     fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").order("id").range(a, b)),
     supabase.from("transport_voucher_rules").select("*").eq("active", true),
@@ -65,18 +66,64 @@ export async function loadResultShared() {
     fetchAll<any>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").order("id").range(a, b)),
     fetchAll<any>((a, b) => supabase.from("vacations").select("collaborator_id, start_date, end_date").order("id").range(a, b)),
     fetchAll<any>((a, b) => supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").order("id").range(a, b)).catch(() => [] as any[]),
+    loadIndustryIds(),
   ]);
   for (const result of [vtRules, dbRules, tbRules, cityDist]) if (result.error) throw result.error;
-  return { people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations, lodgingStays };
+  return { people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations, lodgingStays, industryIds };
 }
+
+const PEOPLE_COLS = "id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, vt_always_full, travel_bonus_enabled, positions(name)";
+
+/** Clientes Indústria (frete extra com local digitado = viagem fora, sem prêmio motorista). */
+export async function loadIndustryIds(): Promise<string[]> {
+  const { data, error } = await supabase.from("clients").select("id").ilike("name", "%ind_stria%");
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((c) => c.id as string).sort();
+}
+
+/** Serviços HH (dos ids pedidos) com RDO depois de `until`: para eles o corte "até o último RDO" não se aplica. */
+export async function hhRdoAfter(workIds: string[], until: string): Promise<string[]> {
+  const out: string[] = [];
+  if (!workIds.length) return out;
+  const { data: hh, error: e } = await supabase.from("works").select("id").in("id", workIds).eq("hh_enabled", true);
+  if (e) throw e;
+  for (const id of ((hh ?? []) as any[]).map((w) => w.id as string).sort()) {
+    const { data, error } = await supabase.from("rdo_workforce").select("work_id").eq("work_id", id).gt("report_date", until).range(0, 0);
+    if (error) throw error;
+    if (data?.length) out.push(id);
+  }
+  return out;
+}
+
+/** Colunas da Transporte usadas pelos Resultados (fretes principal e extras, prêmio motorista). */
+export const VS_COLS = "schedule_date, km, trips, extra_km, client_id, work_id, driver_id, driver_bonus, is_suzano_local, is_external, is_maintenance, external_place, place_toll, extra_client_ids, extra_driver_ids, extra_work_ids, extra_places, vehicles(km_rate, plate, assign_by_work), collaborators(full_name)";
+export const isSuzanoName = (name: string | null | undefined) => /suzano/i.test(String(name ?? ""));
+/** Linha da Transporte com frete para o cliente: principal, extra ou Suzano Local (só para a Suzano). */
+export const vsTouchesClient = (v: any, clientId: string, suzano: boolean) =>
+  v.client_id === clientId || ((v.extra_client_ids ?? []) as string[]).includes(clientId) || (suzano && v.is_suzano_local === true);
+/** Motoristas das linhas (principal e fretes extras). */
+export const vsDriverIds = (rows: any[]) => [...new Set(rows.flatMap((v) => [v.driver_id, ...((v.extra_driver_ids ?? []) as string[])]).filter(Boolean))].sort() as string[];
+export const vsOfDrivers = (v: any, drivers: Set<string>) => (!!v.driver_id && drivers.has(v.driver_id)) || ((v.extra_driver_ids ?? []) as string[]).some((d) => !!d && drivers.has(d));
+/** Clientes das linhas (principal e extras), para ler o transporte montado deles. */
+export const vsClientIds = (rows: any[], extra: (string | null | undefined)[] = []) =>
+  [...new Set([...extra, ...rows.flatMap((v) => [v.client_id, ...((v.extra_client_ids ?? []) as string[])])].filter(Boolean))].sort() as string[];
 
 export function sliceResultRaw(raw: any, workId: string) {
   return { ...raw, clientWorkTravelRows: raw.clientWorkTravelRows ?? raw.workTravelRows, allocs: raw.allocs.filter((r: any) => r.work_id === workId), rdoWf: raw.rdoWf.filter((r: any) => r.work_id === workId), progress: raw.progress.filter((r: any) => r.work_id === workId), entries: raw.entries.filter((r: any) => r.work_id === workId), workTravelRows: raw.workTravelRows.filter((r: any) => r.work_id === workId) };
 }
 
 /** Carrega os dados brutos de um serviço (ou de vários, em "Todos os serviços"). */
-export async function loadWorkData(work: any, workIds: string[], canWrite: boolean, shared?: Awaited<ReturnType<typeof loadResultShared>>): Promise<any> {
+/**
+ * opts.until (AAAA-MM-DD): último dia que interessa (fim do período pedido). Lê escala, RDO, Transporte e custos só até
+ * esse dia (o andamento é acumulado: o começo nunca é cortado). Faturamento e andamento (% conclusão) continuam inteiros
+ * porque definem o corte de contrato/andamento. Sem until, a leitura é a de sempre.
+ */
+export async function loadWorkData(work: any, workIds: string[], canWrite: boolean, shared?: Awaited<ReturnType<typeof loadResultShared>>, opts: { until?: string | undefined } = {}): Promise<any> {
       const w = work;
+      const until = opts.until;
+      const upTo = (q: any, col: string) => (until ? q.lte(col, until) : q);
+      const allocCols = (base: string) => (until ? base.replace("daily_schedules(schedule_date)", "daily_schedules!inner(schedule_date)") : base);
+      const allocUpTo = (q: any) => upTo(q, "daily_schedules.schedule_date");
       const generated = await supabase.rpc("generate_recurring_entries", { _work_ids: workIds });
       if (generated.error) throw generated.error;
       // Rateios vigentes: refaz pelas horas atuais (inclui serviços novos com horas no mês)
@@ -85,22 +132,21 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         const { data: sib } = await supabase.from("works").select("id").eq("client_id", w.client_id);
         await resplitClient((sib ?? []).map((x) => x.id)).catch(() => false);
       }
-      const [allocs, rdoWf, progress, entries, people, siblings, vs, client] = await Promise.all([
+      const [allocs, rdoWf, progress, entries, people, siblings, client] = await Promise.all([
         fetchAll<any>((a, b) =>
-          supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", workIds).order("id").range(a, b),
+          allocUpTo(supabase.from("daily_allocations").select(allocCols("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)")).in("work_id", workIds)).order("id").range(a, b),
         ),
         fetchAll<any>((a, b) =>
-          supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, position_id, collaborators(position_id), rdos(shift)").in("work_id", workIds).order("id").range(a, b),
+          upTo(supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, position_id, collaborators(position_id), rdos(shift)").in("work_id", workIds), "report_date").order("id").range(a, b),
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
-        fetchAll<any>((a, b) => supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", workIds).order("entry_date", { ascending: false }).order("id").range(a, b)),
-        shared ? Promise.resolve(shared.people) : fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled, positions(name)").order("id").range(a, b)),
+        // Faturamento sempre inteiro (corte do contrato); os demais lançamentos só até o fim do período.
+        fetchAll<any>((a, b) => {
+          const q = supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", workIds);
+          return (until ? q.or(`category.eq.faturamento,entry_date.lte.${until}`) : q).order("entry_date", { ascending: false }).order("id").range(a, b);
+        }),
+        shared ? Promise.resolve(shared.people) : fetchAll<any>((a, b) => supabase.from("collaborators").select(PEOPLE_COLS).order("id").range(a, b)),
         w.client_id ? supabase.from("works").select("id, monthly_enabled, night_shift").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
-        w.client_id
-          ? fetchAll<any>((a, b) =>
-              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, place_toll, vehicles(km_rate, plate, assign_by_work), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).order("id").range(a, b),
-            )
-          : Promise.resolve([] as any[]),
         w.client_id
           ? supabase.from("clients").select("name, has_toll, toll_amount, city, distance_km, needs_transport_voucher").eq("id", w.client_id).maybeSingle()
           : Promise.resolve({ data: null as any }),
@@ -123,15 +169,33 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       ]);
       const sibIds: string[] = ((siblings as any).data ?? []).map((x: any) => x.id);
       const clientName = (client as any).data?.name as string | undefined;
+      // Transporte: fretes do cliente (principal ou extra; Suzano Local só para a Suzano) e, para o Prêmio Motorista,
+      // todas as linhas dos motoristas deles no período (o prêmio do dia é pela soma dos fretes de cada motorista).
+      const vs = w.client_id
+        ? await fetchAll<any>((a, b) => upTo(supabase.from("vehicle_schedules").select(VS_COLS)
+            .or(`client_id.eq.${w.client_id},extra_client_ids.cs.{${w.client_id}}${isSuzanoName(clientName) ? ",is_suzano_local.eq.true" : ""}`), "schedule_date").order("schedule_date").range(a, b))
+        : [];
+      const vsDrivers = vsDriverIds(vs);
+      const driverVs = vsDrivers.length
+        ? await fetchAll<any>((a, b) => upTo(supabase.from("vehicle_schedules").select(VS_COLS)
+            .or(`driver_id.in.(${vsDrivers.join(",")}),extra_driver_ids.ov.{${vsDrivers.join(",")}}`), "schedule_date").order("schedule_date").range(a, b))
+        : [];
+      const passengerClients = w.client_id ? vsClientIds(driverVs, [w.client_id]) : [];
+      const passengers = passengerClients.length
+        ? await fetchAll<PassengerRow>((a, b) => upTo(supabase.from("transport_passengers").select("client_id, schedule_date, collaborator_id, vehicle_schedule_id").in("client_id", passengerClients), "schedule_date").order("schedule_date").range(a, b))
+        : [];
+      const industryIds: string[] = shared?.industryIds ?? await loadIndustryIds();
+      // HH com RDO depois do período: o corte "até o último RDO" fica no fim do período (como lendo tudo).
+      const rdoAfter = until ? await hhRdoAfter(workIds, until) : undefined;
       const [sibAllocs, sibRdo, integAppts, integBoxes, clientRdos, supportRows, allRdoWorkforce, integChoices] = await Promise.all([
         sibIds.length
           ? fetchAll<any>((a, b) =>
-              supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", sibIds).order("id").range(a, b),
+              allocUpTo(supabase.from("daily_allocations").select(allocCols("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)")).in("work_id", sibIds)).order("id").range(a, b),
             )
           : Promise.resolve([] as any[]),
         sibIds.length
           ? fetchAll<any>((a, b) =>
-              supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, rdos(shift)").in("work_id", sibIds).order("id").range(a, b),
+              upTo(supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, rdos(shift)").in("work_id", sibIds), "report_date").order("id").range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
@@ -144,12 +208,12 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
               supabase.from("daily_status_entries").select("collaborator_id, daily_schedules(schedule_date)").eq("box_key", `integracao:${clientName}`).order("id").range(a, b),
             )
           : Promise.resolve([] as any[]),
-        fetchAll<any>((a, b) => supabase.from("rdos").select("work_id, report_date").in("work_id", [...new Set([...workIds, ...sibIds])]).order("id").range(a, b)),
+        fetchAll<any>((a, b) => upTo(supabase.from("rdos").select("work_id, report_date").in("work_id", [...new Set([...workIds, ...sibIds])]), "report_date").order("id").range(a, b)),
         w.client_id ? supabase.from("result_support_allocations").select("collaborator_id").eq("client_id", w.client_id) : Promise.resolve({ data: [] }),
         shared ? Promise.resolve(shared.allRdoWorkforce) : Promise.resolve(null as any[] | null),
         // Integração lançada num serviço (aba Serviços): esse serviço arca com o dia todo; sem linha = rateio.
         w.client_id
-          ? fetchAll<any>((a, b) => supabase.from("integration_service_choices").select("collaborator_id, schedule_date, work_id").eq("client_id", w.client_id!).order("schedule_date").order("collaborator_id").range(a, b))
+          ? fetchAll<any>((a, b) => upTo(supabase.from("integration_service_choices").select("collaborator_id, schedule_date, work_id").eq("client_id", w.client_id!), "schedule_date").order("schedule_date").order("collaborator_id").range(a, b))
           : Promise.resolve([] as any[]),
       ]);
       // RDO das mesmas pessoas em outros clientes (dia dividido): sem o lote do Financeiro, lê só quem aparece neste
@@ -159,7 +223,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         const out: any[] = [];
         for (let i = 0; i < ids.length; i += 150) {
           const part = ids.slice(i, i + 150);
-          out.push(...await fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date").in("collaborator_id", part).order("id").range(a, b)));
+          out.push(...await fetchAll<any>((a, b) => upTo(supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date").in("collaborator_id", part), "report_date").order("id").range(a, b)));
         }
         return out;
       })();
@@ -191,6 +255,10 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         nightIds: (((siblings as any).data ?? []) as any[]).filter((x) => x.night_shift).map((x) => x.id as string),
         siblingCount: Math.max(1, (siblings as any).data?.length ?? 1),
         vs,
+        driverVs,
+        passengers,
+        industryIds,
+        ...(rdoAfter ? { rdoAfter } : {}),
         client: (client as any).data,
         workVt,
         workTravelRows,
@@ -298,7 +366,8 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     // HH: realizado só até o último RDO (andamento é automático pelos RDOs)
     if (!isAll && (work as any).hh_enabled) {
       const lastRdo = raw.rdoWf.reduce((m: string, r: any) => (r.report_date > m ? r.report_date : m), "");
-      if (lastRdo && lastRdo < cut) cut = lastRdo;
+      // Leitura cortada no fim do período (loadWorkData until) com RDO depois dele: o último RDO real é posterior.
+      if (lastRdo && lastRdo < cut && !(raw.rdoAfter ?? []).includes(work.id)) cut = lastRdo;
     }
     // Com mês inicial: só o que estiver dentro do período; sem mês inicial: desde o começo da obra
     const from = opts.fromDate ?? (fromMonth ? `${fromMonth}-01` : "");
@@ -333,12 +402,14 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       rdoWf: raw.rdoWf.filter((r: any) => okW(r.work_id, r.report_date)),
       sibRdo: (raw.sibRdo ?? []).filter((r: any) => okW(r.work_id, r.report_date)),
       // Carros "Suzano Local" (sem cliente) entram só nos serviços da Suzano
-      vs: raw.vs.filter((v: any) => okW(v.work_id, v.schedule_date) && (!v.is_suzano_local || /suzano/i.test(String(raw.client?.name ?? "")))),
+      // Linhas da Transporte no período; o serviço de cada frete (principal ou extra) é conferido frete a frete.
+      vs: raw.vs.filter((v: any) => okDate(v.schedule_date)),
       entries: raw.entries.filter((e: any) => e.category === "faturamento" ? okBillMonth(e.entry_date) : okW(e.work_id, e.entry_date)),
       progress: raw.progress.filter((p: any) => !untilMonth || String(p.month).slice(0, 7) <= untilMonth),
     };
     const idSet = new Set(workIds);
     const rate = new Map<string, number>(d.people.map((p: any) => [p.id, Number(p.salary ?? 0)]));
+    const person = new Map<string, any>(d.people.map((p: any) => [p.id, p]));
     const pj = new Set<string>(d.people.filter((p: any) => p.contract_type === "pj").map((p: any) => p.id));
     const noPrem = new Set<string>(d.people.filter((p: any) => p.no_overtime_premium).map((p: any) => p.id));
     const enc = (id: string) => (pj.has(id) ? 1 : ENCARGOS);
@@ -439,7 +510,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const key = `${a.collaborator_id}|${date}`;
       if (!rdoKey.has(key) && !elsewhere.has(key) && workRdoDays.has(`${a.work_id}|${date}`) && idSet.has(a.work_id) && !missingSeen.has(key)) {
         missingSeen.add(key);
-        missingRdo.push({ id: a.collaborator_id, workId: a.work_id, date, name: d.people.find((p: any) => p.id === a.collaborator_id)?.full_name ?? "—", hours: 0, removedHours: DEFAULT_HOURS, removedCost: laborCost(DEFAULT_HOURS, rate.get(a.collaborator_id) ?? 0, pj.has(a.collaborator_id), date, hol, 0, noPrem.has(a.collaborator_id)) });
+        missingRdo.push({ id: a.collaborator_id, workId: a.work_id, date, name: person.get(a.collaborator_id)?.full_name ?? "—", hours: 0, removedHours: DEFAULT_HOURS, removedCost: laborCost(DEFAULT_HOURS, rate.get(a.collaborator_id) ?? 0, pj.has(a.collaborator_id), date, hol, 0, noPrem.has(a.collaborator_id)) });
       }
       if (seen.has(key)) continue;
       seen.add(key);
@@ -465,30 +536,51 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       dayHoursTotal.set(dt, (dayHoursTotal.get(dt) ?? 0) + h);
       if (idSet.has(a.work_id)) dayHoursMine.set(dt, (dayHoursMine.get(dt) ?? 0) + h);
     }
+    // Fretes deste cliente: o principal (client_id, ou Suzano Local na Suzano) e os extras (extra_client_ids) com o km de
+    // cada um como na Frota (dayKm: principal = km × 2 × viagens; extras = extra_km dividido entre eles).
+    const clientX: string | undefined = (work as any)?.client_id ?? undefined;
+    const suzanoX = isSuzanoName(d.client?.name);
+    const mainMine = (v: any) => (v.is_suzano_local ? suzanoX : !clientX || v.client_id === clientX);
     for (const v of d.vs) {
-      if (v.work_id && !idSet.has(v.work_id)) continue;
-      if (unsplit(v.schedule_date)) continue;
-      const trips = Number(v.trips ?? 1);
-      const kmCost = Number(v.km ?? 0) * 2 * trips * Number(v.vehicles?.km_rate ?? KM_RATE);
-      const t = v.is_suzano_local ? 0 : (v.place_toll != null ? Number(v.place_toll) : toll) * 2 * trips;
-      const byHours = !v.work_id && !!v.vehicles?.assign_by_work && (dayHoursTotal.get(v.schedule_date) ?? 0) > 0;
-      const total = byHours ? dayHoursTotal.get(v.schedule_date)! : dayTotal.get(v.schedule_date) ?? 0;
-      const mine = byHours ? dayHoursMine.get(v.schedule_date) ?? 0 : dayMine.get(v.schedule_date) ?? 0;
-      const share = v.work_id ? kmCost + t : total > 0 ? ((kmCost + t) * mine) / total : 0;
-      if (!share) continue;
-      transportRows.push({ date: v.schedule_date, km: Number(v.km ?? 0), trips, kmCost, toll: t, share, mine, total, direct: !!v.work_id, byHours });
-      bump(v.schedule_date.slice(0, 7), "transport", share);
+      const date = v.schedule_date as string;
+      const rateKm = Number(v.vehicles?.km_rate ?? KM_RATE);
+      const freights: { km: number; trips: number; kmCost: number; toll: number; workId: string | null }[] = [];
+      if (mainMine(v) && !v.is_maintenance) {
+        const trips = Number(v.trips ?? 1);
+        freights.push({ km: Number(v.km ?? 0), trips, kmCost: Number(v.km ?? 0) * 2 * trips * rateKm, toll: v.is_suzano_local ? 0 : (v.place_toll != null ? Number(v.place_toll) : toll) * 2 * trips, workId: v.work_id ?? null });
+      }
+      const extras: string[] = v.extra_client_ids ?? [];
+      if (clientX) extras.forEach((c, i) => {
+        if (c !== clientX) return;
+        const km = Number(v.extra_km ?? 0) / extras.length;
+        // Local Indústria digitado (viagem fora) não leva o pedágio do cliente.
+        const ownToll = (v.extra_places?.[i] ?? "").trim() ? 0 : toll * 2;
+        freights.push({ km, trips: 1, kmCost: km * rateKm, toll: ownToll, workId: v.extra_work_ids?.[i] || null });
+      });
+      for (const f of freights) {
+        if (!okW(f.workId, date) || (f.workId && !idSet.has(f.workId))) continue;
+        if (unsplit(date)) continue;
+        const byHours = !f.workId && !!v.vehicles?.assign_by_work && (dayHoursTotal.get(date) ?? 0) > 0;
+        const total = byHours ? dayHoursTotal.get(date)! : dayTotal.get(date) ?? 0;
+        const mine = byHours ? dayHoursMine.get(date) ?? 0 : dayMine.get(date) ?? 0;
+        const share = f.workId ? f.kmCost + f.toll : total > 0 ? ((f.kmCost + f.toll) * mine) / total : 0;
+        if (!share) continue;
+        transportRows.push({ date, km: f.km, trips: f.trips, kmCost: f.kmCost, toll: f.toll, share, mine, total, direct: !!f.workId, byHours });
+        bump(date.slice(0, 7), "transport", share);
+      }
     }
+    // Transporte montado na aba Serviços (VT e prêmio motorista), como no Fechamento.
+    const builtTransport = buildTransport((raw.passengers ?? []) as PassengerRow[]);
     // VT dos colaboradores escalados neste serviço entra no transporte da obra
-    const person = new Map<string, any>(d.people.map((p: any) => [p.id, p]));
     // Alojados: Americana na Suzano = sem VT e sem prêmio; senão VT/prêmio pela cidade do alojamento.
     const lodgingAt = lodgingIndex((d.lodgingStays ?? []) as LodgingStay[]);
     const lodgingBlocked = (id: string, date: string) => lodgingBlocksBenefits(lodgingAt(id, date), d.client?.name);
     const vtNever = (id: string, date: string) => lodgingBlocksVtAlways(lodgingAt(id, date), person.get(id)?.positions?.name);
     const homeCityOf = (id: string, date: string) => effectiveCity(person.get(id)?.city, lodgingAt(id, date));
-    // Marcação de VT vale para o cliente no dia (qualquer serviço do cliente marcado)
-    const workVt = new Map<string, boolean>();
-    for (const r of (d.workVt ?? []) as any[]) workVt.set(r.schedule_id, !!workVt.get(r.schedule_id) || r.pays_vt);
+    // Marcação de VT da obra no dia (schedule_id|work_id), como no Fechamento; sem linha = padrão do cliente.
+    const workVt = new Map<string, boolean>(((d.workVt ?? []) as any[]).map((r) => [`${r.schedule_id}|${r.work_id}`, r.pays_vt]));
+    const leavesBy = new Map<string, any[]>();
+    for (const l of (d.leaves ?? []) as any[]) { const list = leavesBy.get(l.collaborator_id); if (list) list.push(l); else leavesBy.set(l.collaborator_id, [l]); }
     const noVt = new Set<string>((d.noVtRows ?? []).map((r: any) => `${r.schedule_id}|${r.collaborator_id}`));
     const vtDay = (driver: boolean) =>
       (d.vtRules ?? []).reduce((sum: number, r: any) => {
@@ -501,11 +593,15 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     for (const a of sourceAllocs) {
       const date = a.daily_schedules?.schedule_date as string | undefined;
       if (!date || absent(a.collaborator_id, date) || (!rdoKey.has(`${a.collaborator_id}|${date}`) && hoursOf(`${a.collaborator_id}|${date}`, a.work_id) <= 0) || (!supportIds.has(a.collaborator_id) && unsplit(date)) || noVt.has(`${a.schedule_id}|${a.collaborator_id}`)) continue;
-      if ((d.leaves ?? []).some((l: any) => l.collaborator_id === a.collaborator_id && l.start_date <= date && l.end_date >= date)) continue;
+      if ((leavesBy.get(a.collaborator_id) ?? []).some((l: any) => l.start_date <= date && l.end_date >= date)) continue;
       const p = person.get(a.collaborator_id);
-      const pouso = String(homeCityOf(a.collaborator_id, date) ?? "").toLowerCase().includes("pouso alegre");
-      const base = p?.vt_enabled === false || lodgingBlocked(a.collaborator_id, date) ? false : workVtDefault(workVt.get(a.schedule_id), d.client?.needs_transport_voucher) || pouso;
-      if (!(a.vt_override ?? base) || vtNever(a.collaborator_id, date)) continue;
+      // Regra única do VT (transport-rules vtForDay), a mesma do Fechamento.
+      const pays = vtForDay({
+        vtEnabled: p?.vt_enabled, lodgingBlocks: lodgingBlocked(a.collaborator_id, date), vtNever: vtNever(a.collaborator_id, date), alwaysFull: p?.vt_always_full,
+        workMark: workVt.get(`${a.schedule_id}|${a.work_id}`), clientDefault: d.client?.needs_transport_voucher, homeCity: homeCityOf(a.collaborator_id, date),
+        override: a.vt_override, transport: builtTransport, clientId: clientX, date, collaboratorId: a.collaborator_id,
+      });
+      if (!pays) continue;
       const cost = vtDay(!!a.driver) * fraction(a, date);
       if (!cost) continue;
       const v = vtByDate.get(date) ?? { people: 0, cost: 0 };
@@ -590,24 +686,32 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     }
     const vtRows = [...vtByDate.entries()].map(([date, v]) => ({ date, ...v })).sort((x, y) => x.date.localeCompare(y.date));
     const vtTotal = vtRows.reduce((s, r) => s + r.cost, 0);
-    // Prêmio motorista: regras da aba Prêmio de Motorista, rateado como o veículo
+    // Prêmio motorista (lib/driver-bonus.ts, mesma regra do Fechamento): 1 por motorista por dia pela soma do km de ida
+    // de todos os fretes dele no dia; o valor do dia é dividido entre os fretes pelo km e cada frete deste cliente
+    // entra como o veículo (serviço escolhido = direto; senão rateio por pessoas). Fixo mensal não entra aqui.
     const inRule = (r: any, km: number) => km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance));
     const driverRows: { date: string; driver: string; plate: string; km: number; amount: number; share: number }[] = [];
-    const bonusSeen = new Set<string>(); // 1 prêmio por motorista por dia, mesmo com várias viagens
-    for (const v of d.vs) {
-      if (!v.driver_bonus || !v.driver_id || absent(v.driver_id, v.schedule_date) || (v.work_id && !idSet.has(v.work_id))) continue;
-      const bk = `${v.driver_id}|${v.schedule_date}`;
-      if (bonusSeen.has(bk)) continue;
-      bonusSeen.add(bk);
-      const km = Number(v.km ?? 0);
-      const amount = (d.dbRules ?? []).filter((r: any) => r.calculation_type !== "fixed_monthly" && inRule(r, km)).reduce((s: number, r: any) => s + Number(r.amount), 0);
-      if (!amount) continue;
-      const total = dayTotal.get(v.schedule_date) ?? 0;
-      const mine = dayMine.get(v.schedule_date) ?? 0;
-      const share = v.work_id ? amount : total > 0 ? (amount * mine) / total : 0;
-      if (!share) continue;
-      driverRows.push({ date: v.schedule_date, driver: v.collaborators?.full_name ?? "—", plate: v.vehicles?.plate ?? "—", km, amount, share });
-      bump(v.schedule_date.slice(0, 7), "transport", share);
+    {
+      const industry = new Set<string>(raw.industryIds ?? []);
+      const bonusRows = ((raw.driverVs ?? raw.vs) as any[]).filter((v) => okDate(v.schedule_date));
+      const days = driverBonusDays(bonusRows, (d.dbRules ?? []) as any[], {
+        isIndustry: (c) => !!c && industry.has(c),
+        eligible: (f) => !absent(f.driverId, f.date)
+          && driverBonusFor(builtTransport, { client_id: f.clientId, schedule_date: f.date, driver_id: f.driverId, driver_bonus: !!f.schedule.driver_bonus }, pj.has(f.driverId)),
+      });
+      const mineFreight = (f: BonusFreight<any>) => (f.index === 0 ? mainMine(f.schedule) : !!clientX && f.clientId === clientX);
+      for (const day of days) {
+        if (!day.amount) continue;
+        for (const { freight: f, amount } of freightShares(day)) {
+          if (!mineFreight(f) || !okW(f.workId, f.date) || (f.workId && !idSet.has(f.workId))) continue;
+          const total = dayTotal.get(f.date) ?? 0;
+          const mine = dayMine.get(f.date) ?? 0;
+          const share = f.workId ? amount : total > 0 ? (amount * mine) / total : 0;
+          if (!share) continue;
+          driverRows.push({ date: f.date, driver: person.get(f.driverId)?.full_name ?? f.schedule.collaborators?.full_name ?? "—", plate: f.schedule.vehicles?.plate ?? "—", km: day.km, amount: day.amount, share });
+          bump(f.date.slice(0, 7), "transport", share);
+        }
+      }
     }
     const driverTotal = driverRows.reduce((s, r) => s + r.share, 0);
     // Prêmio viagem: distância cidade do colaborador → cidade da obra, regras da aba Prêmio de Viagem
@@ -624,7 +728,11 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const r = rdoKey.get(key);
       if ((r && !r.present) || (!r && hoursOf(key, a.work_id) <= 0)) continue;
       const p = person.get(a.collaborator_id);
-      const travelOn = a.travel_bonus_override ?? (lodgingBlocked(a.collaborator_id, date) ? false : (travelWorkMap.get(`${a.schedule_id}|${a.work_id}`) ?? (d.tbRules ?? []).some((x: any) => inRule(x, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0)))));
+      // Prêmio viagem (transport-rules travelOnFor), a mesma regra do Fechamento e da Programação.
+      const travelOn = travelOnFor({
+        enabled: p?.travel_bonus_enabled, override: a.travel_bonus_override, lodgingBlocks: lodgingBlocked(a.collaborator_id, date),
+        workMark: travelWorkMap.get(`${a.schedule_id}|${a.work_id}`), workDefault: (d.tbRules ?? []).some((x: any) => inRule(x, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0))),
+      });
       if (!travelOn) continue;
       const dist = distFor(homeCityOf(a.collaborator_id, date), d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
       const cost = (d.tbRules ?? []).filter((x: any) => inRule(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0) * fraction(a, date);

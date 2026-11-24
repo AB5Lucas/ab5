@@ -35,6 +35,13 @@ describe("logística", () => {
     expect(b.filter((x) => x.tone === "red").length).toBe(2);
     expect(driverMessage(dem, { items, vehicle: toco, dest, rules })).toContain("Rodízio em São Paulo");
   });
+  it("Transporte: veículo em manutenção/revisão = vermelho; motorista escalado na Transporte = laranja", () => {
+    const driver = { id: "m", full_name: "Motorista", driver_license_category: "D", driver_license_expiry: "2030-01-01" };
+    const a = demandAlerts(dem, { today: "2026-11-19", now: new Date("2026-11-19T12:00:00Z"), items: [], vehicle: toco, driver, rules: [], transportBusy: true, transportMaintenance: true, transportDriverBusy: true });
+    expect(a.find((x) => x.text.includes("manutenção/revisão"))?.tone).toBe("red");
+    expect(a.some((x) => x.text === "Conflito: veículo também escalado na Transporte neste dia")).toBe(false);
+    expect(a.find((x) => x.text.includes("motorista também"))?.tone).toBe("orange");
+  });
 });
 
 describe("logística · agenda", () => {

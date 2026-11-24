@@ -6941,6 +6941,10 @@ export type Database = {
         Args: { _driver_id: string; _vs_id: string }
         Returns: undefined
       }
+      set_vehicle_driver_for_client: {
+        Args: { _client_id: string; _driver_id: string; _vs_id: string }
+        Returns: undefined
+      }
       title_case_name: { Args: { _name: string }; Returns: string }
       unassign_allocation_service: {
         Args: { _alloc_id: string }

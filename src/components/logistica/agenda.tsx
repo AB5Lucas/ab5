@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { demandAlerts, driverMessage, isOwn, kg, KIND_LABEL, loadSummary, overlapCounts, timeSpan, type LogAlert } from "@/lib/logistics";
 import { DemandDialog, type DemandPreset } from "./demand-dialog";
-import { LOG_KEY, useLogData, useTransportBusy, type DemandRow, type Vehicle } from "./use-log-data";
+import { LOG_KEY, transportConflict, useLogData, useTransportBusy, type DemandRow, type Vehicle } from "./use-log-data";
 
 export const todayISO = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 export const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
@@ -47,7 +47,7 @@ export function useAlerts(demands: DemandRow[], from: string, to: string) {
         today, now, items: d.items, rules: b.rules, vehicle: b.vehicles.find((v) => v.id === d.vehicle_id), driver: b.drivers.find((x) => x.id === d.driver_id),
         origin: b.addresses.find((a) => a.id === d.origin_id), dest: b.addresses.find((a) => a.id === d.dest_id),
         overlapVehicle: ov.get(d.id)?.vehicle, overlapPlace: ov.get(d.id)?.place,
-        transportBusy: !!(isOwn(d) && d.vehicle_id && d.scheduled_date && busy.data?.has(`${d.vehicle_id}|${d.scheduled_date}`)),
+        ...(isOwn(d) ? transportConflict(busy.data, d.vehicle_id, d.driver_id, d.scheduled_date) : {}),
       }));
     }
     return map;

@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { activeFinancialEntries } from "./billing-sync";
 import { marginPercent } from "./result-labor";
-import { buildBase, fetchAll, progressUntil, sliceResultRaw, totalMargin, type loadResultShared } from "./results-engine";
+import { buildBase, fetchAll, hhRdoAfter, isSuzanoName, progressUntil, sliceResultRaw, totalMargin, vsClientIds, vsDriverIds, vsOfDrivers, vsTouchesClient, VS_COLS, type loadResultShared } from "./results-engine";
 
 /**
  * Carregamento do Fechamento Financeiro em lote.
@@ -66,10 +66,17 @@ export function financeBatches(list: any[]): FinanceBatch[] {
   });
 }
 
-/** Equivalente em lote de loadWorkData(batch.work, batch.ids, false, shared) para todos os lotes. */
-export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): Promise<Map<string, any>> {
+/**
+ * Equivalente em lote de loadWorkData(batch.work, batch.ids, false, shared, opts) para todos os lotes.
+ * opts.until = último dia do último mês pedido: escala, RDO, Transporte e custos lidos só até ele (faturamento e
+ * andamento inteiros, como em loadWorkData).
+ */
+export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared, opts: { until?: string | undefined } = {}): Promise<Map<string, any>> {
   const out = new Map<string, any>();
   if (!batches.length) return out;
+  const until = opts.until;
+  const upTo = (q: any, col: string) => (until ? q.lte(col, until) : q);
+  const allocCols = until ? "id, work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules!inner(schedule_date)" : "id, work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)";
   const allIds = [...new Set(batches.flatMap((b) => b.ids))];
   const clientIds = [...new Set(batches.map((b) => b.work.client_id).filter(Boolean))] as string[];
   // Recorrências precisam existir antes de ler os lançamentos; rodam junto com serviços/clientes.
@@ -88,13 +95,19 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
   const scope = [...new Set([...allIds, ...batches.flatMap(sibIdsOf)])];
   const clientNames = [...new Set(clientIds.map((id) => clientById.get(id)?.name).filter(Boolean))] as string[];
 
-  const [allocs, rdoWf, progress, entries, vs, workVt, workTravel, integAppts, integBoxes, rdos, support, integChoices] = await Promise.all([
-    byWorks<any>(scope, (ids, a, b) => supabase.from("daily_allocations").select("id, work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", ids).order("id").range(a, b)),
-    byWorks<any>(scope, (ids, a, b) => supabase.from("rdo_workforce").select("id, work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, position_id, collaborators(position_id), rdos(shift)").in("work_id", ids).order("id").range(a, b)),
+  const anySuzano = clientIds.some((id) => isSuzanoName(clientById.get(id)?.name));
+  const [allocs, rdoWf, progress, entries, vs, workVt, workTravel, integAppts, integBoxes, rdos, support, integChoices, rdoAfter] = await Promise.all([
+    byWorks<any>(scope, (ids, a, b) => upTo(supabase.from("daily_allocations").select(allocCols).in("work_id", ids), "daily_schedules.schedule_date").order("id").range(a, b)),
+    byWorks<any>(scope, (ids, a, b) => upTo(supabase.from("rdo_workforce").select("id, work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, position_id, collaborators(position_id), rdos(shift)").in("work_id", ids), "report_date").order("id").range(a, b)),
     supabase.from("work_progress").select("*").in("work_id", allIds).order("month"),
-    byWorks<any>(allIds, (ids, a, b) => supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", ids).order("entry_date", { ascending: false }).order("id").range(a, b)),
+    byWorks<any>(allIds, (ids, a, b) => {
+      const q = supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", ids);
+      return (until ? q.or(`category.eq.faturamento,entry_date.lte.${until}`) : q).order("entry_date", { ascending: false }).order("id").range(a, b);
+    }),
+    // Fretes dos clientes (principal ou extra; Suzano Local só se algum cliente é a Suzano)
     clientIds.length
-      ? fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("id, schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, place_toll, vehicles(km_rate, plate, assign_by_work), collaborators(full_name)").or(`client_id.in.(${clientIds.join(",")}),is_suzano_local.eq.true`).order("id").range(a, b))
+      ? fetchAll<any>((a, b) => upTo(supabase.from("vehicle_schedules").select(`id, ${VS_COLS}`)
+          .or(`client_id.in.(${clientIds.join(",")}),extra_client_ids.ov.{${clientIds.join(",")}}${anySuzano ? ",is_suzano_local.eq.true" : ""}`), "schedule_date").order("id").range(a, b))
       : Promise.resolve([] as any[]),
     byWorks<any>(scope, (ids, a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", ids).order("schedule_id").order("work_id").range(a, b)),
     byWorks<any>(scope, (ids, a, b) => supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("work_id", ids).order("schedule_id").order("work_id").range(a, b)),
@@ -104,12 +117,27 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
     clientNames.length
       ? fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("id, box_key, collaborator_id, daily_schedules(schedule_date)").in("box_key", clientNames.map((n) => `integracao:${n}`)).order("id").range(a, b))
       : Promise.resolve([] as any[]),
-    byWorks<any>(scope, (ids, a, b) => supabase.from("rdos").select("id, work_id, report_date").in("work_id", ids).order("id").range(a, b)),
+    byWorks<any>(scope, (ids, a, b) => upTo(supabase.from("rdos").select("id, work_id, report_date").in("work_id", ids), "report_date").order("id").range(a, b)),
     clientIds.length ? supabase.from("result_support_allocations").select("client_id, collaborator_id").in("client_id", clientIds) : Promise.resolve({ data: [], error: null }),
     clientIds.length
-      ? fetchAll<any>((a, b) => supabase.from("integration_service_choices").select("client_id, collaborator_id, schedule_date, work_id").in("client_id", clientIds).order("schedule_date").order("collaborator_id").order("client_id").range(a, b))
+      ? fetchAll<any>((a, b) => upTo(supabase.from("integration_service_choices").select("client_id, collaborator_id, schedule_date, work_id").in("client_id", clientIds), "schedule_date").order("schedule_date").order("collaborator_id").order("client_id").range(a, b))
       : Promise.resolve([] as any[]),
+    until ? hhRdoAfter(allIds, until) : Promise.resolve(undefined),
   ]);
+  // Prêmio motorista: todas as linhas dos motoristas que aparecem nos fretes de cada cliente (soma do dia por motorista).
+  const vsByClient = new Map<string, any[]>();
+  for (const id of clientIds) vsByClient.set(id, vs.filter((v) => vsTouchesClient(v, id, isSuzanoName(clientById.get(id)?.name))));
+  const allDrivers = vsDriverIds([...vsByClient.values()].flat());
+  const driverVsAll = allDrivers.length
+    ? await fetchAll<any>((a, b) => upTo(supabase.from("vehicle_schedules").select(`id, ${VS_COLS}`)
+        .or(`driver_id.in.(${allDrivers.join(",")}),extra_driver_ids.ov.{${allDrivers.join(",")}}`), "schedule_date").order("id").range(a, b))
+    : [];
+  const driverVsBy = new Map<string, any[]>();
+  for (const [id, rows] of vsByClient) { const ds = new Set(vsDriverIds(rows)); driverVsBy.set(id, ds.size ? driverVsAll.filter((v) => vsOfDrivers(v, ds)) : []); }
+  const passengerClients = [...new Set([...clientIds, ...vsClientIds(driverVsAll)])].sort();
+  const passengersAll = passengerClients.length
+    ? (await Promise.all(chunks(passengerClients).map((part) => fetchAll<any>((a, b) => upTo(supabase.from("transport_passengers").select("id, client_id, schedule_date, collaborator_id, vehicle_schedule_id").in("client_id", part), "schedule_date").order("id").range(a, b))))).flat()
+    : [];
   for (const r of [progress, support] as any[]) if (r.error) throw r.error;
 
   // Remove colunas auxiliares (id/client_id/box_key) para manter o formato de loadWorkData
@@ -135,8 +163,11 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
     const nearSet = new Set(near);
     const client = w.client_id ? (clientById.get(w.client_id) ?? null) : null;
     const clientOut = client ? (({ id: _id, ...rest }: any) => rest)(client) : null;
-    // Mesmo conjunto que .or(client_id.eq.X, is_suzano_local.eq.true), sem duplicar linhas
-    const vsRows = w.client_id ? strip(vs.filter((v) => v.client_id === w.client_id || v.is_suzano_local === true), ["id"]) : [];
+    // Mesmo conjunto que a leitura de loadWorkData (fretes do cliente; Suzano Local só para a Suzano), sem duplicar linhas
+    const vsRows = w.client_id ? strip(vsByClient.get(w.client_id) ?? [], ["id"]) : [];
+    const driverRows = w.client_id ? strip(driverVsBy.get(w.client_id) ?? [], ["id"]) : [];
+    const pClients = w.client_id ? new Set(vsClientIds(driverVsBy.get(w.client_id) ?? [], [w.client_id])) : new Set<string>();
+    const passengers = strip(passengersAll.filter((p) => pClients.has(p.client_id)), ["id"]);
     const raw = {
       clientRdos: pick(rdosBy, near),
       otherClientRdos: shared.allRdoWorkforce.filter((r: any) => !nearSet.has(r.work_id)),
@@ -159,6 +190,10 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared): 
       nightIds: siblings.filter((x: any) => x.night_shift).map((x: any) => x.id as string),
       siblingCount: Math.max(1, siblings.length || 1),
       vs: vsRows,
+      driverVs: driverRows,
+      passengers,
+      industryIds: shared.industryIds,
+      ...(rdoAfter ? { rdoAfter: rdoAfter.filter((id) => workIds.includes(id)) } : {}),
       client: clientOut,
       workVt: pick(vtBy, near),
       workTravelRows: pick(travelBy, near),

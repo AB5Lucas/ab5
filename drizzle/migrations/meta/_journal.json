@@ -1079,6 +1079,55 @@
       "when": 1795463075217,
       "tag": "0153_client_manager",
       "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1795463076217,
+      "tag": "0154_appointment_complete",
+      "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1795463077217,
+      "tag": "0155_client_required_trainings",
+      "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1795463078217,
+      "tag": "0156_collaborator_trainings_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "7",
+      "when": 1795463079217,
+      "tag": "0157_menu_badge_cover_by_item",
+      "breakpoints": true
+    },
+    {
+      "idx": 158,
+      "version": "7",
+      "when": 1795463080217,
+      "tag": "0158_hiring_collaborator",
+      "breakpoints": true
+    },
+    {
+      "idx": 159,
+      "version": "7",
+      "when": 1795463081217,
+      "tag": "0165_set_vehicle_driver_for_client",
+      "breakpoints": true
+    },
+    {
+      "idx": 160,
+      "version": "7",
+      "when": 1795463082217,
+      "tag": "0166_allocation_drops_passenger",
+      "breakpoints": true
     }
   ]
 }
