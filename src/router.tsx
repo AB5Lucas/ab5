@@ -49,6 +49,8 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    // Passar o mouse num link já baixa a página (código e dados da rota): a troca de aba fica imediata.
+    defaultPreload: "intent",
     defaultPreloadStaleTime: 30_000,
   });
 

@@ -136,7 +136,9 @@ function AuthenticatedLayout() {
 
 /** Entrada suave a cada troca de página (sem remontar a página: só reinicia a animação). */
 function PageEnter({ children }: { children: ReactNode }) {
-  const path = useRouterState({ select: (s) => s.location.pathname });
+  // Só depois que a página nova carregou (resolvedLocation): com location a animação reiniciava na página antiga
+  // enquanto a nova ainda carregava, e a tela "piscava" na mesma aba antes de trocar.
+  const path = useRouterState({ select: (s) => s.resolvedLocation?.pathname ?? s.location.pathname });
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
