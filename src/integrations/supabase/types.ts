@@ -1612,13 +1612,12 @@ export type Database = {
           active: boolean
           address: string | null
           cc_prefix: string | null
-          manager_id: string | null
-          substitute_manager_id: string | null
           city: string | null
           created_at: string
           distance_km: number | null
           has_toll: boolean
           id: string
+          manager_id: string | null
           name: string
           needs_company_transport: boolean
           needs_transport_voucher: boolean
@@ -1627,6 +1626,7 @@ export type Database = {
           number: string | null
           requires_integration: boolean
           state: string | null
+          substitute_manager_id: string | null
           toll_amount: number
           trips_per_day: number
           updated_at: string
@@ -1636,13 +1636,12 @@ export type Database = {
           active?: boolean
           address?: string | null
           cc_prefix?: string | null
-          manager_id?: string | null
-          substitute_manager_id?: string | null
           city?: string | null
           created_at?: string
           distance_km?: number | null
           has_toll?: boolean
           id?: string
+          manager_id?: string | null
           name: string
           needs_company_transport?: boolean
           needs_transport_voucher?: boolean
@@ -1651,6 +1650,7 @@ export type Database = {
           number?: string | null
           requires_integration?: boolean
           state?: string | null
+          substitute_manager_id?: string | null
           toll_amount?: number
           trips_per_day?: number
           updated_at?: string
@@ -1660,13 +1660,12 @@ export type Database = {
           active?: boolean
           address?: string | null
           cc_prefix?: string | null
-          manager_id?: string | null
-          substitute_manager_id?: string | null
           city?: string | null
           created_at?: string
           distance_km?: number | null
           has_toll?: boolean
           id?: string
+          manager_id?: string | null
           name?: string
           needs_company_transport?: boolean
           needs_transport_voucher?: boolean
@@ -1675,12 +1674,28 @@ export type Database = {
           number?: string | null
           requires_integration?: boolean
           state?: string | null
+          substitute_manager_id?: string | null
           toll_amount?: number
           trips_per_day?: number
           updated_at?: string
           zip_code?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_substitute_manager_id_fkey"
+            columns: ["substitute_manager_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       closing_adjustments: {
         Row: {
@@ -2975,8 +2990,8 @@ export type Database = {
       }
       hiring_requests: {
         Row: {
-          collaborator_id: string | null
           client_id: string
+          collaborator_id: string | null
           created_at: string
           desired_date: string | null
           filled: number
@@ -2997,8 +3012,8 @@ export type Database = {
           work_id: string
         }
         Insert: {
-          collaborator_id?: string | null
           client_id: string
+          collaborator_id?: string | null
           created_at?: string
           desired_date?: string | null
           filled?: number
@@ -3019,8 +3034,8 @@ export type Database = {
           work_id: string
         }
         Update: {
-          collaborator_id?: string | null
           client_id?: string
+          collaborator_id?: string | null
           created_at?: string
           desired_date?: string | null
           filled?: number
@@ -3046,6 +3061,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hiring_requests_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
             referencedColumns: ["id"]
           },
           {
@@ -4883,12 +4905,6 @@ export type Database = {
           },
         ]
       }
-      schedule_presence: {
-        Row: { schedule_date: string; seen_at: string; user_id: string }
-        Insert: { schedule_date: string; seen_at?: string; user_id: string }
-        Update: { schedule_date?: string; seen_at?: string; user_id?: string }
-        Relationships: []
-      }
       schedule_client_visibility: {
         Row: {
           client_id: string
@@ -4974,6 +4990,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      schedule_presence: {
+        Row: {
+          schedule_date: string
+          seen_at: string
+          user_id: string
+        }
+        Insert: {
+          schedule_date: string
+          seen_at?: string
+          user_id: string
+        }
+        Update: {
+          schedule_date?: string
+          seen_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       schedule_work_night: {
         Row: {
@@ -5154,44 +5188,6 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      timeclock_adjustments: {
-        Row: {
-          created_at: string
-          id: string
-          kind: string
-          rdo_workforce_id: string
-          status: string
-          treated_at: string
-          treated_by: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          kind: string
-          rdo_workforce_id: string
-          status?: string
-          treated_at?: string
-          treated_by?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          kind?: string
-          rdo_workforce_id?: string
-          status?: string
-          treated_at?: string
-          treated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "timeclock_adjustments_rdo_workforce_id_fkey"
-            columns: ["rdo_workforce_id"]
-            isOneToOne: false
-            referencedRelation: "rdo_workforce"
             referencedColumns: ["id"]
           },
         ]
@@ -6473,7 +6469,6 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
-          manager_id: string | null
           monthly_enabled: boolean
           name: string
           neighborhood: string | null
@@ -6489,7 +6484,6 @@ export type Database = {
           start_date: string | null
           state: string | null
           status: Database["public"]["Enums"]["work_status"]
-          substitute_manager_id: string | null
           supervisor_id: string | null
           updated_at: string
           zip_code: string | null
@@ -6518,7 +6512,6 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
-          manager_id?: string | null
           monthly_enabled?: boolean
           name: string
           neighborhood?: string | null
@@ -6534,7 +6527,6 @@ export type Database = {
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]
-          substitute_manager_id?: string | null
           supervisor_id?: string | null
           updated_at?: string
           zip_code?: string | null
@@ -6563,7 +6555,6 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
-          manager_id?: string | null
           monthly_enabled?: boolean
           name?: string
           neighborhood?: string | null
@@ -6579,7 +6570,6 @@ export type Database = {
           start_date?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["work_status"]
-          substitute_manager_id?: string | null
           supervisor_id?: string | null
           updated_at?: string
           zip_code?: string | null
@@ -6590,20 +6580,6 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "works_manager_id_fkey"
-            columns: ["manager_id"]
-            isOneToOne: false
-            referencedRelation: "collaborators"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "works_substitute_manager_id_fkey"
-            columns: ["substitute_manager_id"]
-            isOneToOne: false
-            referencedRelation: "collaborators"
             referencedColumns: ["id"]
           },
           {
@@ -6620,38 +6596,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      day_off_remove_day: {
-        Args: { _collaborator_id: string; _date: string; _whole?: boolean }
-        Returns: number
-      }
-      classify_occurrence: {
-        Args: { _workforce_id: string; _key: string }
-        Returns: string
-      }
-      schedule_entry_to_work: {
-        Args: { _entry_id: string; _work_id: string; _sort: number; _pending: boolean }
-        Returns: string
-      }
-      ensure_schedule: {
-        Args: { _date: string }
-        Returns: string
-      }
-      reorder_allocations: {
-        Args: { _ids: string[]; _orders: number[] }
-        Returns: undefined
-      }
-      schedule_presence_ping: {
-        Args: { _date: string }
-        Returns: { user_id: string; full_name: string }[]
-      }
-      schedule_presence_leave: {
-        Args: { _date: string }
-        Returns: undefined
-      }
-      appointment_complete: {
-        Args: { _date: string; _id: string; _time?: string }
-        Returns: string
-      }
       _andam_move: {
         Args: {
           _fc: string
@@ -6709,6 +6653,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      appointment_complete: {
+        Args: { _date: string; _id: string; _time?: string }
+        Returns: string
+      }
       billing_client_key: { Args: { v: string }; Returns: string }
       billing_client_normalized: { Args: { v: string }; Returns: string }
       billing_doc_key: { Args: { v: string }; Returns: string }
@@ -6748,6 +6696,10 @@ export type Database = {
         }
         Returns: string
       }
+      classify_occurrence: {
+        Args: { _key: string; _workforce_id: string }
+        Returns: string
+      }
       copy_service_split: {
         Args: { _client_id: string; _date: string }
         Returns: number
@@ -6762,6 +6714,7 @@ export type Database = {
       }
       driver_bonus_default: { Args: { _driver_id: string }; Returns: boolean }
       easter_date: { Args: { y: number }; Returns: string }
+      ensure_schedule: { Args: { _date: string }; Returns: string }
       fleet_expenses_replace: {
         Args: { p_file: string; p_rows: Json; p_source: string }
         Returns: number
@@ -6956,10 +6909,33 @@ export type Database = {
         Args: { _note: string; _reason: string; _wf_id: string }
         Returns: undefined
       }
+      rdo_sync_changed: { Args: { _pairs: Json }; Returns: undefined }
+      rdo_sync_workforce: { Args: { _rdo_id: string }; Returns: undefined }
       rdo_undo_absence: { Args: { _wf_id: string }; Returns: undefined }
       relocate_allocation_client: {
         Args: { _alloc_id: string; _client_id: string }
         Returns: undefined
+      }
+      reorder_allocations: {
+        Args: { _ids: string[]; _orders: number[] }
+        Returns: undefined
+      }
+      schedule_entry_to_work: {
+        Args: {
+          _entry_id: string
+          _pending: boolean
+          _sort: number
+          _work_id: string
+        }
+        Returns: string
+      }
+      schedule_presence_leave: { Args: { _date: string }; Returns: undefined }
+      schedule_presence_ping: {
+        Args: { _date: string }
+        Returns: {
+          full_name: string
+          user_id: string
+        }[]
       }
       set_transport_passenger: {
         Args: {
