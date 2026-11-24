@@ -9,6 +9,7 @@ import { RailMenu } from "@/components/nav/rail-menu";
 import { MenuSearch } from "@/components/nav/menu-search";
 import { NotificationsBell } from "@/components/nav/notifications-bell";
 import { useMenuStyle } from "@/components/nav/menu-prefs";
+import { ThemeToggle } from "@/components/nav/theme-toggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -94,8 +95,9 @@ function AuthenticatedLayout() {
       <div className="flex min-h-screen w-full">
         {rail ? <RailMenu /> : <AppSidebar />}
         <MenuSearch />
-        <div className={`flex min-w-0 flex-1 flex-col ${rail ? "pb-20 md:pb-0 md:pl-20" : ""}`}>
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-card/90 px-3 backdrop-blur">
+        <div className={`flex min-w-0 flex-1 flex-col ${rail ? "pb-20 md:pb-0" : ""}`}>
+          {/* Cabeçalho de vidro (mesmo liquid glass do menu) na largura toda; a página rola por baixo. */}
+          <header className={`liquid-glass liquid-glass-bar sticky top-0 z-30 flex h-14 items-center gap-3 px-3 ${rail ? "md:pl-20" : ""}`}>
             {!rail && <SidebarTrigger />}
             {isForeman ? (
               <span className="font-display text-sm uppercase tracking-widest">Relatório Diário</span>
@@ -105,6 +107,7 @@ function AuthenticatedLayout() {
               </Link>
             )}
             <div className="ml-auto flex items-center gap-3">
+              <ThemeToggle />
               <NotificationsBell showMenuAlerts />
               <Badge variant="secondary" className="hidden sm:inline-flex">
                 {ROLE_LABEL[role]}
@@ -119,7 +122,7 @@ function AuthenticatedLayout() {
               </Button>
             </div>
           </header>
-          <main className="flex-1 p-4 md:p-6">
+          <main className={`flex-1 p-4 md:p-6 ${rail ? "md:pl-[6.5rem]" : ""}`}>
             {accessLoading ? null : blocked ? (
               <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
                 Você não tem acesso a esta página. Fale com um administrador.
