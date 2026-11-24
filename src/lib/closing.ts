@@ -49,7 +49,7 @@ export const OVERNIGHT_PRIZE = 25;
 /** Ausências cadastradas (atestado, férias, folga) entre start e end (exclusivo), indexadas por pessoa. */
 export async function loadAbsenceIndex(start: string, end: string) {
   const [daysOff, vacations, leaves] = await Promise.all([
-    all<any>((f, t) => supabase.from("days_off").select("collaborator_id, date, end_date").lt("date", end).order("id").range(f, t)),
+    all<any>((f, t) => supabase.from("days_off").select("collaborator_id, date, end_date").lt("date", end).or(`end_date.gte.${start},and(end_date.is.null,date.gte.${start})`).order("id").range(f, t)),
     all<any>((f, t) => supabase.from("vacations").select("collaborator_id, start_date, end_date").lt("start_date", end).gte("end_date", start).order("id").range(f, t)),
     all<any>((f, t) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").lt("start_date", end).gte("end_date", start).order("id").range(f, t)),
   ]);
@@ -133,9 +133,10 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     ids.length ? supabase.from("schedule_box_vt").select("schedule_id, box_key, pays_vt").in("schedule_id", ids) : empty<any>(),
     ids.length ? supabase.from("schedule_person_vt").select("schedule_id, box_key, collaborator_id, pays_vt").in("schedule_id", ids) : empty<any>(),
     supabase.from("holidays").select("date, name").gte("date", start).lt("date", end),
-    supabase.from("days_off").select("collaborator_id, date, end_date").lt("date", end),
-    supabase.from("vacations").select("collaborator_id, start_date, end_date").lt("start_date", end).gte("end_date", start),
-    supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").lt("start_date", end).gte("end_date", start),
+    // Sem limite inferior a leitura cortava em 1000 linhas (folgas antigas ocupavam o lugar das do mês).
+    all<any>((f, t) => supabase.from("days_off").select("collaborator_id, date, end_date").lt("date", end).or(`end_date.gte.${start},and(end_date.is.null,date.gte.${start})`).order("id").range(f, t)),
+    all<any>((f, t) => supabase.from("vacations").select("collaborator_id, start_date, end_date").lt("start_date", end).gte("end_date", start).order("id").range(f, t)),
+    all<any>((f, t) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").lt("start_date", end).gte("end_date", start).order("id").range(f, t)),
     all<any>((f, t) => supabase.from("rdo_workforce").select("collaborator_id, report_date, present, final_classification, reported_reason")
       .gte("report_date", start).lt("report_date", end).order("id").range(f, t)),
     supabase.from("transport_voucher_rules").select("*").eq("active", true),
@@ -162,7 +163,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     return holiday.get(date) ?? null;
   };
   // Ausências indexadas por pessoa (antes: varredura das listas inteiras a cada dia de cada pessoa).
-  const personAbsence = absenceIndex(leaves.data, vacations.data, daysOff.data);
+  const personAbsence = absenceIndex(leaves, vacations, daysOff);
   const rdoAbsent = new Map<string, string>();
   for (const r of rdoWf) {
     const cls = r.final_classification ?? (r.present ? null : r.reported_reason ?? "falta");

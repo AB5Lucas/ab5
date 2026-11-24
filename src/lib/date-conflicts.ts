@@ -32,7 +32,7 @@ export async function findDateConflicts(
       .eq("collaborator_id", collaboratorId)
       .lte("start_date", to)
       .gte("end_date", from),
-    supabase.from("days_off").select("id,date,end_date").eq("collaborator_id", collaboratorId).lte("date", to),
+    supabase.from("days_off").select("id,date,end_date").eq("collaborator_id", collaboratorId).lte("date", to).or(`end_date.gte.${from},and(end_date.is.null,date.gte.${from})`),
     supabase
       .from("medical_leaves")
       .select("id,start_date,end_date")

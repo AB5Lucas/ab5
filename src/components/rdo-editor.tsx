@@ -122,7 +122,7 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
       const blocked = new Set<string>();
       if (ids.length) {
         const [off, vac, med, appt, boxes] = await Promise.all([
-          supabase.from("days_off").select("collaborator_id, date, end_date").in("collaborator_id", ids).lte("date", date),
+          supabase.from("days_off").select("collaborator_id, date, end_date").in("collaborator_id", ids).lte("date", date).or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`),
           supabase.from("vacations").select("collaborator_id").in("collaborator_id", ids).lte("start_date", date).gte("end_date", date).neq("status", "cancelled"),
           supabase.from("medical_leaves").select("collaborator_id").in("collaborator_id", ids).lte("start_date", date).gte("end_date", date),
           // Com ASO, integração ou treinamento agendado no dia: sai do RDO da obra (como na Programação)

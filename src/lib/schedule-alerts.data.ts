@@ -34,7 +34,7 @@ export async function fetchScheduleAlerts(date: string, qc?: QueryClient) {
   ]);
   // Também cobrem: realizados nos últimos 60 dias (documento aguardando a Conferência) e os treinamentos exigidos pelos clientes.
   const [doneRecent, requiredRows] = await Promise.all([
-    safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, training_id, client_id").eq("status", "realizado").gte("scheduled_date", addDaysIso(today, -60)).range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, training_id, client_id").eq("status", "realizado").gte("scheduled_date", addDaysIso(today, -60)).order("id").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("client_required_trainings").select("client_id, training_id").range(a, b))),
   ]);
   const required = new Map<string, Set<string>>();
@@ -48,7 +48,7 @@ export async function fetchScheduleAlerts(date: string, qc?: QueryClient) {
     recentIds.length ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id").in("schedule_id", recentIds).order("id").range(a, b))) : [],
     sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
     safe(fetchAll<any>((a, b) => supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date).order("id").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date).gte("date", addDaysIso(date, -60)).order("id").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date).or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`).order("id").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date).order("id").range(a, b))),
     sched ? safe(fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
     safe(fetchAll<any>((a, b) => supabase.from("transport_passengers").select("client_id").eq("schedule_date", date).order("id").range(a, b))),

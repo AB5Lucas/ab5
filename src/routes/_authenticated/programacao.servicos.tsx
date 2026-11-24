@@ -142,7 +142,7 @@ function ServicesPage() {
         : [];
       // Quem está de folga, férias ou atestado no dia fica fora (efetivo e transporte)
       const [{ data: off }, { data: vac }, { data: med }, { data: trApp }, { data: trBox }] = await Promise.all([
-        supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date),
+        supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date).or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`),
         supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date),
         supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
         // ASO, treinamento ou integração no dia (como na Programação): a pessoa sai dos serviços.
