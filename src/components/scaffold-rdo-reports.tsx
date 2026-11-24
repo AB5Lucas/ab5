@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { fetchAll, monthEnd } from "@/lib/results-engine";
+import { monthEnd } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import { parseOrder, parseTag } from "@/lib/andaimes";
 import { nightHours } from "@/lib/labor-cost";
 

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { workedHours } from "@/lib/rdo";
 import { allocationHours } from "@/lib/allocation-hours";
 import { laborShare, monthRange, type LaborShareBy } from "@/lib/labor-share";
-import { filteredDailyAllocations } from "@/lib/allocation-daily-pdf";
+import { filteredDailyAllocations } from "@/lib/allocation-daily-filter";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";

@@ -1,9 +1,8 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, lazy, Suspense, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/page-header";
@@ -13,15 +12,18 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetchAll, loadResultShared } from "@/lib/results-engine";
+import { loadResultShared } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import { BUDGET_KM_RATE, dayKm, dayToll, normalizePlate, vehicleMonth, type VehicleMonth } from "@/lib/fleet-costs";
 import { budgetByClient, serviceTransportBudget, type BudgetPart } from "@/lib/fleet-budget";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { financeBatches, financeList, loadFinanceActive, loadFinanceRaws } from "@/lib/finance-data";
 import { syncFleetCostsNow } from "@/lib/fleet-costs.functions";
 
+// recharts só carrega quando os gráficos aparecem (chunk próprio).
+const VehicleBarsChart = lazy(() => import("./manutencao-charts").then((m) => ({ default: m.VehicleBarsChart })));
+const TrendLineChart = lazy(() => import("./manutencao-charts").then((m) => ({ default: m.TrendLineChart })));
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const brlShort = (v: number) => (Math.abs(v) >= 1000 ? `R$ ${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : brl(v));
 const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]}/${ym.slice(2, 4)}`;
 const addMonths = (ym: string, n: number) => {
@@ -252,34 +254,12 @@ export function FleetMaintenancePage() {
         <section className="panel p-4">
           <h3 className="mb-2 text-sm font-medium">Orçado × real por veículo · {monthLabel(month)}</h3>
           {rows.length ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={rows} margin={{ left: 8, right: 16, bottom: 8 }} barGap={2} barCategoryGap="20%">
-                <CartesianGrid vertical={false} className="stroke-border" />
-                <XAxis dataKey="plate" fontSize={10} interval={0} angle={-40} textAnchor="end" height={52} tickLine={false} />
-                <YAxis fontSize={11} tickFormatter={(v: number) => brlShort(v)} width={80} />
-                <Tooltip formatter={(v: number) => brl(v)} labelFormatter={(_, p) => p?.[0]?.payload?.label ?? ""} />
-                <Legend wrapperStyle={{ fontSize: 12 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
-                <Bar dataKey="budget" name="Orçado" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="real" name="Real" fill="var(--chart-blue)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="kmCost" name={`Km × ${brl(BUDGET_KM_RATE)}`} fill="var(--muted-foreground)" fillOpacity={0.45} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="h-[300px]" />}><VehicleBarsChart data={rows} kmRate={BUDGET_KM_RATE} /></Suspense>
           ) : <p className="py-10 text-center text-sm text-muted-foreground">Sem km nem gastos neste mês.</p>}
         </section>
         <section className="panel p-4">
           <h3 className="mb-2 text-sm font-medium">Orçado × real nos últimos 12 meses{vehicleFilter !== "all" ? ` · ${shownVehicles[0]?.plate ?? ""}` : ""}</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={trend} margin={{ left: 8, right: 16 }}>
-              <CartesianGrid vertical={false} className="stroke-border" />
-              <XAxis dataKey="label" fontSize={11} />
-              <YAxis fontSize={11} tickFormatter={(v: number) => brlShort(v)} width={80} />
-              <Tooltip formatter={(v: number) => brl(v)} />
-              <Legend wrapperStyle={{ fontSize: 12 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
-              <Line type="monotone" dataKey="Orçado" stroke="var(--chart-2)" strokeWidth={2} dot={{ r: 4 }} />
-              <Line type="monotone" dataKey="Real" stroke="var(--chart-blue)" strokeWidth={2} dot={{ r: 4 }} />
-              <Line type="monotone" dataKey="Km × 1,35" stroke="var(--muted-foreground)" strokeWidth={2} strokeDasharray="5 4" dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+          <Suspense fallback={<div className="h-[300px]" />}><TrendLineChart data={trend} /></Suspense>
           <p className="mt-1 text-xs text-muted-foreground">Km × 1,35 (tracejado) é referência; só existe a partir do mês em que a programação de veículos passou a ser lançada no sistema.</p>
         </section>
       </div>

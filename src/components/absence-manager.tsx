@@ -18,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import { formatDateBR } from "@/lib/scheduling";
+import { fetchAll } from "@/lib/fetch-all";
+import { invalidateScheduleDay } from "@/lib/invalidate-day";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -85,14 +87,13 @@ export function AbsenceManager({
 
   const rows = useQuery({
     queryKey: [table],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from(table)
-        .select("*")
-        .order(mode === "single" ? "date" : "start_date", { ascending: false });
-      if (error) throw error;
-      return data as unknown as Row[];
-    },
+    // Paginado: a tabela inteira passa de 1000 linhas (corte silencioso do PostgREST).
+    queryFn: async () => (await fetchAll<Row>((a, b) => supabase
+      .from(table)
+      .select("*")
+      .order(mode === "single" ? "date" : "start_date", { ascending: false })
+      .order("id")
+      .range(a, b) as unknown as PromiseLike<{ data: Row[] | null; error: unknown }>)),
   });
 
   const nameById = useMemo(() => {
@@ -166,7 +167,7 @@ export function AbsenceManager({
       reset();
       setEditingId(null);
       qc.invalidateQueries({ queryKey: [table] });
-      qc.invalidateQueries();
+      invalidateScheduleDay(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -179,6 +180,7 @@ export function AbsenceManager({
     onSuccess: () => {
       toast.success("Registro removido.");
       qc.invalidateQueries({ queryKey: [table] });
+      invalidateScheduleDay(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });

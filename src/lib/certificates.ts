@@ -1,4 +1,4 @@
-import { jsPDF } from "jspdf";
+import type { jsPDF } from "jspdf";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import nr06 from "@/assets/nr/nr06.png";
 import nr12 from "@/assets/nr/nr12.png";
@@ -246,6 +246,7 @@ export function certFileName(s: CertSnapshot) {
 }
 
 export async function certificatesPdf(list: CertSnapshot[], fileName: string) {
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
   const lg = await logo();
   const badges = new Map<string, string | null>();
@@ -260,6 +261,7 @@ export async function certificatesPdf(list: CertSnapshot[], fileName: string) {
 }
 
 export async function attendancePdf(lists: ListSnapshot[]) {
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const lg = await logo();
   const W = doc.internal.pageSize.getWidth();

@@ -7,11 +7,25 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { effectiveCity, lodgingBlocksBenefits, lodgingOn, type LodgingStay } from "@/lib/lodging";
+import { fetchAll } from "@/lib/fetch-all";
 
 export { transportNeedsTravel } from "@/lib/schedule-alerts";
 
 export type TravelAlloc = { collaborator_id: string; work_id: string; travel_bonus_override?: boolean | null };
 export type TravelWork = { id: string; client_name?: string | null | undefined; client_city?: string | null | undefined; client_distance_km?: number | null | undefined };
+
+type CityDistance = { city_a: string; city_b: string; km: number };
+const DIST_TTL_MS = 10 * 60_000;
+let distCache: { at: number; rows: Promise<CityDistance[]> } | null = null;
+/** Distâncias entre cidades (cadastro raro de mudar): cache de módulo por 10 min em vez de ler a tabela a cada chamada. */
+function cityDistances(): Promise<CityDistance[]> {
+  if (!distCache || Date.now() - distCache.at > DIST_TTL_MS) {
+    const rows = fetchAll<CityDistance>((a, b) => supabase.from("city_distances").select("city_a, city_b, km").order("id").range(a, b));
+    distCache = { at: Date.now(), rows };
+    rows.catch(() => { if (distCache?.rows === rows) distCache = null; });
+  }
+  return distCache.rows;
+}
 
 export async function travelActiveIds(date: string, scheduleId: string | null, allocs: TravelAlloc[], works: TravelWork[]): Promise<Set<string>> {
   const out = new Set<string>();
@@ -20,14 +34,14 @@ export async function travelActiveIds(date: string, scheduleId: string | null, a
   const [rules, people, dist, workTravel, stays] = await Promise.all([
     supabase.from("travel_bonus_rules").select("minimum_distance, maximum_distance").eq("active", true),
     supabase.from("collaborators").select("id, city, travel_bonus_enabled").in("id", ids),
-    supabase.from("city_distances").select("city_a, city_b, km"),
+    cityDistances().catch(() => [] as CityDistance[]),
     scheduleId ? supabase.from("schedule_work_travel").select("work_id, pays_bonus").eq("schedule_id", scheduleId) : Promise.resolve({ data: [] as { work_id: string; pays_bonus: boolean | null }[] }),
     supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").lte("start_date", date).or(`end_date.is.null,end_date.gte.${date}`),
   ]);
   const ranges = (rules.data ?? []).map((r) => ({ min: Number(r.minimum_distance), max: r.maximum_distance === null ? Infinity : Number(r.maximum_distance) }));
   const hit = (km: number) => ranges.some((r) => km >= r.min && km <= r.max);
   const person = new Map((people.data ?? []).map((p) => [p.id, p]));
-  const distFor = buildDistanceLookup(dist.data ?? []);
+  const distFor = buildDistanceLookup(dist);
   const paysBy = new Map((workTravel.data ?? []).map((w) => [w.work_id, w.pays_bonus]));
   const workBy = new Map(works.map((w) => [w.id, w]));
   const lodgings = (stays.data ?? []) as LodgingStay[];

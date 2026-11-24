@@ -1,17 +1,9 @@
-import { jsPDF } from "jspdf";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 
-type DailyAllocation = {
-  collaborator_id: string | null;
-  daily_schedules: { schedule_date: string } | null;
-};
-
-export function filteredDailyAllocations<T extends DailyAllocation>(rows: T[], person: string) {
-  return rows.filter((row) => row.collaborator_id === person)
-    .sort((a, b) => (a.daily_schedules?.schedule_date ?? "").localeCompare(b.daily_schedules?.schedule_date ?? ""));
-}
+export { filteredDailyAllocations } from "./allocation-daily-filter";
 
 export async function exportAllocationDailyPdf(person: string, period: string, rows: string[][], filename: string) {
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const response = await fetch(ab5Logo.url);
   if (!response.ok) throw new Error("Não foi possível carregar o logo");

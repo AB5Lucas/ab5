@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { syncIndustryNow } from "@/lib/billing-sync.functions";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 
 const brl = (n: number | null) => n === null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const date = (s: string | null) => s ? new Date(s.includes("T") ? s : `${s}T12:00:00Z`).toLocaleString("pt-BR", s.includes("T") ? { dateStyle: "short", timeStyle: "short" } : { dateStyle: "short" }) : "—";

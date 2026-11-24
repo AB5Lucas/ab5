@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import { normalizePlate } from "@/lib/fleet-costs";
 import { closestPlate, isoDay, maintenanceState, type MaintenanceState } from "@/lib/fleet-notes";
 import type { Tables } from "@/integrations/supabase/types";
