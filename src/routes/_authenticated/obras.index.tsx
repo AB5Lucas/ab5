@@ -134,7 +134,8 @@ function WorksPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | WorkStatus>("all");
-  const [clientFilter, setClientFilter] = useState<string[]>([]);
+  // Clientes exibidos (null = todos); Marcar/Desmarcar todos no filtro.
+  const [clientShown, setClientShown] = useState<string[] | null>(null);
   const [resultWork, setResultWork] = useState<Work | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Work | null>(null);
@@ -197,14 +198,14 @@ function WorksPage() {
     const q = search.trim().toLowerCase();
     return (works.data ?? []).filter((w) => {
       if (statusFilter !== "all" && w.status !== statusFilter) return false;
-      if (clientFilter.length && !clientFilter.includes(w.client_id ?? "")) return false;
+      if (clientShown && !clientShown.includes(w.client_id ?? "")) return false;
       if (!q) return true;
       const clientName = w.client_id ? (clientById.get(w.client_id)?.name ?? "") : "";
       // Também pelo pedido (número da lista de pedidos ou o pedido principal) e pelo Nº Orç.
       const orders = Array.isArray(w.orders) ? (w.orders as { number?: unknown }[]).map((o) => String(o?.number ?? "")) : [];
       return [w.name, clientName, w.order_number, w.quote_number, ...orders].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [works.data, search, statusFilter, clientFilter, clientById]);
+  }, [works.data, search, statusFilter, clientShown, clientById]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -299,7 +300,9 @@ function WorksPage() {
             />
           </div>
         </div>
-        <MultiFilter title="Clientes" options={(clients.data ?? []).map((c) => ({ value: c.id, label: c.name }))} values={clientFilter} onChange={setClientFilter} />
+        <MultiFilter title="Clientes" mode="show" hint="Marque os clientes exibidos" options={(clients.data ?? []).map((c) => ({ value: c.id, label: c.name }))}
+          values={clientShown ?? (clients.data ?? []).map((c) => c.id)}
+          onChange={(v) => setClientShown(v.length === (clients.data ?? []).length ? null : v)} />
         <div className="space-y-1">
         <Label>Status</Label>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
