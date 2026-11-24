@@ -225,3 +225,6 @@
 @media (min-width: 768px) { .rail-menu { animation: rail-in 0.4s cubic-bezier(.2,.8,.2,1) both; } }
 .rail-btn:hover { transform: scale(1.08); }
 @media (prefers-reduced-motion: reduce) { .rail-menu { animation: none; } .rail-btn:hover { transform: none; } }
+@keyframes rail-preview-in { from { opacity: 0; transform: translateX(-8px) scale(0.97); } to { opacity: 1; transform: none; } }
+.rail-preview { animation: rail-preview-in 0.35s cubic-bezier(0.32, 0.72, 0, 1) both; transform-origin: left center; }
+@media (prefers-reduced-motion: reduce) { .rail-preview { animation: none; } }

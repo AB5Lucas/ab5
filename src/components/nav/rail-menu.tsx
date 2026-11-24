@@ -5,7 +5,11 @@
  * e a troca para o menu lateral). No celular vira uma barra embaixo.
  */
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, LayoutList, Search, Settings } from "lucide-react";
+import { Bell, Building2, ChevronDown, LayoutList, Search, Settings } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchAll } from "@/lib/fetch-all";
+import { CountUp } from "@/components/count-up";
 import { useEffect, useRef, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -127,108 +131,206 @@ export function RailMenu() {
 }
 
 type Group = (typeof MENU_GROUPS)[number];
+type Badges = ReturnType<typeof useMenuBadges>;
+
+/** Soma dos avisos das páginas do módulo (texto discreto à direita, como o "22,5°" do modelo). */
+function moduleInfo(g: Group, badges: Badges) {
+  const n = g.items.reduce((a, i) => a + (badges[i.url]?.count ?? 0), 0);
+  return n ? `${n} aviso${n > 1 ? "s" : ""}` : "";
+}
+
+/** Prévia de Atividades ao passar o mouse: faturado no mês + barras dos últimos 6 meses (mesma leitura da visão geral). */
+function useActivitiesPreview(enabled: boolean) {
+  return useQuery({
+    queryKey: ["rail-preview", "atividades"],
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().slice(0, 10);
+      const rows = await fetchAll<{ entry_date: string; amount: number }>((a, b) => supabase.from("work_entries").select("entry_date, amount")
+        .eq("category", "faturamento").eq("sync_cancelled", false).gte("entry_date", from).order("id").range(a, b));
+      const months: string[] = [];
+      for (let k = 5; k >= 0; k--) { const d = new Date(now.getFullYear(), now.getMonth() - k, 1); months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }
+      const by = new Map(months.map((m) => [m, 0]));
+      for (const r of rows) { const m = String(r.entry_date).slice(0, 7); if (by.has(m)) by.set(m, by.get(m)! + Number(r.amount ?? 0)); }
+      return months.map((m) => ({ m, v: by.get(m)! }));
+    },
+  });
+}
+
+const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+function ActivitiesPreview() {
+  const q = useActivitiesPreview(true);
+  const [hov, setHov] = useState<number | null>(null);
+  const data = q.data ?? [];
+  const cur = data[data.length - 1]?.v ?? 0, prev = data[data.length - 2]?.v ?? 0;
+  const delta = prev ? ((cur - prev) / prev) * 100 : null;
+  const max = Math.max(1, ...data.map((d) => d.v));
+  const sel = hov ?? data.length - 1;
+  const short = (v: number) => v >= 1e6 ? `${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi` : v >= 1e3 ? `${(v / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil` : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  return (
+    <div className="rail-preview w-64 rounded-3xl bg-neutral-950 p-4 text-white shadow-2xl">
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10"><Building2 className="h-3.5 w-3.5" /></span>
+        <div>
+          <p className="text-sm font-medium leading-tight">Faturado no mês</p>
+          {delta != null && <p className="text-[10px] text-white/60">{delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}% vs. mês anterior</p>}
+        </div>
+      </div>
+      <p className="mt-3 font-display text-4xl font-light tracking-tight">{q.isLoading ? "…" : <CountUp value={`R$ ${short(cur)}`} />}</p>
+      <div className="relative mt-3 flex h-16 items-end gap-1.5" onMouseLeave={() => setHov(null)}>
+        {data.map((d, k) => (
+          <div key={d.m} className="relative flex h-full flex-1 items-end" onMouseEnter={() => setHov(k)}>
+            <div className={cn("ov-grow w-full rounded-md", k === sel ? "bg-primary" : "bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.28)_0_2px,transparent_2px_5px)]")}
+              style={{ height: `${Math.max(6, (d.v / max) * 100)}%`, animationDelay: `${k * 50}ms` }} />
+            {k === sel && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-neutral-900">{MONTHS[Number(d.m.slice(5, 7)) - 1]} · {short(d.v)}</span>}
+          </div>
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between text-[9px] text-white/45">{data.map((d) => <span key={d.m}>{MONTHS[Number(d.m.slice(5, 7)) - 1]}</span>)}</div>
+    </div>
+  );
+}
+
 /**
- * Computador: faixa escura compacta (só ícones) que se abre ao passar o mouse, mostrando os nomes dos módulos e,
- * no módulo aberto, as páginas (como o menu lateral). Sai o mouse, volta a ser compacta.
+ * Computador (modelo do vídeo "Nido"): painel de vidro arredondado, compacto só com ícones; ao passar o mouse abre com
+ * busca, módulos (ativo em pílula escura com o ícone num círculo da cor da marca, avisos à direita), páginas do módulo
+ * aberto com bolinha, prévia escura ao lado (Atividades) e Configurações fixa embaixo.
  */
 function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
-  modules: Group[]; adminItems: { item: Group["items"][number]; group: Group }[]; current: string; currentMod: string | null;
-  badges: ReturnType<typeof useMenuBadges>;
+  modules: Group[]; adminItems: { item: Group["items"][number]; group: Group }[]; current: string; currentMod: string | null; badges: Badges;
 }) {
   const { profile, role } = useCurrentUser();
   const [, setStyle] = useMenuStyle();
   const navigate = useNavigate();
   const [openMod, setOpenMod] = useState<string | null | undefined>(undefined);
   const [hover, setHover] = useState(false);
-  // Abre/fecha com uma pequena espera, para não piscar quando o mouse só passa por cima.
+  const [settings, setSettings] = useState(false);
+  const [preview, setPreview] = useState<{ label: string; top: number } | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const enter = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHover(true), 90); };
-  const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHover(false), 220); };
+  const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => { setHover(false); setPreview(null); }, 240); };
   useEffect(() => () => window.clearTimeout(timer.current), []);
-  const [settings, setSettings] = useState(false);
-  useEffect(() => { setOpenMod(undefined); setSettings(false); }, [current]);
+  useEffect(() => { setOpenMod(undefined); setSettings(false); setPreview(null); }, [current]);
   const openLabel = openMod === undefined ? currentMod : openMod;
   const expanded = hover || settings;
-  const row = "flex h-10 w-full items-center gap-3 rounded-full px-3 text-sm transition-[background-color,color,box-shadow] duration-300";
-  // Rótulos entram depois que a faixa abre e saem antes de ela fechar.
-  const label = cn("truncate whitespace-nowrap transition-[opacity,transform] duration-300 ease-out", expanded ? "translate-x-0 opacity-100 delay-100" : "-translate-x-1 opacity-0 delay-0");
-  // Destaque: o módulo escolhido no menu (aberto); sem escolha, o da página atual.
   const highlighted = expanded && openLabel ? openLabel : currentMod;
+  const ease = "ease-[cubic-bezier(0.32,0.72,0,1)]";
+  const fade = cn("whitespace-nowrap transition-[opacity,transform] duration-300", expanded ? "translate-x-0 opacity-100 delay-100" : "-translate-x-1 opacity-0");
+  const rowBase = "group/row relative flex h-11 w-full items-center gap-3 rounded-full pl-1 pr-3 text-sm transition-[background-color,color,box-shadow] duration-300";
+  const iconWrap = (active: boolean) => cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors duration-300",
+    active ? "bg-primary text-primary-foreground" : "text-foreground/70 group-hover/row:text-foreground");
+  const initials = (profile?.full_name || profile?.email || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
+
   return (
-    <nav aria-label="Menu" onMouseEnter={enter} onMouseLeave={leave}
-      className={cn("rail-menu fixed left-3 top-1/2 z-40 hidden max-h-[calc(100vh-1.5rem)] -translate-y-1/2 flex-col gap-1 overflow-y-auto overflow-x-hidden rounded-[26px] p-1.5 transition-[width] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:flex",
-        GLASS, expanded ? "w-64" : "w-[3.25rem]")}>
-      <button type="button" onClick={openMenuSearch} className={cn(row, IDLE)} title="Buscar (Ctrl+K)">
-        <Search className="h-4 w-4 shrink-0" /><span className={label}>Buscar</span><span className={cn("ml-auto text-[10px] text-muted-foreground transition-opacity duration-300", expanded ? "opacity-100 delay-100" : "opacity-0")}>Ctrl K</span>
-      </button>
-      <span className="mx-auto my-0.5 h-px w-6 shrink-0 bg-foreground/10" />
-      {modules.map((g) => {
-        const tone = worstTone(g.items.map((i) => badges[i.url]));
-        const isOpen = expanded && openLabel === g.label;
-        const isCur = g.label === highlighted;
-        return (
-          <div key={g.label} className="w-full">
-            <button type="button" aria-expanded={isOpen}
-              onClick={() => { const opening = openLabel !== g.label; setOpenMod(opening ? g.label : null); if (opening && g.overview) void navigate({ to: g.overview as never }); }}
-              className={cn(row, "relative", isCur ? ACTIVE : IDLE)}>
-              <g.icon className="h-4 w-4 shrink-0" />
-              <span className={cn(label, "font-medium")}>{g.label}</span>
-              {tone && <span className={cn("h-2 w-2 shrink-0 rounded-full", dotClass(tone), expanded ? "ml-auto" : "absolute right-2 top-2 ring-2 ring-white/70")} />}
+    <div onMouseEnter={enter} onMouseLeave={leave} className="fixed left-3 top-1/2 z-40 hidden -translate-y-1/2 md:block">
+      <nav aria-label="Menu"
+        className={cn("rail-menu flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[28px] p-1.5 transition-[width,box-shadow] duration-500", ease, GLASS, expanded ? "w-[15.5rem]" : "w-[3.25rem]")}>
+        {/* Busca */}
+        <button type="button" onClick={openMenuSearch} title="Buscar (Ctrl+K)"
+          className={cn("mb-1 flex h-10 w-full items-center gap-2 rounded-full pl-2.5 pr-2 text-sm transition-colors duration-300", expanded ? "bg-white/60 text-muted-foreground shadow-inner dark:bg-white/10" : "text-foreground/70 hover:bg-white/50")}>
+          <Search className="h-4 w-4 shrink-0" />
+          <span className={cn(fade, "flex-1 text-left text-[13px]")}>Buscar página…</span>
+          <kbd className={cn(fade, "rounded-md border border-foreground/10 bg-white/70 px-1.5 text-[10px] text-muted-foreground dark:bg-white/10")}>Ctrl K</kbd>
+        </button>
+
+        {/* Módulos (rolam; a lista some suavemente embaixo) */}
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [mask-image:linear-gradient(to_bottom,black_88%,transparent)] [scrollbar-width:none]">
+          <div className="space-y-0.5 pb-6">
+            {modules.map((g) => {
+              const tone = worstTone(g.items.map((i) => badges[i.url]));
+              const isOpen = expanded && openLabel === g.label;
+              const active = g.label === highlighted;
+              const info = moduleInfo(g, badges);
+              return (
+                <div key={g.label}>
+                  <button type="button" aria-expanded={isOpen}
+                    onMouseEnter={(e) => { if (g.overview && expanded) setPreview({ label: g.label, top: (e.currentTarget as HTMLElement).getBoundingClientRect().top }); else setPreview(null); }}
+                    onClick={() => { const opening = openLabel !== g.label; setOpenMod(opening ? g.label : null); if (opening && g.overview) void navigate({ to: g.overview as never }); }}
+                    className={cn(rowBase, active ? "bg-neutral-950 text-white shadow-[0_6px_18px_-6px_rgba(0,0,0,0.45)] dark:bg-white dark:text-neutral-950" : "text-foreground/80 hover:bg-white/70 hover:shadow-sm dark:hover:bg-white/10")}>
+                    <span className={iconWrap(active)}><g.icon className="h-4 w-4" /></span>
+                    <span className={cn(fade, "flex-1 truncate text-left font-medium")}>{g.label}</span>
+                    {info && <span className={cn(fade, "text-[10.5px]", active ? "text-white/60 dark:text-neutral-500" : "text-muted-foreground")}>{info}</span>}
+                    <ChevronDown className={cn(fade, "h-3.5 w-3.5 shrink-0 opacity-60 transition-transform duration-300", isOpen && "rotate-180")} />
+                    {tone && !expanded && <span className={cn("absolute right-1.5 top-1.5 h-2 w-2 rounded-full ring-2 ring-white/80", dotClass(tone))} />}
+                  </button>
+                  <div className={cn("grid transition-[grid-template-rows,opacity] duration-500", ease, isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+                    <div className="min-h-0 overflow-hidden">
+                      <div className="ml-6 mt-0.5 space-y-px py-0.5 pl-2">
+                        {g.overview && (
+                          <Link to={g.overview as never} className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] transition-colors duration-300", current === g.overview ? "bg-white/90 font-semibold text-foreground shadow-sm dark:bg-white/15" : "text-foreground/70 hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10")}>
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Visão geral
+                          </Link>
+                        )}
+                        {g.items.map((i) => {
+                          const b = badges[i.url];
+                          return (
+                            <Link key={i.url} to={i.to ?? i.url}
+                              className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] transition-colors duration-300", current === i.url ? "bg-white/90 font-semibold text-foreground shadow-sm dark:bg-white/15" : "text-foreground/70 hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10")}>
+                              <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", b ? dotClass(b.tone) : "bg-foreground/25")} />
+                              <span className="truncate">{i.title}</span>
+                              {b && <span className="ml-auto text-[10.5px] text-muted-foreground">{b.label ?? b.count}</span>}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Configurações, sempre embaixo */}
+        <Popover open={settings} onOpenChange={setSettings}>
+          <PopoverTrigger asChild>
+            <button type="button" className={cn(rowBase, "mt-1", settings ? "bg-white/80 shadow-sm dark:bg-white/15" : "text-foreground/80 hover:bg-white/70 dark:hover:bg-white/10")}>
+              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-white to-neutral-200 text-[11px] font-semibold text-neutral-700 shadow-sm dark:from-neutral-700 dark:to-neutral-800 dark:text-white">
+                {initials}
+                {adminItems.some(({ item }) => badges[item.url]) && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-white/80" />}
+              </span>
+              <span className={cn(fade, "min-w-0 flex-1 text-left leading-tight")}>
+                <span className="block truncate text-[13px] font-medium">{profile?.full_name || profile?.email}</span>
+                <span className="block truncate text-[10.5px] text-muted-foreground">Configurações</span>
+              </span>
+              <Settings className={cn(fade, "h-4 w-4 shrink-0 opacity-60")} />
             </button>
-            <div className={cn("grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]", isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
-              <div className="min-h-0 overflow-hidden">
-              <div className="ml-5 mt-0.5 grid gap-px border-l border-foreground/10 pl-2">
-                {g.overview && (
-                  <Link to={g.overview as never} className={cn("rounded-full px-3 py-1.5 text-[13px] transition-colors", current === g.overview ? "bg-white/80 font-semibold text-foreground shadow-sm dark:bg-white/15" : "text-foreground/70 hover:bg-white/50 hover:text-foreground dark:hover:bg-white/10")}>Visão geral</Link>
-                )}
-                {g.items.map((i, k) => {
-                  const b = badges[i.url];
+          </PopoverTrigger>
+          <PopoverContent side="right" align="end" sideOffset={14} className={cn("w-64 rounded-2xl p-1.5", GLASS_POP)}>
+            <div className="px-2.5 pb-2 pt-1">
+              <p className="truncate text-sm font-medium">{profile?.full_name || profile?.email}</p>
+              <p className="text-[11px] text-muted-foreground">{ROLE_LABEL[role]}</p>
+            </div>
+            {adminItems.length > 0 && (
+              <>
+                <p className="px-2.5 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Administração</p>
+                {adminItems.map(({ item, group }) => {
+                  const Icon = item.icon ?? group.icon;
                   return (
-                    <Link key={i.url} to={i.to ?? i.url} style={{ animationDelay: `${Math.min(k, 12) * 25}ms` }}
-                      className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] transition-colors duration-300", current === i.url ? "bg-white/80 font-semibold text-foreground shadow-sm dark:bg-white/15" : "text-foreground/70 hover:bg-white/50 hover:text-foreground dark:hover:bg-white/10")}>
-                      <span className="truncate">{i.title}</span>
-                      {b && <BadgePill b={b} className="ml-auto" />}
+                    <Link key={item.url} to={item.to ?? item.url} className={cn("flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-white/60 dark:hover:bg-white/10", current === item.url && "bg-white/70 font-semibold")}>
+                      <Icon className="h-4 w-4 text-muted-foreground" /> {item.title}
+                      {badges[item.url] && <span className="ml-auto h-2 w-2 rounded-full bg-destructive" />}
                     </Link>
                   );
                 })}
-              </div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-      <span className="mx-auto my-0.5 h-px w-6 shrink-0 bg-foreground/10" />
-      <Popover open={settings} onOpenChange={setSettings}>
-        <PopoverTrigger asChild>
-          <button type="button" className={cn(row, "relative", settings ? ACTIVE : IDLE)}>
-            <Settings className="h-4 w-4 shrink-0" /><span className={label}>Configurações</span>
-            {adminItems.some(({ item }) => badges[item.url]) && <span className={cn("h-2 w-2 shrink-0 rounded-full bg-destructive", expanded ? "ml-auto" : "absolute right-2 top-2 ring-2 ring-white/70")} />}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent side="right" align="end" sideOffset={14} className={cn("w-64 rounded-2xl p-1.5", GLASS_POP)}>
-          <div className="px-2.5 pb-2 pt-1">
-            <p className="truncate text-sm font-medium">{profile?.full_name || profile?.email}</p>
-            <p className="text-[11px] text-muted-foreground">{ROLE_LABEL[role]}</p>
-          </div>
-          {adminItems.length > 0 && (
-            <>
-              <p className="px-2.5 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Administração</p>
-              {adminItems.map(({ item, group }) => {
-                const Icon = item.icon ?? group.icon;
-                return (
-                  <Link key={item.url} to={item.to ?? item.url} className={cn("flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-accent", current === item.url && "bg-accent font-semibold")}>
-                    <Icon className="h-4 w-4 text-muted-foreground" /> {item.title}
-                    {badges[item.url] && <span className="ml-auto h-2 w-2 rounded-full bg-destructive" />}
-                  </Link>
-                );
-              })}
-              <div className="my-1 h-px bg-border" />
-            </>
-          )}
-          <Link to="/notificacoes" search={{ aba: "preferencias" } as never} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-white/60 dark:hover:bg-white/10"><Bell className="h-4 w-4 text-muted-foreground" /> Notificações</Link>
-          <button type="button" onClick={() => setStyle("modern")} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-accent"><LayoutList className="h-4 w-4 text-muted-foreground" /> Usar menu lateral</button>
-        </PopoverContent>
-      </Popover>
-    </nav>
+                <div className="my-1 h-px bg-foreground/10" />
+              </>
+            )}
+            <Link to="/notificacoes" search={{ aba: "preferencias" } as never} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-white/60 dark:hover:bg-white/10"><Bell className="h-4 w-4 text-muted-foreground" /> Notificações</Link>
+            <button type="button" onClick={() => setStyle("modern")} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm hover:bg-white/60 dark:hover:bg-white/10"><LayoutList className="h-4 w-4 text-muted-foreground" /> Usar menu lateral</button>
+          </PopoverContent>
+        </Popover>
+      </nav>
+
+      {/* Prévia escura do módulo (Atividades), ao lado da linha em que o mouse está */}
+      {expanded && preview && (
+        <div className="absolute left-[calc(100%+0.75rem)]" style={{ top: Math.max(8, preview.top - (document.querySelector(".rail-menu")?.getBoundingClientRect().top ?? 0) - 8) }}
+          onMouseEnter={enter}>
+          {preview.label === "Atividades" && <ActivitiesPreview />}
+        </div>
+      )}
+    </div>
   );
 }
