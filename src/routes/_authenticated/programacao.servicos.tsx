@@ -425,18 +425,33 @@ function ServicesPage() {
     const q = search.trim().toLowerCase();
     const rq = roleSearch.trim().toLowerCase();
     const posName = new Map(wctx.data.ctx.positions.map((p) => [p.id, p.name.toLowerCase()]));
-    const ref = visible[0]?.id ?? works[0]?.id ?? "";
+    // Bloqueado na lista só se não puder entrar em nenhum serviço exibido; ao soltar, vale o motivo do serviço de destino.
+    const refs = (visible.length ? visible : works).map((w) => w.id);
+    const whyFor = (cid: string) => {
+      let first: string | null = null;
+      for (const ref of refs) {
+        const why = blockReason(cid, ref);
+        if (!why) return null;
+        first ??= why;
+      }
+      return first;
+    };
     return wctx.data.ctx.collaborators
       .filter((c) => !here.has(c.id) && (!q || c.full_name.toLowerCase().includes(q) || (c.registration_number ?? "").toLowerCase().includes(q)))
       .filter((c) => !rq || (posName.get(c.position_id ?? "") ?? "").includes(rq))
-      .map((c) => ({ id: c.id, name: c.full_name, why: ref ? blockReason(c.id, ref) : null }))
+      .map((c) => ({ id: c.id, name: c.full_name, why: refs.length ? whyFor(c.id) : null }))
       .sort((a, b) => Number(!!a.why) - Number(!!b.why) || a.name.localeCompare(b.name, "pt-BR"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWeekend, wctx.data, allocs, search, roleSearch, visible, works, clientId, date]);
   const addPerson = useMutation({
     mutationFn: async ({ cid, workId }: { cid: string; workId: string }) => {
-      const { error } = await supabase.rpc("weekend_add_allocation", { _work_id: workId, _date: date, _collaborator_id: cid });
+      const { data, error } = await supabase.rpc("weekend_add_allocation", { _work_id: workId, _date: date, _collaborator_id: cid });
       if (error) throw error;
+      // Sem linha criada (ex.: a pessoa está num quadro do dia e a inserção foi ignorada): avisa em vez de parecer sucesso.
+      if (!data) {
+        const name = wctx.data?.ctx.collaborators.find((c) => c.id === cid)?.full_name ?? "O colaborador";
+        throw new Error(`${name} está num quadro da Programação neste dia (folga, treinamento…) e não foi escalado`);
+      }
     },
     onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["servicos-weekend-ctx"] }); },
     onError: (e: Error) => { toast.error(e.message); qc.invalidateQueries({ queryKey: ["servicos-weekend-ctx"] }); },
