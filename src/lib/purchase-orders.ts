@@ -11,3 +11,8 @@ export function fileMatchesOrder(fileName: string, order: string) {
   const base = fileName.replace(/\.[^.]+$/, "");
   return base.split(/\D+/).some((part) => part === n || (part.replace(/^0+/, "") === n.replace(/^0+/, "") && part.replace(/^0+/, "") !== ""));
 }
+
+/** Vários pedidos no mesmo item, separados por ";" (ex.: "35828; 35829"). */
+export const splitOrders = (s: string | null | undefined) => String(s ?? "").split(";").map((x) => x.trim()).filter(Boolean);
+/** order_file_path guarda um link por pedido, na mesma ordem, separados por quebra de linha (vazio = não achado). */
+export const orderFilePaths = (s: string | null | undefined) => (s ? s.split("\n") : []);

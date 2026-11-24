@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { splitOrders } from "./purchase-orders";
 
 /** Comprador digitou o nº do pedido: acha o PDF na pasta de pedidos de compras e liga ao item da SC. */
 export const linkPurchaseOrderFile = createServerFn({ method: "POST" })
@@ -16,8 +17,11 @@ export const linkPurchaseOrderFile = createServerFn({ method: "POST" })
     if (!lovableKey || !excelKey) throw new Error("Conexão do SharePoint indisponível");
     const { findPurchaseOrderFile } = await import("./purchase-orders.server");
     const year = Number(new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 4));
-    const file = await findPurchaseOrderFile(data.order, year, { lovableKey, excelKey });
-    const { error } = await context.supabase.rpc("purchase_item_set_file", { _item: data.item, _path: file?.url ?? "" });
+    // Vários pedidos separados por ";": um link por pedido, na mesma ordem (Pedido 1, Pedido 2…).
+    const orders = splitOrders(data.order);
+    const files = await Promise.all(orders.map((o) => findPurchaseOrderFile(o, year, { lovableKey, excelKey })));
+    const path = files.some(Boolean) ? files.map((f) => f?.url ?? "").join("\n") : "";
+    const { error } = await context.supabase.rpc("purchase_item_set_file", { _item: data.item, _path: path });
     if (error) throw new Error(error.message);
-    return file;
+    return { found: files.flatMap((f) => (f ? [f.name] : [])), missing: orders.filter((_, k) => !files[k]) };
   });

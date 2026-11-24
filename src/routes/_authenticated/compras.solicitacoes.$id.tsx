@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { linkPurchaseOrderFile } from "@/lib/purchase-orders.functions";
+import { orderFilePaths, splitOrders } from "@/lib/purchase-orders";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Link2, Camera, Check, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Link2, Camera, Check, Eye, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
@@ -212,7 +213,8 @@ function Page() {
     mutationFn: (v: { item: string; order: string }) => linkOrder({ data: v }),
     onSuccess: (file) => {
       qc.invalidateQueries({ queryKey: ["sc-items", id] });
-      file ? toast.success(`Pedido encontrado: ${file.name}`) : toast.warning("Pedido não encontrado na pasta de pedidos de compras");
+      if (file.missing.length) toast.warning(`Pedido não encontrado na pasta de pedidos de compras: ${file.missing.join(", ")}`);
+      if (file.found.length) toast.success(`Pedido encontrado: ${file.found.join(", ")}`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -373,12 +375,10 @@ function Page() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       {editable ? <Input className="h-8 min-w-24 text-sm" inputMode="decimal" placeholder="0,00" value={x.budget} onChange={(e) => change(i, { budget: e.target.value })} /> : <span className="whitespace-nowrap">{brl(num(x.budget))}</span>}
-                      {x.quote_path && <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Ver cotação/orçamento" onClick={() => openPhoto(x.quote_path!)}><FileText className="h-4 w-4 text-primary" /></Button>}
+                      {x.quote_path && !editable && <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Ver cotação/orçamento" onClick={() => openPhoto(x.quote_path!)}><FileText className="h-4 w-4 text-primary" /></Button>}
                       {editable && (
-                        <label className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-accent" title="Anexar cotação ou orçamento (foto ou PDF)">
-                          <Paperclip className="h-4 w-4 text-muted-foreground" />
-                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadQuote(i, f); e.target.value = ""; }} />
-                        </label>
+                        <AttachMenu path={x.quote_path} accept="image/*,application/pdf" icon={Paperclip} what="cotação ou orçamento (foto ou PDF)"
+                          onView={() => openPhoto(x.quote_path!)} onPick={(f) => void uploadQuote(i, f)} onRemove={() => change(i, { quote_path: null })} />
                       )}
                       <ItemLink value={x.link} editable={editable} onChange={(v) => change(i, { link: v })} />
                     </div>
@@ -401,12 +401,10 @@ function Page() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {x.photo_path && <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver foto" onClick={() => openPhoto(x.photo_path!)}><ImageIcon className="h-4 w-4" /></Button>}
+                      {x.photo_path && !editable && <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver foto" onClick={() => openPhoto(x.photo_path!)}><ImageIcon className="h-4 w-4" /></Button>}
                       {editable && (
-                        <label className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md hover:bg-accent" title="Anexar foto">
-                          <Camera className="h-4 w-4 text-muted-foreground" />
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(i, f); e.target.value = ""; }} />
-                        </label>
+                        <AttachMenu path={x.photo_path} accept="image/*" icon={Camera} what="foto"
+                          onView={() => openPhoto(x.photo_path!)} onPick={(f) => void upload(i, f)} onRemove={() => change(i, { photo_path: null })} />
                       )}
                       {!x.photo_path && !editable && <span className="text-muted-foreground">—</span>}
                     </div>
@@ -439,7 +437,15 @@ function Page() {
                     ) : saved?.order_number ?? "—"}
                     {saved && (saved.order_file_path || (isBuyer && saved.order_number)) && (
                       <div className="mt-1 flex items-center gap-1">
-                        {saved.order_file_path && <Button variant="ghost" size="sm" className="h-7 px-2" title="Abrir o pedido de compras" onClick={() => openPhoto(saved.order_file_path!)}><FileText className="h-4 w-4 text-primary" /> Pedido</Button>}
+                        {(() => {
+                          const files = orderFilePaths(saved.order_file_path);
+                          const many = splitOrders(saved.order_number).length > 1 || files.length > 1;
+                          return files.map((url, k) => url && (
+                            <Button key={k} variant="ghost" size="sm" className="h-7 px-2" title={`Abrir o pedido de compras ${splitOrders(saved.order_number)[k] ?? ""}`} onClick={() => openPhoto(url)}>
+                              <FileText className="h-4 w-4 text-primary" /> {many ? `Pedido ${k + 1}` : "Pedido"}
+                            </Button>
+                          ));
+                        })()}
                         {isBuyer && saved.order_number && (
                           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={findOrder.isPending} title="Procurar de novo na pasta de pedidos de compras"
                             onClick={() => findOrder.mutate({ item: saved.id, order: saved.order_number! })}>
@@ -517,6 +523,39 @@ function Page() {
 }
 
 /** Link de referência do produto (ex.: anúncio): ícone ao lado do clipe; editando abre um campo, senão abre o link. */
+/** Clipe/câmera do item: sem arquivo abre a escolha; com arquivo abre um quadro com Visualizar, Trocar e Remover (como no Excel). */
+function AttachMenu({ path, accept, icon: Icon, what, onView, onPick, onRemove }: {
+  path: string | null; accept: string; icon: typeof Paperclip; what: string;
+  onView: () => void; onPick: (f: File) => void; onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const pick = () => { setOpen(false); input.current?.click(); };
+  const file = <input ref={input} type="file" accept={accept} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = ""; }} />;
+  if (!path) {
+    return (
+      <button type="button" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-accent" title={`Anexar ${what}`} onClick={pick}>
+        <Icon className="h-4 w-4 text-muted-foreground" />{file}
+      </button>
+    );
+  }
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-accent" title={`${what[0]!.toUpperCase()}${what.slice(1)} anexada`}>
+          <Icon className="h-4 w-4 text-primary" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-44 p-1" align="start">
+        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => { setOpen(false); onView(); }}><Eye className="h-4 w-4" /> Visualizar</Button>
+        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={pick}><RefreshCw className="h-4 w-4" /> Trocar</Button>
+        <Button variant="ghost" size="sm" className="w-full justify-start text-destructive" onClick={() => { setOpen(false); onRemove(); }}><Trash2 className="h-4 w-4" /> Remover</Button>
+      </PopoverContent>
+      {file}
+    </Popover>
+  );
+}
+
 function ItemLink({ value, editable, onChange }: { value: string; editable: boolean; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
