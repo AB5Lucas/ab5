@@ -222,9 +222,17 @@ export function RdoEditor({ work, date }: { work: WorkRow; date: string }) {
       .filter((t) => t.planned && !allocIds.has(t.collaborator_id) && ((t.present && t.occurrence_status === "none") || planned.data!.blocked.has(t.collaborator_id)))
       .map((t) => t.id);
     if (!inserts.length && !removed.length) return;
+    // Reserva: o banco já sincroniza pelo trigger em daily_allocations (migração 0169); aqui cobre o que mudou por fora
+    // (ausências, agendamentos). Erro de gravação aparece para o usuário em vez de sumir.
     (async () => {
-      if (inserts.length) await supabase.from("rdo_workforce").upsert(inserts, { onConflict: "rdo_id,collaborator_id", ignoreDuplicates: true });
-      if (removed.length) await supabase.from("rdo_workforce").delete().in("id", removed);
+      if (inserts.length) {
+        const { error } = await supabase.from("rdo_workforce").upsert(inserts, { onConflict: "rdo_id,collaborator_id", ignoreDuplicates: true });
+        if (error) toast.error(`Não foi possível atualizar o efetivo pela Programação: ${error.message}`);
+      }
+      if (removed.length) {
+        const { error } = await supabase.from("rdo_workforce").delete().in("id", removed);
+        if (error) toast.error(`Não foi possível tirar do efetivo quem saiu da Programação: ${error.message}`);
+      }
       qc.invalidateQueries({ queryKey: ["rdo-team", r.id] });
     })();
   }, [r, team.data, planned.data, editable, defaultTimes, date, work.id, qc]);

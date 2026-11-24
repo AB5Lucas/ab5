@@ -4,12 +4,18 @@
  * V1 treinamento sem TST no ADM · V8 veículo sem motorista / CNH vencida · V9 cliente sem transporte ·
  * V10 descanso < 11h entre jornadas · V11 programação do próximo dia útil não criada após o horário de corte ·
  * V13 documento já vencido de escalado (ASO, integração no cliente, treinamento exigido pelo cliente) ·
- * L1 documentos vencendo em 7 dias · L2 agendamento sem confirmação na plataforma · L5 pessoas sem escalação (sem intermitentes e PJ).
+ * V14 escalado em obra com atestado/férias/folga no mesmo dia (ação: tirar da obra) ·
+ * L1 documentos vencendo em 7 dias · L2 agendamento sem confirmação na plataforma · L5 pessoas sem escalação (sem intermitentes e PJ) ·
+ * L6 RDO finalizado diverge da programação · L7 distribuição de serviços pendente no próximo dia útil (sem Indústria) ·
+ * L8 RDO não criado/não finalizado no dia útil anterior · L9 ocorrência de RDO sem classificação a partir do dia 20.
  * (L4, manutenção de veículo, aguarda a aba Manutenção estar alimentada.)
  */
 export type AlertTone = "red" | "orange";
 /** Ação do aviso: feriado municipal de um cliente com equipe escalada (cadastrar só para o cliente ou ignorar). */
-export type AlertAction = { kind: "municipal_holiday"; clientId: string; date: string; name: string };
+export type AlertAction =
+  | { kind: "municipal_holiday"; clientId: string; date: string; name: string }
+  /** Escalado com ausência no dia: tirar da obra (a ausência prevalece). */
+  | { kind: "remove_allocations"; ids: string[] };
 export type ScheduleAlert = { key: string; tone: AlertTone; title: string; people: string[]; action?: AlertAction };
 
 const plain = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
@@ -34,7 +40,7 @@ export function pastCutoff(now: Date): boolean {
 
 const minutes = (t: string | null | undefined) => { const m = (t ?? "").match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
 
-export type AlertWork = { id: string; name: string; client_id: string | null; entry_time: string | null; exit_time: string | null; exit_time_weekend: string | null; night_shift: boolean | null };
+export type AlertWork = { id: string; name: string; client_id: string | null; entry_time: string | null; exit_time: string | null; exit_time_weekend: string | null; night_shift: boolean | null; rdo_general?: boolean | null };
 export type AlertData = {
   date: string;
   today: string;
@@ -42,7 +48,7 @@ export type AlertData = {
   holidays: Set<string>;
   scheduleExists: boolean;
   /** Pessoas escaladas no dia e no dia anterior (data corrida). */
-  allocations: { collaborator_id: string; work_id: string; vt?: boolean; travel?: boolean }[];
+  allocations: { id?: string; collaborator_id: string; work_id: string; vt?: boolean; travel?: boolean }[];
   prevAllocations: { collaborator_id: string; work_id: string }[];
   works: Map<string, AlertWork>;
   clients: Map<string, { name: string; needs_company_transport: boolean | null }>;
@@ -64,6 +70,18 @@ export type AlertData = {
   recent: Set<string>;
   /** Feriados municipais (catálogo, não automáticos) nas cidades dos clientes com equipe, ainda sem decisão. */
   municipal?: { clientId: string; clientName: string; city: string; name: string }[];
+  /** Ausência cadastrada no dia por pessoa (férias, atestado, folga). */
+  absences?: Map<string, string>;
+  /** Nomes dos clientes com distribuição de serviços pendente (aba Serviços), já sem a Indústria. */
+  distributionPending?: string[];
+  /** Dia útil anterior: serviços com equipe, RDOs do dia e clientes que usam RDO (tiveram RDO nos últimos 30 dias). */
+  prevRdo?: { date: string; workIds: string[]; rdos: { work_id: string; status: string }[]; usesRdo: Set<string> } | undefined;
+  /** Ocorrências de RDO sem classificação até o dia. */
+  pendingOccurrences?: { collaborator_id: string; report_date: string; work_id: string; reason: string | null }[];
+  /** RDOs finalizados do dia com quem está no efetivo. */
+  finalizedRdos?: { work_id: string; workforce: string[]; present?: string[] }[];
+  /** Integração lançada num serviço na aba Serviços (entra no RDO desse serviço). */
+  integrationChoices?: { work_id: string; collaborator_id: string }[];
 };
 
 /** Três Corações só pede transporte da empresa quando alguém escalado tem prêmio viagem ativo. Por quê: pedido do usuário. */
@@ -71,6 +89,40 @@ export const transportNeedsTravel = (clientName: string | null | undefined) =>
   String(clientName ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().includes("TRES CORACOES");
 
 const br = (d: string) => d.split("-").reverse().join("/");
+const brShort = (d: string) => d.slice(5).split("-").reverse().join("/");
+
+/** Dia útil anterior a `date` (pula sábado, domingo e feriados). */
+export function previousBusinessDay(date: string, holidays: ReadonlySet<string>): string {
+  let d = addDaysIso(date, -1);
+  for (let i = 0; i < 30 && ([0, 6].includes(weekday(d)) || holidays.has(d)); i++) d = addDaysIso(d, -1);
+  return d;
+}
+const isIndustriaName = (n: string | null | undefined) => plain(n) === "INDUSTRIA";
+
+/**
+ * RDO finalizado × programação do dia: quem está escalado no serviço (no RDO Geral, em qualquer serviço do cliente),
+ * sem ausência/agendamento, mais quem foi lançado no serviço pela integração, comparado ao efetivo do RDO.
+ */
+export function rdoDivergences(d: Pick<AlertData, "works" | "clients" | "people" | "allocations" | "absences" | "appointments" | "finalizedRdos" | "integrationChoices">) {
+  const out: string[] = [];
+  const name = (id: string) => d.people.get(id)?.name ?? "—";
+  const away = new Set([...(d.absences?.keys() ?? []), ...d.appointments.filter((a) => a.status !== "cancelado").map((a) => a.collaborator_id)]);
+  for (const r of d.finalizedRdos ?? []) {
+    const w = d.works.get(r.work_id);
+    if (!w) continue;
+    const scope = new Set(w.rdo_general && w.client_id ? [...d.works.values()].filter((x) => x.client_id === w.client_id).map((x) => x.id) : [w.id]);
+    const integ = (d.integrationChoices ?? []).filter((c) => scope.has(c.work_id)).map((c) => c.collaborator_id);
+    const planned = new Set([...d.allocations.filter((a) => scope.has(a.work_id) && !away.has(a.collaborator_id)).map((a) => a.collaborator_id), ...integ]);
+    const inRdo = new Set(r.workforce);
+    const missing = [...planned].filter((id) => !inRdo.has(id)).map(name).sort();
+    // Ausência informada no RDO (presente = não) não conta como "a mais".
+    const extra = [...new Set(r.present ?? r.workforce)].filter((id) => !planned.has(id)).map(name).sort();
+    if (!missing.length && !extra.length) continue;
+    const label = `${w.client_id ? `${d.clients.get(w.client_id)?.name ?? ""} - ` : ""}${w.name}`;
+    out.push([label, missing.length ? `escalados fora do RDO: ${missing.join(", ")}` : "", extra.length ? `no RDO sem escalação: ${extra.join(", ")}` : ""].filter(Boolean).join(" · "));
+  }
+  return out.sort();
+}
 
 export function scheduleAlerts(d: AlertData): ScheduleAlert[] {
   const out: ScheduleAlert[] = [];
@@ -175,6 +227,54 @@ export function scheduleAlerts(d: AlertData): ScheduleAlert[] {
   // L2: integração agendada no dia sem confirmação na plataforma do cliente (só integrações têm a bolinha verde).
   const unbooked = d.appointments.filter((a) => a.type === "integracao" && a.status === "agendado" && !a.client_booked);
   if (unbooked.length) out.push({ key: "l2", tone: "orange", title: `${unbooked.length} integração(ões) sem confirmação na plataforma`, people: unbooked.map((a) => `${name(a.collaborator_id)} · ${a.label}`).sort() });
+
+  // V14: escalado em obra que tem atestado, férias ou folga no mesmo dia (a ausência prevalece; a Programação esconde a linha).
+  const absentAllocs = d.allocations.filter((a) => d.absences?.has(a.collaborator_id));
+  if (absentAllocs.length) {
+    const ids = absentAllocs.map((a) => a.id).filter((x): x is string => !!x);
+    out.push({
+      key: "v14", tone: "red",
+      title: `${absentAllocs.length} escalado(s) em obra com ${[...new Set(absentAllocs.map((a) => d.absences!.get(a.collaborator_id)!.toLowerCase()))].sort().join("/")} no dia — tire da obra`,
+      people: absentAllocs.map((a) => { const w = d.works.get(a.work_id); return `${name(a.collaborator_id)} · ${d.absences!.get(a.collaborator_id)} · ${(w?.client_id && d.clients.get(w.client_id)?.name) || w?.name || ""}`; }).sort(),
+      ...(ids.length ? { action: { kind: "remove_allocations" as const, ids } } : {}),
+    });
+  }
+
+  // L6: RDO finalizado que diverge da programação do dia.
+  const diverging = rdoDivergences(d);
+  if (diverging.length) out.push({ key: "l6", tone: "orange", title: `RDO finalizado diverge da programação (${diverging.length})`, people: diverging });
+
+  // L7: distribuição de serviços pendente no próximo dia útil (aba Serviços; nunca a Indústria).
+  const dist = (d.distributionPending ?? []).filter((n) => !isIndustriaName(n));
+  if (dist.length && d.date === nextBusinessDay(d.today, d.holidays))
+    out.push({ key: "l7", tone: "orange", title: `${dist.length} cliente(s) com distribuição de serviços pendente`, people: [...dist].sort() });
+
+  // L8: RDO não criado ou não finalizado no dia útil anterior (só clientes que usam RDO; sem a Indústria).
+  if (d.prevRdo && d.prevRdo.date < d.today) {
+    const p = d.prevRdo;
+    const rdoBy = new Map(p.rdos.map((r) => [r.work_id, r.status]));
+    const generalBy = new Map<string, string>();
+    for (const r of p.rdos) { const w = d.works.get(r.work_id); if (w?.rdo_general && w.client_id) generalBy.set(w.client_id, r.status); }
+    const lines: string[] = [];
+    for (const wid of [...new Set(p.workIds)]) {
+      const w = d.works.get(wid);
+      if (!w?.client_id || !p.usesRdo.has(w.client_id) || isIndustriaName(d.clients.get(w.client_id)?.name)) continue;
+      const st = rdoBy.get(wid) ?? generalBy.get(w.client_id);
+      const label = `${d.clients.get(w.client_id)?.name ?? ""} - ${w.name}`;
+      if (!st) lines.push(`${label} · sem RDO`);
+      else if (st === "draft") lines.push(`${label} · não finalizado`);
+    }
+    if (lines.length) out.push({ key: "l8", tone: "orange", title: `${lines.length} RDO(s) de ${br(p.date)} não criado(s) ou não finalizado(s)`, people: lines.sort() });
+  }
+
+  // L9: ocorrência de RDO sem classificação perto do fechamento (a partir do dia 20).
+  if (Number(d.date.slice(8, 10)) >= 20 && d.pendingOccurrences?.length) {
+    const occ = d.pendingOccurrences.filter((o) => o.report_date <= d.date);
+    if (occ.length) out.push({
+      key: "l9", tone: "orange", title: `${occ.length} ocorrência(s) de RDO sem classificação — fechamento próximo`,
+      people: occ.map((o) => { const w = d.works.get(o.work_id); return `${name(o.collaborator_id)} · ${brShort(o.report_date)} · ${(w?.client_id && d.clients.get(w.client_id)?.name) || w?.name || ""}${o.reason ? ` · ${o.reason}` : ""}`; }).sort(),
+    });
+  }
 
   // L5: quem trabalhou nos últimos 14 dias e está sem escalação, quadro, férias, folga ou agendamento (só em dia útil).
   // Quem já terminou o aviso prévio não pode mais ser escalado: fica fora.
