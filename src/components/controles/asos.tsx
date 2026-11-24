@@ -85,14 +85,14 @@ const emptyForm: FormState = { collaborator_id: "", exam_date: todayISO(), notes
 /** Vencimento = 1 ano após a realização − 1 dia (mesma regra do banco). */
 const expiryOf = asoExpiry;
 
-export function AsosPage() {
+export function AsosPage({ initialSearch = "" }: { initialSearch?: string } = {}) {
   const { canWrite, isAdmin } = useCurrentUser();
   const scheduled = useScheduled("aso");
   const inConf = useInConference("aso");
   const qc = useQueryClient();
   const today = todayISO();
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState("all");
   const [followUp, setFollowUp] = useState<FollowUp>("all");
   const [open, setOpen] = useState(false);
