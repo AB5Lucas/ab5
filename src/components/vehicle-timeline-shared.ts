@@ -135,6 +135,8 @@ export const rowDrivers = (r: Pick<VehicleScheduleRow, "driver_id" | "extra_driv
 export function driversByDay(rows: VehicleScheduleRow[]): Map<string, Map<string, Set<string>>> {
   const out = new Map<string, Map<string, Set<string>>>();
   for (const r of rows) {
+    // Manutenção/Revisão: o nome no campo é só o responsável (ex.: Emerson), não conta como repetição.
+    if (r.is_maintenance) continue;
     const day = out.get(r.schedule_date) ?? new Map<string, Set<string>>();
     out.set(r.schedule_date, day);
     for (const d of rowDrivers(r)) {

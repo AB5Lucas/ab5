@@ -794,7 +794,7 @@ export function VehicleTimeline() {
     const row = byCell.get(`${vehicleId}|${d}`);
     const logistics = logDemands.data?.get(`${vehicleId}|${d}`)?.join(" · ");
     if (!row) return { row, driverText: "", placeText: "", extrasTitle: undefined, extrasCount: 0, km: 0, bonusTone: "none" as const, dupDriver: undefined, logistics };
-    const dup = rowDrivers(row).filter((id) => (dayDrivers.get(d)?.get(id)?.size ?? 0) > 1);
+    const dup = row.is_maintenance ? [] : rowDrivers(row).filter((id) => (dayDrivers.get(d)?.get(id)?.size ?? 0) > 1);
     return {
       row,
       driverText: row.driver_id ? shortName(driverName.get(row.driver_id) ?? personName.get(row.driver_id) ?? "—") : row.requester_id ? `${shortName(personName.get(row.requester_id) ?? "—")} · solic.` : "Sem motorista",

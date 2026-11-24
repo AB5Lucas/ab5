@@ -167,7 +167,9 @@ export function VehicleCellEditor(props: {
     else if (d && !cnhCovers(d.driver_license_category, cell.vehicleCnh)) out.push(`CNH ${d.driver_license_category} não cobre a categoria ${cell.vehicleCnh} do veículo`);
     const away = absences.data?.get(id);
     if (away) out.push(`Motorista ${away} neste dia`);
-    const others = [...(ctx.driversOn(cell.date).get(id) ?? [])].filter((v) => v !== cell.vehicleId);
+    // Manutenção/Revisão: o nome é só o responsável, não conta como repetição.
+    const maint = fr.client === MAINTENANCE_KEY || fr.client === REVISION_KEY;
+    const others = maint ? [] : [...(ctx.driversOn(cell.date).get(id) ?? [])].filter((v) => v !== cell.vehicleId);
     if (others.length) out.push(`Já é motorista de ${others.map(ctx.plateOf).join(", ")} neste dia`);
     // Mesmo motorista em dois fretes deste veículo é normal (vários fretes no dia): não avisa.
     void i;
