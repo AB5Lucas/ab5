@@ -1,4 +1,5 @@
 import { Fragment, lazy, Suspense, useMemo, useState } from "react";
+import { CountUp } from "@/components/count-up";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -400,7 +401,7 @@ function Kpi({ label, value, hint, tone, small, onClick }: { label: string; valu
   const body = (
     <>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`${small ? "text-base" : "font-display text-xl"} tabular-nums ${tone === "bad" ? "text-destructive" : tone === "good" ? "text-emerald-600" : ""}`}>{value}</p>
+      <p className={`${small ? "text-base" : "font-display text-xl"} tabular-nums ${tone === "bad" ? "text-destructive" : tone === "good" ? "text-emerald-600" : ""}`}><CountUp value={value} /></p>
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </>
   );

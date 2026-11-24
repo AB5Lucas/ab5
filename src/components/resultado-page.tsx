@@ -1,5 +1,6 @@
 /** Página Resultados (rota /obras/resultado e detalhe do Financeiro). Fica fora da rota para o carregamento sob demanda funcionar. */
 import { marginPercent, meanMarginPercent } from "@/lib/result-labor";
+import { CountUp } from "@/components/count-up";
 import { MarginPercent } from "@/components/margin-percent";
 import { ResultSupport } from "@/components/result-support";
 import { ResultRecurrences } from "@/components/result-recurrences";
@@ -913,7 +914,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
               </div>
               <div className="mt-6 text-center">
                 <SectionTitle>Valor do Pedido</SectionTitle>
-                <p className="mt-2 text-xl font-bold">{brl(shownOrder)}</p>
+                <p className="mt-2 text-xl font-bold"><CountUp value={brl(shownOrder)} /></p>
               </div>
             </div>
 
@@ -995,7 +996,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                 <p className="pt-6 text-sm">{brl(fixedBudget.margin)}</p>
                 <div className="row-span-2 mx-4 w-px bg-border" />
                 <p className={`pt-6 text-sm ${fixedReal.margin < 0 ? "text-destructive" : ""}`}>{brl(fixedReal.margin)}</p>
-                <p className="pt-4 text-lg">{pct(fixedBudget.pct)}</p>
+                <p className="pt-4 text-lg"><CountUp value={pct(fixedBudget.pct)} /></p>
                 <p className="pt-4 text-lg"><MarginPercent value={fixedReal.pct} margin={fixedReal.margin} /></p>
               </div>
               {monthlyInfo && hasPeriod && (
@@ -1529,7 +1530,7 @@ function Gauge({ value }: { value: number }) {
         <polygon points={`${nx},${ny} ${bx1},${by1} ${bx2},${by2}`} fill="var(--muted-foreground)" />
         <circle cx={cx} cy={cy} r={5} fill="var(--muted-foreground)" />
       </svg>
-      <p className="text-2xl font-bold">{pct(v)}</p>
+      <p className="text-2xl font-bold"><CountUp value={pct(v)} /></p>
     </div>
   );
 }

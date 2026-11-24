@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CountUp } from "@/components/count-up";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -102,15 +103,15 @@ export function DriversPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="panel p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Motoristas</p>
-          <p className="font-display text-2xl font-semibold">{counts.total}</p>
+          <p className="font-display text-2xl font-semibold"><CountUp value={counts.total} /></p>
         </div>
         <div className="panel p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">CNH a vencer (30 dias)</p>
-          <p className="font-display text-2xl font-semibold">{counts.expiring}</p>
+          <p className="font-display text-2xl font-semibold"><CountUp value={counts.expiring} /></p>
         </div>
         <div className="panel p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">CNH vencida</p>
-          <p className="font-display text-2xl font-semibold text-destructive">{counts.expired}</p>
+          <p className="font-display text-2xl font-semibold text-destructive"><CountUp value={counts.expired} /></p>
         </div>
       </div>
 
