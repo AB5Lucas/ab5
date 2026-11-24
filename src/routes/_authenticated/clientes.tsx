@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { generateClientImage } from "@/lib/client-images.functions";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Building2, ImagePlus, LayoutGrid, List, MapPin, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CadastrosTabs } from "@/components/cadastros-tabs";
 import { PageHeader } from "@/components/page-header";
@@ -123,6 +125,27 @@ function ClientsPage() {
   const { canWrite, isAdmin } = useCurrentUser();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  // Quadros (padrão) ou lista; lembrado neste navegador.
+  const [view, setView] = useState<"cards" | "list">("cards");
+  useEffect(() => { try { if (localStorage.getItem("clientes-view") === "list") setView("list"); } catch { /* ignora */ } }, []);
+  const changeView = (v: "cards" | "list") => { setView(v); try { localStorage.setItem("clientes-view", v); } catch { /* ignora */ } };
+  // Imagem da fachada gerada pela IA (mesmo estilo para todos): uma por vez, para não estourar o limite da IA.
+  const genImage = useServerFn(generateClientImage);
+  const [genIds, setGenIds] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
+  const runGen = async (id: string) => {
+    setGenIds((s) => new Set(s).add(id));
+    try { await genImage({ data: { clientId: id } }); await queryClient.invalidateQueries({ queryKey: ["clients"] }); return true; }
+    catch (e) { toast.error((e as Error).message); return false; }
+    finally { setGenIds((s) => { const n = new Set(s); n.delete(id); return n; }); }
+  };
+  const genMissing = async () => {
+    const list = (clients.data ?? []).filter((c) => !c.image_path);
+    if (!list.length) { toast.info("Todos os clientes já têm imagem"); return; }
+    setBulk({ done: 0, total: list.length });
+    for (let i = 0; i < list.length; i++) { if (!(await runGen(list[i]!.id))) break; setBulk({ done: i + 1, total: list.length }); }
+    setBulk(null);
+  };
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -385,6 +408,11 @@ function ClientsPage() {
                 onImport={importClients}
               />
             )}
+            {canWrite && view === "cards" && (
+              <Button size="sm" variant="outline" onClick={() => void genMissing()} disabled={!!bulk} title="Gera pela IA a imagem da fachada dos clientes que ainda não têm, no mesmo estilo para todos">
+                <Sparkles className={`h-4 w-4 ${bulk ? "animate-pulse" : ""}`} /> {bulk ? `Gerando ${bulk.done}/${bulk.total}…` : "Gerar imagens"}
+              </Button>
+            )}
             {canWrite && (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4" /> Novo cliente
@@ -394,16 +422,78 @@ function ClientsPage() {
         }
       />
 
-      <div className="relative min-w-52">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="pl-8"
-          placeholder="Buscar por nome, cidade ou bairro"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex items-end gap-2">
+        <div className="relative min-w-52 flex-1">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-8"
+            placeholder="Buscar por nome, cidade ou bairro"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex rounded-full border bg-muted/40 p-0.5">
+          {([["cards", LayoutGrid, "Quadros"], ["list", List, "Lista"]] as const).map(([v, Icon, label]) => (
+            <button key={v} type="button" onClick={() => changeView(v)} title={label} aria-label={label}
+              className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors ${view === v ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+              <Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
+      {view === "cards" && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {clients.isLoading && Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-72 animate-pulse rounded-2xl bg-muted" />)}
+          {!clients.isLoading && filtered.length === 0 && <p className="col-span-full py-10 text-center text-sm text-muted-foreground">Nenhum cliente encontrado.</p>}
+          {filtered.map((c, k) => {
+            const img = c.image_path ? supabase.storage.from("client-images").getPublicUrl(c.image_path).data.publicUrl : null;
+            const busy = genIds.has(c.id);
+            return (
+              <div key={c.id} className="ov-card group overflow-hidden rounded-2xl border bg-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg" style={{ animationDelay: `${Math.min(k, 12) * 40}ms` }}>
+                <div className="relative aspect-[16/9] overflow-hidden bg-muted">
+                  {img ? (
+                    <img src={img} alt={`Fachada ${c.name}`} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                      <Building2 className="h-8 w-8" />
+                      {canWrite && (
+                        <Button size="sm" variant="outline" disabled={busy || !!bulk} onClick={() => void runGen(c.id)}>
+                          <ImagePlus className="h-4 w-4" /> {busy ? "Gerando…" : "Gerar imagem"}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  {busy && img && <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-xs">Gerando nova imagem…</div>}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-8 text-white">
+                    <p className="font-display text-lg font-semibold leading-tight drop-shadow">{c.name}</p>
+                  </div>
+                  {c.cc_prefix && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 font-mono text-[10px] text-white">CC {c.cc_prefix}</span>}
+                  {canWrite && (
+                    <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      {img && <Button size="icon" variant="secondary" className="h-7 w-7" disabled={busy || !!bulk} onClick={() => void runGen(c.id)} title="Gerar outra imagem"><RefreshCw className="h-3.5 w-3.5" /></Button>}
+                      <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => openEdit(c)} title="Editar cliente"><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => setDeleting(c)} title="Excluir cliente"><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2 p-3 text-sm">
+                  <p className="flex gap-1.5 text-muted-foreground"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{[c.address, c.number, c.neighborhood].filter(Boolean).join(", ") || "Endereço não cadastrado"}<br />{[c.city, c.state].filter(Boolean).join("/")}{c.distance_km != null ? ` · ${c.distance_km} km` : ""}</span>
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Badge variant={c.requires_integration ? "outline" : "secondary"} className="text-[10px]">{c.requires_integration ? "Exige integração" : "Não exige integração"}</Badge>
+                    {c.needs_company_transport && <Badge className="text-[10px]">Transporte da empresa</Badge>}
+                    {c.manager_id && <span className="ml-auto text-[11px] text-muted-foreground">Gestor: {nameById.get(c.manager_id) ?? "—"}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {view === "list" && (
       <div className="rounded-lg border border-border">
         <Table>
           <TableHeader>
@@ -479,6 +569,7 @@ function ClientsPage() {
           </TableBody>
         </Table>
       </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">

@@ -1617,6 +1617,7 @@ export type Database = {
           distance_km: number | null
           has_toll: boolean
           id: string
+          image_path: string | null
           manager_id: string | null
           name: string
           needs_company_transport: boolean
@@ -1641,6 +1642,7 @@ export type Database = {
           distance_km?: number | null
           has_toll?: boolean
           id?: string
+          image_path?: string | null
           manager_id?: string | null
           name: string
           needs_company_transport?: boolean
@@ -1665,6 +1667,7 @@ export type Database = {
           distance_km?: number | null
           has_toll?: boolean
           id?: string
+          image_path?: string | null
           manager_id?: string | null
           name?: string
           needs_company_transport?: boolean
