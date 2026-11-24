@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { MultiFilter } from "@/components/multi-filter";
+const ResultadoPage = lazy(() => import("@/components/resultado-page").then((m) => ({ default: m.ResultadoPage })));
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -134,6 +135,7 @@ function WorksPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | WorkStatus>("all");
   const [clientFilter, setClientFilter] = useState<string[]>([]);
+  const [resultWork, setResultWork] = useState<Work | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Work | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -350,7 +352,7 @@ function WorksPage() {
               const c = w.client_id ? clientById.get(w.client_id) : null;
               return (
                 <TableRow key={w.id}>
-                  <TableCell className="font-medium"><Link to="/obras/resultado" search={{ work: w.id }} className="hover:text-primary hover:underline" title="Abrir o resultado deste serviço">{w.name}</Link></TableCell>
+                  <TableCell className="font-medium"><button type="button" onClick={() => setResultWork(w)} className="text-left hover:text-primary hover:underline" title="Abrir o resultado deste serviço">{w.name}</button></TableCell>
                   <TableCell className="font-mono text-xs">{w.cc_suffix ? `${(c as { cc_prefix?: string | null } | null)?.cc_prefix ?? "????"}${w.cc_suffix}` : "—"}</TableCell>
                   <TableCell className="hidden md:table-cell">{c?.name ?? w.client ?? "—"}</TableCell>
                   <TableCell className="hidden lg:table-cell">
@@ -491,6 +493,14 @@ function WorksPage() {
               {save.isPending ? "Salvando..." : "Salvar"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resultado do serviço num quadro grande, como no Financeiro (sem sair da página). */}
+      <Dialog open={!!resultWork} onOpenChange={(o) => !o && setResultWork(null)}>
+        <DialogContent className="max-w-[98vw] w-[98vw] h-[96vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{resultWork ? `${clientById.get(resultWork.client_id ?? "")?.name ?? resultWork.client ?? ""} — ${resultWork.name}` : ""}</DialogTitle></DialogHeader>
+          {resultWork && <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Carregando...</div>}><ResultadoPage key={resultWork.id} initialWorkId={resultWork.id} /></Suspense>}
         </DialogContent>
       </Dialog>
 
