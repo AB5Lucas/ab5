@@ -8,7 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Building2, ImagePlus, LayoutGrid, List, MapPin, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
+import { Building2, ImagePlus, LayoutGrid, List, MapPin, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CadastrosTabs } from "@/components/cadastros-tabs";
 import { PageHeader } from "@/components/page-header";
@@ -459,11 +459,6 @@ function ClientsPage() {
                 columns={IMPORT_COLUMNS}
                 onImport={importClients}
               />
-            )}
-            {canWrite && view === "cards" && (
-              <Button size="sm" variant="outline" onClick={() => void genMissing()} disabled={!!bulk} title="Gera pela IA a imagem da fachada dos clientes que ainda não têm, no mesmo estilo para todos">
-                <Sparkles className={`h-4 w-4 ${bulk ? "animate-pulse" : ""}`} /> {bulk ? `Gerando ${bulk.done}/${bulk.total}…` : "Gerar imagens"}
-              </Button>
             )}
             {canWrite && (
               <Button size="sm" onClick={openNew}>
