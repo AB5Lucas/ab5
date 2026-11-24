@@ -44,7 +44,9 @@ import { AppointmentDialog } from "@/components/appointment-dialog";
 import { useInConference, useScheduled } from "@/hooks/use-scheduled";
 import { FollowUpFilter, followUpApplies, matchesFollowUp, type FollowUp } from "@/components/controles/follow-up-filter";
 import { createNameMatcher, emptyToNull, normText, parseDate } from "@/lib/import-helpers";
-import { addDays, expiryFrom, formatDateBR, todayISO, INTEGRATION_WARN_DAYS } from "@/lib/scheduling";
+import { formatDateBR, todayISO, INTEGRATION_WARN_DAYS } from "@/lib/scheduling";
+import { docStatus, integrationExpiry } from "@/lib/doc-status";
+import { fetchAll } from "@/lib/results-engine";
 import { pendingFirst } from "@/lib/pending-first";
 
 
@@ -71,10 +73,7 @@ const onlyDigits = (v: string) => (v ?? "").replace(/\D/g, "");
 
 function statusOf(expires: string | null, today: string, documentation?: boolean | null): Status {
   if (documentation) return "documentation";
-  if (!expires) return "valid";
-  if (expires < today) return "expired";
-  if (expires <= addDays(today, INTEGRATION_WARN_DAYS)) return "expiring";
-  return "valid";
+  return docStatus(expires, today, INTEGRATION_WARN_DAYS);
 }
 
 const IMPORT_COLUMNS: ImportColumn[] = [
@@ -131,25 +130,25 @@ export function IntegrationsPage() {
   const integrations = useQuery({
     queryKey: ["client-integrations"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<Row>((a, b) => supabase
         .from("client_integrations")
         .select("id, collaborator_id, client_id, integration_date, expires_at, notes, documentation")
-        .order("integration_date", { ascending: false });
-      if (error) throw error;
-      return data as Row[];
+        .order("integration_date", { ascending: false })
+        .order("id")
+        .range(a, b));
     },
   });
 
   const collaborators = useQuery({
     queryKey: ["collaborators-min-active-int"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<{ id: string; full_name: string; cpf: string | null; registration_number: string; position_id: string | null }>((a, b) => supabase
         .from("collaborators")
         .select("id, full_name, cpf, registration_number, position_id")
         .eq("status", "active")
-        .order("full_name");
-      if (error) throw error;
-      return data;
+        .order("full_name")
+        .order("id")
+        .range(a, b));
     },
   });
 
@@ -272,7 +271,7 @@ export function IntegrationsPage() {
         collaborator_id: form.collaborator_id,
         client_id: form.client_id,
         integration_date: form.integration_date,
-        expires_at: form.expires_at || (form.integration_date ? expiryFrom(form.integration_date, 12) : null),
+        expires_at: form.expires_at || (form.integration_date ? integrationExpiry(form.integration_date) : null),
         notes: form.notes.trim() || null,
       };
       if (editing) {
@@ -382,7 +381,7 @@ export function IntegrationsPage() {
         errors.push(`Linha ${line}: data da integração inválida.`);
         continue;
       }
-      const expires = r["validade"] ? parseDate(r["validade"]!) : date ? expiryFrom(date, 12) : null;
+      const expires = r["validade"] ? parseDate(r["validade"]!) : date ? integrationExpiry(date) : null;
       if (r["validade"] && !expires) {
         errors.push(`Linha ${line}: data de validade inválida.`);
         continue;
@@ -657,7 +656,7 @@ export function IntegrationsPage() {
                 value={form.integration_date}
                 onChange={(e) => {
                   const v = e.target.value;
-                  setForm((f) => ({ ...f, integration_date: v, expires_at: v ? expiryFrom(v, 12) : f.expires_at }));
+                  setForm((f) => ({ ...f, integration_date: v, expires_at: v ? integrationExpiry(v) : f.expires_at }));
                 }}
               />
             </div>

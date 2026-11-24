@@ -1574,6 +1574,39 @@ export type Database = {
           },
         ]
       }
+      client_required_trainings: {
+        Row: {
+          client_id: string
+          created_at: string
+          training_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          training_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          training_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_required_trainings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_required_trainings_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           active: boolean
@@ -2942,6 +2975,7 @@ export type Database = {
       }
       hiring_requests: {
         Row: {
+          collaborator_id: string | null
           client_id: string
           created_at: string
           desired_date: string | null
@@ -2963,6 +2997,7 @@ export type Database = {
           work_id: string
         }
         Insert: {
+          collaborator_id?: string | null
           client_id: string
           created_at?: string
           desired_date?: string | null
@@ -2984,6 +3019,7 @@ export type Database = {
           work_id: string
         }
         Update: {
+          collaborator_id?: string | null
           client_id?: string
           created_at?: string
           desired_date?: string | null
@@ -6578,6 +6614,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      appointment_complete: {
+        Args: { _date: string; _id: string; _time?: string }
+        Returns: string
+      }
       _andam_move: {
         Args: {
           _fc: string

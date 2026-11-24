@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateBR, todayISO } from "@/lib/scheduling";
+import { OnboardingPendingNotice, onboardingPendingWarning } from "@/components/controles/onboarding-pending";
 
 export type AppointmentType = "aso" | "treinamento" | "integracao";
 
@@ -81,19 +82,28 @@ type AppointmentDialogProps = {
   /** Mostra só um ícone de calendário (para usar na linha de um colaborador). */
   iconOnly?: boolean;
   initialValues?: Partial<Pick<FormState, "collaborator_id" | "training_id" | "client_id">>;
+  /**
+   * Controlado de fora (sem botão próprio): a janela abre já preenchida com initialValues.
+   * Use uma `key` diferente por pessoa/documento para recomeçar o formulário.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
-export function AppointmentDialog({ type, iconOnly, initialValues }: AppointmentDialogProps) {
+export function AppointmentDialog({ type, iconOnly, initialValues, open: openProp, onOpenChange }: AppointmentDialogProps) {
   const { canWrite, isAdmin } = useCurrentUser();
   const qc = useQueryClient();
 
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm());
+  const controlled = openProp !== undefined;
+  const [openState, setOpenState] = useState(false);
+  const open = controlled ? openProp : openState;
+  const setOpen = (v: boolean) => (controlled ? onOpenChange?.(v) : setOpenState(v));
+  const [form, setForm] = useState<FormState>(() => (controlled ? { ...emptyForm(), ...initialValues } : emptyForm()));
   const [editing, setEditing] = useState<Row | null>(null);
   const [personQuery, setPersonQuery] = useState("");
   const [fFrom, setFFrom] = useState("");
   const [fTo, setFTo] = useState("");
-  const [fPerson, setFPerson] = useState("all");
+  const [fPerson, setFPerson] = useState(controlled ? initialValues?.collaborator_id ?? "all" : "all");
   const [fStatus, setFStatus] = useState("agendado");
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -228,15 +238,20 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
         const replaced = await futureSameKind(payload);
         const { error } = await supabase.from("appointments").insert(payload);
         if (error) throw error;
-        return replaced;
+        const warn = type === "integracao" ? await onboardingPendingWarning(payload.collaborator_id, payload.client_id) : null;
+        return { replaced, warn };
       }
-      return [] as string[];
+      return { replaced: [] as string[], warn: null };
     },
-    onSuccess: (replaced?: string[]) => {
+    onSuccess: ({ replaced, warn }) => {
       toast.success(editing ? "Agendamento atualizado" : `Agendamento criado${replacedText(replaced ?? [])}`);
+      if (warn) toast.warning(warn);
       reset();
+      if (controlled) setOpen(false);
       qc.invalidateQueries({ queryKey: ["appointments"] });
       qc.invalidateQueries({ queryKey: ["appointments-day"] });
+      qc.invalidateQueries({ queryKey: ["scheduled-tags"] });
+      qc.invalidateQueries({ queryKey: ["release-by-client"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -281,7 +296,7 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
 
   return (
     <>
-      {iconOnly ? (
+      {controlled ? null : iconOnly ? (
         <Button
           variant="ghost"
           size="icon"
@@ -401,6 +416,9 @@ export function AppointmentDialog({ type, iconOnly, initialValues }: Appointment
                       </SelectContent>
                     </Select>
                   </div>
+                )}
+                {type === "integracao" && !editing && (
+                  <OnboardingPendingNotice collaboratorId={form.collaborator_id} clientId={form.client_id} />
                 )}
 
                 <div className="space-y-1.5 sm:col-span-2">

@@ -35,6 +35,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
+import { MultiFilter } from "@/components/multi-filter";
 import { emptyToNull, insertSequentially, parseBool, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
 
 type Client = Tables<"clients">;
@@ -129,6 +130,8 @@ function ClientsPage() {
   const [deleting, setDeleting] = useState<Client | null>(null);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
+  /** Treinamentos exigidos pelo cliente (client_required_trainings): bloqueiam a escalação na Programação. */
+  const [reqTrainings, setReqTrainings] = useState<string[]>([]);
 
   const clients = useQuery({
     queryKey: ["clients"],
@@ -147,6 +150,32 @@ function ClientsPage() {
       return data;
     },
   });
+  const trainings = useQuery({
+    queryKey: ["trainings-active-min"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("trainings").select("id, name, description").eq("active", true).order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const trainingOptions = useMemo(
+    () => (trainings.data ?? []).map((t) => ({ value: t.id, label: t.description ? `${t.name} — ${t.description}` : t.name })),
+    [trainings.data],
+  );
+  const required = useQuery({
+    queryKey: ["client-required-trainings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("client_required_trainings").select("client_id, training_id");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const requiredBy = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const r of required.data ?? []) m.set(r.client_id, [...(m.get(r.client_id) ?? []), r.training_id]);
+    return m;
+  }, [required.data]);
+
   const nameById = useMemo(() => new Map((people.data ?? []).map((p) => [p.id, p.full_name])), [people.data]);
 
   const filtered = useMemo(() => {
@@ -182,6 +211,7 @@ function ClientsPage() {
         manager_id: ref(form.manager_id),
         substitute_manager_id: ref(form.substitute_manager_id),
       };
+      let clientId = editing?.id ?? null;
       if (editing) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editing.id);
         if (error) throw error;
@@ -198,8 +228,25 @@ function ClientsPage() {
           queryClient.invalidateQueries({ queryKey: ["km-report"] });
         }
       } else {
-        const { error } = await supabase.from("clients").insert(payload);
+        const { data, error } = await supabase.from("clients").insert(payload).select("id").single();
         if (error) throw error;
+        clientId = data.id;
+      }
+      // Treinamentos exigidos: tira os desmarcados e inclui os novos.
+      if (clientId) {
+        const before = new Set(requiredBy.get(clientId) ?? []);
+        const after = new Set(reqTrainings);
+        const removed = [...before].filter((t) => !after.has(t));
+        const added = [...after].filter((t) => !before.has(t));
+        if (removed.length) {
+          const { error } = await supabase.from("client_required_trainings").delete().eq("client_id", clientId).in("training_id", removed);
+          if (error) throw error;
+        }
+        if (added.length) {
+          const { error } = await supabase.from("client_required_trainings")
+            .upsert(added.map((training_id) => ({ client_id: clientId!, training_id })), { onConflict: "client_id,training_id", ignoreDuplicates: true });
+          if (error) throw error;
+        }
       }
     },
     onSuccess: () => {
@@ -208,6 +255,9 @@ function ClientsPage() {
       setEditing(null);
       setForm(emptyForm);
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["client-required-trainings"] });
+      queryClient.invalidateQueries({ queryKey: ["schedule-ctx"] });
+      queryClient.invalidateQueries({ queryKey: ["release-by-client"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -228,6 +278,7 @@ function ClientsPage() {
   function openNew() {
     setEditing(null);
     setForm(emptyForm);
+    setReqTrainings([]);
     setAddressSource("");
     setOpen(true);
   }
@@ -257,6 +308,7 @@ function ClientsPage() {
 
   function openEdit(c: Client) {
     setEditing(c);
+    setReqTrainings(requiredBy.get(c.id) ?? []);
     setForm({
       name: c.name ?? "",
       address: c.address ?? "",
@@ -548,6 +600,21 @@ function ClientsPage() {
                 checked={form.requires_integration}
                 onCheckedChange={(v) => set("requires_integration", v)}
               />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <MultiFilter
+                title="Treinamentos exigidos"
+                options={trainingOptions}
+                values={reqTrainings}
+                onChange={setReqTrainings}
+                allLabel="Nenhum"
+                hint="Marque os treinamentos que o cliente exige"
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Na Programação, quem está sem o treinamento ou com ele vencido não pode ser escalado neste cliente
+                (salvo aceite na Conferência).
+              </p>
             </div>
             <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 sm:col-span-2">
               <div>

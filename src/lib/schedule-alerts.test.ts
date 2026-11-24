@@ -65,4 +65,27 @@ describe("avisos da programação", () => {
     const pj = new Map(d.people); pj.set("tst", { ...pj.get("tst")!, contract: "intermitente" });
     expect(keys({ ...d, people: pj })).not.toContain("l5");
   });
+  it("V13 documento já vencido de escalado (vermelho) e cobertura por agendamento", () => {
+    const alloc = [{ collaborator_id: "p2", work_id: "w1" }];
+    // ASO vencido: vermelho; vencendo: só laranja.
+    expect(keys(base({ allocations: alloc, asos: [{ collaborator_id: "p2", expires_at: "2026-11-10" }] }))).toContain("v13");
+    expect(keys(base({ allocations: alloc, asos: [{ collaborator_id: "p2", expires_at: "2026-11-20" }] }))).not.toContain("v13");
+    expect(keys(base({ allocations: alloc, asos: [{ collaborator_id: "p2", expires_at: "2026-11-10" }], covered: new Set(["aso|p2"]) }))).not.toContain("v13");
+    // Integração vencida no cliente escalado; em outro cliente, não.
+    const int = { collaborator_id: "p2", client_id: "c1", expires_at: "2026-10-01", documentation: false };
+    const v = scheduleAlerts(base({ allocations: alloc, integrations: [int] })).find((a) => a.key === "v13");
+    expect(v?.tone).toBe("red");
+    expect(v?.people).toEqual(["Caio · integração YARA vencida em 01/10/2026"]);
+    expect(keys(base({ allocations: [{ collaborator_id: "p2", work_id: "adm" }], integrations: [int] }))).not.toContain("v13");
+    expect(keys(base({ allocations: alloc, integrations: [int], covered: new Set(["int|p2|c1"]) }))).not.toContain("v13");
+    // Treinamento vencido só conta se o cliente exige; coberto só pelo mesmo treinamento.
+    const trn = [{ collaborator_id: "p2", training_id: "t35", name: "NR-35", expires_at: "2026-11-01" }];
+    const required = new Map([["c1", new Set(["t35"])]]);
+    expect(keys(base({ allocations: alloc, trainings: trn }))).not.toContain("v13");
+    expect(scheduleAlerts(base({ allocations: alloc, trainings: trn, required })).find((a) => a.key === "v13")?.people).toEqual(["Caio · NR-35 vencido em 01/11/2026"]);
+    expect(keys(base({ allocations: alloc, trainings: trn, required, covered: new Set(["trn|p2|t33"]) }))).toContain("v13");
+    expect(keys(base({ allocations: alloc, trainings: trn, required, covered: new Set(["trn|p2|t35"]) }))).not.toContain("v13");
+    // Registro sem vencimento não vence.
+    expect(keys(base({ allocations: alloc, trainings: [...trn, { ...trn[0]!, expires_at: null }], required }))).not.toContain("v13");
+  });
 });

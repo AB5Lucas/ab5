@@ -36,20 +36,16 @@ const RECORD_COLUMNS: ImportColumn[] = [
   { key: "documento_url", hint: "Link do certificado/documento.", example: "https://..." },
 ];
 
-import { expiryFrom, formatDateBR } from "@/lib/scheduling";
+import { formatDateBR } from "@/lib/scheduling";
+import { docStatus, trainingExpiry } from "@/lib/doc-status";
+import { fetchAll } from "@/lib/results-engine";
 import { pendingFirst } from "@/lib/pending-first";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-const addMonths = expiryFrom;
 
-function statusOf(expires: string | null): "valid" | "expiring" | "expired" {
-  if (!expires) return "valid";
-  const days = Math.floor((new Date(`${expires}T00:00:00`).getTime() - new Date(`${today()}T00:00:00`).getTime()) / 86400000);
-  if (days < 0) return "expired";
-  if (days <= 30) return "expiring";
-  return "valid";
-}
+/** Situação pelo vencimento (lib/doc-status): sem vencimento = não vence; a vencer = até 30 dias. */
+const statusOf = (expires: string | null) => docStatus(expires, today());
 
 const STATUS_LABEL = { valid: "Válido", expiring: "A vencer", expired: "Vencido" } as const;
 
@@ -117,12 +113,13 @@ export function TrainingsPage() {
   const records = useQuery({
     queryKey: ["collaborator-trainings"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Em páginas (ordem estável): passava de 1000 registros e cortava em silêncio.
+      return fetchAll<{ id: string; collaborator_id: string; training_id: string; completed_at: string; expires_at: string | null; document_url: string | null }>((a, b) => supabase
         .from("collaborator_trainings")
-        .select("*")
-        .order("completed_at", { ascending: false });
-      if (error) throw error;
-      return data;
+        .select("id, collaborator_id, training_id, completed_at, expires_at, document_url")
+        .order("completed_at", { ascending: false })
+        .order("id")
+        .range(a, b));
     },
   });
 
@@ -202,7 +199,7 @@ export function TrainingsPage() {
       if (!rPerson) throw new Error("Selecione o colaborador");
       if (!rTraining) throw new Error("Selecione o treinamento");
       const training = (trainings.data ?? []).find((t) => t.id === rTraining);
-      const expires = training?.validity_months ? addMonths(rDate, training.validity_months) : null;
+      const expires = trainingExpiry(rDate, training?.validity_months);
       if (editingId) {
         const { error } = await supabase
           .from("collaborator_trainings")
@@ -214,7 +211,7 @@ export function TrainingsPage() {
             document_url: rDoc.trim() || null,
           })
           .eq("id", editingId);
-        if (error) throw error;
+        if (error) throw new Error(error.code === "23505" ? "Este colaborador já tem registro deste treinamento: edite o registro existente" : error.message);
         return;
       }
       const { error } = await upsertTrainingRecord({
@@ -357,7 +354,7 @@ export function TrainingsPage() {
       }
       const expires =
         parseDate(r["data_vencimento"] ?? "") ??
-        (training.validity_months ? addMonths(done, training.validity_months) : null);
+        trainingExpiry(done, training.validity_months);
       recs.push({
         line,
         values: {
