@@ -1128,6 +1128,41 @@
       "when": 1795463082217,
       "tag": "0166_allocation_drops_passenger",
       "breakpoints": true
+    },
+    {
+      "idx": 161,
+      "version": "7",
+      "when": 1795463083217,
+      "tag": "0167_schedule_concurrency",
+      "breakpoints": true
+    },
+    {
+      "idx": 162,
+      "version": "7",
+      "when": 1795463084217,
+      "tag": "0168_schedule_atomic_moves",
+      "breakpoints": true
+    },
+    {
+      "idx": 163,
+      "version": "7",
+      "when": 1795463085217,
+      "tag": "0169_rdo_follows_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 164,
+      "version": "7",
+      "when": 1795463086217,
+      "tag": "0170_weekend_add_allocation_checks",
+      "breakpoints": true
+    },
+    {
+      "idx": 165,
+      "version": "7",
+      "when": 1795463087217,
+      "tag": "0171_day_off_remove_day",
+      "breakpoints": true
     }
   ]
 }
