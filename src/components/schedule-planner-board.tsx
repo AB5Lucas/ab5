@@ -26,7 +26,7 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { copyBoxes, selectedCopyRows } from "@/lib/schedule-copy";
-import { workVtDefault } from "@/lib/transport-rules";
+import { travelOnFor, vtBaseForDay, vtForDay, workVtDefault } from "@/lib/transport-rules";
 import { nextBoxTravel, resolveBoxTravel } from "@/lib/schedule-box-benefits";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   addDays,
+  asoBlocksWork,
   checkAso,
   pendingForWork,
   checkIntegration,
@@ -483,16 +484,18 @@ export function SchedulePlannerBoard({
   const pousoIds = useQuery({
     queryKey: ["pouso-alegre-collabs"],
     queryFn: async () => {
-      const { data } = await supabase.from("collaborators").select("id, city, vt_enabled, positions(name)");
-      const pouso = new Set<string>();
+      const { data } = await supabase.from("collaborators").select("id, city, vt_enabled, vt_always_full, positions(name)");
+      const city = new Map<string, string | null>();
       const noVt = new Set<string>();
+      const full = new Set<string>();
       const position = new Map<string, string>();
       for (const r of data ?? []) {
         position.set(r.id, (r.positions as { name: string } | null)?.name ?? "");
+        city.set(r.id, r.city ?? null);
         if (r.vt_enabled === false) noVt.add(r.id);
-        else if ((r.city ?? "").toLowerCase().includes("pouso alegre")) pouso.add(r.id);
+        if (r.vt_always_full) full.add(r.id);
       }
-      return { pouso, noVt, position };
+      return { city, noVt, full, position };
     },
   });
   // Alojamentos no dia (Americana: sem VT/prêmio na Suzano; Mogi Guaçu: como morador de Mogi Guaçu).
@@ -503,14 +506,27 @@ export function SchedulePlannerBoard({
   const lodgingOf = (collaboratorId: string) => lodgingOn(lodgingStays.data ?? [], collaboratorId, date);
   const lodgingBlocked = (workId: string, collaboratorId: string) =>
     lodgingBlocksBenefits(lodgingOf(collaboratorId), ctx.data?.works.find((w) => w.id === workId)?.clients?.name);
-  const defaultAllocVt = (workId: string, collaboratorId: string) => {
-    if (pousoIds.data?.noVt.has(collaboratorId) || lodgingBlocked(workId, collaboratorId)) return false;
-    if (lodgingBlocksVtAlways(lodgingOf(collaboratorId), pousoIds.data?.position.get(collaboratorId))) return false;
+  /** Entrada da regra única de VT (lib/transport-rules.ts) para a pessoa na obra no dia. */
+  const vtInput = (workId: string, collaboratorId: string) => {
     const lodging = lodgingOf(collaboratorId);
-    // Alojado vale a cidade do alojamento (não a do cadastro) para a regra de Pouso Alegre.
-    const pouso = lodging ? false : pousoIds.data?.pouso.has(collaboratorId) ?? false;
-    return workPaysVt(workId) || pouso;
+    return {
+      vtEnabled: !pousoIds.data?.noVt.has(collaboratorId),
+      lodgingBlocks: lodgingBlocked(workId, collaboratorId),
+      vtNever: lodgingBlocksVtAlways(lodging, pousoIds.data?.position.get(collaboratorId)),
+      alwaysFull: pousoIds.data?.full.has(collaboratorId) ?? false,
+      workMark: workVt.data?.get(workId),
+      clientDefault: ctx.data?.works.find((w) => w.id === workId)?.clients?.needs_transport_voucher,
+      // Alojado vale a cidade do alojamento (não a do cadastro) para a regra de Pouso Alegre.
+      homeCity: effectiveCity(pousoIds.data?.city.get(collaboratorId), lodging),
+    };
   };
+  const defaultAllocVt = (workId: string, collaboratorId: string) => {
+    const i = vtInput(workId, collaboratorId);
+    return vtBaseForDay(i) && !i.vtNever;
+  };
+  /** VT que vale na bolinha (VT cheio aparece verde; Montador alojado em MGG nunca). */
+  const allocVtOn = (workId: string, collaboratorId: string, override: boolean | null | undefined) =>
+    vtForDay({ ...vtInput(workId, collaboratorId), override });
 
   const toggleWorkVt = useMutation({
     mutationFn: async (workId: string) => {
@@ -561,7 +577,14 @@ export function SchedulePlannerBoard({
   const workPaysTravel = (workId: string) => workTravel.data?.get(workId) ?? workTravelDefault(workId);
   const defaultAllocTravel = (workId: string, collaboratorId: string) => {
     const t = travelInfo.data;
-    if (!t || !workPaysTravel(workId) || lodgingBlocked(workId, collaboratorId)) return false;
+    if (!t) return false;
+    const on = travelOnFor({
+      enabled: !t.off.has(collaboratorId),
+      lodgingBlocks: lodgingBlocked(workId, collaboratorId),
+      workMark: workTravel.data?.get(workId),
+      workDefault: workTravelDefault(workId),
+    });
+    if (!on) return false;
     const w = workOf(workId);
     const km = t.distFor(effectiveCity(t.city.get(collaboratorId), lodgingOf(collaboratorId)), w?.clients?.city, Number(w?.clients?.distance_km ?? 0));
     return t.hit(km);
@@ -1139,7 +1162,7 @@ export function SchedulePlannerBoard({
     const warnings: string[] = issues.map((i) => i.label);
     if (integ.status === "expiring")
       warnings.unshift(`Integração com ${clientName} vence em ${formatDateBR(integ.expiresAt)}`);
-    if (requiresInt && aso.status === "expiring")
+    if (asoBlocksWork(c as ScheduleContext, workId) && aso.status === "expiring")
       warnings.unshift(`ASO vence em ${formatDateBR(aso.expiresAt)}`);
     if (integ.status === "no_client") warnings.unshift("Serviço sem cliente vinculado");
     if (integ.status === "expired") warnings.unshift(`Integração com ${clientName} vencida em ${formatDateBR(integ.expiresAt)}`);
@@ -1470,6 +1493,7 @@ export function SchedulePlannerBoard({
         .filter((r) => !existing.has(r.collaborator_id))
         .filter((r) => !entryByCollaborator.has(r.collaborator_id)) // quem já está num quadro (treinamento, folga…) fica só nele
         .filter((r) => { const n = noticeOf(r.collaborator_id); return !(n?.end && date > n.end); })
+        .filter((r) => !checkRequirements(c, r.work_id, r.collaborator_id, date).some((i) => i.blocking))
         .map((r, i) => ({
           schedule_id: id,
           work_id: r.work_id,
@@ -2063,7 +2087,7 @@ export function SchedulePlannerBoard({
                         )}
                         <span className="flex shrink-0 flex-col items-center gap-0.5">
                         {(() => {
-                          const vt = r.vt_override ?? defaultAllocVt(r.work_id, r.collaborator_id);
+                          const vt = allocVtOn(r.work_id, r.collaborator_id, r.vt_override);
                           return (
                             <button
                               type="button"
@@ -2077,7 +2101,7 @@ export function SchedulePlannerBoard({
                         })()}
                         {(() => {
                           // Ciclo: azul (prêmio viagem) → amarela (pernoite R$ 25) → apagada → azul
-                          const tb = r.travel_bonus_override ?? defaultAllocTravel(r.work_id, r.collaborator_id);
+                          const tb = travelInfo.data?.off.has(r.collaborator_id) ? false : r.travel_bonus_override ?? defaultAllocTravel(r.work_id, r.collaborator_id);
                           const on = !!(r as any).overnight;
                           return (
                             <button
