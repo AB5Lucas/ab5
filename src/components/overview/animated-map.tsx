@@ -44,7 +44,7 @@ export function AnimatedMap({ clients, region, className }: { clients: MapClient
               style={{ animationDelay: `${region === "BR" ? i * 40 : 0}ms` }} />
           ))}
           {pts.map((p, i) => (
-            <g key={p.c.id} className="amap-pin" style={{ animationDelay: `${2300 + i * 70}ms`, transformOrigin: `${p.xy[0]}px ${p.xy[1]}px` }}
+            <g key={p.c.id} className="amap-pin" style={{ animationDelay: `${2600 + i * 70}ms` }}
               onMouseEnter={() => setHover(p.c)} onMouseLeave={() => setHover(null)}>
               <circle cx={p.xy[0]} cy={p.xy[1]} r={p.r} className="fill-foreground stroke-background" strokeWidth={2.5} fillOpacity={0.85} />
             </g>
