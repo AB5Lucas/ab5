@@ -2,7 +2,7 @@ import { resultHours, resultAbsenceCheck, marginPercent, supportDailyWeights, su
 import { isResultMonth } from "./result-period";
 import { activeFinancialEntries } from "./billing-sync";
 import { supabase } from "@/integrations/supabase/client";
-import { contractFraction } from "@/lib/contract";
+import { billedUntil, contractValueFraction } from "@/lib/contract";
 import { resplitClient } from "@/lib/resplit";
 import { laborCost, nightHours, ENCARGOS } from "@/lib/labor-cost";
 import { buildDistanceLookup } from "@/lib/city-distance";
@@ -667,10 +667,13 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     }
     let progMap = new Map<string, number>(d.progress.map((p: any) => [String(p.month).slice(0, 7), Number(p.percent)]));
     if (!isAll && (work as any).contract_enabled) {
-      // Contrato: andamento mensal automático = faturamentos acumulados ÷ meses
-      const bills = d.entries.filter((e: any) => e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)).sort();
+      // Contrato: andamento mensal automático = faturado acumulado ÷ valor do pedido (parcelas podem ter valores diferentes)
+      const bills = [...new Set<string>(d.entries.filter((e: any) => e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7) as string))].sort();
       progMap = new Map();
-      bills.forEach((ym: string, i: number) => progMap.set(ym, contractFraction(i + 1, Number((work as any).contract_months ?? 12)) * 100));
+      for (const ym of bills) {
+        const b = billedUntil(d.entries, ym);
+        progMap.set(ym, contractValueFraction(b.amount, Number(work.order_value ?? 0), b.months, Number((work as any).contract_months ?? 12)) * 100);
+      }
     }
     if (!isAll && (work as any).hh_enabled) {
       // HH: andamento automático = valor HH acumulado dos RDOs (horas × valor hora cobrado) ÷ valor total do pedido
@@ -704,8 +707,12 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         .filter((p: any) => !ctWorks.has(p.work_id) && !hhWorks.has(p.work_id))
         .map((p: any) => ({ ym: String(p.month).slice(0, 7), id: p.work_id, pc: Number(p.percent) }));
       for (const [id, months] of ctWorks) {
-        const bills = d.entries.filter((e: any) => e.work_id === id && e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)).sort();
-        bills.forEach((ym: string, i: number) => progEv.push({ ym, id, pc: contractFraction(i + 1, months) * 100 }));
+        const bills = [...new Set<string>(d.entries.filter((e: any) => e.work_id === id && e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7) as string))].sort();
+        const ord = Number(ow[id] ?? (opts.allWorks ?? []).find((x: any) => x.id === id)?.order_value ?? 0);
+        for (const ym of bills) {
+          const b = billedUntil(d.entries, ym, id);
+          progEv.push({ ym, id, pc: contractValueFraction(b.amount, ord, b.months, months) * 100 });
+        }
       }
       for (const [id, hw] of hhWorks) {
         const rates = (hw.hh_rates ?? {}) as Record<string, number>;
@@ -876,7 +883,8 @@ export function adjustedItems(work: any, base: NonNullable<ReturnType<typeof bui
   void raw;
   let items = base.items.map((i) => ({ ...i }));
   if (work.contract_enabled) {
-    const f = contractFraction(base.billingCount, Number(work.contract_months ?? 12));
+    const b = billedUntil(base.entries, "9999-12");
+    const f = contractValueFraction(b.amount, Number(work.order_value ?? 0), b.months, Number(work.contract_months ?? 12));
     items = items.map((i) => ({ ...i, budget: i.budget * f }));
   }
   if (work.monthly_enabled) {
@@ -905,7 +913,10 @@ export function totalMargin(work: any, full: NonNullable<ReturnType<typeof build
 /** Andamento (%) até o mês informado, como em Resultados. */
 export function progressUntil(work: any, full: NonNullable<ReturnType<typeof buildBase>>, untilYm: string) {
   if (work.monthly_enabled) return 100;
-  if (work.contract_enabled) return contractFraction(full.billingMonths.filter((ym) => ym <= untilYm).length, Number(work.contract_months ?? 12)) * 100;
+  if (work.contract_enabled) {
+    const b = billedUntil(full.entries, untilYm);
+    return contractValueFraction(b.amount, Number(work.order_value ?? 0), b.months, Number(work.contract_months ?? 12)) * 100;
+  }
   const r = full.rows.filter((x) => x.ym <= untilYm).pop();
   return r?.progress ?? 0;
 }

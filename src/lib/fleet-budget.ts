@@ -1,5 +1,5 @@
 import { bdiBudget, buildBase, monthlyOrderRevenue } from "./results-engine";
-import { contractFraction } from "./contract";
+import { billedUntil, contractValueFraction } from "./contract";
 
 /** Uma parcela do orçado de transporte do mês, para o detalhamento ao clicar em "Orçado". */
 export type BudgetPart = { workId: string; clientKey: string; client: string; service: string; rule: string; base: string; value: number };
@@ -47,9 +47,11 @@ export function serviceTransportBudget(work: any, raw: any, ym: string, opts: { 
   if (!filled || work.monthly_enabled) return part("Sem orçado lançado: custo real dos veículos", "km e pedágio dos veículos no mês", vehicleReal);
   const item = Number(base.items.find((i) => i.key === "transporte")?.budget ?? 0);
   if (work.contract_enabled) {
-    const billed = [...new Set(((raw.entries ?? []) as any[]).filter((e) => e.work_id === work.id && e.category === "faturamento").map((e) => String(e.entry_date).slice(0, 7)))];
     const months = Number(work.contract_months ?? 12);
-    const frac = contractFraction(billed.filter((m) => m <= ym).length, months) - contractFraction(billed.filter((m) => m < ym).length, months);
+    const ord = Number(work.order_value ?? 0);
+    const prevYm = (() => { const [y, m] = ym.split("-").map(Number); return m === 1 ? `${y! - 1}-12` : `${y}-${String(m! - 1).padStart(2, "0")}`; })();
+    const now = billedUntil(raw.entries ?? [], ym, work.id), before = billedUntil(raw.entries ?? [], prevYm, work.id);
+    const frac = contractValueFraction(now.amount, ord, now.months, months) - contractValueFraction(before.amount, ord, before.months, months);
     return part("Orçado lançado (contrato)", `${brl(item)} × ${pct(frac * 100)}`, item * frac);
   }
   return part(Number(bi["bdi"] ?? 0) === 1 ? "Orçado lançado (BDI) × andamento" : "Orçado lançado × andamento", `${brl(item)} × ${pct(advance)}`, (item * advance) / 100);

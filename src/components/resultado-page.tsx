@@ -3,7 +3,7 @@ import { marginPercent, meanMarginPercent } from "@/lib/result-labor";
 import { MarginPercent } from "@/components/margin-percent";
 import { ResultSupport } from "@/components/result-support";
 import { ResultRecurrences } from "@/components/result-recurrences";
-import { contractFraction } from "@/lib/contract";
+import { billedUntil, contractValueFraction } from "@/lib/contract";
 import { resultWorksForRole } from "@/lib/result-work-access";
 import { isResultMonth } from "@/lib/result-period";
 import { DateRangePicker, type DayRange } from "@/components/date-range-picker";
@@ -351,7 +351,8 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   const calcCt = useMemo(() => {
     const w = hhSavedWork;
     if (!calcHH || isAll || !w?.contract_enabled) return calcHH;
-    const f = contractFraction(calcHH.billingCount, Number(w.contract_months ?? 12));
+    const billed = billedUntil(calcHH.entries, "9999-12");
+    const f = contractValueFraction(billed.amount, Number(w.order_value ?? 0), billed.months, Number(w.contract_months ?? 12));
     const items = calcHH.items.map((i) => {
       const b = i.budget * f;
       return { ...i, budget: b, used: b ? (i.real / b) * 100 : i.real ? 100 : 0 };
