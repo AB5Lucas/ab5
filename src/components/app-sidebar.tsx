@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Bell, ChevronDown, LayoutList, PanelLeftClose, PanelLeftOpen, Search, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -29,6 +29,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed" && !isMobile;
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const current = menuUrlFor(pathname) ?? pathname;
+  const navigate = useNavigate();
   const { canAccess, loading } = useAccess();
   const badges = useMenuBadges();
   const { user, profile, role } = useCurrentUser();
@@ -62,7 +63,7 @@ export function AppSidebar() {
   const all = loading ? [] : MENU_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canAccess(i.url)) })).filter((g) => g.items.length);
   const modules = all.filter((g) => !g.userMenu);
   const adminItems = all.filter((g) => g.userMenu).flatMap((g) => g.items.map((i) => ({ item: i, group: g })));
-  const currentMod = modules.find((g) => g.items.some((i) => i.url === current))?.label ?? null;
+  const currentMod = modules.find((g) => g.overview === current || g.items.some((i) => i.url === current))?.label ?? null;
   const openLabel = openMod === undefined ? currentMod : openMod;
   const favItems = all.flatMap((g) => g.items.map((i) => ({ item: i, group: g }))).filter((x) => favs.includes(x.item.url));
   const closeMobile = () => { if (isMobile) setOpenMobile(false); };
@@ -202,6 +203,12 @@ export function AppSidebar() {
                         <g.icon className="h-3 w-3" /> {g.label}
                       </p>
                       <div className="grid gap-px">
+                        {g.overview && (
+                          <Link to={g.overview as never} onClick={() => setFly(null)}
+                            className={`menu-row flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-sidebar-accent ${current === g.overview ? "bg-sidebar-accent font-semibold" : ""}`}>
+                            <span className="truncate">Visão geral</span>
+                          </Link>
+                        )}
                         {g.items.map((i, k) => {
                           const b = badges[i.url];
                           return (
@@ -235,7 +242,7 @@ export function AppSidebar() {
                 const tone = worstTone(g.items.map((i) => badges[i.url]));
                 return (
                   <SidebarMenuItem key={g.label} className="menu-stagger" style={{ animationDelay: `${modules.indexOf(g) * 35}ms` }}>
-                    <SidebarMenuButton onClick={() => setOpenMod(open ? null : g.label)} aria-expanded={open}
+                    <SidebarMenuButton onClick={() => { if (g.overview && !open) { void navigate({ to: g.overview as never }); closeMobile(); } setOpenMod(open ? null : g.label); }} aria-expanded={open}
                       className={`h-9 rounded-lg text-sidebar-foreground ${open ? "font-semibold" : ""}`}>
                       <g.icon className="h-4 w-4 opacity-90" />
                       <span className="truncate">{g.label}</span>

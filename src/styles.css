@@ -203,3 +203,19 @@
   .menu-stagger, .menu-sub, .menu-active-bar, .menu-badge, .menu-dot { animation: none; }
   .menu-row, .menu-row:hover { transition: none; transform: none; }
 }
+
+/* Visão geral dos módulos (components/overview): barras crescem, linha se desenha, medidor enche. */
+@keyframes ov-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes ov-widen { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes ov-draw { from { stroke-dasharray: 1; stroke-dashoffset: 1; } to { stroke-dasharray: 1; stroke-dashoffset: 0; } }
+@keyframes ov-gauge { from { stroke-dashoffset: 220; } to { stroke-dashoffset: var(--ov-off); } }
+@keyframes ov-fade { from { opacity: 0; } to { opacity: 1; } }
+.ov-grow, .ov-bar { transform-box: fill-box; transform-origin: bottom; animation: ov-grow 0.6s cubic-bezier(.2,.8,.2,1) both; }
+.ov-widen { transform-origin: left; animation: ov-widen 0.7s cubic-bezier(.2,.8,.2,1) both; }
+.ov-draw { animation: ov-draw 1.1s ease-out both; }
+.ov-gauge { animation: ov-gauge 1.1s cubic-bezier(.2,.8,.2,1) both; }
+.ov-fade { animation: ov-fade 0.9s ease-out both; }
+.ov-card { animation: page-enter 0.45s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .ov-grow, .ov-bar, .ov-widen, .ov-draw, .ov-gauge, .ov-fade, .ov-card { animation: none; }
+}

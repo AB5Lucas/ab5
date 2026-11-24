@@ -44,7 +44,8 @@ import {
 /** url = chave de acesso (Acessos); to = para onde o menu leva, quando diferente (ex.: Clientes abre em /clientes). */
 export type MenuItem = { title: string; url: string; icon?: LucideIcon; to?: string };
 /** userMenu = grupo que fica no menu do usuário (rodapé), fora da lista principal (ex.: Administração). */
-export type MenuGroup = { label: string; icon: typeof Users; items: MenuItem[]; userMenu?: boolean };
+/** overview: página de visão geral do módulo (aberta ao clicar no título do módulo no menu). */
+export type MenuGroup = { label: string; icon: typeof Users; items: MenuItem[]; userMenu?: boolean; overview?: string };
 
 /**
  * Menu real do sistema — fonte única para o menu lateral e a página Acessos.
@@ -92,6 +93,7 @@ const RAW_GROUPS: MenuGroup[] = [
   {
     label: "Atividades",
     icon: Building2,
+    overview: "/atividades",
     items: [
       { title: "Clientes", url: "/obras", to: "/clientes", icon: Building2 },
       { title: "Resultados", url: "/obras/resultado", icon: TrendingUp },

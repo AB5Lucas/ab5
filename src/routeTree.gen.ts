@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
+import { Route as AuthenticatedAtividadesRouteImport } from './routes/_authenticated/atividades'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as AuthenticatedConferenciaRouteImport } from './routes/_authenticated/conferencia'
 import { Route as AuthenticatedConsultaRouteImport } from './routes/_authenticated/consulta'
@@ -99,6 +100,11 @@ const AuthenticatedAgendamentosRoute =
     path: '/agendamentos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAtividadesRoute = AuthenticatedAtividadesRouteImport.update({
+  id: '/atividades',
+  path: '/atividades',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
   id: '/clientes',
   path: '/clientes',
@@ -452,6 +458,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
+  '/atividades': typeof AuthenticatedAtividadesRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/conferencia': typeof AuthenticatedConferenciaRoute
   '/consulta': typeof AuthenticatedConsultaRoute
@@ -517,6 +524,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
+  '/atividades': typeof AuthenticatedAtividadesRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/conferencia': typeof AuthenticatedConferenciaRoute
   '/consulta': typeof AuthenticatedConsultaRoute
@@ -584,6 +592,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
+  '/_authenticated/atividades': typeof AuthenticatedAtividadesRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/conferencia': typeof AuthenticatedConferenciaRoute
   '/_authenticated/consulta': typeof AuthenticatedConsultaRoute
@@ -651,6 +660,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/agendamentos'
+    | '/atividades'
     | '/clientes'
     | '/conferencia'
     | '/consulta'
@@ -716,6 +726,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/agendamentos'
+    | '/atividades'
     | '/clientes'
     | '/conferencia'
     | '/consulta'
@@ -782,6 +793,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/agendamentos'
+    | '/_authenticated/atividades'
     | '/_authenticated/clientes'
     | '/_authenticated/conferencia'
     | '/_authenticated/consulta'
@@ -888,6 +900,13 @@ declare module '@tanstack/react-router' {
       path: '/agendamentos'
       fullPath: '/agendamentos'
       preLoaderRoute: typeof AuthenticatedAgendamentosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/atividades': {
+      id: '/_authenticated/atividades'
+      path: '/atividades'
+      fullPath: '/atividades'
+      preLoaderRoute: typeof AuthenticatedAtividadesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/clientes': {
@@ -1308,6 +1327,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendamentosRoute: typeof AuthenticatedAgendamentosRoute
+  AuthenticatedAtividadesRoute: typeof AuthenticatedAtividadesRoute
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedConferenciaRoute: typeof AuthenticatedConferenciaRoute
   AuthenticatedConsultaRoute: typeof AuthenticatedConsultaRoute
@@ -1368,6 +1388,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendamentosRoute: AuthenticatedAgendamentosRoute,
+  AuthenticatedAtividadesRoute: AuthenticatedAtividadesRoute,
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedConferenciaRoute: AuthenticatedConferenciaRoute,
   AuthenticatedConsultaRoute: AuthenticatedConsultaRoute,
