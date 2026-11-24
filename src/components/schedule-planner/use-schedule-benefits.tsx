@@ -34,7 +34,7 @@ export function useScheduleBenefits({
   onWriteError: (e: unknown) => void;
 }) {
   const qc = useQueryClient();
-  const workById = (workId: string) => ctxData?.worksById.get(workId);
+  const workById = (workId: string) => ctxData?.worksById?.get(workId);
   const workVt = useQuery({
     queryKey: ["work-vt", scheduleId],
     enabled: !!scheduleId,
@@ -54,7 +54,7 @@ export function useScheduleBenefits({
     const travelOff = new Set<string>();
     const position = new Map<string, string>();
     for (const r of [...(ctxData?.collaborators ?? []), ...(ctxData?.inactiveCollaborators ?? [])]) {
-      position.set(r.id, (r.position_id ? ctxData?.positionById.get(r.position_id)?.name : null) ?? "");
+      position.set(r.id, (r.position_id ? ctxData?.positionById?.get(r.position_id)?.name : null) ?? "");
       city.set(r.id, r.city ?? null);
       if (r.vt_enabled === false) noVt.add(r.id);
       if (r.vt_always_full) full.add(r.id);
