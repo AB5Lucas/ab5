@@ -9,8 +9,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useScheduleAlerts } from "@/hooks/use-schedule-alerts";
 import { useSeenAlerts } from "@/hooks/use-seen-alerts";
 import { worstAlertTone } from "@/lib/schedule-alerts";
-import { invalidateScheduleDay } from "@/lib/invalidate-day";
-import { useCurrentUser } from "@/hooks/use-auth";
 
 /** Botão discreto ao lado de Folgas: avisos do dia (vermelho = alto impacto, laranja = pequeno impacto). */
 export function ScheduleAlertsButton({ date }: { date: string }) {
@@ -24,9 +22,8 @@ export function ScheduleAlertsButton({ date }: { date: string }) {
   const reds = pending.filter((a) => a.tone === "red").length, oranges = pending.length - reds;
   // Feriado municipal: cadastrar só para o cliente (client_holidays) ou ignorar; a decisão fica gravada e o aviso some.
   const qc = useQueryClient();
-  const { canWrite } = useCurrentUser();
   const decide = useMutation({
-    mutationFn: async ({ action, register }: { action: Extract<AlertAction, { kind: "municipal_holiday" }>; register: boolean }) => {
+    mutationFn: async ({ action, register }: { action: AlertAction; register: boolean }) => {
       if (register) {
         const { error } = await supabase.from("client_holidays").upsert({ client_id: action.clientId, date: action.date, is_holiday: true, name: action.name }, { onConflict: "client_id,date" });
         if (error) throw error;
@@ -36,16 +33,6 @@ export function ScheduleAlertsButton({ date }: { date: string }) {
       return register;
     },
     onSuccess: (register) => { toast.success(register ? "Feriado cadastrado para o cliente" : "Aviso ignorado"); qc.invalidateQueries({ queryKey: ["schedule-alerts"] }); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  // Escalado com ausência no dia: tira da obra (a ausência prevalece; a Programação já esconde a linha).
-  const removeAllocs = useMutation({
-    mutationFn: async (ids: string[]) => {
-      const { error } = await supabase.from("daily_allocations").delete().in("id", ids);
-      if (error) throw error;
-      return ids.length;
-    },
-    onSuccess: (n) => { toast.success(`${n} pessoa(s) retirada(s) da obra`); invalidateScheduleDay(qc); },
     onError: (e: Error) => toast.error(e.message),
   });
   return (
@@ -74,23 +61,12 @@ export function ScheduleAlertsButton({ date }: { date: string }) {
                     <span className={`flex-1 text-sm ${isSeen(date, a) ? "text-muted-foreground" : ""}`}>{a.title}</span>
                     {a.people.length > 0 && <ChevronDown className={`mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open[a.key] ? "rotate-180" : ""}`} />}
                   </button>
-                  {a.action?.kind === "municipal_holiday" && (() => {
-                    const action = a.action;
-                    return (
-                      <div className="mt-1.5 flex gap-1.5 pl-4">
-                        <Button size="sm" className="h-7 px-2 text-xs" disabled={decide.isPending} onClick={() => decide.mutate({ action, register: true })}>Cadastrar feriado para o cliente</Button>
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={decide.isPending} onClick={() => decide.mutate({ action, register: false })}>Ignorar</Button>
-                      </div>
-                    );
-                  })()}
-                  {a.action?.kind === "remove_allocations" && canWrite && (() => {
-                    const ids = a.action.ids;
-                    return (
-                      <div className="mt-1.5 flex gap-1.5 pl-4">
-                        <Button size="sm" className="h-7 px-2 text-xs" disabled={removeAllocs.isPending} onClick={() => removeAllocs.mutate(ids)}>Tirar da obra</Button>
-                      </div>
-                    );
-                  })()}
+                  {a.action && (
+                    <div className="mt-1.5 flex gap-1.5 pl-4">
+                      <Button size="sm" className="h-7 px-2 text-xs" disabled={decide.isPending} onClick={() => decide.mutate({ action: a.action!, register: true })}>Cadastrar feriado para o cliente</Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={decide.isPending} onClick={() => decide.mutate({ action: a.action!, register: false })}>Ignorar</Button>
+                    </div>
+                  )}
                   {open[a.key] && (
                     <ul className="mt-1 space-y-0.5 pl-4 text-xs text-muted-foreground">
                       {a.people.map((p, i) => <li key={i}>{p}</li>)}

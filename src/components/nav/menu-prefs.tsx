@@ -47,7 +47,7 @@ export const worstTone = (list: (MenuBadge | undefined)[]) =>
 export function BadgePill({ b, className = "", small = false }: { b: MenuBadge; className?: string; small?: boolean }) {
   return (
     <span title={badgeText(b)}
-      className={`${small ? "min-w-3 rounded-[3px] px-[3px] text-[8px] leading-[12px]" : "min-w-3.5 rounded-[4px] px-1 text-[9px] leading-[14px]"} text-center font-semibold tabular-nums ${b.tone === "red" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground"} ${className}`}>
+      className={`${small ? "min-w-3 rounded-[3px] px-[3px] text-[8px] leading-[12px]" : "min-w-3.5 rounded-[4px] px-1 text-[9px] leading-[14px]"} menu-badge text-center font-semibold tabular-nums ${b.tone === "red" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground"} ${className}`}>
       {b.label ?? (b.count > 99 ? "99+" : b.count)}
     </span>
   );

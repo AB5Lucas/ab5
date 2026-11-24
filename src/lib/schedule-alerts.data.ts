@@ -3,8 +3,7 @@ import { transportNeedsTravel, travelActiveIds } from "@/lib/travel-active";
 import { fetchAll } from "@/lib/fetch-all";
 import { todayISO } from "@/lib/scheduling";
 import { workVtDefault } from "@/lib/transport-rules";
-import { addDaysIso, nextBusinessDay, previousBusinessDay, scheduleAlerts, type AlertData, type AlertWork } from "@/lib/schedule-alerts";
-import { isIndustria, isTresCoracoes, isWeekend, serviceDistribution } from "@/lib/service-distribution";
+import { addDaysIso, scheduleAlerts, type AlertData, type AlertWork } from "@/lib/schedule-alerts";
 import { cityHolidaysOn, type CityHoliday } from "@/lib/holidays";
 import { readCadastro } from "@/lib/cadastro-cache";
 import type { QueryClient } from "@tanstack/react-query";
@@ -13,7 +12,7 @@ const safe = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
 
 /** Serviços e clientes (cadastro) — mesma leitura para os avisos da Programação e a distribuição da aba Serviços. */
 export const readWorksCadastro = (qc?: QueryClient) => readCadastro(qc, "works", () =>
-  fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, active, entry_time, exit_time, exit_time_weekend, night_shift, rdo_general").order("id").range(a, b)));
+  fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, active, entry_time, exit_time, exit_time_weekend, night_shift").order("id").range(a, b)));
 export const readClientsCadastro = (qc?: QueryClient) => readCadastro(qc, "clients", () =>
   fetchAll<any>((a, b) => supabase.from("clients").select("id, name, city, distance_km, needs_company_transport, needs_transport_voucher").order("id").range(a, b)));
 
@@ -25,7 +24,7 @@ export async function fetchScheduleAlerts(date: string, qc?: QueryClient) {
   const today = todayISO();
   const [schedules, holidays, works, clients, people, vehicles, appts, future] = await Promise.all([
     safe(fetchAll<any>((a, b) => supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", addDaysIso(date, -14)).lte("schedule_date", date).order("id").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("holidays").select("date").gte("date", [addDaysIso(today, -1), addDaysIso(date, -15)].sort()[0]!).lte("date", addDaysIso(date, 40)).order("id").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("holidays").select("date").gte("date", addDaysIso(today, -1)).lte("date", addDaysIso(date, 40)).order("id").range(a, b))),
     safe(readWorksCadastro(qc)),
     safe(readClientsCadastro(qc)),
     safe(readCadastro(qc, "collaborators:alerts", () => fetchAll<any>((a, b) => supabase.from("collaborators").select("id, full_name, status, contract_type, driver_license_expiry, vt_enabled, city, notice_end, positions(name)").order("id").range(a, b)))),
@@ -33,42 +32,20 @@ export async function fetchScheduleAlerts(date: string, qc?: QueryClient) {
     safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, status, client_booked, training_id, client_id, trainings(name), clients(name)").eq("scheduled_date", date).neq("status", "cancelado").order("id").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, training_id, client_id").eq("status", "agendado").gte("scheduled_date", today).order("id").range(a, b))),
   ]);
-  // Também cobrem: realizados nos últimos 60 dias (documento aguardando a Conferência) e os treinamentos exigidos pelos clientes.
-  const [doneRecent, requiredRows] = await Promise.all([
-    safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, training_id, client_id").eq("status", "realizado").gte("scheduled_date", addDaysIso(today, -60)).order("id").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("client_required_trainings").select("client_id, training_id").order("client_id").order("training_id").range(a, b))),
-  ]);
-  const required = new Map<string, Set<string>>();
-  for (const r of requiredRows) required.set(r.client_id, new Set([...(required.get(r.client_id) ?? []), r.training_id]));
   const sched = schedules.find((s) => s.schedule_date === date);
   const prevSched = schedules.find((s) => s.schedule_date === prev);
   const recentIds = schedules.filter((s) => s.schedule_date < date).map((s) => s.id);
   const [allocs, prevAllocs, recentAllocs, boxes, vacations, daysOff, medical, workVt, passengers] = await Promise.all([
-    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("id, collaborator_id, work_id, vt_override, travel_bonus_override, service_assigned").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
+    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id, work_id, vt_override, travel_bonus_override").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
     prevSched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id, work_id").eq("schedule_id", prevSched.id).order("id").range(a, b))) : [],
     recentIds.length ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id").in("schedule_id", recentIds).order("id").range(a, b))) : [],
-    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("collaborator_id, box_key").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
+    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
     safe(fetchAll<any>((a, b) => supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date).order("id").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date).or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`).order("id").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date).order("id").range(a, b))),
     sched ? safe(fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
     safe(fetchAll<any>((a, b) => supabase.from("transport_passengers").select("client_id").eq("schedule_date", date).order("id").range(a, b))),
   ]);
-  // RDO: dia útil anterior (L8), RDOs finalizados do dia (L6), ocorrências sem classificação (L9) e integração por serviço.
-  const holidaySet = new Set<string>(holidays.map((h: any) => h.date));
-  const prevBd = previousBusinessDay(date, holidaySet);
-  const prevBdSched = prevBd < today ? (await safe(fetchAll<any>((a, b) => supabase.from("daily_schedules").select("id").eq("schedule_date", prevBd).order("id").range(a, b))))[0] : null;
-  const [prevBdAllocs, prevBdRdos, recentRdos, dayRdos, pendingOcc, integChoices] = await Promise.all([
-    prevBdSched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("work_id").eq("schedule_id", prevBdSched.id).order("id").range(a, b))) : [],
-    prevBd < today ? safe(fetchAll<any>((a, b) => supabase.from("rdos").select("work_id, status").eq("report_date", prevBd).order("id").range(a, b))) : [],
-    prevBd < today ? safe(fetchAll<any>((a, b) => supabase.from("rdos").select("work_id").gte("report_date", addDaysIso(prevBd, -30)).lte("report_date", prevBd).order("id").range(a, b))) : [],
-    date <= today ? safe(fetchAll<any>((a, b) => supabase.from("rdos").select("id, work_id, status").eq("report_date", date).neq("status", "draft").order("id").range(a, b))) : [],
-    Number(date.slice(8, 10)) >= 20 ? safe(fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("collaborator_id, report_date, work_id, reported_reason").eq("occurrence_status", "pending").gte("report_date", addDaysIso(date, -60)).lte("report_date", date).order("id").range(a, b))) : [],
-    safe(fetchAll<any>((a, b) => supabase.from("integration_service_choices").select("work_id, collaborator_id").eq("schedule_date", date).order("collaborator_id").order("client_id").range(a, b))),
-  ]);
-  const dayWorkforce = dayRdos.length
-    ? await safe(fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("rdo_id, collaborator_id, present").in("rdo_id", dayRdos.map((r: any) => r.id)).order("id").range(a, b)))
-    : [];
   const [catalog, decisions, clientHol] = await Promise.all([
     safe(readCadastro(qc, "city_holiday_catalog", () => fetchAll<any>((a, b) => supabase.from("city_holiday_catalog").select("*").order("id").range(a, b)))) as Promise<CityHoliday[]>,
     safe(fetchAll<any>((a, b) => supabase.from("holiday_alert_decisions").select("client_id").eq("date", date).order("client_id").range(a, b))),
@@ -99,7 +76,7 @@ export async function fetchScheduleAlerts(date: string, qc?: QueryClient) {
 
   const kind = (t: string) => { const s = String(t).toLowerCase(); return s.includes("aso") ? "aso" : s.startsWith("trein") ? "trn" : s.startsWith("integ") ? "int" : ""; };
   const covered = new Set<string>();
-  for (const a of [...future, ...doneRecent]) {
+  for (const a of future) {
     const k = kind(a.type);
     if (k === "aso") covered.add(`aso|${a.collaborator_id}`);
     if (k === "trn" && a.training_id) covered.add(`trn|${a.collaborator_id}|${a.training_id}`);
@@ -115,28 +92,11 @@ export async function fetchScheduleAlerts(date: string, qc?: QueryClient) {
         return { id: a.work_id, client_name: c?.name, client_city: c?.city, client_distance_km: c?.distance_km };
       })).catch(() => new Set<string>())
     : new Set<string>();
-  // Ausências cadastradas do dia (escalado com ausência = V14).
-  const absences = new Map<string, string>();
-  for (const x of daysOff) if ((x.end_date ?? x.date) >= date) absences.set(x.collaborator_id, "Folga");
-  for (const x of vacations) absences.set(x.collaborator_id, "Férias");
-  for (const x of medical) absences.set(x.collaborator_id, "Atestado");
-  // L7: distribuição pendente (mesma regra do contador da aba Serviços), só para o próximo dia útil.
-  let distributionPending: string[] = [];
-  if (sched && date === nextBusinessDay(today, holidaySet)) {
-    const excluded = new Set<string>([
-      ...absences.keys(), ...appts.filter((a: any) => ["agendado", "realizado"].includes(a.status)).map((a: any) => a.collaborator_id),
-      ...boxes.filter((b: any) => b.box_key === "treinamento" || String(b.box_key).startsWith("integracao:")).map((b: any) => b.collaborator_id),
-    ]);
-    const r = serviceDistribution(works, allocs.map((a: any) => ({ work_id: a.work_id, collaborator_id: a.collaborator_id, service_assigned: !!a.service_assigned })), excluded);
-    distributionPending = r.pendingClientIds
-      .map((id) => clientBy.get(id)?.name as string | undefined)
-      .filter((n): n is string => !!n && !isIndustria(n) && (isWeekend(date) || !isTresCoracoes(n)));
-  }
   const data: AlertData = {
     date, today, now: new Date(),
-    holidays: holidaySet,
+    holidays: new Set(holidays.map((h) => h.date)),
     scheduleExists: !!sched,
-    allocations: allocs.map((a: any) => ({ id: a.id, collaborator_id: a.collaborator_id, work_id: a.work_id, vt: vtOf(a), travel: traveling.has(a.collaborator_id) })), prevAllocations: prevAllocs,
+    allocations: allocs.map((a: any) => ({ collaborator_id: a.collaborator_id, work_id: a.work_id, vt: vtOf(a), travel: traveling.has(a.collaborator_id) })), prevAllocations: prevAllocs,
     builtTransport: new Set(passengers.map((p: any) => p.client_id)),
     works: new Map(works.map((w) => [w.id, w as AlertWork])),
     clients: new Map(clients.map((c) => [c.id, { name: c.name, needs_company_transport: c.needs_company_transport }])),
@@ -150,7 +110,7 @@ export async function fetchScheduleAlerts(date: string, qc?: QueryClient) {
       label: kind(a.type) === "trn" ? `treinamento ${a.trainings?.name ?? ""}`.trim() : kind(a.type) === "int" ? `integração ${a.clients?.name ?? ""}`.trim() : "ASO",
     })),
     covered,
-    asos, integrations: ints, required,
+    asos, integrations: ints,
     trainings: trns.map((t: any) => ({ collaborator_id: t.collaborator_id, training_id: t.training_id, name: t.trainings?.name ?? "treinamento", expires_at: t.expires_at })),
     accounted: new Set([
       ...boxes.map((x: any) => x.collaborator_id), ...vacations.map((x: any) => x.collaborator_id), ...medical.map((x: any) => x.collaborator_id),
@@ -158,18 +118,6 @@ export async function fetchScheduleAlerts(date: string, qc?: QueryClient) {
     ]),
     recent: new Set(recentAllocs.map((x: any) => x.collaborator_id)),
     municipal,
-    absences,
-    distributionPending,
-    prevRdo: prevBd < today ? {
-      date: prevBd, workIds: prevBdAllocs.map((a: any) => a.work_id), rdos: prevBdRdos,
-      usesRdo: new Set(recentRdos.map((r: any) => workBy.get(r.work_id)?.client_id).filter(Boolean)),
-    } : undefined,
-    pendingOccurrences: pendingOcc.map((o: any) => ({ collaborator_id: o.collaborator_id, report_date: o.report_date, work_id: o.work_id, reason: o.reported_reason })),
-    finalizedRdos: dayRdos.map((r: any) => {
-      const wf = dayWorkforce.filter((x: any) => x.rdo_id === r.id);
-      return { work_id: r.work_id, workforce: wf.map((x: any) => x.collaborator_id), present: wf.filter((x: any) => x.present).map((x: any) => x.collaborator_id) };
-    }),
-    integrationChoices: integChoices,
   };
   return { alerts: scheduleAlerts(data), holidays: data.holidays };
 }

@@ -173,3 +173,33 @@
 @media (prefers-reduced-motion: reduce) {
   .page-enter, .page-enter .panel { animation: none; }
 }
+
+/* Menu lateral: módulos entram em sequência, submenu desce, barra ativa cresce, linha desliza no mouse, avisos "batem". */
+@keyframes menu-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes menu-bar {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes menu-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes menu-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, currentColor 0%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-destructive) 25%, transparent); }
+}
+.menu-stagger { animation: menu-in 0.28s ease-out both; }
+.menu-sub { transform-origin: top; animation: page-enter 0.22s ease-out both; }
+.menu-active-bar { transform-origin: center; animation: menu-bar 0.25s ease-out both; }
+.menu-row { transition: transform 0.15s ease, background-color 0.15s ease; }
+.menu-row:hover { transform: translateX(2px); }
+.menu-badge { animation: menu-pop 0.35s ease-out both; }
+.menu-dot { animation: menu-pop 0.35s ease-out both, menu-pulse 2.4s ease-in-out 0.4s 3; }
+@media (prefers-reduced-motion: reduce) {
+  .menu-stagger, .menu-sub, .menu-active-bar, .menu-badge, .menu-dot { animation: none; }
+  .menu-row, .menu-row:hover { transition: none; transform: none; }
+}

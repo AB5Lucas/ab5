@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, ChevronUp, LayoutList, PanelLeftClose, PanelLeftOpen, Search, Star } from "lucide-react";
+import { ChevronDown, LayoutList, PanelLeftClose, PanelLeftOpen, Search, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -68,16 +68,16 @@ export function AppSidebar() {
   const closeMobile = () => { if (isMobile) setOpenMobile(false); };
   const initials = (profile?.full_name || profile?.email || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 
-  const pageRow = (item: MenuItem, group: MenuGroup, opts: { icon?: boolean; key?: string; fav?: boolean } = {}) => {
+  const pageRow = (item: MenuItem, group: MenuGroup, opts: { icon?: boolean; key?: string; fav?: boolean; delay?: number } = {}) => {
     const Icon = item.icon ?? group.icon;
     const active = current === item.url;
     const b = badges[item.url];
     return (
-      <SidebarMenuItem key={(opts.key ?? "") + item.url}>
+      <SidebarMenuItem key={(opts.key ?? "") + item.url} {...(opts.delay != null ? { className: "menu-stagger", style: { animationDelay: `${opts.delay}ms` } } : {})}>
         <SidebarMenuButton asChild isActive={active}
           className="relative h-8 rounded-lg text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold">
-          <Link to={item.to ?? item.url} onClick={() => { if (opts.fav) { if (current === item.url) setOpenMod(null); else fromFav.current = true; } closeMobile(); }} className="flex items-center gap-2.5 pr-2">
-            {active && <span className="absolute inset-y-1.5 -left-2 w-[3px] rounded-r-full bg-sidebar-primary" aria-hidden />}
+          <Link to={item.to ?? item.url} onClick={() => { if (opts.fav) { if (current === item.url) setOpenMod(null); else fromFav.current = true; } closeMobile(); }} className="menu-row flex items-center gap-2.5 pr-2">
+            {active && <span className="menu-active-bar absolute inset-y-1.5 -left-2 w-[3px] rounded-r-full bg-sidebar-primary" aria-hidden />}
             {opts.icon && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-sidebar-primary" : "opacity-90"}`} />}
             <span className="truncate">{item.title}</span>
             {/* Aviso e estrela alinhados à direita, com margem da borda. */}
@@ -190,7 +190,7 @@ export function AppSidebar() {
                       <SidebarMenuButton isActive={isCur} {...(fly === g.label ? {} : { tooltip: g.label })}
                         className="relative data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-primary">
                         <g.icon className="h-4 w-4" />
-                        {tone && <span className={`absolute right-1 top-1 h-2 w-2 rounded-full ring-2 ring-sidebar ${dotClass(tone)}`} />}
+                        {tone && <span className={`menu-dot absolute right-1 top-1 h-2 w-2 rounded-full ring-2 ring-sidebar ${dotClass(tone)}`} />}
                       </SidebarMenuButton>
                     </PopoverTrigger>
                     <PopoverContent side="right" align="start" sideOffset={10}
@@ -199,11 +199,11 @@ export function AppSidebar() {
                         <g.icon className="h-3 w-3" /> {g.label}
                       </p>
                       <div className="grid gap-px">
-                        {g.items.map((i) => {
+                        {g.items.map((i, k) => {
                           const b = badges[i.url];
                           return (
-                            <Link key={i.url} to={i.to ?? i.url} onClick={() => setFly(null)}
-                              className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-sidebar-accent ${current === i.url ? "bg-sidebar-accent font-semibold" : ""}`}>
+                            <Link key={i.url} to={i.to ?? i.url} onClick={() => setFly(null)} style={{ animationDelay: `${Math.min(k, 12) * 25}ms` }}
+                              className={`menu-stagger menu-row flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-sidebar-accent ${current === i.url ? "bg-sidebar-accent font-semibold" : ""}`}>
                               <span className="truncate">{i.title}</span>
                               {b && <BadgePill b={b} className="ml-auto" />}
                             </Link>
@@ -231,17 +231,17 @@ export function AppSidebar() {
                 const open = openLabel === g.label;
                 const tone = worstTone(g.items.map((i) => badges[i.url]));
                 return (
-                  <SidebarMenuItem key={g.label}>
+                  <SidebarMenuItem key={g.label} className="menu-stagger" style={{ animationDelay: `${modules.indexOf(g) * 35}ms` }}>
                     <SidebarMenuButton onClick={() => setOpenMod(open ? null : g.label)} aria-expanded={open}
                       className={`h-9 rounded-lg text-sidebar-foreground ${open ? "font-semibold" : ""}`}>
                       <g.icon className="h-4 w-4 opacity-90" />
                       <span className="truncate">{g.label}</span>
-                      {!open && tone && <span title="Há avisos neste módulo" className={`ml-auto h-2 w-2 shrink-0 rounded-full ${dotClass(tone)}`} />}
-                      {open ? <ChevronUp className={`${tone ? "" : "ml-auto"} h-4 w-4 opacity-70`} /> : <ChevronDown className={`${!open && tone ? "" : "ml-auto"} h-4 w-4 opacity-70`} />}
+                      {!open && tone && <span title="Há avisos neste módulo" className={`menu-dot ml-auto h-2 w-2 shrink-0 rounded-full ${dotClass(tone)}`} />}
+                      <ChevronDown className={`${!open && tone ? "" : "ml-auto"} h-4 w-4 opacity-70 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
                     </SidebarMenuButton>
                     {open && (
-                      <SidebarMenu className="mb-1 ml-4 mt-0.5 w-auto gap-0.5 border-l border-sidebar-border pl-2">
-                        {g.items.map((i) => pageRow(i, g))}
+                      <SidebarMenu className="menu-sub mb-1 ml-4 mt-0.5 w-auto gap-0.5 border-l border-sidebar-border pl-2">
+                        {g.items.map((i, k) => pageRow(i, g, { delay: Math.min(k, 12) * 25 }))}
                       </SidebarMenu>
                     )}
                   </SidebarMenuItem>
