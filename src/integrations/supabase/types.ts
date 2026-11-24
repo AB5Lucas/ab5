@@ -1617,10 +1617,12 @@ export type Database = {
           distance_km: number | null
           has_toll: boolean
           id: string
+          image_origin: string | null
           image_path: string | null
           image_source: string | null
-          image_origin: string | null
           image_source_kind: string | null
+          lat: number | null
+          lon: number | null
           manager_id: string | null
           name: string
           needs_company_transport: boolean
@@ -1645,10 +1647,12 @@ export type Database = {
           distance_km?: number | null
           has_toll?: boolean
           id?: string
+          image_origin?: string | null
           image_path?: string | null
           image_source?: string | null
-          image_origin?: string | null
           image_source_kind?: string | null
+          lat?: number | null
+          lon?: number | null
           manager_id?: string | null
           name: string
           needs_company_transport?: boolean
@@ -1673,10 +1677,12 @@ export type Database = {
           distance_km?: number | null
           has_toll?: boolean
           id?: string
+          image_origin?: string | null
           image_path?: string | null
           image_source?: string | null
-          image_origin?: string | null
           image_source_kind?: string | null
+          lat?: number | null
+          lon?: number | null
           manager_id?: string | null
           name?: string
           needs_company_transport?: boolean
@@ -3838,74 +3844,6 @@ export type Database = {
           },
         ]
       }
-      positions: {
-        Row: {
-          active: boolean
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
-      prize_hours: {
-        Row: {
-          collaborator_id: string
-          created_at: string
-          created_by: string | null
-          entry_date: string
-          hourly_rate: number
-          hours: number
-          id: string
-          multiplier: number
-          updated_at: string
-        }
-        Insert: {
-          collaborator_id: string
-          created_at?: string
-          created_by?: string | null
-          entry_date: string
-          hourly_rate?: number
-          hours: number
-          id?: string
-          multiplier?: number
-          updated_at?: string
-        }
-        Update: {
-          collaborator_id?: string
-          created_at?: string
-          created_by?: string | null
-          entry_date?: string
-          hourly_rate?: number
-          hours?: number
-          id?: string
-          multiplier?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "prize_hours_collaborator_id_fkey"
-            columns: ["collaborator_id"]
-            isOneToOne: false
-            referencedRelation: "collaborators"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       notification_deliveries: {
         Row: {
           attempts: number
@@ -4094,38 +4032,73 @@ export type Database = {
         }
         Relationships: []
       }
-      push_subscriptions: {
+      positions: {
         Row: {
-          auth: string
+          active: boolean
           created_at: string
-          endpoint: string
+          description: string | null
           id: string
-          last_ok_at: string | null
-          p256dh: string
-          user_agent: string | null
-          user_id: string
+          name: string
         }
         Insert: {
-          auth: string
+          active?: boolean
           created_at?: string
-          endpoint: string
+          description?: string | null
           id?: string
-          last_ok_at?: string | null
-          p256dh: string
-          user_agent?: string | null
-          user_id: string
+          name: string
         }
         Update: {
-          auth?: string
+          active?: boolean
           created_at?: string
-          endpoint?: string
+          description?: string | null
           id?: string
-          last_ok_at?: string | null
-          p256dh?: string
-          user_agent?: string | null
-          user_id?: string
+          name?: string
         }
         Relationships: []
+      }
+      prize_hours: {
+        Row: {
+          collaborator_id: string
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          hourly_rate: number
+          hours: number
+          id: string
+          multiplier: number
+          updated_at: string
+        }
+        Insert: {
+          collaborator_id: string
+          created_at?: string
+          created_by?: string | null
+          entry_date: string
+          hourly_rate?: number
+          hours: number
+          id?: string
+          multiplier?: number
+          updated_at?: string
+        }
+        Update: {
+          collaborator_id?: string
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          hourly_rate?: number
+          hours?: number
+          id?: string
+          multiplier?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prize_hours_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_approvers: {
         Row: {
@@ -4607,6 +4580,39 @@ export type Database = {
         Update: {
           last_number?: number
           requester_key?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_ok_at: string | null
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_ok_at?: string | null
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_ok_at?: string | null
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -6933,6 +6939,10 @@ export type Database = {
         Args: { _key: string; _workforce_id: string }
         Returns: string
       }
+      collaborator_off_on: {
+        Args: { _collab: string; _date: string }
+        Returns: boolean
+      }
       copy_service_split: {
         Args: { _client_id: string; _date: string }
         Returns: number
@@ -6944,6 +6954,10 @@ export type Database = {
       create_client_service: {
         Args: { _client_id: string; _name: string }
         Returns: string
+      }
+      day_off_remove_day: {
+        Args: { _collaborator_id: string; _date: string; _whole?: boolean }
+        Returns: undefined
       }
       driver_bonus_default: { Args: { _driver_id: string }; Returns: boolean }
       easter_date: { Args: { y: number }; Returns: string }
@@ -7029,42 +7043,9 @@ export type Database = {
         Returns: undefined
       }
       norm_city: { Args: { t: string }; Returns: string }
-      prev_business_day: { Args: { _date: string }; Returns: string }
-      purchase_apply_policy: {
-        Args: { _entries: Json; _line: string; _summary: Json }
-        Returns: number
-      }
-      purchase_can_edit: {
-        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
-        Returns: boolean
-      }
-      purchase_can_see: {
-        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
-        Returns: boolean
-      }
-      purchase_client_manager: { Args: { _client: string }; Returns: string }
-      purchase_client_substitute: {
-        Args: { _client: string; _manager: string }
-        Returns: string
-      }
-      purchase_effective_approver: {
-        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
-        Returns: string
-      }
-      purchase_fixed_observers: { Args: never; Returns: string[] }
-      purchase_is_approver_of: {
-        Args: { _requester: string }
-        Returns: boolean
-      }
-      purchase_is_buyer: { Args: never; Returns: boolean }
-      purchase_item_set: {
-        Args: { _date?: string; _item: string; _order: string; _status: string }
-        Returns: undefined
-      }
-      purchase_item_set_file: {
-        Args: { _item: string; _path: string }
-        Returns: undefined
-      }
+      notif_buyer_ids: { Args: never; Returns: string[] }
+      notif_collaborator_of_user: { Args: { _user: string }; Returns: string }
+      notif_whatsapp_phone: { Args: { _user: string }; Returns: string }
       notification_deliveries_claim: {
         Args: { _limit?: number }
         Returns: {
@@ -7109,13 +7090,64 @@ export type Database = {
         }[]
       }
       notification_send_test: { Args: never; Returns: string }
-      purchase_deadline_level: {
-        Args: { _advance: number; _due: string; _today: string; _urgent: number }
+      notify_user: {
+        Args: {
+          _body: string
+          _dedupe: string
+          _entity_id: string
+          _entity_type: string
+          _kind: string
+          _link: string
+          _module: string
+          _ref: string
+          _title: string
+          _user: string
+        }
         Returns: string
       }
-      purchase_notify_deadlines: { Args: never; Returns: number }
-      push_subscription_save: {
-        Args: { _auth: string; _endpoint: string; _p256dh: string; _ua?: string }
+      prev_business_day: { Args: { _date: string }; Returns: string }
+      purchase_apply_policy: {
+        Args: { _entries: Json; _line: string; _summary: Json }
+        Returns: number
+      }
+      purchase_can_edit: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: boolean
+      }
+      purchase_can_see: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: boolean
+      }
+      purchase_client_manager: { Args: { _client: string }; Returns: string }
+      purchase_client_substitute: {
+        Args: { _client: string; _manager: string }
+        Returns: string
+      }
+      purchase_deadline_level: {
+        Args: {
+          _advance: number
+          _due: string
+          _today: string
+          _urgent: number
+        }
+        Returns: string
+      }
+      purchase_effective_approver: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: string
+      }
+      purchase_fixed_observers: { Args: never; Returns: string[] }
+      purchase_is_approver_of: {
+        Args: { _requester: string }
+        Returns: boolean
+      }
+      purchase_is_buyer: { Args: never; Returns: boolean }
+      purchase_item_set: {
+        Args: { _date?: string; _item: string; _order: string; _status: string }
+        Returns: undefined
+      }
+      purchase_item_set_file: {
+        Args: { _item: string; _path: string }
         Returns: undefined
       }
       purchase_my_pending_validation: {
@@ -7124,6 +7156,11 @@ export type Database = {
           due_date: string
         }[]
       }
+      purchase_notif_desc: {
+        Args: { r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: string
+      }
+      purchase_notify_deadlines: { Args: never; Returns: number }
       purchase_replace_entries: {
         Args: {
           _entries: Json
@@ -7170,6 +7207,15 @@ export type Database = {
       purchase_user_of_collaborator: {
         Args: { _collab: string }
         Returns: string
+      }
+      push_subscription_save: {
+        Args: {
+          _auth: string
+          _endpoint: string
+          _p256dh: string
+          _ua?: string
+        }
+        Returns: undefined
       }
       rdo_add_integration: {
         Args: {
