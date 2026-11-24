@@ -25,7 +25,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { copyBoxes, selectedCopyRows } from "@/lib/schedule-copy";
+import { copySkipReason } from "@/lib/schedule-copy";
+import { CopyDayDialog } from "@/components/schedule-planner/copy-day-dialog";
 import { travelOnFor, vtBaseForDay, vtForDay, workVtDefault } from "@/lib/transport-rules";
 import { nextBoxTravel, resolveBoxTravel } from "@/lib/schedule-box-benefits";
 import { Input } from "@/components/ui/input";
@@ -1456,118 +1457,28 @@ export function SchedulePlannerBoard({
   const [confirmCopyPrev, setConfirmCopyPrev] = useState(false);
   const [openFolgas, setOpenFolgas] = useState(false);
   const [openLodging, setOpenLodging] = useState(false);
-  const [copyFrom, setCopyFrom] = useState(addDays(date, -1));
-  const [selectedCopyBoxes, setSelectedCopyBoxes] = useState<Set<string>>(new Set());
-  const copySource = useQuery({
-    queryKey: ["schedule-copy-source", copyFrom],
-    enabled: confirmCopyPrev && !!copyFrom,
-    queryFn: async () => {
-      const { data: source, error } = await supabase.from("daily_schedules").select("id").eq("schedule_date", copyFrom).maybeSingle();
-      if (error) throw error;
-      const getPage = (from: number) => supabase.from("daily_allocations")
-        .select("*, works(id, name, client_id, clients(name))").eq("schedule_id", source?.id ?? "").order("id").range(from, from + 999);
-      const collected: NonNullable<Awaited<ReturnType<typeof getPage>>["data"]> = [];
-      if (source) {
-        for (let from = 0; ; from += 1000) {
-          const page = await getPage(from);
-          if (page.error) throw page.error;
-          collected.push(...(page.data ?? []));
-          if (!page.data || page.data.length < 1000) break;
-        }
-      }
-      return { scheduleId: source?.id, rows: collected };
-    },
-  });
-  const sourceBoxes = useMemo(() => copyBoxes(copySource.data?.rows ?? []), [copySource.data]);
-  useEffect(() => {
-    setSelectedCopyBoxes(new Set(sourceBoxes.map((b) => b.key)));
-  }, [sourceBoxes, confirmCopyPrev]);
   function openCopyPrevious() {
-    setCopyFrom(addDays(date, -1));
     setConfirmCopyPrev(true);
   }
-  const copyPrevious = useMutation({
-    mutationFn: async () => {
-      if (!c) throw new Error("Carregando dados");
-      const prevSchedule = copySource.data?.scheduleId;
-      if (!prevSchedule) throw new Error("Não existe programação na data selecionada");
-      if (copyFrom === date) throw new Error("Escolha uma data diferente do destino");
-      const prevRows = selectedCopyRows(copySource.data?.rows ?? [], selectedCopyBoxes);
-      if (!prevRows.length) throw new Error("Selecione ao menos um quadro com efetivo");
-      const selectedWorkIds = new Set(prevRows.map((r) => r.work_id));
-
-      const id = await ensureSchedule();
-      const { data: currentRows, error: currentError } = await supabase.from("daily_allocations").select("collaborator_id").eq("schedule_id", id);
-      if (currentError) throw currentError;
-      const existing = new Set((currentRows ?? []).map((r) => r.collaborator_id));
-      const inserts = prevRows
-        .filter((r) => !c.absences.has(r.collaborator_id))
-        .filter((r) => !appointmentByCollaborator.has(r.collaborator_id))
-        .filter((r) => !workRequiresIntegration(c as ScheduleContext, r.work_id) || checkAso(c as ScheduleContext, r.collaborator_id, date, r.work_id).status !== "expired")
-        .filter((r) => !existing.has(r.collaborator_id))
-        .filter((r) => !entryByCollaborator.has(r.collaborator_id)) // quem já está num quadro (treinamento, folga…) fica só nele
-        .filter((r) => { const n = noticeOf(r.collaborator_id); return !(n?.end && date > n.end); })
-        .filter((r) => !checkRequirements(c, r.work_id, r.collaborator_id, date).some((i) => i.blocking))
-        .map((r, i) => ({
-          schedule_id: id,
-          work_id: r.work_id,
-          collaborator_id: r.collaborator_id,
-          position_id: r.position_id,
-          vehicle_id: r.vehicle_id,
-          driver: r.driver,
-          vt_override: r.vt_override,
-          travel_bonus_override: r.travel_bonus_override,
-          source: "copied_previous_day" as const,
-          confirmation_status: "pending" as const,
-          has_pending_requirement: checkRequirements(c, r.work_id, r.collaborator_id, date).length > 0,
-          sort_order: rows.length + i,
-        }));
-      if (inserts.length === 0) throw new Error("Nada novo para copiar dos quadros selecionados");
-      // Quem foi escalado por outro usuário no meio da cópia é pulado (chave única pessoa × dia), sem derrubar o lote.
-      const { data: inserted, error } = await supabase.from("daily_allocations")
-        .upsert(inserts, { onConflict: "schedule_id,collaborator_id", ignoreDuplicates: true })
-        .select("collaborator_id");
-      if (error) throw error;
-      const { error: copiedErr } = await supabase.from("daily_schedules").update({ copied_from_schedule_id: prevSchedule }).eq("id", id);
-      if (copiedErr) throw copiedErr;
-      const { data: prevVt, error: prevVtErr } = await supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", prevSchedule);
-      if (prevVtErr) throw prevVtErr;
-      if (prevVt && prevVt.length) {
-        const current = workVt.data ?? new Map<string, boolean>();
-        const vtRows = prevVt.filter((v) => selectedWorkIds.has(v.work_id) && !current.has(v.work_id)).map((v) => ({ schedule_id: id, work_id: v.work_id, pays_vt: v.pays_vt }));
-        if (vtRows.length) {
-          const { error: vtErr } = await supabase.from("schedule_work_vt").upsert(vtRows, { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
-          if (vtErr) throw vtErr;
+  /** Motivo de não copiar a pessoa no "Copiar dia" (mesmas regras de escalação da Programação). */
+  const copySkip = (r: { work_id: string; collaborator_id: string }) => {
+    if (!c) return "carregando dados";
+    return copySkipReason(r, {
+      absence: (id) => c.absences.get(id),
+      appointment: (id) => appointmentByCollaborator.get(id),
+      box: (id) => { const e = entryByCollaborator.get(id); return e ? boxLabelOf(e.box_key) : null; },
+      noticeEnded: (id) => { const n = noticeOf(id); return n?.end && date > n.end ? formatDateBR(n.end) : null; },
+      docs: (row) => {
+        const out: string[] = [];
+        if (workRequiresIntegration(c as ScheduleContext, row.work_id)) {
+          const aso = checkAso(c as ScheduleContext, row.collaborator_id, date, row.work_id);
+          if (aso.status === "expired") out.push(`ASO vencido em ${formatDateBR(aso.expiresAt)}`);
         }
-      }
-      qc.invalidateQueries({ queryKey: ["work-vt", id] });
-      const { data: prevTr, error: prevTrErr } = await supabase.from("schedule_work_travel").select("work_id, pays_bonus").eq("schedule_id", prevSchedule);
-      if (prevTrErr) throw prevTrErr;
-      const trRows = (prevTr ?? []).filter((v) => selectedWorkIds.has(v.work_id)).map((v) => ({ schedule_id: id, work_id: v.work_id, pays_bonus: v.pays_bonus }));
-      if (trRows.length) {
-        const { error: trErr } = await supabase.from("schedule_work_travel").upsert(trRows, { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
-        if (trErr) throw trErr;
-      }
-      const clientIds = [...new Set(prevRows.map((r) => r.works?.client_id).filter((id): id is string => !!id))];
-      if (clientIds.length) {
-        const { error: visibilityError } = await supabase.from("schedule_client_visibility").upsert(
-          clientIds.map((client_id) => ({ schedule_date: date, client_id, visible: true })),
-          { onConflict: "schedule_date,client_id" },
-        );
-        if (visibilityError) throw visibilityError;
-        qc.invalidateQueries({ queryKey: ["client-visibility", date] });
-      }
-      qc.invalidateQueries({ queryKey: ["work-travel", id] });
-      return { count: inserted?.length ?? inserts.length, id };
-    },
-    onSuccess: (r) => {
-      toast.success(`${r.count} alocação(ões) copiadas de ${formatDateBR(copyFrom)}`);
-      setConfirmCopyPrev(false);
-      invalidate(r.id);
-    },
-    onError: onWriteError,
-  });
-
+        for (const i of checkRequirements(c, row.work_id, row.collaborator_id, date)) if (i.blocking && !out.includes(i.label)) out.push(i.label);
+        return out;
+      },
+    });
+  };
 
   function startDrag(e: React.DragEvent, payload: DragPayload) {
     e.dataTransfer.setData("text/plain", JSON.stringify(payload));
@@ -1675,52 +1586,19 @@ export function SchedulePlannerBoard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AlertDialog open={confirmCopyPrev} onOpenChange={setConfirmCopyPrev}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Copiar programação</AlertDialogTitle>
-            <AlertDialogDescription>
-              Confirmar cópia dos quadros selecionados para {formatDateBR(date)}?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-3">
-            <label className="block space-y-1 text-sm" htmlFor="copy-source-date">
-              <span className="font-medium">Dia que será copiado</span>
-              <Input id="copy-source-date" type="date" value={copyFrom} disabled={copyPrevious.isPending} onChange={(e) => { setCopyFrom(e.target.value); setSelectedCopyBoxes(new Set()); }} />
-            </label>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium">Obras com efetivo</p>
-                <div className="flex gap-1">
-                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={copyPrevious.isPending || !sourceBoxes.length}
-                    onClick={() => setSelectedCopyBoxes(new Set(sourceBoxes.map((b) => b.key)))}>Todos</Button>
-                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={copyPrevious.isPending || !selectedCopyBoxes.size}
-                    onClick={() => setSelectedCopyBoxes(new Set())}>Nenhum</Button>
-                </div>
-              </div>
-              <div className="max-h-72 overflow-y-auto rounded-md border border-border divide-y divide-border">
-                {copySource.isFetching ? <p className="p-3 text-sm text-muted-foreground">Carregando obras...</p> : copySource.error ? <p className="p-3 text-sm text-destructive">Não foi possível carregar a programação.</p> : sourceBoxes.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Nenhuma obra com efetivo nesta data.</p> : sourceBoxes.map((box) => (
-                  <label key={box.key} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <Checkbox checked={selectedCopyBoxes.has(box.key)} disabled={copyPrevious.isPending} onCheckedChange={(checked) => setSelectedCopyBoxes((old) => {
-                      const next = new Set(old);
-                      if (checked) next.add(box.key); else next.delete(box.key);
-                      return next;
-                    })} />
-                    <span className="min-w-0 flex-1 break-words">{box.label}</span>
-                    <span className="text-xs text-muted-foreground">{box.count}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <Button disabled={copyPrevious.isPending || copySource.isFetching || !!copySource.error || !copyFrom || copyFrom === date || !selectedCopyBoxes.size} onClick={() => copyPrevious.mutate()}>
-              {copyPrevious.isPending ? "Copiando..." : "Copiar"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <CopyDayDialog
+        date={date}
+        open={confirmCopyPrev}
+        onOpenChange={setConfirmCopyPrev}
+        currentCount={rows.length}
+        workVt={workVt.data}
+        skipReason={copySkip}
+        hasPending={(r) => !!c && checkRequirements(c, r.work_id, r.collaborator_id, date).length > 0}
+        nameOf={(id) => personById.get(id)?.full_name ?? "Colaborador"}
+        ensureSchedule={ensureSchedule}
+        onCopied={(id) => invalidate(id)}
+        onWriteError={onWriteError}
+      />
       <RdoAbsenceDialog
         open={!!occOpen}
         onOpenChange={(v) => !v && setOccOpen(null)}
@@ -1834,7 +1712,7 @@ export function SchedulePlannerBoard({
             </DropdownMenuContent>
           </DropdownMenu>
           {editable && (
-            <Button size="sm" variant="outline" onClick={openCopyPrevious} disabled={copyPrevious.isPending}>
+            <Button size="sm" variant="outline" onClick={openCopyPrevious}>
               <Copy className="h-4 w-4" /> Dia anterior
             </Button>
           )}

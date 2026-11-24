@@ -19,3 +19,27 @@ export function copyBoxes(rows: readonly CopyAllocation[]) {
 export function selectedCopyRows<T extends CopyAllocation>(rows: readonly T[], selected: ReadonlySet<string>) {
   return rows.filter((row) => selected.has(copyBoxKey(row)));
 }
+/** Verificações do "Copiar dia" por pessoa (cada uma devolve o detalhe do motivo ou nada). */
+export type CopySkipChecks = {
+  absence: (collaboratorId: string) => string | null | undefined;
+  appointment: (collaboratorId: string) => string | null | undefined;
+  docs: (row: { work_id: string; collaborator_id: string }) => string[];
+  box: (collaboratorId: string) => string | null | undefined;
+  noticeEnded: (collaboratorId: string) => string | null | undefined;
+};
+
+/** Motivo de uma pessoa do dia de origem não ser copiada (null = pode copiar). Mesma ordem das checagens da Programação. */
+export function copySkipReason(row: { work_id: string; collaborator_id: string }, ch: CopySkipChecks): string | null {
+  const id = row.collaborator_id;
+  const abs = ch.absence(id);
+  if (abs) return `ausência (${abs.toLowerCase()})`;
+  const appt = ch.appointment(id);
+  if (appt) return `agendamento (${appt})`;
+  const box = ch.box(id);
+  if (box) return `quadro ${box}`;
+  const notice = ch.noticeEnded(id);
+  if (notice) return `aviso prévio terminou em ${notice}`;
+  const docs = ch.docs(row);
+  if (docs.length) return `ASO/treinamento: ${docs.join(", ")}`;
+  return null;
+}
