@@ -25,7 +25,7 @@ const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 let citiesCache: Promise<number[][][]> | null = null;
 const loadCities = () => (citiesCache ??= fetch("/geo/sp-cities.json").then((r) => r.json()).catch(() => []));
 
-export function AnimatedMap({ clients, region, className, extra }: { clients: MapClient[]; region: "SP" | "BR"; className?: string; extra?: React.ReactNode }) {
+export function AnimatedMap({ clients, region, className, extra, focus, selected }: { clients: MapClient[]; region: "SP" | "BR"; className?: string; extra?: React.ReactNode; focus?: { lon: number; lat: number; n: number } | null; selected?: string | null }) {
   const [run, setRun] = useState(0);
   const [hover, setHover] = useState<MapClient | null>(null);
   const [cities, setCities] = useState<number[][][]>([]);
@@ -41,7 +41,7 @@ export function AnimatedMap({ clients, region, className, extra }: { clients: Ma
   const drag = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   useEffect(() => { setView({ x: 0, y: 0, k: 1 }); }, [region, run]);
-  useEffect(() => { if (region === "SP") void loadCities().then(setCities); }, [region]);
+  useEffect(() => { if (region === "SP" || view.k >= 2) void loadCities().then(setCities); }, [region, view.k >= 2]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { paths, project } = useMemo(() => {
     const keys = region === "SP" ? ["SP"] : Object.keys(STATES);
@@ -57,9 +57,9 @@ export function AnimatedMap({ clients, region, className, extra }: { clients: Ma
     return { paths, project, ring };
   }, [region, H]);
   const cityPath = useMemo(() => {
-    if (region !== "SP" || !cities.length) return "";
+    if (!cities.length || (region !== "SP" && view.k < 2)) return "";
     return cities.map((r) => "M" + r.map((p) => project(p[0]!, p[1]!).map((v) => v.toFixed(1)).join(",")).join("L") + "Z").join("");
-  }, [cities, project, region]);
+  }, [cities, project, region, view.k >= 2]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const max = Math.max(1, ...clients.map((c) => c.billed ?? 0));
   const pts = clients.map((c) => ({ c, xy: project(c.lon, c.lat), r: (region === "SP" ? 8 : 6) + Math.sqrt((c.billed ?? 0) / max) * (region === "SP" ? 14 : 10) }))
@@ -73,6 +73,14 @@ export function AnimatedMap({ clients, region, className, extra }: { clients: Ma
     const x = Math.min(W - vw, Math.max(0, px - (cx / W) * vw)), y = Math.min(H - vh, Math.max(0, py - (cy / H) * vh));
     return { x, y, k };
   });
+  // Aproxima no cliente escolhido na lista (depois do reset de região).
+  useEffect(() => {
+    if (!focus) return;
+    const [fx, fy] = project(focus.lon, focus.lat);
+    const k = region === "SP" ? 5 : 8, vw = W / k, vh = H / k;
+    const t = setTimeout(() => setView({ k, x: Math.min(W - vw, Math.max(0, fx - vw / 2)), y: Math.min(H - vh, Math.max(0, fy - vh / 2)) }), 30);
+    return () => clearTimeout(t);
+  }, [focus?.n, project]); // eslint-disable-line react-hooks/exhaustive-deps
   const toSvg = (e: { clientX: number; clientY: number }) => {
     const r = svgRef.current!.getBoundingClientRect();
     return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H] as const;
@@ -90,7 +98,7 @@ export function AnimatedMap({ clients, region, className, extra }: { clients: Ma
     <div ref={boxRef} className={`relative overflow-hidden bg-card text-foreground ${className ?? ""}`} style={{ perspective: "1400px" }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
       <div key={`${region}-${run}`} className="amap-stage h-full w-full">
-        <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${W / view.k} ${H / view.k}`} className="h-full w-full cursor-grab touch-none active:cursor-grabbing" preserveAspectRatio="xMidYMid meet"
+        <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${W / view.k} ${H / view.k}`} shapeRendering="geometricPrecision" className="h-full w-full cursor-grab touch-none active:cursor-grabbing" preserveAspectRatio="xMidYMid meet"
           onPointerDown={(e) => { (e.target as Element).setPointerCapture?.(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; }}
           onPointerMove={(e) => {
             const d = drag.current; if (!d || view.k === 1) return;
@@ -102,12 +110,12 @@ export function AnimatedMap({ clients, region, className, extra }: { clients: Ma
           {paths.map((p, i) => (
             <path key={p.key} d={p.d} pathLength={1} className="amap-line" style={{ animationDelay: `${region === "BR" ? i * 40 : 0}ms` }} />
           ))}
-          {cityPath && <path d={cityPath} className="amap-cities" strokeWidth={0.6 * inv} />}
+          {cityPath && <path d={cityPath} className="amap-cities" strokeWidth={view.k > 2 ? 0.8 : 0.6} style={{ vectorEffect: "non-scaling-stroke", strokeOpacity: view.k > 2 ? 0.55 : undefined }} />}
           {pts.map((p, i) => (
             <g key={p.c.id} className="amap-pin" style={{ animationDelay: `${2600 + i * 60}ms` }}
               onMouseEnter={() => setHover(p.c)} onMouseLeave={() => setHover(null)}>
               <circle cx={p.xy[0]} cy={p.xy[1]} r={(p.r + 10) * inv} fill="transparent" />
-              <circle cx={p.xy[0]} cy={p.xy[1]} r={p.r * inv} className={hover?.id === p.c.id ? "fill-primary stroke-background" : "fill-foreground stroke-background"} strokeWidth={2.5 * inv} fillOpacity={0.88} />
+              <circle cx={p.xy[0]} cy={p.xy[1]} r={p.r * inv} className={hover?.id === p.c.id || selected === p.c.id ? "fill-primary stroke-background" : "fill-foreground stroke-background"} strokeWidth={2.5 * inv} fillOpacity={0.88} />
             </g>
           ))}
         </svg>

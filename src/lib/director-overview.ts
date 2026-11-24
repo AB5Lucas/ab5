@@ -61,7 +61,7 @@ export function directorSummary(list: any[], rawByWork: Map<string, any>, yms: s
   const clients = [...byClient.values()].map((c) => ({ ...c, billed: c.comp, pct: pctOf(c.margin, c.comp) })).sort((a, b) => b.comp - a.comp);
   // Serviços que puxam a margem para baixo: com faturamento e % abaixo da meta, ou com custo sem faturamento.
   const worst = works.filter((w) => (w.pct != null && w.pct < MARGIN_GOAL) || (!w.comp && w.margin < 0)).sort((a, b) => a.margin - b.margin).slice(0, 6);
-  return { months: monthList, totals: { ...tot, margin, pct: pctOf(margin, tot.comp), tax: tot.comp * FIN_TAX }, clients, worst };
+  return { months: monthList, totals: { ...tot, margin, pct: pctOf(margin, tot.comp), tax: tot.comp * FIN_TAX }, clients, worst, works };
 }
 
 /** Cobertura de RDO: dias × serviços com mão de obra escalada que têm RDO (qualquer situação; RDO Geral cobre o cliente). */

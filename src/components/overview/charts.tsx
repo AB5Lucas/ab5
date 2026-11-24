@@ -319,3 +319,76 @@ export function StackBar({ parts, format }: { parts: { label: string; value: num
     </div>
   );
 }
+
+/** Barras em toda a largura do cartão, com balão ao passar o mouse. */
+export function HoverBars({ data, format, dark, height = "h-16" }: { data: { label: string; value: number; tip?: string }[]; format: (v: number) => string; dark?: boolean; height?: string }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const sel = hover ?? data.length - 1;
+  const d = data[sel];
+  return (
+    <div className="relative" onMouseLeave={() => setHover(null)}>
+      <div className={cn("flex w-full items-end gap-[2px]", height)}>
+        {data.map((x, i) => (
+          <span key={i} onMouseEnter={() => setHover(i)} className="flex h-full flex-1 items-end">
+            <span className={cn("ov-grow w-full rounded-[3px] transition-colors", i === sel ? (dark ? "bg-background" : "bg-foreground") : dark ? "bg-background/30" : "bg-foreground/20")}
+              style={{ height: `${x.value > 0 ? Math.max(6, (x.value / max) * 100) : 3}%`, animationDelay: `${i * 20}ms` }} />
+          </span>
+        ))}
+      </div>
+      {d && (
+        <div className={cn("mt-1 flex justify-between text-[10px] tabular-nums", dark ? "text-background/70" : "text-muted-foreground")}>
+          <span>{d.tip ?? d.label}</span><span className="font-medium">{format(d.value)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Linha de margens (%) com traço no zero; balão ao passar o mouse. */
+export function MarginLine({ data }: { data: { label: string; pct: number }[] }) {
+  const [hover, setHover] = useState<number | null>(null);
+  if (!data.length) return <p className="py-4 text-center text-[11px] text-muted-foreground">Sem margens no período.</p>;
+  const clamp = (v: number) => Math.max(-30, Math.min(80, v));
+  const vals = data.map((d) => clamp(d.pct));
+  const hi = Math.max(5, ...vals), lo = Math.min(-5, ...vals);
+  const n = Math.max(1, data.length - 1);
+  const y = (v: number) => 4 + ((hi - v) / (hi - lo)) * 42;
+  const x = (i: number) => (data.length === 1 ? 50 : (i / n) * 100);
+  const path = vals.map((v, i) => `${i ? "L" : "M"} ${x(i)} ${y(v)}`).join(" ");
+  const sel = hover ?? null;
+  const fmt = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+  return (
+    <div className="relative" onMouseLeave={() => setHover(null)}>
+      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="h-16 w-full overflow-visible"
+        onMouseMove={(e) => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); setHover(Math.max(0, Math.min(data.length - 1, Math.round(((e.clientX - r.left) / r.width) * n)))); }}>
+        <line x1={0} x2={100} y1={y(0)} y2={y(0)} className="stroke-muted-foreground" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+        <path d={path} fill="none" className="ov-draw stroke-foreground" strokeWidth="1.8" vectorEffect="non-scaling-stroke" pathLength={1} />
+        {sel != null && <line x1={x(sel)} x2={x(sel)} y1={0} y2={50} className="stroke-border" strokeWidth="1" vectorEffect="non-scaling-stroke" />}
+      </svg>
+      {sel != null && <span className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground" style={{ left: `${x(sel)}%`, top: `${(y(vals[sel]!) / 50) * 100}%` }} />}
+      <div className="mt-1 flex justify-between gap-2 text-[10px] text-muted-foreground">
+        {sel != null ? <><span className="truncate">{data[sel]!.label}</span><span className="font-medium tabular-nums">{fmt(data[sel]!.pct)}</span></>
+          : <><span>— 0%</span><span>{data.length} {data.length === 1 ? "ponto" : "pontos"}</span></>}
+      </div>
+    </div>
+  );
+}
+
+/** Gráfico circular de uma fração (0–1) com o valor no meio. */
+export function Donut({ frac, center, sub }: { frac: number; center: string; sub?: string }) {
+  const f = Math.max(0, Math.min(1, frac)), r = 38, c = 2 * Math.PI * r;
+  return (
+    <div className="relative mx-auto h-28 w-28">
+      <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+        <circle cx="50" cy="50" r={r} fill="none" strokeWidth="12" className="stroke-muted" />
+        <circle cx="50" cy="50" r={r} fill="none" strokeWidth="12" strokeLinecap="round" className="ov-gauge stroke-foreground"
+          style={{ strokeDasharray: c, ["--ov-off" as string]: c * (1 - f), strokeDashoffset: c * (1 - f) }} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-display text-xl font-semibold tabular-nums">{center}</span>
+        {sub && <span className="text-[10px] text-muted-foreground">{sub}</span>}
+      </div>
+    </div>
+  );
+}

@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
 import { useWorkScope } from "@/hooks/use-work-scope";
-import { Big, LineArea, MiniBars, OverviewCard, RankBars } from "@/components/overview/charts";
+import { Big, Donut, HoverBars, LineArea, MarginLine, OverviewCard, RankBars } from "@/components/overview/charts";
 import { RdoTiles, type TileCol } from "@/components/overview/rdo-tiles";
 import { cn } from "@/lib/utils";
 import { ClientsMap } from "@/components/overview/clients-map";
@@ -103,7 +103,7 @@ function AtividadesOverview() {
     const s = directorSummary(fList, raws.data, P.yms, holidays.data ?? [], fWorks.data ?? []);
     const months = s.months.filter((m) => m.pct != null);
     const avg = months.length ? months.reduce((a, m) => a + m.pct!, 0) / months.length : null;
-    return { avg, months: s.months };
+    return { avg, months: s.months, works: (s.works ?? []).filter((w: any) => w.comp > 0 && w.pct != null).sort((a: any, b: any) => b.pct - a.pct) };
   }, [raws.data, fList, P.yms, holidays.data, fWorks.data]);
 
   const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
@@ -153,6 +153,20 @@ function AtividadesOverview() {
       (activeByDay.get(dt) ?? activeByDay.set(dt, new Set()).get(dt)!).add(c);
       if (dt >= P.from && dt <= P.to) activeIds.add(c);
     }
+    // Serviços com alocação e pessoas escaladas por dia (ou mês).
+    const svcBy = new Map<string, Set<string>>(P.buckets.map((b) => [b, new Set<string>()]));
+    const pplBy = new Map<string, number>(P.buckets.map((b) => [b, 0]));
+    const svcAll = new Set<string>(), daysBy = new Map<string, Set<string>>();
+    for (const a of q.data.allocs) {
+      if (!workBy.has(a.work_id)) continue;
+      const dt = String(a.daily_schedules?.schedule_date ?? "").slice(0, 10); if (!dt) continue;
+      const k = keyOf(dt); if (!svcBy.has(k)) continue;
+      svcBy.get(k)!.add(a.work_id); svcAll.add(a.work_id); pplBy.set(k, pplBy.get(k)! + 1);
+      (daysBy.get(k) ?? daysBy.set(k, new Set()).get(k)!).add(dt);
+    }
+    const bLabel = (b: string) => (P.unit === "day" ? `${b.slice(8, 10)}/${b.slice(5, 7)}` : `${monthLabel(b)}/${b.slice(2, 4)}`);
+    const svcSeries = P.buckets.map((b) => ({ label: bLabel(b), value: svcBy.get(b)!.size }));
+    const pplSeries = P.buckets.map((b) => ({ label: bLabel(b), tip: P.unit === "day" ? bLabel(b) : `${bLabel(b)} (média por dia)`, value: Math.round(pplBy.get(b)! / Math.max(1, daysBy.get(b)?.size ?? 1)) }));
     const rdoDay = new Map<string, Map<string, boolean>>(); // dia → cliente → finalizado?
     for (const r of q.data.rdos) {
       const c = clientOf(r.work_id) ?? (r.client_id && scope.allowClient(r.client_id) ? (r.client_id as string) : null);
@@ -177,7 +191,7 @@ function AtividadesOverview() {
     });
 
     return {
-      byClientId, activeIds, cur, prev, ordered, openBalance, top, cols,
+      byClientId, activeIds, svcSeries, pplSeries, svcCount: svcAll.size, cur, prev, ordered, openBalance, top, cols,
       series: P.buckets.map((b) => ({ label: P.unit === "day" ? `${b.slice(8, 10)}/${b.slice(5, 7)}` : `${monthLabel(b)}/${b.slice(2, 4)}`, a: byBucket.get(b) ?? 0 })),
       activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
       statusBars: [["Planejados", "planned"], ["Ativos", "active"], ["Pausados", "paused"], ["Concluídos", "completed"]].map(([l, s]) => ({ label: l!, value: works.filter((w) => w.status === s).length })),
@@ -220,16 +234,14 @@ function AtividadesOverview() {
             {can("/obras/resultado") && (
               <OverviewCard dark title={`Faturado — ${pLabel}`} to="/obras/resultado" linkLabel="Ver resultados" hint="Notas lançadas nos serviços no período, comparadas ao período anterior equivalente">
                 <Big dark value={brl(d.cur)} delta={delta(d.cur, d.prev)} />
-                <div className="mt-3"><MiniBars dark values={d.series.map((s) => s.a)} /></div>
+                <div className="mt-3"><HoverBars dark data={d.series.map((s) => ({ label: s.label, value: s.a }))} format={brl} /></div>
               </OverviewCard>
             )}
             {can("/obras") && (
-              <OverviewCard title="Serviços ativos" to="/obras" linkLabel="Ver serviços" hint="Serviços ativos (não concluídos nem cancelados) e clientes atendidos">
-                <div className="flex h-full flex-col">
-                  <Big value={d.activeCount} />
-                  <p className="text-xs text-muted-foreground">em {d.clientCount} clientes</p>
-                  <StatusBars rows={d.statusBars} />
-                </div>
+              <OverviewCard title="Serviços com equipe" to="/obras" linkLabel="Ver serviços" hint="Serviços com pessoas escaladas no período (por dia no mês; por mês no ano)">
+                <Big value={d.svcCount} />
+                <p className="text-xs text-muted-foreground">serviços com alocação {P.unit === "day" ? "no mês" : "no período"}</p>
+                <div className="mt-3"><HoverBars data={d.svcSeries} format={(v) => `${v} serviços`} /></div>
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
@@ -238,41 +250,35 @@ function AtividadesOverview() {
                   <>
                     <Big value={fmtPct(margin.avg)} />
                     <p className="text-xs text-muted-foreground">{margin.months.length > 1 ? `média de ${margin.months.filter((m) => m.pct != null).length} meses` : "no mês"}</p>
-                    <div className="mt-2"><MiniBars values={margin.months.map((m) => Math.max(0, m.pct ?? 0))} /></div>
+                    <div className="mt-2"><MarginLine data={P.unit === "day"
+                      ? margin.works.map((w: any) => ({ label: `${w.client} · ${w.name}`, pct: w.pct }))
+                      : margin.months.filter((m) => m.pct != null).map((m) => ({ label: `${monthLabel(m.ym)}/${m.ym.slice(2, 4)}`, pct: m.pct! }))} /></div>
                   </>
                 ) : <div className="h-16 animate-pulse rounded-lg bg-muted" />}
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
               <OverviewCard title="Saldo a faturar" to="/obras/resultado" linkLabel="Ver resultados" hint="Pedidos dos serviços ativos com data até o fim do período menos o faturado neles até essa data">
-                <Big value={brl(d.openBalance)} />
-                <p className="text-xs text-muted-foreground">de {brl(d.ordered)} em pedidos até {P.to.slice(8, 10)}/{P.to.slice(5, 7)}/{P.to.slice(0, 4)}</p>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <Big value={brl(d.openBalance)} />
+                    <p className="text-xs text-muted-foreground">de {brl(d.ordered)} em pedidos até {P.to.slice(8, 10)}/{P.to.slice(5, 7)}/{P.to.slice(0, 4)}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Faturado: {brl(d.ordered - d.openBalance)}</p>
+                  </div>
+                  <Donut frac={d.ordered ? (d.ordered - d.openBalance) / d.ordered : 0} center={d.ordered ? `${Math.round(((d.ordered - d.openBalance) / d.ordered) * 100)}%` : "—"} sub="faturado" />
+                </div>
               </OverviewCard>
             )}
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
             {can("/obras") && (
-              <OverviewCard title="Clientes no mapa" to="/clientes" linkLabel="Ver clientes" className="min-h-[560px]" hint="Marcador do tamanho do faturado no período; roda do mouse aproxima">
+              <OverviewCard title="Clientes no mapa" to="/clientes" linkLabel="Ver clientes" className="lg:col-span-2" hint="Marcador do tamanho do faturado no período; clique num cliente da lista para aproximar">
                 {mapClients.length > 0 ? (
-                  <div className="h-full min-h-[460px]" onClick={(e) => e.preventDefault()}>
-                    <ClientsMap clients={mapClients} className="h-full min-h-[460px] w-full rounded-xl" />
+                  <div onClick={(e) => e.preventDefault()}>
+                    <ClientsMap clients={mapClients} className="h-[480px] w-full rounded-xl" />
                   </div>
                 ) : <p className="py-8 text-center text-xs text-muted-foreground">Nenhum cliente com endereço localizado.</p>}
-              </OverviewCard>
-            )}
-            {can("/externo/relatorio-diario") && (
-              <OverviewCard className="lg:col-span-2" title={P.unit === "day" ? "RDOs por dia" : "RDOs por mês (média por dia)"} to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
-                hint="Altura = clientes com equipe escalada no mês; cada quadradinho é um cliente com RDO">
-                <div onClick={(e) => e.preventDefault()}><RdoTiles cols={d.cols} unit={P.unit} /></div>
-              </OverviewCard>
-            )}
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            {can("/obras/resultado") && (
-              <OverviewCard className="lg:col-span-2" title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
-                <LineArea data={d.series} format={(p) => brl(p.a)} />
               </OverviewCard>
             )}
             {can("/obras") && (
@@ -281,25 +287,31 @@ function AtividadesOverview() {
               </OverviewCard>
             )}
           </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            {can("/externo/relatorio-diario") && (
+              <OverviewCard className="lg:col-span-2" title={P.unit === "day" ? "RDOs por dia" : "RDOs por mês (média por dia)"} to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
+                hint="Altura = clientes com equipe escalada no mês; cada quadradinho é um cliente com RDO">
+                <div onClick={(e) => e.preventDefault()}><RdoTiles cols={d.cols} unit={P.unit} /></div>
+              </OverviewCard>
+            )}
+            {can("/obras") && (
+              <OverviewCard title={P.unit === "day" ? "Pessoas escaladas por dia" : "Pessoas escaladas por dia (média do mês)"} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Alocações em serviços na Programação">
+                <Big value={Math.round(d.pplSeries.reduce((a, x) => a + x.value, 0) / Math.max(1, d.pplSeries.filter((x) => x.value > 0).length))} />
+                <p className="text-xs text-muted-foreground">média por dia com equipe</p>
+                <div className="mt-3"><HoverBars data={d.pplSeries} format={(v) => `${v} pessoas`} height="h-24" /></div>
+              </OverviewCard>
+            )}
+          </div>
+
+          {can("/obras/resultado") && (
+            <OverviewCard title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
+              <LineArea data={d.series} format={(p) => brl(p.a)} />
+            </OverviewCard>
+          )}
         </>
       )}
     </div>
   );
 }
 
-/** Barras dos serviços por situação, ocupando o resto do quadro. */
-function StatusBars({ rows }: { rows: { label: string; value: number }[] }) {
-  const max = Math.max(1, ...rows.map((r) => r.value));
-  return (
-    <div className="mt-3 flex min-h-[72px] flex-1 items-end gap-2">
-      {rows.map((r, i) => (
-        <div key={r.label} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${r.label}: ${r.value}`}>
-          <span className="text-[10px] tabular-nums text-muted-foreground">{r.value}</span>
-          <span className={cn("ov-grow w-full rounded-md", r.label === "Ativos" ? "bg-foreground" : "bg-foreground/20")}
-            style={{ height: `${Math.max(6, (r.value / max) * 100)}%`, animationDelay: `${i * 60}ms` }} />
-          <span className="text-[10px] text-muted-foreground">{r.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 export type TileCol = { key: string; label: string; title: string; max: number; fin: number; draft: number; expected: number; totalFin?: number; totalDraft?: number; totalExpected?: number };
 
-const MAX_ROWS = 14;
+const MAX_ROWS = 7;
 
 export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month" }) {
   const [sel, setSel] = useState<number | null>(null);
@@ -39,7 +39,7 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
                     : fromBottom < f ? "bg-foreground"
                     : fromBottom < f + dr ? "bg-foreground/45"
                     : "border border-dashed border-border bg-muted/40";
-                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", unit === "month" ? "h-8" : "h-4", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
+                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", unit === "month" ? "h-4" : "h-2", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
                 })}
                 <span className="mt-1 text-center text-[10px] tabular-nums text-muted-foreground">{ci % step === 0 || ci === i ? col.label : "\u00a0"}</span>
               </button>
@@ -54,11 +54,11 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
         </div>
       </div>
       {c && (
-        <div className="flex w-full flex-col rounded-xl border bg-muted/30 p-3 md:w-52">
+        <div className="flex w-full flex-col rounded-xl border bg-muted/30 p-3 md:w-48 md:p-2.5">
           <p className="text-[11px] text-muted-foreground">{c.title}</p>
-          <p className="font-display text-3xl font-semibold tabular-nums">{fin + draft}</p>
+          <p className="font-display text-2xl font-semibold tabular-nums">{fin + draft}</p>
           <p className="text-[11px] text-muted-foreground">RDOs de {exp} esperados</p>
-          <div className="mt-3 space-y-2 text-xs">
+          <div className="mt-2 grid grid-cols-3 gap-1 text-xs md:grid-cols-1 md:space-y-0">
             <Row cls="bg-foreground" label="Finalizados" v={fin} pct={pct(fin)} />
             <Row cls="bg-foreground/45" label="Rascunho" v={draft} pct={pct(draft)} />
             <Row cls="border border-dashed border-border bg-muted/40" label="Sem RDO" v={Math.max(0, exp - fin - draft)} pct={pct(Math.max(0, exp - fin - draft))} />
