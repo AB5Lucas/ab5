@@ -1,0 +1,1 @@
+-- Aplicada direto (a fila de migrações trava numa regra antiga da Frota). Ver day_off_remove_day no banco.
