@@ -562,7 +562,7 @@ function AttendanceTab() {
     queryKey: ["att-certs", date],
     queryFn: async () => {
       const { data, error } = await supabase.from("training_certificates")
-        .select("collaborator_id, training_id, collaborators(full_name, cpf, registration_number), trainings(name)")
+        .select("collaborator_id, training_id, version, issued_at, snapshot, collaborators(full_name, cpf, registration_number), trainings(name)")
         .eq("training_date", date);
       if (error) throw error;
       return (data ?? []) as any[];
@@ -582,6 +582,19 @@ function AttendanceTab() {
     }
     return [...map.values()].map((g) => ({ ...g, people: g.people.sort((a, b) => a.name.localeCompare(b.name)) })).sort((a, b) => a.name.localeCompare(b.name));
   }, [day.data, certs.data]);
+  // A lista sai com a data do certificado emitido (último dia do período escolhido na emissão; ex.: treinamento
+  // ontem, certificado da NR-18 com data de amanhã). Sem certificado, vale o dia do treinamento.
+  const certDateBy = useMemo(() => {
+    const m = new Map<string, { date: string; at: string }>();
+    for (const c of certs.data ?? []) {
+      const d = String((c.snapshot as { date?: string } | null)?.date ?? "").slice(0, 10);
+      if (!d) continue;
+      const cur = m.get(c.training_id);
+      if (!cur || String(c.issued_at) > cur.at) m.set(c.training_id, { date: d, at: String(c.issued_at) });
+    }
+    return m;
+  }, [certs.data]);
+  const listDate = (trainingId: string) => certDateBy.get(trainingId)?.date ?? date;
   const pk = (t: string, c: string) => `${t}|${c}`;
   const picked = (g: (typeof groups)[number]) => g.people.filter((p) => !off[pk(g.trainingId, p.collabId)]);
   const setAll = (g: (typeof groups)[number], keep: (p: AttPerson) => boolean) =>
@@ -601,7 +614,7 @@ function AttendanceTab() {
           s: {
             subject: cd?.subject ?? g.name.toUpperCase(),
             tstName: t.full_name.toUpperCase(),
-            date,
+            date: listDate(g.trainingId),
             schedule: cd?.schedule_text ?? "",
             hours: Number(cd?.workload_hours ?? 0),
             people: picked(g).map((p) => ({ name: p.name, cpf: formatCpf(p.cpf) })),
@@ -643,6 +656,9 @@ function AttendanceTab() {
               <span className="font-semibold">{g.name}</span>
               <Badge variant="secondary">{n} de {g.people.length} participante(s)</Badge>
               {withCert > 0 && <Badge variant="outline">{withCert} com certificado</Badge>}
+              <span className="text-sm text-muted-foreground" title={certDateBy.has(g.trainingId) ? "Data do certificado emitido" : "Sem certificado emitido: vale o dia do treinamento"}>
+                Lista em {brDate(listDate(g.trainingId))}{certDateBy.has(g.trainingId) ? " (data do certificado)" : ""}
+              </span>
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen((s) => ({ ...s, [g.trainingId]: !s[g.trainingId] }))}>
                 {open[g.trainingId] ? "Ocultar pessoas" : "Escolher pessoas"}
               </Button>
