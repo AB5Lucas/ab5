@@ -135,7 +135,8 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared, o
     : [];
   const driverVsBy = new Map<string, any[]>();
   for (const [id, rows] of vsByClient) { const ds = new Set(vsDriverIds(rows)); driverVsBy.set(id, ds.size ? driverVsAll.filter((v) => vsOfDrivers(v, ds)) : []); }
-  const passengerClients = [...new Set([...clientIds, ...vsClientIds(driverVsAll)])].sort();
+  // Só ids de cliente reais (os fretes usam marcadores como __external__, que quebram o filtro).
+  const passengerClients = [...new Set([...clientIds, ...vsClientIds(driverVsAll)])].filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))).sort();
   const passengersAll = passengerClients.length
     ? (await Promise.all(chunks(passengerClients).map((part) => fetchAll<any>((a, b) => upTo(supabase.from("transport_passengers").select("id, client_id, schedule_date, collaborator_id, vehicle_schedule_id").in("client_id", part), "schedule_date").order("id").range(a, b))))).flat()
     : [];

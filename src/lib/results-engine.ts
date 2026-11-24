@@ -182,7 +182,7 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
         ? await fetchAll<any>((a, b) => upTo(supabase.from("vehicle_schedules").select(VS_COLS)
             .or(`driver_id.in.(${vsDrivers.join(",")}),extra_driver_ids.ov.{${vsDrivers.join(",")}}`), "schedule_date").order("schedule_date").range(a, b))
         : [];
-      const passengerClients = w.client_id ? vsClientIds(driverVs, [w.client_id]) : [];
+      const passengerClients = w.client_id ? vsClientIds(driverVs, [w.client_id]).filter((id: string) => /^[0-9a-f-]{36}$/i.test(String(id))) : [];
       const passengers = passengerClients.length
         ? await fetchAll<PassengerRow>((a, b) => upTo(supabase.from("transport_passengers").select("client_id, schedule_date, collaborator_id, vehicle_schedule_id").in("client_id", passengerClients), "schedule_date").order("schedule_date").range(a, b))
         : [];

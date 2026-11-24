@@ -7,6 +7,18 @@ import { RotateCcw } from "lucide-react";
 import { STATES } from "./geo-shapes";
 import type { MapClient } from "./clients-map";
 
+/** Ponto dentro do contorno do estado (ray casting nos anéis do desenho). */
+export function inState(uf: string, lon: number, lat: number) {
+  let inside = false;
+  for (const r of STATES[uf] ?? []) {
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const xi = r[i]![0]!, yi = r[i]![1]!, xj = r[j]![0]!, yj = r[j]![1]!;
+      if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 export function AnimatedMap({ clients, region, className }: { clients: MapClient[]; region: "SP" | "BR"; className?: string }) {
@@ -36,7 +48,7 @@ export function AnimatedMap({ clients, region, className }: { clients: MapClient
     .sort((a, b) => a.xy[0] - b.xy[0]);
 
   return (
-    <div className={`relative overflow-hidden bg-muted/30 ${className ?? ""}`} style={{ perspective: "1400px" }}>
+    <div className={`relative overflow-hidden bg-card text-foreground ${className ?? ""}`} style={{ perspective: "1400px" }}>
       <div key={run} className="amap-stage h-full w-full">
         <svg viewBox={`0 0 ${W} ${H}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
           {paths.map((p, i) => (
