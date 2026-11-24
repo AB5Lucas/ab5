@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CountUp } from "@/components/count-up";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Trash2, Pencil } from "lucide-react";
@@ -276,7 +277,7 @@ export function BonusPage() {
             </div>
             <div className="panel px-4 py-2">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Total do mês</p>
-              <p className="font-display text-xl font-semibold">{money(total)}</p>
+              <p className="font-display text-xl font-semibold"><CountUp value={money(total)} /></p>
             </div>
           </div>
 

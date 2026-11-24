@@ -162,3 +162,14 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-panel);
 }
+
+/* Entrada suave das páginas (route.tsx PageEnter) e dos quadros/painéis. */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.page-enter { animation: page-enter 0.35s ease-out both; }
+.page-enter .panel { animation: page-enter 0.45s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .page-enter, .page-enter .panel { animation: none; }
+}

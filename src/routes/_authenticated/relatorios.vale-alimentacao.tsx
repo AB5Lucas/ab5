@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CountUp } from "@/components/count-up";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -110,7 +111,7 @@ function Report() {
       <p className="text-muted-foreground">Faltando: {sheets.data.missing.join(", ")}</p>
     </div>}
     {sheets.data?.found && <>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[["Colaboradores", lines.length], ["Recebem integral", lines.filter((l) => l.pct === 0).length], ["Com desconto", lines.filter((l) => l.pct > 0).length], ["Total a pagar", brl(total)]].map(([l, v]) => <div key={String(l)} className="rounded-md border border-border bg-card p-4"><p className="text-sm text-muted-foreground">{l}</p><p className="mt-2 text-2xl font-semibold tabular-nums">{v}</p></div>)}</div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[["Colaboradores", lines.length], ["Recebem integral", lines.filter((l) => l.pct === 0).length], ["Com desconto", lines.filter((l) => l.pct > 0).length], ["Total a pagar", brl(total)]].map(([l, v]) => <div key={String(l)} className="rounded-md border border-border bg-card p-4"><p className="text-sm text-muted-foreground">{l}</p><p className="mt-2 text-2xl font-semibold tabular-nums"><CountUp value={v} /></p></div>)}</div>
       <div className="overflow-x-auto"><Table><TableHeader><TableRow>{["Matrícula", "Nome", "Faltas injustificadas", "Faltas justificadas", "Atrasos", "Desconto", "Valor VA"].map((h) => <TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader>
         <TableBody>{shown.map((l) => <TableRow key={l.id}><TableCell className="tabular-nums">{l.reg}</TableCell><TableCell className="min-w-64 font-medium">{l.events.length ? <button className="text-left hover:underline" onClick={() => setDetail({ line: l, kind: "all" })}>{l.name}</button> : l.name}</TableCell>
           <TableCell className="text-center"><Cell l={l} k="injustificada" n={l.unjust} /></TableCell><TableCell className="text-center"><Cell l={l} k="justificada" n={l.just} /></TableCell><TableCell className="text-center"><Cell l={l} k="atraso" n={l.late} /></TableCell>

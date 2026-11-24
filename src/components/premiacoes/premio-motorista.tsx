@@ -1,4 +1,5 @@
 import { loadBuiltTransport, driverBonusFor } from "@/lib/transport-rules";
+import { CountUp } from "@/components/count-up";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -259,11 +260,11 @@ export function DriverBonusPage() {
             </div>
             <div className="panel px-4 py-2">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Total de prêmios</p>
-              <p className="font-display text-xl font-semibold">{money(total)}</p>
+              <p className="font-display text-xl font-semibold"><CountUp value={money(total)} /></p>
             </div>
             <div className="panel px-4 py-2">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Total de pedágio</p>
-              <p className="font-display text-xl font-semibold">{money(totalToll)}</p>
+              <p className="font-display text-xl font-semibold"><CountUp value={money(totalToll)} /></p>
             </div>
           </div>
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CountUp } from "@/components/count-up";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -115,7 +116,7 @@ function Page() {
       {canEdit && <div className="flex justify-end"><Button onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" />Novo andaime</Button></div>}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {cards.map(([l, n]) => (
-          <div key={l} className="rounded-md border p-3"><div className="text-xs text-muted-foreground">{l}</div><div className="text-2xl font-semibold">{n}</div></div>
+          <div key={l} className="rounded-md border p-3"><div className="text-xs text-muted-foreground">{l}</div><div className="text-2xl font-semibold"><CountUp value={n} /></div></div>
         ))}
       </div>
       <div className="flex flex-wrap gap-2">

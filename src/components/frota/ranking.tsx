@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
+import { CountUp } from "@/components/count-up";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,7 +18,7 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: "bad
   return (
     <div className="panel p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`text-lg font-semibold tabular-nums ${tone === "bad" ? "text-destructive" : ""}`}>{value}</div>
+      <div className={`text-lg font-semibold tabular-nums ${tone === "bad" ? "text-destructive" : ""}`}><CountUp value={value} /></div>
     </div>
   );
 }

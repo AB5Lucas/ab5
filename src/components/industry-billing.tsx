@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CountUp } from "@/components/count-up";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Undo2, RefreshCw, CheckCircle2, CircleHelp, AlertTriangle, Clock } from "lucide-react";
@@ -93,7 +94,7 @@ export function IndustryBilling() {
   const rows = useMemo(() => all.filter((n: any) => (state === "all" || n.status === state) && `${n.invoice_number} ${n.order_number ?? ""} ${n.client_name}`.toLowerCase().includes(search.toLowerCase())), [all, state, search]);
   const counts = [{ l: "Notas", v: all.length, I: CheckCircle2 }, { l: "Lançadas", v: all.filter((n: any) => n.status === "posted").length, I: CheckCircle2 }, { l: "Pendentes", v: all.filter((n: any) => n.status === "pending").length, I: CircleHelp }, { l: "Total faturado", v: brl(rows.reduce((a: number, n: any) => a + Number(n.amount), 0)), I: CheckCircle2 }];
   return <div className="space-y-5 pt-2"><SyncBar source="faturamento" />
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{counts.map(({ l, v, I }) => <div key={l} className="rounded-md border border-border bg-card p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>{l}</span><I className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums">{v}</p></div>)}</div>
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{counts.map(({ l, v, I }) => <div key={l} className="rounded-md border border-border bg-card p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>{l}</span><I className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums"><CountUp value={v} /></p></div>)}</div>
     <Tabs defaultValue="notes" className="w-full"><TabsList><TabsTrigger value="notes">Notas</TabsTrigger><TabsTrigger value="runs">Execuções</TabsTrigger></TabsList>
       <TabsContent value="notes" className="w-full space-y-4">
         <div className="flex flex-wrap items-end gap-3"><div className="min-w-48 flex-1"><Label htmlFor="ind-search">NF, pedido ou cliente</Label><Input id="ind-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar" /></div>

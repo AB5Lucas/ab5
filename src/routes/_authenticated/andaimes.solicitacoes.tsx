@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CountUp } from "@/components/count-up";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -122,7 +123,7 @@ function Page() {
           <Card key={s.key} className={`cursor-pointer transition-colors ${fStage === s.key ? "border-primary" : ""}`} onClick={() => setFStage(fStage === s.key ? ALL : s.key)}>
             <CardContent className="p-3">
               <div className="text-xs text-muted-foreground">{s.label}</div>
-              <div className="text-2xl font-semibold">{rows.filter((r: any) => r.flow_stage === s.key).length}</div>
+              <div className="text-2xl font-semibold"><CountUp value={rows.filter((r: any) => r.flow_stage === s.key).length} /></div>
             </CardContent>
           </Card>
         ))}

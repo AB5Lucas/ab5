@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { LogOut, User2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -125,11 +125,25 @@ function AuthenticatedLayout() {
                 Você não tem acesso a esta página. Fale com um administrador.
               </div>
             ) : (
-              <Outlet />
+              <PageEnter><Outlet /></PageEnter>
             )}
           </main>
         </div>
       </div>
     </SidebarProvider>
   );
+}
+
+/** Entrada suave a cada troca de página (sem remontar a página: só reinicia a animação). */
+function PageEnter({ children }: { children: ReactNode }) {
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.classList.remove("page-enter");
+    void el.offsetWidth; // reinicia a animação
+    el.classList.add("page-enter");
+  }, [path]);
+  return <div ref={ref} className="page-enter">{children}</div>;
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CountUp } from "@/components/count-up";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -90,7 +91,7 @@ function Page() {
           <button key={l.key} onClick={() => setF({ ...f, location: f.location === l.key ? ALL : l.key })}
             className={`panel p-3 text-left transition hover:bg-muted/40 ${f.location === l.key ? "ring-2 ring-primary" : ""}`}>
             <div className="text-xs text-muted-foreground">{l.label}</div>
-            <div className="font-display text-2xl font-semibold">{totals(l.key).toLocaleString("pt-BR")}</div>
+            <div className="font-display text-2xl font-semibold"><CountUp value={totals(l.key)} /></div>
           </button>
         ))}
       </div>

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { CountUp } from "@/components/count-up";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -69,7 +70,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="panel p-4">
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="font-display text-3xl font-semibold">{value}</p>
+      <p className="font-display text-3xl font-semibold"><CountUp value={value} /></p>
     </div>
   );
 }
