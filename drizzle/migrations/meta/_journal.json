@@ -1219,6 +1219,13 @@
       "when": 1795463095217,
       "tag": "0186_client_image_source",
       "breakpoints": true
+    },
+    {
+      "idx": 174,
+      "version": "7",
+      "when": 1795463096217,
+      "tag": "0187_client_location",
+      "breakpoints": true
     }
   ]
 }

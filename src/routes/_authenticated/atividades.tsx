@@ -11,6 +11,7 @@ import { financeBatches, financeList, loadFinanceActive, loadFinanceRaws } from 
 import { directorSummary, MARGIN_GOAL, rdoCoverage } from "@/lib/director-overview";
 import { BilledVsCost, Big, MarginGauge, MarginMonths, MiniBars, OverviewCard, StackBar } from "@/components/overview/charts";
 import { CountUp } from "@/components/count-up";
+import { ClientsMap } from "@/components/overview/clients-map";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/atividades")({
@@ -102,6 +103,14 @@ function AtividadesOverview() {
     };
   }, [ops.data, works.data, scope.ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clientes com ponto no mapa (endereço localizado), com faturado/margem do período.
+  const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
+  const mapClients = useMemo(() => {
+    const by = new Map((fin?.clients ?? []).map((c) => [c.name, c]));
+    return (mapQ.data ?? []).filter((c: any) => scope.allowClient(c.id) && !isInternal(c.name)).map((c: any) => ({
+      id: c.id, name: c.name, city: c.city, lat: Number(c.lat), lon: Number(c.lon), billed: by.get(c.name)?.comp ?? 0, marginPct: by.get(c.name)?.pct ?? null,
+    }));
+  }, [mapQ.data, fin, scope.ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const can = (u: string) => canAccess(u);
   const finLoading = can("/obras/resultado") && (!fin || !chart);
   const periodLabel = period === "ano" ? `${today.getFullYear()} até ${monthName(curYm)}` : `${monthName(sel[0]!)}/${sel[0]!.slice(0, 4)}`;
@@ -114,7 +123,7 @@ function AtividadesOverview() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Atividades <span className="text-primary">·</span> visão da diretoria</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Atividades</h1>
           <p className="text-sm text-muted-foreground">Resultado, margem, clientes e operação — {periodLabel}. Clique em um quadro para abrir os dados.</p>
         </div>
         <div className="flex rounded-full border bg-muted/40 p-0.5 text-xs">
@@ -141,7 +150,7 @@ function AtividadesOverview() {
               <OverviewCard title="Margem de contribuição" to="/fechamentos/financeiro" linkLabel="Ver por serviço" hint="Faturado por competência menos 18,5% de impostos e os custos (mão de obra, transporte, materiais)">
                 <Big value={brl(t.margin)} />
                 <div className="mt-1 flex items-center gap-2 text-xs">
-                  <span className={cn("rounded-full px-2 py-0.5 font-semibold", goodMargin(t.pct) ? "bg-success/15 text-success" : "bg-primary/10 text-primary")}>{pct1(t.pct)}</span>
+                  <span className={cn("rounded-full px-2 py-0.5 font-semibold", goodMargin(t.pct) ? "bg-foreground text-background" : "border text-muted-foreground")}>{pct1(t.pct)}</span>
                   <span className="text-muted-foreground">meta {MARGIN_GOAL}% · {goodMargin(t.pct) ? "acima da meta" : "abaixo da meta"}</span>
                 </div>
               </OverviewCard>
@@ -149,65 +158,72 @@ function AtividadesOverview() {
                 <Big value={brl(t.mo + t.transport + t.materials)} />
                 <div className="mt-2"><StackBar format={brl} parts={[
                   { label: "Mão de obra", value: t.mo, className: "bg-foreground" },
-                  { label: "Transporte", value: t.transport, className: "bg-primary" },
-                  { label: "Materiais", value: t.materials, className: "bg-muted-foreground/50" },
+                  { label: "Transporte", value: t.transport, className: "bg-foreground/50" },
+                  { label: "Materiais", value: t.materials, className: "bg-foreground/20" },
                 ]} /></div>
               </OverviewCard>
               <OverviewCard title="Carteira a faturar" to="/obras/resultado" linkLabel="Ver andamento" hint="Pedidos dos serviços ativos ainda não faturados">
                 <Big value={op ? brl(op.backlog) : "…"} />
                 {op && <>
                   <p className="text-xs text-muted-foreground">de {brl(op.ordered)} em pedidos ativos</p>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="ov-widen h-full rounded-full bg-primary" style={{ width: `${op.billedPct ?? 0}%` }} /></div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="ov-widen h-full rounded-full bg-foreground" style={{ width: `${op.billedPct ?? 0}%` }} /></div>
                   <p className="mt-1 text-[11px] text-muted-foreground">{pct1(op.billedPct)} já faturado</p>
                 </>}
               </OverviewCard>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-5">
-              <OverviewCard className="lg:col-span-2" title={sel.length > 1 ? "Margem por mês" : `Margem de ${monthName(sel[0]!)}`} to="/fechamentos/financeiro" linkLabel="Abrir Fechamento"
-                hint={`Meta da empresa: ${MARGIN_GOAL}%. Verde = acima da meta.`}>
+              <OverviewCard dark={sel.length === 1} className="lg:col-span-2" title={sel.length > 1 ? "Margem por mês" : `Margem de ${monthName(sel[0]!)}`} to="/fechamentos/financeiro" linkLabel="Abrir Fechamento"
+                hint={`Meta da empresa: ${MARGIN_GOAL}%. Barra cheia = na meta ou acima; hachurada = abaixo.`}>
                 {sel.length > 1
                   ? <MarginMonths goal={MARGIN_GOAL} data={fin!.months.map((m) => ({ label: monthName(m.ym), pct: m.pct, tip: `${monthName(m.ym)}/${m.ym.slice(2, 4)}`, extra: `${brl(m.margin)} de ${brl(m.comp)}` }))} />
-                  : <MarginGauge pct={t.pct} goal={MARGIN_GOAL} label={`${brl(t.margin)} sobre ${brl(t.comp)} faturados`} />}
+                  : <MarginGauge pct={t.pct} goal={MARGIN_GOAL} sub={`${brl(t.margin)} sobre ${brl(t.comp)} faturados`} />}
               </OverviewCard>
               <OverviewCard className="lg:col-span-3" title={`Faturado × custos — ${sel.length > 1 ? "meses do ano" : "últimos 6 meses"}`} to="/fechamentos/financeiro" linkLabel="Abrir Fechamento">
                 <BilledVsCost format={brl} data={chart!.months.map((m) => ({ label: monthName(m.ym), billed: m.billed, cost: m.mo + m.transport + m.materials, marginPct: m.pct, tip: `${monthName(m.ym)}/${m.ym.slice(2, 4)}` }))} />
               </OverviewCard>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <OverviewCard title="Clientes — faturado e margem" to="/fechamentos/financeiro" linkLabel="Ver todos os clientes">
-                <div className="space-y-2">
-                  {fin!.clients.slice(0, 6).map((c, i) => {
-                    const max = fin!.clients[0]?.comp || 1;
-                    return (
-                      <div key={c.name} className="text-xs">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate font-medium">{c.name}</span>
-                          <span className="flex items-center gap-2 tabular-nums">
-                            <span className="text-muted-foreground">{brl(c.comp)}</span>
-                            <span className={cn("w-14 rounded-full px-1.5 text-center text-[10px] font-semibold", goodMargin(c.pct) ? "bg-success/15 text-success" : "bg-primary/10 text-primary")}>{pct1(c.pct)}</span>
-                          </span>
-                        </div>
-                        <div className="mt-1 h-1.5 rounded-full bg-muted"><div className="ov-widen h-full rounded-full bg-foreground/80" style={{ width: `${(c.comp / max) * 100}%`, animationDelay: `${i * 60}ms` }} /></div>
-                      </div>
-                    );
-                  })}
-                  {!fin!.clients.length && <p className="py-6 text-center text-xs text-muted-foreground">Sem faturamento no período.</p>}
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="ov-card rounded-2xl border bg-card p-4 lg:col-span-2">
+                <div className="mb-3 flex items-baseline justify-between gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">Clientes no mapa — faturado e margem no período</p>
+                  <Link to="/clientes" className="text-[11px] text-muted-foreground underline-offset-4 hover:underline">Ver clientes</Link>
                 </div>
-              </OverviewCard>
+                <div className="grid gap-4 xl:grid-cols-[1fr_220px]">
+                  <ClientsMap clients={mapClients} />
+                  <div className="space-y-2">
+                    {fin!.clients.slice(0, 7).map((c, i) => {
+                      const max = fin!.clients[0]?.comp || 1;
+                      return (
+                        <div key={c.name} className="text-xs">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate font-medium">{c.name}</span>
+                            <span className={cn("w-12 shrink-0 rounded-full px-1.5 text-center text-[10px] font-semibold", goodMargin(c.pct) ? "bg-foreground text-background" : "border text-muted-foreground")}>{pct1(c.pct)}</span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <div className="h-1.5 flex-1 rounded-full bg-muted"><div className="ov-widen h-full rounded-full bg-foreground/80" style={{ width: `${(c.comp / max) * 100}%`, animationDelay: `${i * 60}ms` }} /></div>
+                            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{brl(c.comp)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {!fin!.clients.length && <p className="py-6 text-center text-xs text-muted-foreground">Sem faturamento no período.</p>}
+                  </div>
+                </div>
+              </div>
               <div className="ov-card rounded-2xl border bg-card p-4">
-                <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-primary" /><p className="text-xs font-medium text-muted-foreground">Serviços abaixo da meta de {MARGIN_GOAL}%</p></div>
+                <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-medium text-muted-foreground">Serviços abaixo da meta de {MARGIN_GOAL}%</p></div>
                 <div className="mt-3 divide-y">
                   {fin!.worst.map((w) => (
                     <Link key={w.id} to="/obras/resultado" search={{ work: w.id } as never} className="group flex items-center gap-3 py-2 text-xs">
                       <div className="min-w-0 flex-1"><p className="truncate font-medium group-hover:underline">{w.name}</p><p className="truncate text-muted-foreground">{w.client}</p></div>
                       <span className="tabular-nums text-muted-foreground">{brl(w.margin)}</span>
-                      <span className="w-14 rounded-full bg-primary/10 px-1.5 text-center text-[10px] font-semibold text-primary">{w.pct == null ? "sem fat." : pct1(w.pct)}</span>
+                      <span className="w-14 rounded-full border px-1.5 text-center text-[10px] font-semibold text-muted-foreground">{w.pct == null ? "sem fat." : pct1(w.pct)}</span>
                       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:rotate-45" />
                     </Link>
                   ))}
-                  {!fin!.worst.length && <p className="py-6 text-center text-xs text-success">Todos os serviços estão na meta. 👏</p>}
+                  {!fin!.worst.length && <p className="py-6 text-center text-xs text-muted-foreground">Todos os serviços estão na meta.</p>}
                 </div>
               </div>
             </div>
@@ -226,7 +242,7 @@ function AtividadesOverview() {
                   <p className="text-xs text-muted-foreground">{op.cov.done} de {op.cov.expected} serviço-dias com RDO</p>
                   {op.missingLast.length > 0 && (
                     <div className="mt-3 text-[11px]">
-                      <p className="font-medium text-primary">Sem RDO em {op.lastDay?.slice(8, 10)}/{op.lastDay?.slice(5, 7)}:</p>
+                      <p className="font-medium">Sem RDO em {op.lastDay?.slice(8, 10)}/{op.lastDay?.slice(5, 7)}:</p>
                       {op.missingLast.slice(0, 4).map((m) => <p key={m.id} className="truncate text-muted-foreground">• {m.name}</p>)}
                       {op.missingLast.length > 4 && <p className="text-muted-foreground">+ {op.missingLast.length - 4}</p>}
                     </div>
@@ -238,7 +254,7 @@ function AtividadesOverview() {
                     return (
                       <div key={d} className="group/day relative flex h-full flex-1 flex-col justify-end" title={`${d.slice(8, 10)}/${d.slice(5, 7)}: ${v.done} de ${v.expected}`}>
                         <div className="relative w-full overflow-hidden rounded-sm bg-muted" style={{ height: `${Math.max(12, Math.min(100, v.expected * 6))}%` }}>
-                          <div className={cn("ov-grow absolute inset-x-0 bottom-0", p >= 1 ? "bg-foreground" : "bg-primary")} style={{ height: `${p * 100}%`, animationDelay: `${i * 15}ms` }} />
+                          <div className={cn("ov-grow absolute inset-x-0 bottom-0", p >= 1 ? "bg-foreground" : "bg-foreground/40")} style={{ height: `${p * 100}%`, animationDelay: `${i * 15}ms` }} />
                         </div>
                       </div>
                     );
@@ -260,7 +276,7 @@ function AtividadesOverview() {
                   {op.clients.slice(0, 5).map(([name, n], i) => (
                     <div key={name} className="flex items-center gap-2 text-[11px]">
                       <span className="w-24 truncate">{name}</span>
-                      <div className="h-1.5 flex-1 rounded-full bg-muted"><div className="ov-widen h-full rounded-full bg-primary/80" style={{ width: `${(n / (op.clients[0]?.[1] || 1)) * 100}%`, animationDelay: `${i * 60}ms` }} /></div>
+                      <div className="h-1.5 flex-1 rounded-full bg-muted"><div className="ov-widen h-full rounded-full bg-foreground/70" style={{ width: `${(n / (op.clients[0]?.[1] || 1)) * 100}%`, animationDelay: `${i * 60}ms` }} /></div>
                       <span className="w-5 text-right tabular-nums text-muted-foreground">{n}</span>
                     </div>
                   ))}

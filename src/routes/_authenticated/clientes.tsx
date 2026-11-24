@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { generateClientImage } from "@/lib/client-images.functions";
-import { aerialMosaic, geocode } from "@/lib/client-aerial";
+import { geocodeClient } from "@/lib/client-geo";
 import { ORIGIN_LABEL, type ImageOrigin } from "@/lib/client-images";
 import { PastePrint } from "@/components/compras/paste-print";
 import { createFileRoute } from "@tanstack/react-router";
@@ -157,28 +157,26 @@ function ClientsPage() {
   const genImage = useServerFn(generateClientImage);
   const [genIds, setGenIds] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
-  // Sem foto de referência nem busca do Google, o navegador monta a vista aérea do satélite e grava como fonte.
-  const runGen = async (id: string) => {
+  // Imagem só de foto real (referência do cadastro, Google Maps ou busca do Google). Sem foto, o quadro fica com o ícone.
+  const noSourceWarned = useRef(false);
+  const runGen = async (id: string, quiet = false) => {
     setGenIds((s) => new Set(s).add(id));
     try {
-      let res = await genImage({ data: { clientId: id } });
-      if (res.needAerial) {
+      const res = await genImage({ data: { clientId: id } });
+      if (res.noSource) {
         const c = (clients.data ?? []).find((x) => x.id === id);
-        if (!c) throw new Error("Cliente não encontrado");
-        const geo = await geocode(c);
-        if (!geo) throw new Error(`Endereço de ${c.name} não localizado no mapa: cole uma foto de referência no cadastro.`);
-        const blob = await aerialMosaic(geo.lat, geo.lon);
-        const path = `src/${id}-aerea-${Date.now()}.jpg`;
-        const up = await supabase.storage.from("client-images").upload(path, blob, { contentType: "image/jpeg", upsert: true });
-        if (up.error) throw up.error;
-        const { error } = await supabase.from("clients").update({ image_source: path, image_source_kind: "aerea" }).eq("id", id);
-        if (error) throw error;
-        res = await genImage({ data: { clientId: id } });
+        if (!quiet || !noSourceWarned.current) {
+          noSourceWarned.current = true;
+          toast.info(res.configured
+            ? `Não achei foto de ${c?.name ?? "cliente"} no Google. Cole uma foto de referência no cadastro.`
+            : "A busca de fotos do Google ainda não está configurada (GOOGLE_MAPS_API_KEY). Enquanto isso, cole uma foto de referência no cadastro do cliente.");
+        }
+        return false;
       }
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
       return true;
     }
-    catch (e) { toast.error((e as Error).message); return false; }
+    catch (e) { if (!quiet) toast.error((e as Error).message); return false; }
     finally { setGenIds((s) => { const n = new Set(s); n.delete(id); return n; }); }
   };
   // Faltando = sem imagem ou feita pelo modo antigo (inventada, sem origem real).
@@ -187,7 +185,7 @@ function ClientsPage() {
     const list = (clients.data ?? []).filter(needsImage);
     if (!list.length) { if (!auto) toast.info("Todos os clientes já têm imagem"); return; }
     setBulk({ done: 0, total: list.length });
-    for (let i = 0; i < list.length; i++) { await runGen(list[i]!.id); setBulk({ done: i + 1, total: list.length }); }
+    for (let i = 0; i < list.length; i++) { await runGen(list[i]!.id, auto); setBulk({ done: i + 1, total: list.length }); }
     setBulk(null);
   };
   // Automático: cliente novo ou com foto de referência nova gera na hora; ao abrir a página, gera as que faltam (uma vez).
@@ -304,6 +302,10 @@ function ClientsPage() {
         if (error) throw error;
       }
       if (clientId) pendingGen.current.add(clientId);
+      // Ponto no mapa dos clientes (visão geral de Atividades): pelo endereço, quando é novo ou o endereço mudou.
+      if (clientId && (!editing || editing.address !== payload.address || editing.number !== payload.number || editing.city !== payload.city)) {
+        void geocodeClient(payload as never).then((pt) => { if (pt) void supabase.from("clients").update({ lat: pt.lat, lon: pt.lon } as never).eq("id", clientId!); });
+      }
       // Treinamentos exigidos: tira os desmarcados e inclui os novos.
       if (clientId) {
         const before = new Set(requiredBy.get(clientId) ?? []);
@@ -497,7 +499,8 @@ function ClientsPage() {
           {clients.isLoading && Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-72 animate-pulse rounded-2xl bg-muted" />)}
           {!clients.isLoading && filtered.length === 0 && <p className="col-span-full py-10 text-center text-sm text-muted-foreground">Nenhum cliente encontrado.</p>}
           {filtered.map((c, k) => {
-            const img = c.image_path ? supabase.storage.from("client-images").getPublicUrl(c.image_path).data.publicUrl : null;
+            // Só imagem feita de foto real (origem marcada); as antigas inventadas não aparecem.
+            const img = c.image_path && c.image_origin ? supabase.storage.from("client-images").getPublicUrl(c.image_path).data.publicUrl : null;
             const busy = genIds.has(c.id);
             return (
               <div key={c.id} className="ov-card group overflow-hidden rounded-2xl border bg-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg" style={{ animationDelay: `${Math.min(k, 12) * 40}ms` }}>
@@ -639,9 +642,9 @@ function ClientsPage() {
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Foto de referência da fachada ou da fábrica (opcional)</Label>
-              <PastePrint file={refFile} currentUrl={editing?.image_source && !/^https?:/.test(editing.image_source) && editing.image_source_kind !== "aerea" ? supabase.storage.from("client-images").getPublicUrl(editing.image_source).data.publicUrl : null} onPaste={setRefFile} />
+              <PastePrint file={refFile} currentUrl={editing?.image_source && !/^https?:/.test(editing.image_source) ? supabase.storage.from("client-images").getPublicUrl(editing.image_source).data.publicUrl : null} onPaste={setRefFile} />
               <Input placeholder="ou cole o link de uma foto (https://…)" value={refLink} onChange={(e) => setRefLink(e.target.value)} />
-              <p className="text-[11px] text-muted-foreground">A imagem do quadro é feita a partir desta foto real (a IA só tira textos e anúncios). Sem foto, o sistema usa a vista aérea do satélite no endereço.</p>
+              <p className="text-[11px] text-muted-foreground">A imagem do quadro é feita a partir desta foto real (a IA só tira textos e anúncios). Sem foto aqui, o sistema procura as fotos do lugar no Google pelo nome e endereço.</p>
             </div>
             <div className="hidden sm:block" />
             <div className="space-y-1">

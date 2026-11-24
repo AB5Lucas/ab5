@@ -1,14 +1,14 @@
 /**
  * Imagem dos clientes (página Clientes em quadros) a partir de imagem REAL, nunca inventada:
  * 1) foto de referência do cadastro (clients.image_source: colada no cadastro ou link);
- * 2) busca de imagens do Google (se GOOGLE_CSE_KEY e GOOGLE_CSE_CX estiverem configurados);
- * 3) vista aérea do satélite (Esri World Imagery) no endereço localizado pelo OpenStreetMap (Nominatim).
- * A IA só limpa/realça a imagem real (tira textos, anúncios e marcas; não inventa prédios), no formato 16:9.
+ * 2) fotos do lugar no Google Maps (Places API; GOOGLE_MAPS_API_KEY), procurado pelo nome + endereço;
+ * 3) busca de imagens do Google (GOOGLE_CSE_KEY e GOOGLE_CSE_CX).
+ * Sem foto real, não gera nada. A IA só limpa a imagem real (tira textos, anúncios e marcas; não inventa prédios), em 16:9.
  */
 export type ClientForImage = { name: string; address?: string | null; number?: string | null; neighborhood?: string | null; city?: string | null; state?: string | null; notes?: string | null };
-export type ImageOrigin = "foto" | "busca" | "aerea";
+export type ImageOrigin = "foto" | "maps" | "busca";
 
-export const ORIGIN_LABEL: Record<ImageOrigin, string> = { foto: "Foto de referência", busca: "Foto da internet", aerea: "Vista aérea (satélite Esri)" };
+export const ORIGIN_LABEL: Record<ImageOrigin, string> = { foto: "Foto de referência", maps: "Foto do Google Maps", busca: "Foto da internet" };
 
 export function photoCleanupPrompt(c: ClientForImage): string {
   return [
@@ -21,29 +21,12 @@ export function photoCleanupPrompt(c: ClientForImage): string {
   ].join(" ");
 }
 
-export function aerialPrompt(c: ClientForImage): string {
-  return [
-    `Esta é uma imagem de satélite (vista de cima) do local da empresa "${c.name.trim()}".`,
-    "Melhore nitidez, contraste e cores para parecer uma fotografia aérea profissional feita por drone em dia claro,",
-    "mantendo EXATAMENTE os mesmos prédios, telhados, pátios, ruas, árvores e posições. Não acrescente nem remova nada.",
-    "Sem textos, rótulos, marcas d'água ou bordas. Formato horizontal 16:9.",
-  ].join(" ");
-}
-
-/** Consultas de localização, da mais precisa para a menos (o nome da empresa costuma estar no mapa). */
+/** Consultas para localizar o cliente no mapa (OpenStreetMap), da mais precisa para a menos. */
 export function geocodeQueries(c: ClientForImage): string[] {
   const city = [c.city, c.state].filter(Boolean).join(", ");
-  const street = [c.address, c.number].filter(Boolean).join(" ");
-  const out = [`${c.name} ${city}`, street && `${street}, ${city}, Brasil`, c.address && `${c.address}, ${city}, Brasil`].filter(Boolean) as string[];
+  const num = c.number && !/^km/i.test(c.number.trim()) ? ` ${c.number}` : "";
+  const out = [c.address && `${c.address}${num}, ${city}, Brasil`, c.address && `${c.address}, ${city}, Brasil`, city && `${city}, Brasil`].filter(Boolean) as string[];
   return [...new Set(out)];
-}
-
-/** Recorte 16:9 (~500 m de largura) em graus em volta do ponto, para a exportação do satélite. */
-export function aerialBbox(lat: number, lon: number, widthMeters = 520) {
-  const h = (widthMeters * 9) / 16;
-  const dLat = h / 2 / 111_320;
-  const dLon = widthMeters / 2 / (111_320 * Math.cos((lat * Math.PI) / 180));
-  return [lon - dLon, lat - dLat, lon + dLon, lat + dLat] as const;
 }
 
 export const clientImagePath = (clientId: string) => `${clientId}/${Date.now()}.png`;

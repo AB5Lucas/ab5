@@ -173,38 +173,36 @@ export function RankBars({ rows, format }: { rows: { label: string; value: numbe
   );
 }
 
-/** Medidor meia-roda de margem: 0 a 50%, com traço na meta (23%); acima da meta verde, abaixo vermelho da AB5. */
-export function MarginGauge({ pct, goal = 23, max = 50, label }: { pct: number | null; goal?: number; max?: number; label?: string }) {
+/** Medidor meia-roda de margem (0 a 50%) no estilo do medidor escuro, com traço na meta (23%). */
+export function MarginGauge({ pct, goal = 23, max = 50, label, sub }: { pct: number | null; goal?: number; max?: number; label?: string; sub?: string }) {
   const p = Math.max(0, Math.min(max, pct ?? 0));
-  const r = 80, c = Math.PI * r;
-  const pos = (v: number) => { const a = Math.PI * (1 - v / max); return [100 + r * Math.cos(a), 100 - r * Math.sin(a)] as const; };
-  const [gx1, gy1] = (() => { const a = Math.PI * (1 - goal / max); return [100 + (r - 14) * Math.cos(a), 100 - (r - 14) * Math.sin(a)]; })();
-  const [gx2, gy2] = (() => { const a = Math.PI * (1 - goal / max); return [100 + (r + 14) * Math.cos(a), 100 - (r + 14) * Math.sin(a)]; })();
-  const good = (pct ?? 0) >= goal;
-  const [nx, ny] = pos(p);
+  const r = 70, c = Math.PI * r;
+  const at = (v: number, rr: number) => { const a = Math.PI * (1 - v / max); return [90 + rr * Math.cos(a), 90 - rr * Math.sin(a)] as const; };
+  const [g1x, g1y] = at(goal, r - 11), [g2x, g2y] = at(goal, r + 11), [tx, ty] = at(goal, r + 20);
+  const good = (pct ?? -1) >= goal;
   return (
-    <div className="relative mx-auto w-full max-w-[280px]">
-      <svg viewBox="0 0 200 112" className="w-full overflow-visible">
-        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" strokeWidth="16" strokeLinecap="round" className="stroke-muted" />
-        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" strokeWidth="16" strokeLinecap="round"
-          className={cn("ov-gauge", good ? "stroke-success" : "stroke-primary")}
+    <div className="relative mx-auto w-full max-w-[240px]">
+      <svg viewBox="0 0 180 104" className="w-full overflow-visible">
+        <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" strokeWidth="12" strokeLinecap="round" className="stroke-background/15" strokeDasharray="2 5" />
+        <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" strokeWidth="12" strokeLinecap="round" className="ov-gauge stroke-background"
           style={{ strokeDasharray: c, ["--ov-off" as string]: c * (1 - p / max), strokeDashoffset: c * (1 - p / max) }} />
-        <line x1={gx1} y1={gy1} x2={gx2} y2={gy2} className="stroke-foreground" strokeWidth="2.5" strokeLinecap="round" />
-        <text x={gx2 + (gx2 > 100 ? 4 : -4)} y={gy2 - 4} textAnchor={gx2 > 100 ? "start" : "end"} className="fill-muted-foreground text-[8px]">meta {goal}%</text>
-        <circle cx={nx} cy={ny} r="5" className="fill-background stroke-foreground" strokeWidth="2" />
-        <text x="20" y="111" textAnchor="middle" className="fill-muted-foreground text-[7px]">0%</text>
-        <text x="180" y="111" textAnchor="middle" className="fill-muted-foreground text-[7px]">{max}%</text>
+        <line x1={g1x} y1={g1y} x2={g2x} y2={g2y} className="stroke-background" strokeWidth="2.5" strokeLinecap="round" />
+        <text x={tx} y={ty} textAnchor="middle" className="fill-background/70 text-[7px]">meta {goal}%</text>
+        <text x="20" y="102" textAnchor="middle" className="fill-background/50 text-[6.5px]">0%</text>
+        <text x="160" y="102" textAnchor="middle" className="fill-background/50 text-[6.5px]">{max}%</text>
       </svg>
-      <div className="absolute inset-x-0 bottom-3 text-center">
-        <p className={cn("font-display text-4xl font-semibold tabular-nums", good ? "text-success" : "text-primary")}>{pct == null ? "—" : <CountUp value={`${(pct ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`} />}</p>
-        {label && <p className="text-[11px] text-muted-foreground">{label}</p>}
+      <div className="absolute inset-x-0 bottom-1 text-center">
+        <p className="font-display text-3xl font-semibold tabular-nums">{pct == null ? "—" : <CountUp value={`${pct.toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`} />}</p>
+        <p className="text-[11px] text-background/70">{good ? "acima da meta" : "abaixo da meta"}{label ? ` · ${label}` : ""}</p>
+        {sub && <p className="text-[10px] text-background/55">{sub}</p>}
       </div>
     </div>
   );
 }
 
-/** Margem % por mês: barras (verde acima da meta, vermelho abaixo) com a linha tracejada da meta e balão. */
+/** Margem % por mês no estilo das barras hachuradas: na meta ou acima = barra cheia; abaixo = hachurada; linha da meta tracejada. */
 export function MarginMonths({ data, goal = 23 }: { data: { label: string; pct: number | null; tip?: string; extra?: string }[]; goal?: number }) {
+  const id = useId().replace(/:/g, "");
   const [hover, setHover] = useState<number | null>(null);
   const vals = data.map((d) => d.pct ?? 0);
   const top = Math.max(goal + 10, ...vals, 10), bottom = Math.min(0, ...vals);
@@ -214,23 +212,29 @@ export function MarginMonths({ data, goal = 23 }: { data: { label: string; pct: 
   const sel = hover ?? data.length - 1;
   return (
     <div className="relative">
-      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="h-48 w-full overflow-visible" onMouseLeave={() => setHover(null)}>
+      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="h-44 w-full overflow-visible" onMouseLeave={() => setHover(null)}>
+        <defs>
+          <pattern id={`m${id}`} width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="1.6" className="stroke-foreground/35" strokeWidth="0.6" />
+          </pattern>
+        </defs>
         <line x1="0" x2="100" y1={y(0)} y2={y(0)} className="stroke-border" strokeWidth="1" vectorEffect="non-scaling-stroke" />
         {data.map((d, i) => {
           const v = d.pct ?? 0;
           const y1 = Math.min(y(v), y(0)), h = Math.max(0.8, Math.abs(y(v) - y(0)));
+          const solid = v >= goal || i === sel;
           return (
             <g key={i} onMouseEnter={() => setHover(i)}>
               <rect x={i * w} y={0} width={w} height={50} fill="transparent" />
-              <rect className="ov-bar" x={i * w + w * 0.2} y={y1} width={w * 0.6} height={h} rx={1}
-                fill={d.pct == null ? "var(--color-muted)" : v >= goal ? "var(--color-success)" : "var(--color-primary)"}
-                opacity={i === sel ? 1 : 0.55} style={{ animationDelay: `${i * 40}ms` }} />
+              <rect className="ov-bar" x={i * w + w * 0.18} y={y1} width={w * 0.64} height={h} rx={1.2}
+                fill={solid ? "var(--color-foreground)" : `url(#m${id})`} stroke={solid ? "none" : "var(--color-border)"} strokeWidth="0.2"
+                opacity={i === sel || v >= goal ? 1 : 0.9} style={{ animationDelay: `${i * 40}ms` }} />
             </g>
           );
         })}
-        <line x1="0" x2="100" y1={y(goal)} y2={y(goal)} className="stroke-foreground" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+        <line x1="0" x2="100" y1={y(goal)} y2={y(goal)} className="stroke-foreground/60" strokeWidth="1" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
       </svg>
-      <span className="pointer-events-none absolute right-0 rounded bg-foreground px-1.5 text-[9px] text-background" style={{ top: `calc(${(y(goal) / 50) * 100}% - 8px)` }}>meta {goal}%</span>
+      <span className="pointer-events-none absolute right-0 rounded-full border bg-background px-1.5 text-[9px] text-muted-foreground" style={{ top: `calc(${(y(goal) / 50) * 100}% - 8px)` }}>meta {goal}%</span>
       <div className="mt-1 flex text-[10px] text-muted-foreground">{data.map((d, i) => <span key={i} className={cn("flex-1 text-center", i === sel && "font-semibold text-foreground")}>{d.label}</span>)}</div>
       {data[sel] && (
         <div className="pointer-events-none absolute top-0 rounded-lg border bg-popover px-2 py-1 text-[11px] shadow-md" style={{ left: `clamp(0px, calc(${(sel + 0.5) * w}% - 75px), calc(100% - 150px))`, width: 150 }}>
@@ -243,37 +247,45 @@ export function MarginMonths({ data, goal = 23 }: { data: { label: string; pct: 
   );
 }
 
-/** Faturado × custos por mês: barra cheia = faturado, barra hachurada = custos; balão com margem. */
+/** Faturado por mês em barras hachuradas (mês em destaque cheio) e custos como linha suave por cima; balão com margem. */
 export function BilledVsCost({ data, format }: { data: { label: string; billed: number; cost: number; tip?: string; marginPct: number | null }[]; format: (v: number) => string }) {
   const id = useId().replace(/:/g, "");
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...data.flatMap((d) => [d.billed, d.cost]));
   const w = 100 / Math.max(1, data.length);
   const sel = hover ?? data.length - 1;
+  const pts = data.map((d, i) => [(i + 0.5) * w, 50 - (d.cost / max) * 46] as const);
+  const line = pts.map(([x, y], i) => {
+    if (!i) return `M ${x} ${y}`;
+    const [px, py] = pts[i - 1]!; const cx = (px + x) / 2;
+    return `C ${cx} ${py}, ${cx} ${y}, ${x} ${y}`;
+  }).join(" ");
   return (
     <div className="relative">
-      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="h-48 w-full overflow-visible" onMouseLeave={() => setHover(null)}>
+      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="h-44 w-full overflow-visible" onMouseLeave={() => setHover(null)}>
         <defs>
           <pattern id={`c${id}`} width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="1.6" className="stroke-primary/60" strokeWidth="0.7" />
+            <line x1="0" y1="0" x2="0" y2="1.6" className="stroke-foreground/25" strokeWidth="0.6" />
           </pattern>
         </defs>
         {[0.25, 0.5, 0.75].map((g) => <line key={g} x1="0" x2="100" y1={50 - g * 46} y2={50 - g * 46} className="stroke-border" strokeWidth="0.15" strokeDasharray="0.8 0.8" vectorEffect="non-scaling-stroke" />)}
         {data.map((d, i) => {
-          const hb = Math.max(0.8, (d.billed / max) * 46), hc = Math.max(0.8, (d.cost / max) * 46);
+          const hb = Math.max(1.2, (d.billed / max) * 46);
           return (
             <g key={i} onMouseEnter={() => setHover(i)}>
               <rect x={i * w} y={0} width={w} height={50} fill="transparent" />
-              <rect className="ov-bar" x={i * w + w * 0.14} y={50 - hb} width={w * 0.34} height={hb} rx={0.8} fill="var(--color-foreground)" opacity={i === sel ? 1 : 0.75} style={{ animationDelay: `${i * 40}ms` }} />
-              <rect className="ov-bar" x={i * w + w * 0.52} y={50 - hc} width={w * 0.34} height={hc} rx={0.8} fill={`url(#c${id})`} stroke="var(--color-primary)" strokeOpacity="0.5" strokeWidth="0.2" style={{ animationDelay: `${i * 40 + 20}ms` }} />
+              <rect className="ov-bar" x={i * w + w * 0.18} y={50 - hb} width={w * 0.64} height={hb} rx={1.2}
+                fill={i === sel ? "var(--color-foreground)" : `url(#c${id})`} stroke={i === sel ? "none" : "var(--color-border)"} strokeWidth="0.2" style={{ animationDelay: `${i * 40}ms` }} />
             </g>
           );
         })}
+        <path d={line} fill="none" className="ov-draw stroke-muted-foreground" strokeWidth="1.5" strokeDasharray="0" vectorEffect="non-scaling-stroke" pathLength={1} />
       </svg>
+      {pts.map(([x, y], i) => <span key={i} className={cn("pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background", i === sel ? "bg-foreground" : "bg-muted-foreground")} style={{ left: `${x}%`, top: `${(y / 50) * 176}px` }} />)}
       <div className="mt-1 flex text-[10px] text-muted-foreground">{data.map((d, i) => <span key={i} className={cn("flex-1 text-center", i === sel && "font-semibold text-foreground")}>{d.label}</span>)}</div>
       <div className="mt-2 flex gap-4 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-foreground" /> Faturado</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-primary/60 bg-[repeating-linear-gradient(45deg,var(--color-primary)_0_1px,transparent_1px_3px)] opacity-70" /> Custos (MO, transporte, materiais)</span>
+        <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-muted-foreground" /> Custos (MO, transporte, materiais)</span>
       </div>
       {data[sel] && (
         <div className="pointer-events-none absolute top-0 rounded-lg border bg-popover px-2 py-1 text-[11px] shadow-md" style={{ left: `clamp(0px, calc(${(sel + 0.5) * w}% - 80px), calc(100% - 160px))`, width: 160 }}>

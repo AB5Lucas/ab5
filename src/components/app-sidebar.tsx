@@ -189,7 +189,7 @@ export function AppSidebar() {
               const isCur = g.label === currentMod;
               return (
                 <SidebarMenuItem key={g.label}>
-                  <Popover open={fly === g.label} onOpenChange={(o) => setFly(o ? g.label : null)}>
+                  <Popover open={fly === g.label} onOpenChange={(o) => { setFly(o ? g.label : null); if (o && g.overview) void navigate({ to: g.overview as never }); }}>
                     <PopoverTrigger asChild>
                       <SidebarMenuButton isActive={isCur} {...(fly === g.label ? {} : { tooltip: g.label })}
                         className="relative data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-primary">
@@ -203,12 +203,6 @@ export function AppSidebar() {
                         <g.icon className="h-3 w-3" /> {g.label}
                       </p>
                       <div className="grid gap-px">
-                        {g.overview && (
-                          <Link to={g.overview as never} onClick={() => setFly(null)}
-                            className={`menu-row flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-sidebar-accent ${current === g.overview ? "bg-sidebar-accent font-semibold" : ""}`}>
-                            <span className="truncate">Visão geral</span>
-                          </Link>
-                        )}
                         {g.items.map((i, k) => {
                           const b = badges[i.url];
                           return (

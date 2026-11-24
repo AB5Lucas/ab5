@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { aerialPrompt, clientImagePath, photoCleanupPrompt, type ClientForImage, type ImageOrigin } from "./client-images";
+import { clientImagePath, photoCleanupPrompt, type ClientForImage, type ImageOrigin } from "./client-images";
 
 const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const AI_IMAGE_MODEL = "google/gemini-2.5-flash-image-preview";
@@ -18,11 +18,36 @@ async function download(url: string): Promise<{ bytes: Uint8Array; mime: string 
   } catch { return null; }
 }
 
-/** Busca de imagens do Google (Programmable Search), só se as chaves estiverem configuradas. */
+/**
+ * Fotos do lugar no Google Maps (Places API New): procura pelo nome + endereço e pega a foto horizontal mais larga.
+ * Precisa de GOOGLE_MAPS_API_KEY com a "Places API (New)" ativada. Devolve também o ponto, para o mapa dos clientes.
+ */
+async function placesPhoto(c: ClientForImage) {
+  const key = process.env["GOOGLE_MAPS_API_KEY"];
+  if (!key) return null;
+  const textQuery = [c.name, [c.address, c.number].filter(Boolean).join(" "), c.city, c.state].filter(Boolean).join(", ");
+  try {
+    const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST", signal: AbortSignal.timeout(15000),
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": "places.displayName,places.location,places.photos" },
+      body: JSON.stringify({ textQuery, languageCode: "pt-BR", regionCode: "BR", maxResultCount: 1 }),
+    });
+    const place = ((await r.json()) as any)?.places?.[0];
+    if (!place) return null;
+    const photos = [...(place.photos ?? [])].sort((a: any, b: any) => (b.widthPx / Math.max(1, b.heightPx)) - (a.widthPx / Math.max(1, a.heightPx)));
+    for (const ph of photos.slice(0, 4)) {
+      const img = await download(`https://places.googleapis.com/v1/${ph.name}/media?maxWidthPx=1600&key=${key}`);
+      if (img) return { ...img, lat: place.location?.latitude as number | undefined, lon: place.location?.longitude as number | undefined };
+    }
+  } catch { /* sem foto */ }
+  return null;
+}
+
+/** Busca de imagens do Google (Programmable Search), só se GOOGLE_CSE_KEY e GOOGLE_CSE_CX estiverem configurados. */
 async function googleImage(c: ClientForImage) {
   const key = process.env["GOOGLE_CSE_KEY"], cx = process.env["GOOGLE_CSE_CX"];
   if (!key || !cx) return null;
-  const q = `${c.name} ${c.city ?? ""} fábrica fachada`.trim();
+  const q = `${c.name} ${[c.address, c.number].filter(Boolean).join(" ")} ${c.city ?? ""} fachada`.trim();
   try {
     const r = await fetch(`https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&searchType=image&imgSize=large&num=6&q=${encodeURIComponent(q)}`, { signal: AbortSignal.timeout(15000) });
     const j: any = await r.json();
@@ -51,7 +76,8 @@ export const generateClientImage = createServerFn({ method: "POST" })
     if (!key) throw new Error("IA da Lovable indisponível (LOVABLE_API_KEY)");
 
     let src: { bytes: Uint8Array; mime: string } | null = null;
-    let origin: ImageOrigin = c.image_source_kind === "aerea" ? "aerea" : "foto";
+    let origin: ImageOrigin = "foto";
+    let point: { lat?: number | undefined; lon?: number | undefined } = {};
     if (c.image_source) {
       if (/^https?:\/\//i.test(c.image_source)) src = await download(c.image_source);
       else {
@@ -59,9 +85,10 @@ export const generateClientImage = createServerFn({ method: "POST" })
         if (f.data) src = { bytes: new Uint8Array(await f.data.arrayBuffer()), mime: f.data.type || "image/png" };
       }
     }
+    if (!src) { const p = await placesPhoto(c); if (p) { src = p; origin = "maps"; point = { lat: p.lat, lon: p.lon }; } }
     if (!src) { src = await googleImage(c); origin = "busca"; }
-    // Sem foto: o navegador monta a vista aérea do satélite (lib/client-aerial.ts), grava como fonte e chama de novo.
-    if (!src) return { needAerial: true as const };
+    // Sem foto real não gera nada (nunca inventa): o quadro fica com o ícone até ter foto.
+    if (!src) return { noSource: true as const, configured: !!(process.env["GOOGLE_MAPS_API_KEY"] || process.env["GOOGLE_CSE_KEY"]) };
 
     const res = await fetch(AI_URL, {
       method: "POST",
@@ -70,7 +97,7 @@ export const generateClientImage = createServerFn({ method: "POST" })
       body: JSON.stringify({
         model: AI_IMAGE_MODEL, modalities: ["image", "text"],
         messages: [{ role: "user", content: [
-          { type: "text", text: origin === "aerea" ? aerialPrompt(c) : photoCleanupPrompt(c) },
+          { type: "text", text: photoCleanupPrompt(c) },
           { type: "image_url", image_url: { url: `data:${src.mime};base64,${toBase64(src.bytes)}` } },
         ] }],
       }),
@@ -91,8 +118,8 @@ export const generateClientImage = createServerFn({ method: "POST" })
     const path = clientImagePath(c.id);
     const up = await context.supabase.storage.from("client-images").upload(path, out, { contentType: outMime, upsert: true });
     if (up.error) throw new Error(up.error.message);
-    const upd = await context.supabase.from("clients").update({ image_path: path, image_origin: origin } as never).eq("id", c.id);
+    const upd = await context.supabase.from("clients").update({ image_path: path, image_origin: origin, ...(point.lat != null && point.lon != null ? { lat: point.lat, lon: point.lon } : {}) } as never).eq("id", c.id);
     if (upd.error) throw new Error(upd.error.message);
     if (c.image_path && c.image_path !== path) await context.supabase.storage.from("client-images").remove([c.image_path]);
-    return { path, origin, needAerial: false as const };
+    return { path, origin, noSource: false as const };
   });

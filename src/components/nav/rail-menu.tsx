@@ -1,6 +1,6 @@
 /**
  * Menu flutuante (estilo do vídeo de referência): faixa escura arredondada presa à esquerda, só com ícones dos
- * módulos; passar o mouse mostra o nome, clicar abre o quadro com as páginas (e a Visão geral, se o módulo tiver).
+ * módulos; passar o mouse mostra o nome, clicar abre o quadro com as páginas (módulo com visão geral também abre a visão geral).
  * Sem logo e sem botão de estender; o último botão é Configurações (usuário, Administração, Notificações, Buscar
  * e a troca para o menu lateral). No celular vira uma barra embaixo.
  */
@@ -52,6 +52,7 @@ export function RailMenu() {
   const { profile, role } = useCurrentUser();
   const [, setStyle] = useMenuStyle();
   const [open, setOpen] = useState<string | null>(null);
+  const navigateM = useNavigate();
   useEffect(() => setOpen(null), [current]);
 
   const all = loading ? [] : MENU_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canAccess(i.url)) })).filter((g) => g.items.length);
@@ -70,16 +71,13 @@ export function RailMenu() {
       {modules.map((g) => {
         const tone = worstTone(g.items.map((i) => badges[i.url]));
         return (
-          <Popover key={g.label} open={open === g.label} onOpenChange={(o) => setOpen(o ? g.label : null)}>
+          <Popover key={g.label} open={open === g.label} onOpenChange={(o) => { setOpen(o ? g.label : null); if (o && g.overview) void navigateM({ to: g.overview as never }); }}>
             <PopoverTrigger asChild>
               <span><RailButton label={g.label} active={open ? open === g.label : g.label === currentMod} dot={tone}><g.icon className="h-4 w-4" /></RailButton></span>
             </PopoverTrigger>
             <PopoverContent side="right" align="center" sideOffset={14} className={cn("rail-pop w-60 rounded-2xl p-1.5", GLASS_POP)}>
               <p className="px-2.5 pb-1.5 pt-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{g.label}</p>
               <div className="grid gap-px">
-                {g.overview && (
-                  <Link to={g.overview as never} onClick={() => setOpen(null)} className={cn(pageLink, current === g.overview && "bg-accent font-semibold")}>Visão geral</Link>
-                )}
                 {g.items.map((i) => {
                   const b = badges[i.url];
                   const Icon = i.icon ?? g.icon;
@@ -270,11 +268,6 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
                   <div className={cn("grid transition-[grid-template-rows,opacity] duration-500", ease, isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
                     <div className="min-h-0 overflow-hidden">
                       <div className="ml-6 mt-0.5 space-y-px py-0.5 pl-2">
-                        {g.overview && (
-                          <Link to={g.overview as never} className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] transition-colors duration-300", current === g.overview ? "bg-white/90 font-semibold text-foreground shadow-sm dark:bg-white/15" : "text-foreground/70 hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10")}>
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Visão geral
-                          </Link>
-                        )}
                         {g.items.map((i) => {
                           const b = badges[i.url];
                           return (
