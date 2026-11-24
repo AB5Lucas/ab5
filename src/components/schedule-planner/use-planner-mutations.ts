@@ -121,7 +121,7 @@ export function usePlannerMutations(d: {
       if (error) throw error;
       if (entry?.box_key === "folga") {
         // Só o dia: encurta ou divide o período da folga; inteira: apaga o registro (day_off_remove_day, uma transação).
-        const { error: offErr } = await supabase.rpc("day_off_remove_day", { _collaborator_id: entry.collaborator_id, _date: date, _whole: folga === "all" });
+        const { error: offErr } = await (supabase.rpc.bind(supabase) as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ error: unknown }>)("day_off_remove_day", { _collaborator_id: entry.collaborator_id, _date: date, _whole: folga === "all" });
         if (offErr) throw offErr;
       }
     },
