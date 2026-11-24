@@ -285,6 +285,8 @@
 .amap-pin { cursor: pointer; transform-box: fill-box; transform-origin: center; animation: amap-pop 0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
 @keyframes amap-draw { to { stroke-dashoffset: 0; } }
 @keyframes amap-fill { to { fill-opacity: 1; } }
-@keyframes amap-tilt { from { transform: rotateX(0) rotateZ(0) scale(1); } to { transform: rotateX(28deg) rotateZ(-4deg) scale(0.96); } }
+@keyframes amap-tilt { from { transform: rotateX(0) rotateZ(0) scale(1); } to { transform: rotateX(24deg) rotateZ(-4deg) scale(1.04); } }
 @keyframes amap-pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .amap-stage, .amap-line, .amap-pin { animation-duration: 1ms; animation-delay: 0ms; } }
+.amap-cities { fill: none; stroke: var(--muted-foreground); stroke-opacity: 0.35; opacity: 0; animation: amap-show 0.8s ease-out 1.5s forwards; }
+@keyframes amap-show { to { opacity: 1; } }

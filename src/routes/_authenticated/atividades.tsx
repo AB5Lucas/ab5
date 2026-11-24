@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
 import { useWorkScope } from "@/hooks/use-work-scope";
-import { Big, Gauge, LineArea, MiniBars, OverviewCard, RankBars } from "@/components/overview/charts";
+import { Big, LineArea, MiniBars, OverviewCard, RankBars } from "@/components/overview/charts";
 import { RdoTiles, type TileCol } from "@/components/overview/rdo-tiles";
 import { cn } from "@/lib/utils";
 import { ClientsMap } from "@/components/overview/clients-map";
@@ -38,10 +38,6 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const ymOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 const isoOf = (d: Date) => `${ymOf(d)}-${pad(d.getDate())}`;
 const monthLabel = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1]!;
-const orderTotal = (w: any) => {
-  const list = Array.isArray(w.orders) ? (w.orders as { value?: unknown }[]) : [];
-  return list.reduce((a, o) => a + (Number(o?.value) || 0), 0) || Number(w.order_value ?? 0);
-};
 
 /** Período do filtro: dias (mês) ou meses (ano), mais o período anterior equivalente para comparação. */
 function periodOf(p: Period, today: Date) {
@@ -132,12 +128,17 @@ function AtividadesOverview() {
         if (w?.client_id) byClientId.set(w.client_id, (byClientId.get(w.client_id) ?? 0) + v);
       } else if (dt >= P.prevFrom && dt <= P.prevTo) prev += v;
     }
-    // Pedidos x faturado (serviços ativos)
+    // Saldo a faturar no fim do período: pedidos com data até o fim do período (sem data = sempre) menos o faturado até essa data.
     const active = works.filter((w) => w.active && w.status !== "cancelled" && w.status !== "completed");
-    const billedBy = new Map<string, number>();
-    for (const e of billing) billedBy.set(e.work_id, (billedBy.get(e.work_id) ?? 0) + Number(e.amount ?? 0));
-    let ordered = 0, billedActive = 0;
-    for (const w of active) { const o = orderTotal(w); if (o > 0) { ordered += o; billedActive += Math.min(o, billedBy.get(w.id) ?? 0); } }
+    const billedUntil = new Map<string, number>();
+    for (const e of billing) if (String(e.entry_date).slice(0, 10) <= P.to) billedUntil.set(e.work_id, (billedUntil.get(e.work_id) ?? 0) + Number(e.amount ?? 0));
+    const orderedUntil = (w: any) => {
+      const list = Array.isArray(w.orders) ? (w.orders as { value?: unknown; date?: unknown }[]) : [];
+      if (!list.length) return Number(w.order_value ?? 0);
+      return list.reduce((a, o) => a + (!o?.date || String(o.date).slice(0, 10) <= P.to ? Number(o?.value) || 0 : 0), 0);
+    };
+    let ordered = 0, openBalance = 0;
+    for (const w of active) { const o = orderedUntil(w); if (o > 0) { ordered += o; openBalance += Math.max(0, o - (billedUntil.get(w.id) ?? 0)); } }
     const top = [...byClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value }));
 
     // RDOs: clientes com atividade (MO escalada) no mês = índice máximo; preenchido = clientes com RDO no dia (ou média por dia útil no mês).
@@ -173,10 +174,9 @@ function AtividadesOverview() {
     });
 
     return {
-      byClientId, cur, prev, ordered, billedActive, top, cols,
+      byClientId, cur, prev, ordered, openBalance, top, cols,
       series: P.buckets.map((b) => ({ label: P.unit === "day" ? `${b.slice(8, 10)}/${b.slice(5, 7)}` : `${monthLabel(b)}/${b.slice(2, 4)}`, a: byBucket.get(b) ?? 0 })),
       activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
-      openBalance: Math.max(0, ordered - billedActive),
       statusBars: [["Planejados", "planned"], ["Ativos", "active"], ["Pausados", "paused"], ["Concluídos", "completed"]].map(([l, s]) => ({ label: l!, value: works.filter((w) => w.status === s).length })),
     };
   }, [q.data, scope.ready, P]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -241,22 +241,21 @@ function AtividadesOverview() {
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
-              <OverviewCard title="Saldo a faturar" to="/obras/resultado" linkLabel="Ver resultados" hint="Soma dos pedidos dos serviços ativos menos o que já foi faturado neles">
+              <OverviewCard title="Saldo a faturar" to="/obras/resultado" linkLabel="Ver resultados" hint="Pedidos dos serviços ativos com data até o fim do período menos o faturado neles até essa data">
                 <Big value={brl(d.openBalance)} />
-                <p className="text-xs text-muted-foreground">de {brl(d.ordered)} em pedidos</p>
+                <p className="text-xs text-muted-foreground">de {brl(d.ordered)} em pedidos até {P.to.slice(8, 10)}/{P.to.slice(5, 7)}/{P.to.slice(0, 4)}</p>
               </OverviewCard>
             )}
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
-            {can("/obras/resultado") && (
-              <OverviewCard dark title="Pedidos faturados" to="/obras/resultado" linkLabel="Ver andamento por serviço" hint="Quanto dos pedidos dos serviços ativos já foi faturado; no mapa, clientes do estado de SP">
-                <Gauge dark pct={d.ordered ? (d.billedActive / d.ordered) * 100 : 0} label="dos pedidos ativos" sub={`${brl(d.billedActive)} de ${brl(d.ordered)}`} />
-                {mapClients.length > 0 && (
-                  <div className="mt-3" onClick={(e) => e.preventDefault()}>
-                    <ClientsMap clients={mapClients} className="h-[300px] w-full rounded-xl" />
+            {can("/obras") && (
+              <OverviewCard title="Clientes no mapa" to="/clientes" linkLabel="Ver clientes" className="min-h-[560px]" hint="Marcador do tamanho do faturado no período; roda do mouse aproxima">
+                {mapClients.length > 0 ? (
+                  <div className="h-full min-h-[460px]" onClick={(e) => e.preventDefault()}>
+                    <ClientsMap clients={mapClients} className="h-full min-h-[460px] w-full rounded-xl" />
                   </div>
-                )}
+                ) : <p className="py-8 text-center text-xs text-muted-foreground">Nenhum cliente com endereço localizado.</p>}
               </OverviewCard>
             )}
             {can("/externo/relatorio-diario") && (
