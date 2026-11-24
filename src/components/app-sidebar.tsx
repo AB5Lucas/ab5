@@ -139,7 +139,7 @@ export function AppSidebar() {
           <Link to="/notificacoes" search={{ aba: "preferencias" }} onClick={closeMobile}><Bell className="h-4 w-4" /> Notificações</Link>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={openMenuSearch}><Search className="h-4 w-4" /> Buscar <span className="ml-auto text-xs text-muted-foreground">{isMac ? "⌘" : "Ctrl"} K</span></DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setStyle("classic")}><LayoutList className="h-4 w-4" /> Usar menu clássico</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setStyle("rail")}><LayoutList className="h-4 w-4" /> Usar menu flutuante</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

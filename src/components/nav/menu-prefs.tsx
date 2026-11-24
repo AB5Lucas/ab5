@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { MenuBadge } from "@/hooks/use-nav-badges";
 
 /**
- * Preferências do menu guardadas neste navegador: estilo (novo ou clássico) e páginas favoritas.
- * O menu clássico continua disponível para voltar atrás a qualquer momento.
+ * Preferências do menu guardadas neste navegador: estilo (lateral ou flutuante) e páginas favoritas.
+ * "classic" antigo (menu descartado) é lido como lateral.
  */
-export type MenuStyle = "modern" | "classic";
+export type MenuStyle = "modern" | "rail";
 const STYLE_KEY = "menu-style";
 const FAV_KEY = (uid: string | undefined) => `menu-favorites:${uid ?? "anon"}`;
 const EVENT = "menu-prefs";
@@ -30,7 +30,10 @@ function useStored<T>(key: string, fallback: T): [T, (v: T) => void] {
   return [value, useCallback((v: T) => write(key, v), [key])];
 }
 
-export const useMenuStyle = () => useStored<MenuStyle>(STYLE_KEY, "modern");
+export const useMenuStyle = (): [MenuStyle, (v: MenuStyle) => void] => {
+  const [v, set] = useStored<string>(STYLE_KEY, "modern");
+  return [v === "rail" ? "rail" : "modern", set as (v: MenuStyle) => void];
+};
 
 export function useFavorites(uid: string | undefined) {
   const [favs, setFavs] = useStored<string[]>(FAV_KEY(uid), []);

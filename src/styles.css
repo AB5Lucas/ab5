@@ -219,3 +219,9 @@
 @media (prefers-reduced-motion: reduce) {
   .ov-grow, .ov-bar, .ov-widen, .ov-draw, .ov-gauge, .ov-fade, .ov-card { animation: none; }
 }
+
+/* Menu flutuante (nav/rail-menu.tsx): entra deslizando; botões crescem levemente no mouse. */
+@keyframes rail-in { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+@media (min-width: 768px) { .rail-menu { animation: rail-in 0.4s cubic-bezier(.2,.8,.2,1) both; } }
+.rail-btn:hover { transform: scale(1.08); }
+@media (prefers-reduced-motion: reduce) { .rail-menu { animation: none; } .rail-btn:hover { transform: none; } }
