@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CountUp } from "@/components/count-up";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LOCATIONS, locLabel } from "@/lib/andaimes";
-import { AndaimesInsights } from "@/components/insights/andaimes-insights";
 
 export const Route = createFileRoute("/_authenticated/andaimes/estoque")({
   head: () => ({
@@ -27,12 +26,6 @@ export const Route = createFileRoute("/_authenticated/andaimes/estoque")({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
-  }),
-  // cliente/obra/local: opcionais, usados pelos blocos vivos (Estoque por local abre a lista já filtrada).
-  validateSearch: (s: Record<string, unknown>): { cliente?: string; obra?: string; local?: string } => ({
-    ...(typeof s["cliente"] === "string" && s["cliente"] ? { cliente: s["cliente"] } : {}),
-    ...(typeof s["obra"] === "string" && s["obra"] ? { obra: s["obra"] } : {}),
-    ...(typeof s["local"] === "string" && s["local"] ? { local: s["local"] } : {}),
   }),
   component: Page,
 });
@@ -52,13 +45,6 @@ function Page() {
   const works = useQuery({ queryKey: ["andam-works"], queryFn: async () => (await supabase.from("works").select("id, name, client_id").order("name")).data ?? [] });
 
   const [f, setF] = useState({ client: ALL, work: ALL, item: ALL, category: ALL, location: ALL });
-  // Local escolhido no bloco "Estoque por local" (pela própria faixa ou pelo endereço).
-  const pickPlace = (p: { location: string; workId: string | null; clientId: string | null }) =>
-    setF((cur) => ({ ...cur, item: ALL, category: ALL, location: p.location, client: p.clientId ?? ALL, work: p.workId ?? (p.location === "obra" && p.clientId ? CANTEIRO : ALL) }));
-  const search = Route.useSearch();
-  useEffect(() => {
-    if (search.local) pickPlace({ location: search.local, workId: search.obra ?? null, clientId: search.cliente ?? null });
-  }, [search.local, search.obra, search.cliente]);
   const [adjust, setAdjust] = useState<any>(null);
   const [transfer, setTransfer] = useState<any>(null);
   const [newItem, setNewItem] = useState<any>(null);
@@ -99,7 +85,6 @@ function Page() {
           </div>
         ) : undefined}
       />
-      <AndaimesInsights id="estoque" onPlace={pickPlace} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {LOCATIONS.map((l) => (

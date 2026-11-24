@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCurrentUser } from "@/hooks/use-auth";
 import { todayISO, formatDateBR } from "@/lib/scheduling";
 import { RDO_STATUS_LABEL } from "@/lib/rdo";
-import { DayInsights } from "@/components/insights/day-insights";
 import { deliverRdoFile, downloadRdoFile, prepareRdoDownload, type RdoPdfFile } from "@/lib/rdo-download";
 
 /** PDF do RDO (jspdf, ~390 KB) só é baixado ao gerar. */
@@ -33,26 +32,15 @@ export const Route = createFileRoute("/_authenticated/externo/relatorio-diario")
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  // obra/data: opcionais, usados pelos blocos vivos (RDOs do dia abre o RDO do serviço).
-  validateSearch: (s: Record<string, unknown>): { obra?: string; data?: string } => ({
-    ...(typeof s["obra"] === "string" && s["obra"] ? { obra: s["obra"] } : {}),
-    ...(typeof s["data"] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s["data"]) ? { data: s["data"] as string } : {}),
-  }),
   component: RdoPage,
 });
 
 function RdoPage() {
   const { user, canWrite, role } = useCurrentUser();
   const [tab, setTab] = useState("fill");
-  const search = Route.useSearch();
-  const [workId, setWorkId] = useState<string>(search.obra ?? "");
-  const [date, setDate] = useState(search.data ?? todayISO());
+  const [workId, setWorkId] = useState<string>("");
+  const [date, setDate] = useState(todayISO());
   const [mode, setMode] = useState<"service" | "client">("service");
-  // Mesmo aberto, o endereço com obra/data (blocos vivos) abre o RDO daquele serviço e dia.
-  useEffect(() => {
-    if (search.obra) { setWorkId(search.obra); setMode("service"); setTab("fill"); }
-    if (search.data) setDate(search.data);
-  }, [search.obra, search.data]);
   const [clientId, setClientId] = useState<string>("");
 
   const works = useQuery({
@@ -122,7 +110,6 @@ function RdoPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <PageHeader title="Relatório Diário de Obras — RDO" />
-      <DayInsights date={date} id="rdo" blocks={["rdo", "pulse"]} onOpenRdo={(id) => { setWorkId(id); setMode("service"); setTab("fill"); }} />
       <Tabs pageTabs value={tab} onValueChange={setTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="fill">Preencher</TabsTrigger>

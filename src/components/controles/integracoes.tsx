@@ -106,14 +106,14 @@ const emptyForm: FormState = {
   notes: "",
 };
 
-export function IntegrationsPage({ initialSearch = "" }: { initialSearch?: string } = {}) {
+export function IntegrationsPage() {
   const { canWrite, isAdmin } = useCurrentUser();
   const scheduled = useScheduled("integracao");
   const inConf = useInConference("integracao");
   const qc = useQueryClient();
   const today = todayISO();
 
-  const [search, setSearch] = useState(initialSearch);
+  const [search, setSearch] = useState("");
   const [clientFilter, setClientFilter] = useState("all");
   
   const [statusFilter, setStatusFilter] = useState("all");

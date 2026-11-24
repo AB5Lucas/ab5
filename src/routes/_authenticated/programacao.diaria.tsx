@@ -3,7 +3,6 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader } from "@/components/page-header";
 import { SchedulePlannerBoard } from "@/components/schedule-planner-board";
-import { DayInsights } from "@/components/insights/day-insights";
 import { todayISO } from "@/lib/scheduling";
 
 const searchSchema = z.object({
@@ -36,7 +35,6 @@ function DailySchedulePage() {
         title="Programação Diária"
         description="Arraste os colaboradores da lista lateral para os cards de obra. O sistema valida disponibilidade, conflitos e requisitos."
       />
-      <DayInsights date={valid} id="programacao" />
       <SchedulePlannerBoard
         date={valid}
         onDateChange={(d) => navigate({ search: { date: d } })}

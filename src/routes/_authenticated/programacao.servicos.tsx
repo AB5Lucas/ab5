@@ -28,7 +28,6 @@ import { addDays, checkAso, checkIntegration, checkRequirements, fetchScheduleCo
 import { cn } from "@/lib/utils";
 import { fetchAll } from "@/lib/fetch-all";
 import { SERVICE_BADGE_DATE, useServiceDistribution } from "@/hooks/use-service-distribution";
-import { DayInsights } from "@/components/insights/day-insights";
 
 /** Ausências e compromissos do dia (folga, férias, atestado, agendamento, quadro de treinamento/integração). */
 async function fetchDayAbsences(date: string) {
@@ -57,11 +56,6 @@ export const Route = createFileRoute("/_authenticated/programacao/servicos")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  // data/cliente: opcionais, usados pelos blocos vivos (Distribuição pendente abre o cliente no dia).
-  validateSearch: (s: Record<string, unknown>): { data?: string; cliente?: string } => ({
-    ...(typeof s["data"] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s["data"]) ? { data: s["data"] as string } : {}),
-    ...(typeof s["cliente"] === "string" && s["cliente"] ? { cliente: s["cliente"] } : {}),
-  }),
   component: ServicesPage,
 });
 
@@ -73,8 +67,7 @@ function ServicesPage() {
   // Admin/programador veem todos os clientes; demais só os atribuídos em Usuários
   const canWrite = role === "admin" || role === "programmer";
   const qc = useQueryClient();
-  const urlSearch = Route.useSearch();
-  const [date, setDate] = useState(urlSearch.data ?? todayISO());
+  const [date, setDate] = useState(todayISO());
   const distribution = useServiceDistribution(date);
   useEffect(() => {
     qc.setQueryData(SERVICE_BADGE_DATE, date);
@@ -85,15 +78,9 @@ function ServicesPage() {
   useEffect(() => {
     if (dateInit || userLoading) return;
     setDateInit(true);
-    if (urlSearch.data) return;
     if (isForeman) setDate(addDays(todayISO(), 1));
   }, [dateInit, userLoading, isForeman]);
-  const [clientId, setClientId] = useState(urlSearch.cliente ?? "");
-  // Mesmo aberto, o endereço com data/cliente (blocos vivos) troca o dia e o cliente.
-  useEffect(() => {
-    if (urlSearch.data) setDate(urlSearch.data);
-    if (urlSearch.cliente) setClientId(urlSearch.cliente);
-  }, [urlSearch.data, urlSearch.cliente]);
+  const [clientId, setClientId] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -615,7 +602,6 @@ function ServicesPage() {
     <div className="space-y-4">
       {relocateDialog}
       <PageHeader title="Serviços" description="Divida os colaboradores escalados no cliente entre os serviços do dia." />
-      <DayInsights date={date} id="servicos" onOpenClient={chooseClient} />
       <div className="panel flex flex-wrap items-end gap-3 p-3">
         <div className="flex items-end gap-1">
           <Button variant="outline" size="icon" onClick={() => setDate(addDays(date, -1))} aria-label="Dia anterior"><ChevronLeft className="h-4 w-4" /></Button>

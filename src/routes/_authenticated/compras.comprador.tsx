@@ -16,8 +16,6 @@ import { ApproversPanel } from "@/components/compras/approvers";
 import { ScReportButton } from "@/components/compras/sc-report-dialog";
 import { Pill, ScTable, todayISO, StatusFilter, statusCounts, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 import { SC_DONE_STATUSES, SC_STATUSES, statusClass } from "@/lib/purchase-requests";
-import { PurchaseInsights, flowStage } from "@/components/insights/purchase-insights";
-import { FLOW_LABEL, type FlowStage } from "@/lib/insights/purchases";
 
 export const Route = createFileRoute("/_authenticated/compras/comprador")({
   head: () => ({ meta: [{ title: "Comprador | AB5 Hub" }, { name: "description", content: "Solicitações de compra aprovadas, para o comprador tratar." }] }),
@@ -34,10 +32,7 @@ function Page() {
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
   const done = (r: ScRow) => SC_DONE_STATUSES.includes(r.status);
   const scoped = (list.data ?? []).filter((r) => scope === "todas" || (scope === "concluidas" ? done(r) : !done(r)));
-  // Etapa escolhida no bloco "Onde a SC está parada" (faixa do topo): filtra a lista; clicar de novo limpa.
-  const [flow, setFlow] = useState<FlowStage | null>(null);
-  const pickFlow = (s: FlowStage | null) => { setFlow(s); if (s === "comprada" && scope === "abertas") setScope("todas"); };
-  const rows = scoped.filter((r) => (status === "all" || r.status === status) && (!flow || flowStage(r) === flow));
+  const rows = scoped.filter((r) => status === "all" || r.status === status);
   const [edit, setEdit] = useState<ScRow | null>(null);
   const [form, setForm] = useState({ status: "", notes: "", date: "" });
   const [returning, setReturning] = useState<ScRow | null>(null);
@@ -79,7 +74,6 @@ function Page() {
           <TabsTrigger value="aprovadores">Validadores</TabsTrigger>
         </TabsList>
         <TabsContent value="solicitacoes" className="mt-4 space-y-4">
-          <PurchaseInsights id="comprador" rows={list.data ?? []} loading={list.isLoading} stage={flow} onStage={pickFlow} />
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label className="block text-xs">Mostrar</Label>
@@ -93,7 +87,6 @@ function Page() {
               </Select>
             </div>
             <StatusFilter value={status} onChange={setStatus} counts={statusCounts(scoped)} exclude={["EM PREPARAÇÃO"]} />
-            {flow && <Button variant="outline" size="sm" onClick={() => setFlow(null)}>Etapa: {FLOW_LABEL[flow]} ✕</Button>}
             <div className="ml-auto"><ScReportButton /></div>
           </div>
           {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (

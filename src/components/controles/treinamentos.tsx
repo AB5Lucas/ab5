@@ -82,7 +82,7 @@ async function upsertTrainingRecord(values: {
   return { error };
 }
 
-export function TrainingsPage({ initialSearch = "" }: { initialSearch?: string } = {}) {
+export function TrainingsPage() {
   const { canWrite, isAdmin } = useCurrentUser();
   const scheduled = useScheduled("treinamento");
   const inConf = useInConference("treinamento");
@@ -191,7 +191,7 @@ export function TrainingsPage({ initialSearch = "" }: { initialSearch?: string }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "valid" | "expiring" | "expired" | "missing">("all");
   const [followUp, setFollowUp] = useState<FollowUp>("all");
-  const [personSearch, setPersonSearch] = useState(initialSearch);
+  const [personSearch, setPersonSearch] = useState("");
   const [trainingIds, setTrainingIds] = useState<string[]>([]);
 
   const addRecord = useMutation({

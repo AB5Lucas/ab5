@@ -12,8 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScTable, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
-import { PurchaseInsights, flowStage } from "@/components/insights/purchase-insights";
-import { FLOW_LABEL, type FlowStage } from "@/lib/insights/purchases";
 
 export const Route = createFileRoute("/_authenticated/compras/aprovacao")({
   head: () => ({ meta: [{ title: "Validação de Compras | AB5 Hub" }, { name: "description", content: "Solicitações de compra para eu validar e as que já validei." }] }),
@@ -42,11 +40,7 @@ function Page() {
   const approved = all.filter((r) => r.decided_by === uid && r.stage !== "rascunho");
   const returned = all.filter((r) => r.decided_by === uid && r.stage === "rascunho");
   const base = view === "pendentes" ? pending : view === "aprovadas" ? approved : view === "devolvidas" ? returned : [...new Map([...pending, ...approved, ...returned].map((r) => [r.id, r])).values()];
-  const seen = [...new Map([...pending, ...approved, ...returned].map((r) => [r.id, r])).values()];
-  // Etapa escolhida no bloco "Onde a SC está parada" (faixa do topo): filtra a lista; clicar de novo limpa.
-  const [flow, setFlow] = useState<FlowStage | null>(null);
-  const pickFlow = (s: FlowStage | null) => { setFlow(s); if (s && s !== "validacao") setView("todas"); };
-  const rows = base.filter((r) => (client === "all" || r.client_id === client) && (!flow || flowStage(r) === flow))
+  const rows = base.filter((r) => client === "all" || r.client_id === client)
     .sort((a, b) => (view === "pendentes" ? (a.due_date ?? "").localeCompare(b.due_date ?? "") : (b.sent_at ?? "").localeCompare(a.sent_at ?? "")));
   const usedClients = [...new Set([...pending, ...approved, ...returned].map((r) => r.client_id).filter((x): x is string => !!x))];
 
@@ -63,7 +57,6 @@ function Page() {
   return (
     <div className="space-y-4">
       <PageHeader title="Validação" description="Solicitações dos clientes em que você é o gestor (ou substituto durante as férias dele). Clique no número para ver os itens." />
-      <PurchaseInsights id="validacao" rows={seen} loading={list.isLoading} stage={flow} onStage={pickFlow} />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label className="text-xs">Situação</Label>
@@ -87,7 +80,6 @@ function Page() {
             </SelectContent>
           </Select>
         </div>
-        {flow && <Button variant="outline" size="sm" onClick={() => setFlow(null)}>Etapa: {FLOW_LABEL[flow]} ✕</Button>}
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
         <ScTable rows={rows} clientName={clientName} actions={(r) => r.stage === "aprovacao" && (r.approver_id === uid || r.substitute_id === uid) ? (
