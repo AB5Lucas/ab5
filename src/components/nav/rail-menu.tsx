@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { CountUp } from "@/components/count-up";
+import { useCompanyRole } from "@/hooks/use-company-role";
 import { useEffect, useRef, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -202,6 +203,7 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
   modules: Group[]; adminItems: { item: Group["items"][number]; group: Group }[]; current: string; currentMod: string | null; badges: Badges;
 }) {
   const { profile, role } = useCurrentUser();
+  const companyRole = useCompanyRole();
   const [, setStyle] = useMenuStyle();
   const navigate = useNavigate();
   const [openMod, setOpenMod] = useState<string | null | undefined>(undefined);
@@ -227,6 +229,14 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
     <div onMouseEnter={enter} onMouseLeave={leave} className="fixed left-3 top-1/2 z-40 hidden -translate-y-1/2 md:block">
       <nav aria-label="Menu"
         className={cn("rail-menu flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[28px] p-1.5 transition-[width,box-shadow] duration-500", ease, GLASS, expanded ? "w-[15.5rem]" : "w-[3.25rem]")}>
+        {/* Logo e a pessoa (nome e função na empresa) */}
+        <div className="mb-1.5 flex h-11 items-center gap-2.5 pl-1 pr-2">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-neutral-950 font-display text-[11px] font-bold tracking-tight text-white shadow-sm dark:bg-white dark:text-neutral-950">AB5</span>
+          <span className={cn(fade, "min-w-0 leading-tight")}>
+            <span className="block truncate font-display text-sm font-semibold">AB5 Hub</span>
+            <span className="block truncate text-[10.5px] text-muted-foreground">{companyRole || ROLE_LABEL[role]}</span>
+          </span>
+        </div>
         {/* Busca */}
         <button type="button" onClick={openMenuSearch} title="Buscar (Ctrl+K)"
           className={cn("mb-1 flex h-10 w-full items-center gap-2 rounded-full pl-2.5 pr-2 text-sm transition-colors duration-300", expanded ? "bg-white/60 text-muted-foreground shadow-inner dark:bg-white/10" : "text-foreground/70 hover:bg-white/50")}>

@@ -6,7 +6,7 @@ import type { MenuBadge } from "@/hooks/use-nav-badges";
  * "classic" antigo (menu descartado) é lido como lateral.
  */
 export type MenuStyle = "modern" | "rail";
-const STYLE_KEY = "menu-style";
+const STYLE_KEY = "menu-style-v2";
 const FAV_KEY = (uid: string | undefined) => `menu-favorites:${uid ?? "anon"}`;
 const EVENT = "menu-prefs";
 
@@ -30,9 +30,10 @@ function useStored<T>(key: string, fallback: T): [T, (v: T) => void] {
   return [value, useCallback((v: T) => write(key, v), [key])];
 }
 
+/** Menu flutuante é o principal para todos (24/11); a escolha antiga (chave "menu-style") não vale mais. */
 export const useMenuStyle = (): [MenuStyle, (v: MenuStyle) => void] => {
-  const [v, set] = useStored<string>(STYLE_KEY, "modern");
-  return [v === "rail" ? "rail" : "modern", set as (v: MenuStyle) => void];
+  const [v, set] = useStored<string>(STYLE_KEY, "rail");
+  return [v === "modern" ? "modern" : "rail", set as (v: MenuStyle) => void];
 };
 
 export function useFavorites(uid: string | undefined) {
