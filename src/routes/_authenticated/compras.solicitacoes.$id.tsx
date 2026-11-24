@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { NOTIF_KEY } from "@/hooks/use-notifications";
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -112,6 +113,11 @@ function Page() {
   const [editMode, setEditMode] = useState(!!editParam);
   const canEdit = canSendDraft || isValidator;
   const editable = canEdit && editMode;
+  // Abrir a SC marca como lidas as notificações dela (RLS: só as da própria pessoa).
+  useEffect(() => {
+    void supabase.from("notifications").update({ read_at: new Date().toISOString() } as never).eq("entity_id", id).is("read_at", null)
+      .then(() => qc.invalidateQueries({ queryKey: NOTIF_KEY }));
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Validador com a SC aberta: avisa o banco a cada 30 s (vale 90 s); enquanto isso o solicitante não puxa de volta.
   useEffect(() => {
     if (!isValidator) return;

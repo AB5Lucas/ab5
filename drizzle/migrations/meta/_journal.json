@@ -1177,6 +1177,34 @@
       "when": 1795463089217,
       "tag": "0180_purchase_totvs_print_required",
       "breakpoints": true
+    },
+    {
+      "idx": 168,
+      "version": "7",
+      "when": 1795463090217,
+      "tag": "0173_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 169,
+      "version": "7",
+      "when": 1795463091217,
+      "tag": "0174_purchase_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 170,
+      "version": "7",
+      "when": 1795463092217,
+      "tag": "0175_notification_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 171,
+      "version": "7",
+      "when": 1795463093217,
+      "tag": "0176_push_subscription_save",
+      "breakpoints": true
     }
   ]
 }
