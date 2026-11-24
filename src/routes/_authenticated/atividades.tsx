@@ -1,17 +1,11 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
 import { useWorkScope } from "@/hooks/use-work-scope";
-import { loadResultShared, monthEnd } from "@/lib/results-engine";
-import { financeBatches, financeList, loadFinanceActive, loadFinanceRaws } from "@/lib/finance-data";
-import { directorSummary, MARGIN_GOAL, rdoCoverage } from "@/lib/director-overview";
-import { BilledVsCost, Big, MarginGauge, MarginMonths, MiniBars, OverviewCard, StackBar } from "@/components/overview/charts";
-import { CountUp } from "@/components/count-up";
-import { ClientsMap } from "@/components/overview/clients-map";
+import { Big, Gauge, HatchBars, LineArea, MiniBars, OverviewCard, RankBars } from "@/components/overview/charts";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/atividades")({
@@ -19,273 +13,158 @@ export const Route = createFileRoute("/_authenticated/atividades")({
   component: AtividadesOverview,
 });
 
-type Period = "mes" | "anterior" | "ano";
-const PERIODS: [Period, string][] = [["mes", "Mês atual"], ["anterior", "Mês anterior"], ["ano", "Este ano"]];
-const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-const pct1 = (v: number | null) => (v == null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
+const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-const addMonths = (ym: string, n: number) => { const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + n, 1); return ymOf(d); };
-const monthName = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1]!;
-const isInternal = (name: string | null | undefined) => /^(ADM|COMERCIAL|P[AÁ]TIO|IND[UÚ]STRIA)$/i.test((name ?? "").trim());
+const isoOf = (d: Date) => `${ymOf(d)}-${String(d.getDate()).padStart(2, "0")}`;
+const monthLabel = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1]!;
 const orderTotal = (w: any) => {
   const list = Array.isArray(w.orders) ? (w.orders as { value?: unknown }[]) : [];
-  return list.reduce((a, o) => a + (Number(o?.value) || 0), 0) || Number(w.order_value ?? 0);
+  const s = list.reduce((a, o) => a + (Number(o?.value) || 0), 0);
+  return s || Number(w.order_value ?? 0);
 };
 
-/** Visão da diretoria para o módulo Atividades: resultado, margem, clientes, serviços e operação (RDO e equipe). */
+/** Visão geral do módulo Atividades: cada cartão resume uma página e leva até ela. */
 function AtividadesOverview() {
   const { canAccess } = useAccess();
   const scope = useWorkScope();
-  const [period, setPeriod] = useState<Period>("mes");
+  const [span, setSpan] = useState<6 | 12>(6);
   const today = new Date();
-  const curYm = ymOf(today);
-  // Meses do filtro e janela do gráfico (mês único mostra os 6 meses até ele, como contexto).
-  const sel = useMemo(() => {
-    if (period === "ano") { const out: string[] = []; for (let m = 1; m <= today.getMonth() + 1; m++) out.push(`${today.getFullYear()}-${String(m).padStart(2, "0")}`); return out; }
-    return [period === "mes" ? curYm : addMonths(curYm, -1)];
-  }, [period, curYm]); // eslint-disable-line react-hooks/exhaustive-deps
-  const chartYms = useMemo(() => (sel.length > 1 ? sel : Array.from({ length: 6 }, (_, i) => addMonths(sel[0]!, i - 5))), [sel]);
-  const start = `${chartYms[0]}-01`;
-  const end = monthEnd(sel[sel.length - 1]!);
-  const selStart = `${sel[0]}-01`;
-  const todayIso = today.toISOString().slice(0, 10);
-  const opEnd = end < todayIso ? end : todayIso;
+  const from12 = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+  const from30 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29);
 
-  const works = useQuery({ queryKey: ["fin-works"], queryFn: async () => (await supabase.from("works").select("*, clients(name)").order("name")).data ?? [] });
-  const holidays = useQuery({ queryKey: ["holidays-dates"], queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string) });
-  const active = useQuery({ queryKey: ["fin-active", start, end], queryFn: () => loadFinanceActive(start, end) });
-  const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 60_000, queryFn: loadResultShared });
-  const list = useMemo(() => financeList(works.data ?? [], active.data, start, end).filter((w: any) => scope.allowWork(w)), [works.data, active.data, start, end, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
-  const batches = useMemo(() => financeBatches(list), [list]);
-  const batchKey = useMemo(() => batches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [batches]);
-  const raws = useQuery({
-    queryKey: ["fin-client-raw", batchKey, end], staleTime: 60_000,
-    enabled: !!shared.data && !!active.data && canAccess("/obras/resultado"),
-    queryFn: () => loadFinanceRaws(batches, shared.data!, { until: end }),
-  });
-  const chart = useMemo(() => (raws.data ? directorSummary(list, raws.data, chartYms, holidays.data ?? [], works.data ?? []) : null), [raws.data, list, chartYms, holidays.data, works.data]);
-  const fin = useMemo(() => (raws.data ? directorSummary(list, raws.data, sel, holidays.data ?? [], works.data ?? []) : null), [raws.data, list, sel, holidays.data, works.data]);
-
-  // Operação: serviços com MO escalada × RDO (qualquer situação) e equipe por dia, no período até hoje.
-  const ops = useQuery({
-    queryKey: ["overview", "ops", selStart, opEnd],
+  const q = useQuery({
+    queryKey: ["overview", "atividades", isoOf(today)],
     staleTime: 2 * 60_000,
+    refetchInterval: 5 * 60_000,
     queryFn: async () => {
-      const sch = await fetchAll<any>((a, b) => supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", selStart).lte("schedule_date", opEnd).order("id").range(a, b));
-      const dateOf = new Map(sch.map((s) => [s.id, String(s.schedule_date)]));
-      const ids = [...dateOf.keys()];
-      const allocs: any[] = [];
-      for (let i = 0; i < ids.length; i += 60) allocs.push(...await fetchAll<any>((a, b) => supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id").in("schedule_id", ids.slice(i, i + 60)).order("id").range(a, b)));
-      const rdos = await fetchAll<any>((a, b) => supabase.from("rdos").select("work_id, report_date").gte("report_date", selStart).lte("report_date", opEnd).order("id").range(a, b));
-      const billing = await fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id, amount").eq("category", "faturamento").eq("sync_cancelled", false).order("id").range(a, b));
-      return { allocs: allocs.map((a) => ({ work_id: a.work_id, collaborator_id: a.collaborator_id, date: dateOf.get(a.schedule_id)! })), rdos, billing };
+      const [works, billing, rdos] = await Promise.all([
+        fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, status, active, order_value, orders, clients(name)").order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id, entry_date, amount").eq("category", "faturamento").eq("sync_cancelled", false).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("rdos").select("work_id, report_date, status").gte("report_date", isoOf(from30)).order("id").range(a, b)),
+      ]);
+      return { works, billing, rdos };
     },
   });
-  const op = useMemo(() => {
-    if (!ops.data || !works.data || !scope.ready) return null;
-    const wc = new Map((works.data as any[]).map((w) => [w.id, { client_id: w.client_id, general: !!w.rdo_general, internal: isInternal(w.clients?.name) }]));
-    const allowed = new Set((works.data as any[]).filter((w) => scope.allowWork(w)).map((w) => w.id));
-    const cov = rdoCoverage(ops.data.allocs.filter((a) => allowed.has(a.work_id)), ops.data.rdos, wc);
-    const activeWorks = (works.data as any[]).filter((w) => allowed.has(w.id) && w.active && !["cancelled", "completed"].includes(w.status) && !isInternal(w.clients?.name));
-    const billedBy = new Map<string, number>();
-    for (const e of ops.data.billing) billedBy.set(e.work_id, (billedBy.get(e.work_id) ?? 0) + Number(e.amount ?? 0));
-    let ordered = 0, billed = 0;
-    for (const w of activeWorks) { const o = orderTotal(w); if (o > 0) { ordered += o; billed += Math.min(o, billedBy.get(w.id) ?? 0); } }
-    const byClient = new Map<string, number>();
-    for (const w of activeWorks) { const n = w.clients?.name ?? "—"; byClient.set(n, (byClient.get(n) ?? 0) + 1); }
-    const workName = new Map((works.data as any[]).map((w) => [w.id, `${w.clients?.name ?? ""} · ${w.name}`]));
-    const lastDay = [...cov.byDay.keys()].sort().pop();
-    return {
-      cov, lastDay, missingLast: cov.missing.filter((m) => m.date === lastDay).map((m) => ({ id: m.work_id, name: workName.get(m.work_id) ?? "—" })),
-      activeCount: activeWorks.length, clients: [...byClient.entries()].sort((a, b) => b[1] - a[1]),
-      backlog: Math.max(0, ordered - billed), ordered, billedPct: ordered ? (billed / ordered) * 100 : null,
-    };
-  }, [ops.data, works.data, scope.ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Clientes com ponto no mapa (endereço localizado), com faturado/margem do período.
-  const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
-  const mapClients = useMemo(() => {
-    const by = new Map((fin?.clients ?? []).map((c) => [c.name, c]));
-    return (mapQ.data ?? []).filter((c: any) => scope.allowClient(c.id) && !isInternal(c.name)).map((c: any) => ({
-      id: c.id, name: c.name, city: c.city, lat: Number(c.lat), lon: Number(c.lon), billed: by.get(c.name)?.comp ?? 0, marginPct: by.get(c.name)?.pct ?? null,
-    }));
-  }, [mapQ.data, fin, scope.ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  const d = useMemo(() => {
+    if (!q.data || !scope.ready) return null;
+    const works = q.data.works.filter((w) => scope.allowWork(w));
+    const workBy = new Map(works.map((w) => [w.id, w]));
+    const billing = q.data.billing.filter((e) => workBy.has(e.work_id));
+    const rdos = q.data.rdos.filter((r) => workBy.has(r.work_id));
+    // Faturado por mês (12 meses)
+    const months: string[] = [];
+    for (let i = 11; i >= 0; i--) months.push(ymOf(new Date(today.getFullYear(), today.getMonth() - i, 1)));
+    const byMonth = new Map(months.map((m) => [m, 0]));
+    for (const e of billing) { const m = String(e.entry_date).slice(0, 7); if (byMonth.has(m)) byMonth.set(m, byMonth.get(m)! + Number(e.amount ?? 0)); }
+    const monthVals = months.map((m) => byMonth.get(m)!);
+    const cur = monthVals[11]!, prev = monthVals[10]!;
+    // Pedidos x faturado (serviços ativos)
+    const active = works.filter((w) => w.active && w.status !== "cancelled" && w.status !== "completed");
+    const billedBy = new Map<string, number>();
+    for (const e of billing) billedBy.set(e.work_id, (billedBy.get(e.work_id) ?? 0) + Number(e.amount ?? 0));
+    let ordered = 0, billedActive = 0;
+    for (const w of active) { const o = orderTotal(w); if (o > 0) { ordered += o; billedActive += Math.min(o, billedBy.get(w.id) ?? 0); } }
+    // Top clientes no mês
+    const cm = ymOf(today);
+    const byClient = new Map<string, number>();
+    for (const e of billing) if (String(e.entry_date).startsWith(cm)) { const n = workBy.get(e.work_id)?.clients?.name ?? "—"; byClient.set(n, (byClient.get(n) ?? 0) + Number(e.amount ?? 0)); }
+    const top = [...byClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value }));
+    // RDOs por dia (30 dias)
+    const days: string[] = [];
+    for (let i = 29; i >= 0; i--) days.push(isoOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i)));
+    const rdoDay = new Map(days.map((x) => [x, { fin: 0, all: 0 }]));
+    for (const r of rdos) { const x = rdoDay.get(String(r.report_date).slice(0, 10)); if (x) { x.all++; if (r.status === "finalized") x.fin++; } }
+    const todayR = rdoDay.get(isoOf(today))!;
+    return {
+      months, monthVals, cur, prev, ordered, billedActive, top, days, rdoDay, todayR,
+      activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
+      openBalance: Math.max(0, ordered - billedActive),
+      statusBars: ["planned", "active", "paused", "completed"].map((s) => works.filter((w) => w.status === s).length),
+    };
+  }, [q.data, scope.ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const can = (u: string) => canAccess(u);
-  const finLoading = can("/obras/resultado") && (!fin || !chart);
-  const periodLabel = period === "ano" ? `${today.getFullYear()} até ${monthName(curYm)}` : `${monthName(sel[0]!)}/${sel[0]!.slice(0, 4)}`;
-  const t = fin?.totals;
-  const prevMonth = chart && sel.length === 1 ? chart.months[chart.months.length - 2] : null;
-  const delta = (a: number, b: number | undefined) => (b ? ((a - b) / b) * 100 : null);
-  const goodMargin = (p: number | null) => (p ?? -1) >= MARGIN_GOAL;
+  const delta = (a: number, b: number) => (b > 0 ? ((a - b) / b) * 100 : null);
+  const loading = !d;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">Atividades</h1>
-          <p className="text-sm text-muted-foreground">Resultado, margem, clientes e operação — {periodLabel}. Clique em um quadro para abrir os dados.</p>
+          <p className="text-sm text-muted-foreground">Visão geral de clientes, resultados e relatórios diários. Clique em um quadro para abrir a página.</p>
         </div>
         <div className="flex rounded-full border bg-muted/40 p-0.5 text-xs">
-          {PERIODS.map(([k, label]) => (
-            <button key={k} type="button" onClick={() => setPeriod(k)}
-              className={cn("rounded-full px-3 py-1 transition-colors duration-300", period === k ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}>
-              {label}
+          {([6, 12] as const).map((s) => (
+            <button key={s} type="button" onClick={() => setSpan(s)}
+              className={cn("rounded-full px-3 py-1 transition-colors duration-300", span === s ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}>
+              {s} meses
             </button>
           ))}
         </div>
       </div>
 
-      {can("/obras/resultado") && (
-        finLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-40 animate-pulse rounded-2xl bg-muted" />)}</div>
-        ) : t && (
-          <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <OverviewCard dark title="Faturamento" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Notas lançadas nos serviços no período (data da nota)">
-                <Big dark value={brl(t.billed)} delta={prevMonth ? delta(t.billed, prevMonth.billed) : null} />
-                <p className="text-[11px] text-background/60">{prevMonth ? `vs. ${monthName(prevMonth.ym)}: ${brl(prevMonth.billed)}` : `${sel.length} meses`}</p>
-                <div className="mt-2"><MiniBars dark values={chart!.months.map((m) => m.billed)} /></div>
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />)}</div>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {can("/obras/resultado") && (
+              <OverviewCard dark title="Faturado no mês" to="/obras/resultado" linkLabel="Ver resultados" hint="Notas lançadas nos serviços no mês atual, comparadas ao mês anterior">
+                <Big dark value={brl(d.cur)} delta={delta(d.cur, d.prev)} />
+                <div className="mt-3"><MiniBars dark values={d.monthVals.slice(-span)} /></div>
               </OverviewCard>
-              <OverviewCard title="Margem de contribuição" to="/fechamentos/financeiro" linkLabel="Ver por serviço" hint="Faturado por competência menos 18,5% de impostos e os custos (mão de obra, transporte, materiais)">
-                <Big value={brl(t.margin)} />
-                <div className="mt-1 flex items-center gap-2 text-xs">
-                  <span className={cn("rounded-full px-2 py-0.5 font-semibold", goodMargin(t.pct) ? "bg-foreground text-background" : "border text-muted-foreground")}>{pct1(t.pct)}</span>
-                  <span className="text-muted-foreground">meta {MARGIN_GOAL}% · {goodMargin(t.pct) ? "acima da meta" : "abaixo da meta"}</span>
-                </div>
+            )}
+            {can("/obras") && (
+              <OverviewCard title="Serviços ativos" to="/obras" linkLabel="Ver serviços" hint="Serviços ativos (não concluídos nem cancelados) e clientes atendidos">
+                <Big value={d.activeCount} />
+                <p className="text-xs text-muted-foreground">em {d.clientCount} clientes</p>
+                <div className="mt-2"><MiniBars values={d.statusBars} /></div>
               </OverviewCard>
-              <OverviewCard title="Custos do período" to="/fechamentos/financeiro" linkLabel="Ver detalhamento" hint="Mão de obra (com encargos), transporte e materiais/ferramentas/andaimes, mais impostos de 18,5%">
-                <Big value={brl(t.mo + t.transport + t.materials)} />
-                <div className="mt-2"><StackBar format={brl} parts={[
-                  { label: "Mão de obra", value: t.mo, className: "bg-foreground" },
-                  { label: "Transporte", value: t.transport, className: "bg-foreground/50" },
-                  { label: "Materiais", value: t.materials, className: "bg-foreground/20" },
-                ]} /></div>
+            )}
+            {can("/externo/relatorio-diario") && (
+              <OverviewCard title="RDOs de hoje" to="/externo/relatorio-diario" linkLabel="Ver relatórios" hint="RDOs finalizados hoje sobre os criados hoje">
+                <Big value={`${d.todayR.fin} de ${d.todayR.all}`} />
+                <p className="text-xs text-muted-foreground">finalizados</p>
+                <div className="mt-2"><MiniBars values={d.days.slice(-14).map((x) => d.rdoDay.get(x)!.fin)} /></div>
               </OverviewCard>
-              <OverviewCard title="Carteira a faturar" to="/obras/resultado" linkLabel="Ver andamento" hint="Pedidos dos serviços ativos ainda não faturados">
-                <Big value={op ? brl(op.backlog) : "…"} />
-                {op && <>
-                  <p className="text-xs text-muted-foreground">de {brl(op.ordered)} em pedidos ativos</p>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="ov-widen h-full rounded-full bg-foreground" style={{ width: `${op.billedPct ?? 0}%` }} /></div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{pct1(op.billedPct)} já faturado</p>
-                </>}
+            )}
+            {can("/obras/resultado") && (
+              <OverviewCard title="Saldo a faturar" to="/obras/resultado" linkLabel="Ver resultados" hint="Soma dos pedidos dos serviços ativos menos o que já foi faturado neles">
+                <Big value={brl(d.openBalance)} />
+                <p className="text-xs text-muted-foreground">de {brl(d.ordered)} em pedidos</p>
               </OverviewCard>
-            </div>
+            )}
+          </div>
 
-            <div className="grid gap-4 lg:grid-cols-5">
-              <OverviewCard dark={sel.length === 1} className="lg:col-span-2" title={sel.length > 1 ? "Margem por mês" : `Margem de ${monthName(sel[0]!)}`} to="/fechamentos/financeiro" linkLabel="Abrir Fechamento"
-                hint={`Meta da empresa: ${MARGIN_GOAL}%. Barra cheia = na meta ou acima; hachurada = abaixo.`}>
-                {sel.length > 1
-                  ? <MarginMonths goal={MARGIN_GOAL} data={fin!.months.map((m) => ({ label: monthName(m.ym), pct: m.pct, tip: `${monthName(m.ym)}/${m.ym.slice(2, 4)}`, extra: `${brl(m.margin)} de ${brl(m.comp)}` }))} />
-                  : <MarginGauge pct={t.pct} goal={MARGIN_GOAL} sub={`${brl(t.margin)} sobre ${brl(t.comp)} faturados`} />}
-              </OverviewCard>
-              <OverviewCard className="lg:col-span-3" title={`Faturado × custos — ${sel.length > 1 ? "meses do ano" : "últimos 6 meses"}`} to="/fechamentos/financeiro" linkLabel="Abrir Fechamento">
-                <BilledVsCost format={brl} data={chart!.months.map((m) => ({ label: monthName(m.ym), billed: m.billed, cost: m.mo + m.transport + m.materials, marginPct: m.pct, tip: `${monthName(m.ym)}/${m.ym.slice(2, 4)}` }))} />
-              </OverviewCard>
-            </div>
-
+          {can("/obras/resultado") && (
             <div className="grid gap-4 lg:grid-cols-3">
-              <div className="ov-card rounded-2xl border bg-card p-4 lg:col-span-2">
-                <div className="mb-3 flex items-baseline justify-between gap-2">
-                  <p className="text-xs font-medium text-muted-foreground">Clientes no mapa — faturado e margem no período</p>
-                  <Link to="/clientes" className="text-[11px] text-muted-foreground underline-offset-4 hover:underline">Ver clientes</Link>
-                </div>
-                <div className="grid gap-4 xl:grid-cols-[1fr_220px]">
-                  <ClientsMap clients={mapClients} />
-                  <div className="space-y-2">
-                    {fin!.clients.slice(0, 7).map((c, i) => {
-                      const max = fin!.clients[0]?.comp || 1;
-                      return (
-                        <div key={c.name} className="text-xs">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate font-medium">{c.name}</span>
-                            <span className={cn("w-12 shrink-0 rounded-full px-1.5 text-center text-[10px] font-semibold", goodMargin(c.pct) ? "bg-foreground text-background" : "border text-muted-foreground")}>{pct1(c.pct)}</span>
-                          </div>
-                          <div className="mt-1 flex items-center gap-2">
-                            <div className="h-1.5 flex-1 rounded-full bg-muted"><div className="ov-widen h-full rounded-full bg-foreground/80" style={{ width: `${(c.comp / max) * 100}%`, animationDelay: `${i * 60}ms` }} /></div>
-                            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{brl(c.comp)}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {!fin!.clients.length && <p className="py-6 text-center text-xs text-muted-foreground">Sem faturamento no período.</p>}
-                  </div>
-                </div>
-              </div>
-              <div className="ov-card rounded-2xl border bg-card p-4">
-                <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-medium text-muted-foreground">Serviços abaixo da meta de {MARGIN_GOAL}%</p></div>
-                <div className="mt-3 divide-y">
-                  {fin!.worst.map((w) => (
-                    <Link key={w.id} to="/obras/resultado" search={{ work: w.id } as never} className="group flex items-center gap-3 py-2 text-xs">
-                      <div className="min-w-0 flex-1"><p className="truncate font-medium group-hover:underline">{w.name}</p><p className="truncate text-muted-foreground">{w.client}</p></div>
-                      <span className="tabular-nums text-muted-foreground">{brl(w.margin)}</span>
-                      <span className="w-14 rounded-full border px-1.5 text-center text-[10px] font-semibold text-muted-foreground">{w.pct == null ? "sem fat." : pct1(w.pct)}</span>
-                      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:rotate-45" />
-                    </Link>
-                  ))}
-                  {!fin!.worst.length && <p className="py-6 text-center text-xs text-muted-foreground">Todos os serviços estão na meta.</p>}
-                </div>
-              </div>
+              <OverviewCard dark title="Pedidos faturados" to="/obras/resultado" linkLabel="Ver andamento por serviço" hint="Quanto dos pedidos dos serviços ativos já foi faturado">
+                <Gauge dark pct={d.ordered ? (d.billedActive / d.ordered) * 100 : 0} label="dos pedidos ativos" sub={`${brl(d.billedActive)} de ${brl(d.ordered)}`} />
+              </OverviewCard>
+              <OverviewCard className="lg:col-span-2" title={`Faturamento por mês — últimos ${span} meses`} to="/obras/resultado" linkLabel="Abrir Resultados">
+                <HatchBars format={brl} data={d.months.slice(-span).map((m, i) => ({ label: monthLabel(m), value: d.monthVals.slice(-span)[i]!, tip: `${monthLabel(m)}/${m.slice(2, 4)}` }))} />
+              </OverviewCard>
             </div>
-          </>
-        )
-      )}
+          )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {can("/externo/relatorio-diario") && (
-          <OverviewCard className="lg:col-span-2" title="RDO dos serviços com equipe escalada" to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
-            hint="Para cada dia, serviços (fora ADM/Comercial/Pátio/Indústria) com mão de obra escalada e se já existe RDO (rascunho ou finalizado); RDO Geral cobre o cliente">
-            {!op ? <div className="h-40 animate-pulse rounded-xl bg-muted" /> : (
-              <div className="grid gap-4 md:grid-cols-[180px_1fr]">
-                <div>
-                  <p className="font-display text-3xl font-semibold tabular-nums"><CountUp value={pct1(op.cov.pct)} /></p>
-                  <p className="text-xs text-muted-foreground">{op.cov.done} de {op.cov.expected} serviço-dias com RDO</p>
-                  {op.missingLast.length > 0 && (
-                    <div className="mt-3 text-[11px]">
-                      <p className="font-medium">Sem RDO em {op.lastDay?.slice(8, 10)}/{op.lastDay?.slice(5, 7)}:</p>
-                      {op.missingLast.slice(0, 4).map((m) => <p key={m.id} className="truncate text-muted-foreground">• {m.name}</p>)}
-                      {op.missingLast.length > 4 && <p className="text-muted-foreground">+ {op.missingLast.length - 4}</p>}
-                    </div>
-                  )}
-                </div>
-                <div className="flex h-36 items-end gap-[3px]">
-                  {[...op.cov.byDay.entries()].sort().slice(-31).map(([d, v], i) => {
-                    const p = v.expected ? v.done / v.expected : 0;
-                    return (
-                      <div key={d} className="group/day relative flex h-full flex-1 flex-col justify-end" title={`${d.slice(8, 10)}/${d.slice(5, 7)}: ${v.done} de ${v.expected}`}>
-                        <div className="relative w-full overflow-hidden rounded-sm bg-muted" style={{ height: `${Math.max(12, Math.min(100, v.expected * 6))}%` }}>
-                          <div className={cn("ov-grow absolute inset-x-0 bottom-0", p >= 1 ? "bg-foreground" : "bg-foreground/40")} style={{ height: `${p * 100}%`, animationDelay: `${i * 15}ms` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {can("/externo/relatorio-diario") && (
+              <OverviewCard className="lg:col-span-2" title="RDOs nos últimos 30 dias" to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário" hint="Linha cheia = finalizados; tracejada = criados">
+                <LineArea data={d.days.map((x) => ({ label: `${x.slice(8, 10)}/${x.slice(5, 7)}`, a: d.rdoDay.get(x)!.fin, b: d.rdoDay.get(x)!.all }))}
+                  format={(p) => `${p.a} finalizados de ${p.b ?? 0}`} />
+              </OverviewCard>
             )}
-          </OverviewCard>
-        )}
-        {can("/obras") && (
-          <OverviewCard title="Operação" to="/clientes" linkLabel="Ver clientes e serviços" hint="Serviços ativos (fora ADM/Comercial/Pátio/Indústria) e média de pessoas escaladas por dia no período">
-            {!op ? <div className="h-40 animate-pulse rounded-xl bg-muted" /> : (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><p className="font-display text-3xl font-semibold tabular-nums"><CountUp value={op.activeCount} /></p><p className="text-[11px] text-muted-foreground">serviços ativos</p></div>
-                  <div><p className="font-display text-3xl font-semibold tabular-nums"><CountUp value={Math.round(op.cov.headcount)} /></p><p className="text-[11px] text-muted-foreground">pessoas/dia em obra</p></div>
-                </div>
-                <div className="mt-3 space-y-1.5">
-                  {op.clients.slice(0, 5).map(([name, n], i) => (
-                    <div key={name} className="flex items-center gap-2 text-[11px]">
-                      <span className="w-24 truncate">{name}</span>
-                      <div className="h-1.5 flex-1 rounded-full bg-muted"><div className="ov-widen h-full rounded-full bg-foreground/70" style={{ width: `${(n / (op.clients[0]?.[1] || 1)) * 100}%`, animationDelay: `${i * 60}ms` }} /></div>
-                      <span className="w-5 text-right tabular-nums text-muted-foreground">{n}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
+            {can("/obras") && (
+              <OverviewCard title="Clientes que mais faturaram no mês" to="/clientes" linkLabel="Ver clientes">
+                {d.top.length ? <RankBars rows={d.top} format={brl} /> : <p className="py-8 text-center text-xs text-muted-foreground">Nenhuma nota lançada neste mês.</p>}
+              </OverviewCard>
             )}
-          </OverviewCard>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

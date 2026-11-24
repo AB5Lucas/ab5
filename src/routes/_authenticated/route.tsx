@@ -94,7 +94,7 @@ function AuthenticatedLayout() {
       <div className="flex min-h-screen w-full">
         {rail ? <RailMenu /> : <AppSidebar />}
         <MenuSearch />
-        <div className={`flex min-w-0 flex-1 flex-col ${rail ? "pb-20 md:pb-0 md:pl-16" : ""}`}>
+        <div className={`flex min-w-0 flex-1 flex-col ${rail ? "pb-20 md:pb-0 md:pl-20" : ""}`}>
           <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-card/90 px-3 backdrop-blur">
             {!rail && <SidebarTrigger />}
             {isForeman ? (
