@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { CountUp } from "@/components/count-up";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Undo2, RefreshCw, CheckCircle2, CircleHelp, AlertTriangle, Clock } from "lucide-react";
+import { ArrowRight, Download, Undo2, RefreshCw, CheckCircle2, CircleHelp, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { syncIndustryNow } from "@/lib/billing-sync.functions";
 import { fetchAll } from "@/lib/fetch-all";
+import { DateRangePicker } from "@/components/date-range-picker";
+import type { DayRange } from "@/lib/day-range";
 
 const brl = (n: number | null) => n === null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const date = (s: string | null) => s ? new Date(s.includes("T") ? s : `${s}T12:00:00Z`).toLocaleString("pt-BR", s.includes("T") ? { dateStyle: "short", timeStyle: "short" } : { dateStyle: "short" }) : "—";
@@ -86,19 +88,25 @@ function Launch({ id, works }: { id: string; works: { id: string; name: string }
 }
 
 export function IndustryBilling() {
-  const [search, setSearch] = useState(""); const [state, setState] = useState("all");
+  const [search, setSearch] = useState(""); const [state, setState] = useState("all"); const [period, setPeriod] = useState<DayRange | null>(null);
   const qcInv = useQueryClient();
   const inv = useQuery({ queryKey: ["industry-sync", "invoices"], refetchInterval: () => syncPoll(qcInv.getQueryData(["industry-sync", "runs"])), queryFn: () => fetchAll<any>((a, b) => supabase.from("industry_invoices").select("*").order("issued_at", { ascending: false }).order("id").range(a, b)) });
   const works = useIndustryWorks();
   const all = inv.data ?? [];
-  const rows = useMemo(() => all.filter((n: any) => (state === "all" || n.status === state) && `${n.invoice_number} ${n.order_number ?? ""} ${n.client_name}`.toLowerCase().includes(search.toLowerCase())), [all, state, search]);
+  const rows = useMemo(() => all.filter((n: any) => (state === "all" || n.status === state) && (!period || (String(n.issued_at ?? "").slice(0, 10) >= period.from && String(n.issued_at ?? "").slice(0, 10) <= period.to)) && `${n.invoice_number} ${n.order_number ?? ""} ${n.client_name}`.toLowerCase().includes(search.toLowerCase())), [all, state, search, period]);
+  function exportNotes() {
+    const headers = ["Emissão", "NF", "Cliente", "Pedido", "Valor", "Itens", "Situação", "Pendência"];
+    const cells = rows.map((n: any) => [date(n.issued_at), n.invoice_number, n.client_name, n.order_number, n.amount, (n.items as unknown[]).length, n.status === "posted" ? "Lançada" : n.status === "pending" ? "Pendente" : n.status, n.issue ?? ""]);
+    const csv = [headers, ...cells].map((row) => row.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" })); const a = document.createElement("a"); a.href = url; a.download = "faturamento-industria.csv"; a.click(); URL.revokeObjectURL(url);
+  }
   const counts = [{ l: "Notas", v: all.length, I: CheckCircle2 }, { l: "Lançadas", v: all.filter((n: any) => n.status === "posted").length, I: CheckCircle2 }, { l: "Pendentes", v: all.filter((n: any) => n.status === "pending").length, I: CircleHelp }, { l: "Total faturado", v: brl(rows.reduce((a: number, n: any) => a + Number(n.amount), 0)), I: CheckCircle2 }];
   return <div className="space-y-5 pt-2"><SyncBar source="faturamento" />
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{counts.map(({ l, v, I }) => <div key={l} className="rounded-md border border-border bg-card p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>{l}</span><I className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums"><CountUp value={v} /></p></div>)}</div>
     <Tabs defaultValue="notes" className="w-full"><TabsList><TabsTrigger value="notes">Notas</TabsTrigger><TabsTrigger value="runs">Execuções</TabsTrigger></TabsList>
       <TabsContent value="notes" className="w-full space-y-4">
-        <div className="flex flex-wrap items-end gap-3"><div className="min-w-48 flex-1"><Label htmlFor="ind-search">NF, pedido ou cliente</Label><Input id="ind-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar" /></div>
-          <div className="flex gap-1">{[["all", "Todas"], ["posted", "Lançadas"], ["pending", "Pendentes"]].map(([k, v]) => <Button key={k} size="sm" variant={state === k ? "default" : "outline"} onClick={() => setState(k!)}>{v}</Button>)}</div></div>
+        <div className="flex flex-wrap items-end gap-3"><DateRangePicker id="ind-period" label="Período (emissão)" value={period} onChange={setPeriod} onClear={() => setPeriod(null)} emptyLabel="Todas as datas" /><div className="min-w-48 flex-1"><Label htmlFor="ind-search">NF, pedido ou cliente</Label><Input id="ind-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar" /></div>
+          <div className="flex gap-1">{[["all", "Todas"], ["posted", "Lançadas"], ["pending", "Pendentes"]].map(([k, v]) => <Button key={k} size="sm" variant={state === k ? "default" : "outline"} onClick={() => setState(k!)}>{v}</Button>)}</div><Button variant="outline" size="sm" onClick={exportNotes} disabled={!rows.length}><Download className="h-4 w-4" />Exportar</Button></div>
         <div className="w-full overflow-x-auto"><Table className="w-full"><TableHeader><TableRow>{["Emissão", "NF", "Cliente", "Pedido", "Valor", "Itens", "Situação", "Serviço"].map(h => <TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader>
           <TableBody>{rows.map((n: any) => <TableRow key={n.id}><TableCell>{date(n.issued_at)}</TableCell><TableCell className="font-medium">{n.invoice_number}</TableCell><TableCell>{n.client_name}</TableCell><TableCell>{n.order_number || "—"}</TableCell><TableCell className="text-right tabular-nums">{brl(n.amount)}</TableCell><TableCell>{(n.items as unknown[]).length}</TableCell><TableCell><State s={n.status} issue={n.issue} /></TableCell><TableCell>{n.status === "pending" ? <Launch id={n.id} works={works.data ?? []} /> : n.status === "posted" ? <Reverse id={n.id} nf={n.invoice_number} /> : "—"}</TableCell></TableRow>)}
             {!rows.length && <TableRow><TableCell colSpan={8} className="py-12 text-center text-muted-foreground">{inv.isLoading ? "Carregando…" : "Nenhuma nota encontrada"}</TableCell></TableRow>}</TableBody></Table></div>
