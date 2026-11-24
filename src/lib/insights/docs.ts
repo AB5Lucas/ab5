@@ -14,15 +14,8 @@ export const DOC_KIND_TAB: Record<DocKind, "asos" | "treinamentos" | "integracoe
 
 export type ExpiringDoc = { key: string; collaboratorId: string; name: string; kind: DocKind; label: string; expires: string };
 
-/** Dias inteiros de `from` até `to` (datas ISO). */
-export const daysBetween = (from: string, to: string) =>
-  Math.round((Date.parse(`${to.slice(0, 10)}T12:00:00Z`) - Date.parse(`${from.slice(0, 10)}T12:00:00Z`)) / 86400000);
-
-export const addDaysIso = (d: string, n: number) => {
-  const x = new Date(`${d.slice(0, 10)}T12:00:00Z`);
-  x.setUTCDate(x.getUTCDate() + n);
-  return x.toISOString().slice(0, 10);
-};
+import { addDaysIso } from "@/lib/insights/dates";
+export { addDaysIso, daysBetween } from "@/lib/insights/dates";
 
 /** Urgência pelo número de dias até vencer: até 7 = vermelho, até 30 = laranja, depois verde. */
 export function urgencyTone(days: number): "red" | "orange" | "green" {

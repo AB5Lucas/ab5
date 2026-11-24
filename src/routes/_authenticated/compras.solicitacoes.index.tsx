@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SC_DONE_STATUSES } from "@/lib/purchase-requests";
+import { PurchaseInsights, flowStage } from "@/components/insights/purchase-insights";
+import { FLOW_LABEL, type FlowStage } from "@/lib/insights/purchases";
 import { ScHeaderDialog, ScRemoveDialog, ScTable, StatusFilter, statusCounts, useClientsList, useScRemove, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 
 export const Route = createFileRoute("/_authenticated/compras/solicitacoes/")({
@@ -41,7 +43,10 @@ function Page() {
   const scoped = scope === "minhas" ? mine : scope === "copia" ? copied : shownAll;
   const clients = useClientsList();
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
-  const rows = scoped.filter((r) => status === "all" || r.status === status);
+  // Etapa escolhida no bloco "Onde a SC está parada" (faixa do topo); clicar de novo limpa.
+  const [flow, setFlow] = useState<FlowStage | null>(null);
+  const rows = scoped.filter((r) => (status === "all" || r.status === status) && (!flow || flowStage(r) === flow));
+  const pickFlow = (s: FlowStage | null) => { setFlow(s); if (s === "comprada" && show === "abertas") setShow("todas"); };
   const send = useMutation({
     mutationFn: async (id: string) => { const { data, error } = await supabase.rpc("purchase_request_send", { _id: id }); if (error) throw error; return data; },
     onSuccess: (to) => { toast.success(to === "compras" ? "Enviada direto para o Comprador" : "Enviada para o validador"); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
@@ -104,6 +109,7 @@ function Page() {
   return (
     <div className="space-y-4">
       <PageHeader title="Solicitações" description="Suas solicitações e as que você acompanha em cópia. Enviar manda para o validador (gestor do cliente); depois de validada, vai para o Comprador. Antes da validação você pode puxar de volta pelo lápis (fica bloqueado enquanto o validador está com ela aberta); depois, só se o validador ou o Comprador devolver. O botão de copiar cria uma SC nova igual." />
+      <PurchaseInsights id="solicitacoes" rows={all} loading={list.isLoading} stage={flow} onStage={pickFlow} />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label className="block text-xs">Mostrar</Label>
@@ -128,6 +134,7 @@ function Page() {
           </Select>
         </div>
         <StatusFilter value={status} onChange={setStatus} counts={statusCounts(scoped)} />
+        {flow && <Button variant="outline" size="sm" onClick={() => setFlow(null)}>Etapa: {FLOW_LABEL[flow]} ✕</Button>}
         <Button className="ml-auto" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nova</Button>
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (

@@ -9,7 +9,7 @@ const clamp01 = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v))
 
 /** Anel de progresso (0–1) com rótulo no centro. */
 export function Ring({ value, size = 48, stroke = 5, className, children, title }: {
-  value: number; size?: number; stroke?: number; className?: string; children?: ReactNode; title?: string;
+  value: number; size?: number | undefined; stroke?: number | undefined; className?: string | undefined; children?: ReactNode | undefined; title?: string | undefined;
 }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -27,7 +27,7 @@ export function Ring({ value, size = 48, stroke = 5, className, children, title 
 }
 
 /** Barra horizontal fina (valor ÷ máximo). */
-export function Bar({ value, max = 1, className, trackClassName, title }: { value: number; max?: number; className?: string; trackClassName?: string; title?: string }) {
+export function Bar({ value, max = 1, className, trackClassName, title }: { value: number; max?: number | undefined; className?: string | undefined; trackClassName?: string | undefined; title?: string | undefined }) {
   const pct = clamp01(max > 0 ? value / max : 0) * 100;
   return (
     <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-muted", trackClassName)} title={title}>
@@ -39,7 +39,7 @@ export function Bar({ value, max = 1, className, trackClassName, title }: { valu
 export type StackPart = { key: string; label: string; value: number; className: string };
 
 /** Barra empilhada (partes de um total); clicar numa parte chama onPick. */
-export function StackedBar({ parts, onPick, className }: { parts: StackPart[]; onPick?: (key: string) => void; className?: string }) {
+export function StackedBar({ parts, onPick, className }: { parts: StackPart[]; onPick?: ((key: string) => void) | undefined; className?: string | undefined }) {
   const total = parts.reduce((s, p) => s + Math.max(0, p.value), 0);
   return (
     <div className={cn("flex h-2.5 w-full overflow-hidden rounded-full bg-muted", className)}>
@@ -55,7 +55,7 @@ export function StackedBar({ parts, onPick, className }: { parts: StackPart[]; o
 }
 
 /** Mini-linha (sparkline) dos valores na ordem dada. */
-export function Sparkline({ values, width = 84, height = 24, className, title }: { values: number[]; width?: number; height?: number; className?: string; title?: string }) {
+export function Sparkline({ values, width = 84, height = 24, className, title }: { values: number[]; width?: number | undefined; height?: number | undefined; className?: string | undefined; title?: string | undefined }) {
   if (!values.length) return null;
   const max = Math.max(...values, 0);
   const step = values.length > 1 ? width / (values.length - 1) : 0;
@@ -72,7 +72,7 @@ export function Sparkline({ values, width = 84, height = 24, className, title }:
 }
 
 /** Legenda pequena com bolinha colorida. */
-export function Legend({ items }: { items: { label: string; className: string; value?: ReactNode }[] }) {
+export function Legend({ items }: { items: { label: string; className: string; value?: ReactNode | undefined }[] }) {
   return (
     <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
       {items.map((i) => (

@@ -20,11 +20,11 @@ function writeCollapsed(id: string, v: boolean) {
 export function InsightStrip({ id, title = "Painel", summary, children, className }: {
   /** Chave da página (lembra se está recolhida). */
   id: string;
-  title?: string;
+  title?: string | undefined;
   /** Resumo curto mostrado quando a faixa está recolhida. */
-  summary?: ReactNode;
+  summary?: ReactNode | undefined;
   children: ReactNode;
-  className?: string;
+  className?: string | undefined;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => { setCollapsed(readCollapsed(id)); }, [id]);
@@ -57,17 +57,17 @@ const TONE_BORDER: Record<InsightTone, string> = {
 
 export function InsightCard({ title, icon, tone = "default", pulse, hint, onClick, children, className, loading, error }: {
   title: string;
-  icon?: ReactNode;
-  tone?: InsightTone;
+  icon?: ReactNode | undefined;
+  tone?: InsightTone | undefined;
   /** Pulsa discretamente: só quando exige ação. */
-  pulse?: boolean;
+  pulse?: boolean | undefined;
   /** Explica a conta (aparece ao passar o mouse). */
-  hint?: string;
-  onClick?: () => void;
-  children?: ReactNode;
-  className?: string;
-  loading?: boolean;
-  error?: boolean;
+  hint?: string | undefined;
+  onClick?: (() => void) | undefined;
+  children?: ReactNode | undefined;
+  className?: string | undefined;
+  loading?: boolean | undefined;
+  error?: boolean | undefined;
 }) {
   const onKey = (e: KeyboardEvent) => { if (onClick && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onClick(); } };
   return (
@@ -102,7 +102,7 @@ export function InsightCard({ title, icon, tone = "default", pulse, hint, onClic
 }
 
 /** Número de destaque + legenda curta. */
-export function BigNumber({ children, label, className }: { children: ReactNode; label?: ReactNode; className?: string }) {
+export function BigNumber({ children, label, className }: { children: ReactNode; label?: ReactNode | undefined; className?: string | undefined }) {
   return (
     <div className="flex items-baseline gap-1.5">
       <span className={cn("font-display text-2xl font-semibold tabular-nums leading-none", className)}>{children}</span>
@@ -112,7 +112,7 @@ export function BigNumber({ children, label, className }: { children: ReactNode;
 }
 
 /** Linha clicável dentro de um bloco (não dispara o clique do bloco). */
-export function InsightRow({ children, onClick, title, className }: { children: ReactNode; onClick?: () => void; title?: string; className?: string }) {
+export function InsightRow({ children, onClick, title, className }: { children: ReactNode; onClick?: (() => void) | undefined; title?: string | undefined; className?: string | undefined }) {
   if (!onClick) return <div className={cn("flex min-w-0 items-center gap-2 text-xs", className)} title={title}>{children}</div>;
   return (
     <button type="button" title={title}

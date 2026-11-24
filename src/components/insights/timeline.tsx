@@ -5,7 +5,7 @@
 import { cn } from "@/lib/utils";
 
 export type TimelineTone = "red" | "orange" | "green" | "gray";
-export type TimelineDay = { date: string; count: number; tone: TimelineTone; title?: string };
+export type TimelineDay = { date: string; count: number; tone: TimelineTone; title?: string | undefined };
 
 const FILL: Record<TimelineTone, string> = {
   red: "fill-destructive",
@@ -17,7 +17,7 @@ const FILL: Record<TimelineTone, string> = {
 const br = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 export function Timeline({ days, selected, onPick, className }: {
-  days: TimelineDay[]; selected?: string | null; onPick?: (date: string) => void; className?: string;
+  days: TimelineDay[]; selected?: string | null | undefined; onPick?: ((date: string) => void) | undefined; className?: string | undefined;
 }) {
   const col = 10;
   const h = 26;
