@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, ChevronUp, LayoutList, PanelLeftClose, PanelLeftOpen, Search, Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
 } from "@/components/ui/sidebar";
@@ -47,7 +47,9 @@ export function AppSidebar() {
   // Um módulo aberto por vez: o da página atual, salvo se o usuário abrir/fechar outro.
   const [openMod, setOpenMod] = useState<string | null | undefined>(undefined);
   const [fly, setFly] = useState<string | null>(null);
-  useEffect(() => { setOpenMod(undefined); setFly(null); }, [current]);
+  // Página aberta pelos Fixados não expande o módulo dela (fica tudo recolhido).
+  const fromFav = useRef(false);
+  useEffect(() => { setOpenMod(fromFav.current ? null : undefined); fromFav.current = false; setFly(null); }, [current]);
 
   const all = loading ? [] : MENU_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canAccess(i.url)) })).filter((g) => g.items.length);
   const modules = all.filter((g) => !g.userMenu);
@@ -58,7 +60,7 @@ export function AppSidebar() {
   const closeMobile = () => { if (isMobile) setOpenMobile(false); };
   const initials = (profile?.full_name || profile?.email || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 
-  const pageRow = (item: MenuItem, group: MenuGroup, opts: { icon?: boolean; key?: string } = {}) => {
+  const pageRow = (item: MenuItem, group: MenuGroup, opts: { icon?: boolean; key?: string; fav?: boolean } = {}) => {
     const Icon = item.icon ?? group.icon;
     const active = current === item.url;
     const b = badges[item.url];
@@ -66,7 +68,7 @@ export function AppSidebar() {
       <SidebarMenuItem key={(opts.key ?? "") + item.url}>
         <SidebarMenuButton asChild isActive={active}
           className="relative h-8 rounded-lg text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold">
-          <Link to={item.to ?? item.url} onClick={closeMobile} className="flex items-center gap-2.5 pr-2">
+          <Link to={item.to ?? item.url} onClick={() => { if (opts.fav) { if (current === item.url) setOpenMod(null); else fromFav.current = true; } closeMobile(); }} className="flex items-center gap-2.5 pr-2">
             {active && <span className="absolute inset-y-1.5 -left-2 w-[3px] rounded-r-full bg-sidebar-primary" aria-hidden />}
             {opts.icon && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-sidebar-primary" : "opacity-90"}`} />}
             <span className="truncate">{item.title}</span>
@@ -213,7 +215,7 @@ export function AppSidebar() {
                 <p className="flex items-center gap-1.5 px-2 pb-1 pt-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/75">
                   <Star className="h-3 w-3" /> Fixados
                 </p>
-                <SidebarMenu className="gap-0.5">{favItems.map(({ item, group }) => pageRow(item, group, { icon: true, key: "fav-" }))}</SidebarMenu>
+                <SidebarMenu className="gap-0.5">{favItems.map(({ item, group }) => pageRow(item, group, { icon: true, key: "fav-", fav: true }))}</SidebarMenu>
               </div>
             )}
             <SidebarMenu className="gap-0.5">
