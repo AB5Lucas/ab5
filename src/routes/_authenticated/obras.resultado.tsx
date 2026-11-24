@@ -12,5 +12,12 @@ export const Route = createFileRoute("/_authenticated/obras/resultado")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: () => <ResultadoPage />,
+  // ?work=<id> abre já no serviço (clique no nome do serviço em Clientes › Serviços).
+  validateSearch: (s: Record<string, unknown>): { work?: string } => (typeof s["work"] === "string" && s["work"] ? { work: s["work"] } : {}),
+  component: ResultadoRoute,
 });
+
+function ResultadoRoute() {
+  const { work } = Route.useSearch();
+  return <ResultadoPage key={work ?? ""} {...(work ? { initialWorkId: work } : {})} />;
+}

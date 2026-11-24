@@ -350,7 +350,7 @@ function WorksPage() {
               const c = w.client_id ? clientById.get(w.client_id) : null;
               return (
                 <TableRow key={w.id}>
-                  <TableCell className="font-medium">{w.name}</TableCell>
+                  <TableCell className="font-medium"><Link to="/obras/resultado" search={{ work: w.id }} className="hover:text-primary hover:underline" title="Abrir o resultado deste serviço">{w.name}</Link></TableCell>
                   <TableCell className="font-mono text-xs">{w.cc_suffix ? `${(c as { cc_prefix?: string | null } | null)?.cc_prefix ?? "????"}${w.cc_suffix}` : "—"}</TableCell>
                   <TableCell className="hidden md:table-cell">{c?.name ?? w.client ?? "—"}</TableCell>
                   <TableCell className="hidden lg:table-cell">
