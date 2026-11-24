@@ -7,7 +7,7 @@ import type { QueryClient } from "@tanstack/react-query";
  */
 const DAY_KEYS: readonly (readonly string[])[] = [
   ["schedule-ctx"], ["schedule"], ["allocations"], ["status-entries"], ["rdo-absence-origin"], ["appointments-day"],
-  ["servicos-day"], ["servicos-weekend-ctx"], ["weekly-folgas"], ["closing"], ["dashboard"], ["report-allocations"],
+  ["servicos-day"], ["day-absences"], ["servicos-weekend-ctx"], ["weekly-folgas"], ["closing"], ["dashboard"], ["report-allocations"],
   ["days_off"], ["vacations"], ["medical_leaves"],
   ["menu-badges"], ["schedule-alerts"], ["service-distribution"],
 ];

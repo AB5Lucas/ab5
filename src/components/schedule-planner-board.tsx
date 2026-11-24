@@ -1,34 +1,23 @@
 import { ScheduleAlertsButton } from "@/components/schedule-alerts-button";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle,
-  ArrowDown,
-  Ban,
+  BedDouble,
   CalendarDays,
-  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
-  GripVertical,
   LayoutGrid,
   MapPin,
-  Moon,
   Search,
   SlidersHorizontal,
-  Users,
-  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { copySkipReason } from "@/lib/schedule-copy";
-import { CopyDayDialog } from "@/components/schedule-planner/copy-day-dialog";
-import { travelOnFor, vtBaseForDay, vtForDay, workVtDefault } from "@/lib/transport-rules";
-import { nextBoxTravel, resolveBoxTravel } from "@/lib/schedule-box-benefits";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,6 +28,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   addDays,
   asoBlocksWork,
@@ -54,45 +52,31 @@ import {
   ASO_LABEL,
   INTEGRATION_LABEL,
 } from "@/lib/scheduling";
-import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
+import type { ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
+import { copySkipReason } from "@/lib/schedule-copy";
 import { scheduleWriteError } from "@/lib/schedule-write-error";
-import { invalidateScheduleDay } from "@/lib/invalidate-day";
-import { SchedulePresence } from "@/components/schedule-planner/schedule-presence";
-import { useScheduleBenefits } from "@/components/schedule-planner/use-schedule-benefits";
 import { formatCpf } from "@/lib/copy-names";
-import { buildDistanceLookup } from "@/lib/city-distance";
-import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
+import type { PendingOccurrence } from "@/lib/rdo";
 import { RdoAbsenceDialog } from "@/components/rdo-absence-dialog";
 import { WeeklyDaysOffDialog } from "@/components/weekly-days-off-dialog";
-import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingOn, LODGING_LABEL, LODGING_TAG, type LodgingStay } from "@/lib/lodging";
 import { LodgingDialog } from "@/components/lodging-dialog";
-import { BedDouble } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
-
+import { CopyDayDialog } from "@/components/schedule-planner/copy-day-dialog";
+import { SchedulePresence } from "@/components/schedule-planner/schedule-presence";
+import { useScheduleBenefits } from "@/components/schedule-planner/use-schedule-benefits";
+import { usePlannerMutations } from "@/components/schedule-planner/use-planner-mutations";
+import { WorkBox } from "@/components/schedule-planner/work-box";
+import { StatusBox } from "@/components/schedule-planner/status-box";
+import type { PlannerApi, PlannerRow } from "@/components/schedule-planner/planner-api";
 import {
   STATUS_BOXES,
-  BOX_LABEL,
   AUTO_BOX_KEYS,
   MANUAL_BOXES,
   ABSENCE_BOX,
   BOXES_STORAGE_KEY,
-  isWeekendDate,
-  APPOINTMENT_BOX,
   INTEGRATION_PREFIX,
   integrationClientOf,
   boxLabelOf,
-  appointmentClientName,
-  WEEKDAYS,
   dayLine,
   hourLabel,
   ASO_FOOTER,
@@ -100,13 +84,14 @@ import {
   copyToClipboard,
   appointmentLabel,
   appointmentBoxKey,
-  vtBoxDefault,
   FILTERS,
   HIDDEN_CONTRACTS,
   LEVEL_DOT,
   LEVEL_TEXT,
 } from "@/components/schedule-planner/boxes";
-import type { Level, Evaluation, DragPayload, AppointmentRow, FilterKey } from "@/components/schedule-planner/boxes";
+import type { Evaluation, DragPayload, AppointmentRow, FilterKey } from "@/components/schedule-planner/boxes";
+
+const NO_ROWS: PlannerRow[] = [];
 
 export function SchedulePlannerBoard({
   date,
@@ -115,7 +100,7 @@ export function SchedulePlannerBoard({
   date: string;
   onDateChange: (d: string) => void;
 }) {
-  const { canWrite, user } = useCurrentUser();
+  const { canWrite } = useCurrentUser();
   const qc = useQueryClient();
   /** Duplicidade (outro usuário gravou o mesmo dia) vira aviso e releitura; o resto mostra a mensagem. */
   const onWriteError = (e: unknown) => scheduleWriteError(qc, e);
@@ -258,38 +243,6 @@ export function SchedulePlannerBoard({
   const [occOpen, setOccOpen] = useState<PendingOccurrence | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [copyAsk, setCopyAsk] = useState<{ work: any; siblings: any[] } | null>(null);
-  const classify = useMutation({
-    mutationFn: async ({ occ, key }: { occ: PendingOccurrence; key: string }) => {
-      const { data: u } = await supabase.auth.getUser();
-      await classifyOccurrence(occ, key, u.user?.id ?? null);
-      return occ;
-    },
-    onSuccess: () => {
-      toast.success("Ocorrência classificada e programação atualizada");
-      setOccOpen(null);
-      qc.invalidateQueries({ queryKey: ["rdo-pending", date] });
-      qc.invalidateQueries({ queryKey: ["schedule", date] });
-      qc.invalidateQueries({ queryKey: ["allocations"] });
-      qc.invalidateQueries({ queryKey: ["status-entries"] });
-    },
-    onError: onWriteError,
-  });
-  const keepOcc = useMutation({
-    mutationFn: async (occ: PendingOccurrence) => {
-      const { error } = await supabase
-        .from("rdo_workforce")
-        .update({ present: true, occurrence_status: "none", reported_reason: null, reported_note: null, final_classification: null })
-        .eq("id", occ.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Colaborador mantido no efetivo");
-      setOccOpen(null);
-      qc.invalidateQueries({ queryKey: ["rdo-pending", date] });
-    },
-    onError: onWriteError,
-  });
-
   const statusEntries = useQuery({
     queryKey: ["status-entries", scheduleId],
     enabled: !!scheduleId,
@@ -463,6 +416,12 @@ export function SchedulePlannerBoard({
     const allocated = new Set(rows.map((r: { work_id: string }) => r.work_id));
     return (c?.works ?? []).filter((w) => w.active || allocated.has(w.id));
   }, [c, rows]);
+  /** Índices para o desenho (antes um .find por pessoa a cada render). */
+  const worksById = useMemo(() => new Map(works.map((w) => [w.id, w])), [works]);
+  const allocById = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
+  const entryById = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
+  /** Ocorrência pendente do RDO por serviço|pessoa. */
+  const occByKey = useMemo(() => new Map((pendingOcc.data ?? []).map((o) => [`${o.work_id}|${o.collaborator_id}`, o])), [pendingOcc.data]);
   /** Clientes com serviços ativos (lista do botão "Clientes"). */
   const clientOptions = useMemo(() => {
     const m = new Map<string, string>();
@@ -622,7 +581,7 @@ export function SchedulePlannerBoard({
     const absence = c?.absences.get(collaboratorId);
     const current = allocByCollaborator.get(collaboratorId);
     const currentLabel = () => {
-      const w = works.find((x) => x.id === current?.work_id);
+      const w = current ? worksById.get(current.work_id) : undefined;
       return w ? workLabel(w) : "outra obra";
     };
 
@@ -651,7 +610,7 @@ export function SchedulePlannerBoard({
     if (notice?.end && date > notice.end)
       return base({ level: "block", hardBlock: true, reasons: [`Aviso prévio terminou em ${formatDateBR(notice.end)}`] });
 
-    const work = works.find((x) => x.id === workId);
+    const work = worksById.get(workId);
     const clientName = work?.clients?.name ?? "cliente";
     const integ = checkIntegration(c as ScheduleContext, workId, collaboratorId, date);
     const requiresInt = workRequiresIntegration(c as ScheduleContext, workId);
@@ -762,210 +721,11 @@ export function SchedulePlannerBoard({
     qc.invalidateQueries({ queryKey: ["dashboard"] });
   }
 
-  /** Move o colaborador para uma caixa de situação (folga, atestado, etc.). */
-  const dropBox = useMutation({
-    mutationFn: async ({ collaboratorId, allocationId, boxKey }: DragPayload & { boxKey: string }) => {
-      const person = personById.get(collaboratorId);
-      const name = person?.full_name ?? "Colaborador";
-      const id = await ensureSchedule();
-      const alloc = allocationId ?? allocByCollaborator.get(collaboratorId)?.id ?? null;
-      if (alloc) {
-        const { error } = await supabase.from("daily_allocations").delete().eq("id", alloc);
-        if (error) throw error;
-      }
-      const boxRows = entries.filter((e) => e.box_key === boxKey);
-      const sort = boxRows.length ? Math.max(...boxRows.map((e) => e.sort_order)) + 1 : 0;
-      const { error } = await supabase
-        .from("daily_status_entries")
-        .upsert(
-          { schedule_id: id, collaborator_id: collaboratorId, box_key: boxKey, sort_order: sort },
-          { onConflict: "schedule_id,collaborator_id" },
-        );
-      if (error) throw error;
-      if (boxKey === "folga") {
-        // Cadastra automaticamente a folga do dia na aba Folgas
-        const { data: existing } = await supabase
-          .from("days_off")
-          .select("id")
-          .eq("collaborator_id", collaboratorId)
-          .lte("date", date)
-          .or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`)
-          .limit(1);
-        if (!existing?.length) {
-          const { error: e2 } = await supabase
-            .from("days_off")
-            .insert({ collaborator_id: collaboratorId, date, reason: "Programação" });
-          if (e2) throw e2;
-        }
-      }
-      return { id, name, boxKey };
-    },
-    onSuccess: (r) => {
-      toast.success(`${r.name} registrado em ${boxLabelOf(r.boxKey)}`);
-      invalidate(r.id);
-      if (r.boxKey === "folga") {
-        qc.invalidateQueries({ queryKey: ["schedule-ctx", date] });
-        qc.invalidateQueries({ queryKey: ["days_off"] });
-      }
-    },
-    onError: onWriteError,
-  });
-
-  const removeEntry = useMutation({
-    mutationFn: async ({ id, folga }: { id: string; folga?: "day" | "all" }) => {
-      const entry = entries.find((e) => e.id === id);
-      const { error } = await supabase.from("daily_status_entries").delete().eq("id", id);
-      if (error) throw error;
-      if (entry?.box_key === "folga") {
-        // Só o dia: encurta ou divide o período da folga; inteira: apaga o registro (day_off_remove_day, uma transação).
-        const { error: offErr } = await supabase.rpc("day_off_remove_day", { _collaborator_id: entry.collaborator_id, _date: date, _whole: folga === "all" });
-        if (offErr) throw offErr;
-      }
-    },
-    onSuccess: () => {
-      toast.success("Registro removido da caixa");
-      setFolgaAsk(null);
-      invalidate();
-      invalidateScheduleDay(qc);
-    },
-    onError: onWriteError,
-  });
-  /** Folga de vários dias: pergunta se tira só o dia aberto ou a folga inteira. */
-  const [folgaAsk, setFolgaAsk] = useState<{ id: string; name: string; start: string; end: string } | null>(null);
-  async function askRemoveEntry(id: string) {
-    const entry = entries.find((e) => e.id === id);
-    if (entry?.box_key !== "folga") { removeEntry.mutate({ id }); return; }
-    const { data, error } = await supabase.from("days_off").select("date, end_date")
-      .eq("collaborator_id", entry.collaborator_id).lte("date", date)
-      .or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`);
-    if (error) { onWriteError(error); return; }
-    const long = (data ?? []).find((o) => (o.end_date ?? o.date) !== o.date);
-    if (!long) { removeEntry.mutate({ id, folga: "day" }); return; }
-    setFolgaAsk({ id, name: personById.get(entry.collaborator_id)?.full_name ?? "Colaborador", start: long.date, end: long.end_date ?? long.date });
-  }
-
-  const drop = useMutation({
-    mutationFn: async ({
-      collaboratorId,
-      allocationId,
-      workId,
-      beforeSort,
-    }: DragPayload & { workId: string; beforeSort?: number }) => {
-      if (!c) throw new Error("Carregando dados");
-      const person = personById.get(collaboratorId);
-      const name = person?.full_name ?? "Colaborador";
-      const fromBox = entryByCollaborator.get(collaboratorId) ?? null;
-      const ev = evaluate(collaboratorId, workId, { ignoreEntry: true });
-      if (ev.level === "block" || ev.hardBlock)
-        throw new Error(`${name} não pode ser alocado nesta obra: ${ev.reasons.join(", ")}`);
-
-      const issues = checkRequirements(c, workId, collaboratorId, date);
-      const id = await ensureSchedule();
-      const targetRows = rows.filter((r) => r.work_id === workId && r.collaborator_id !== collaboratorId);
-      // Solto em cima de alguém: entra no lugar dele e quem está dali para baixo desce uma posição (sort_order é inteiro).
-      let sort: number;
-      if (beforeSort != null) {
-        sort = Math.ceil(beforeSort);
-        const below = targetRows.filter((r) => r.sort_order >= sort);
-        if (below.length) {
-          // Uma transação só: falha no meio não deixa a ordem pela metade.
-          const { error } = await supabase.rpc("reorder_allocations", { _ids: below.map((r) => r.id), _orders: below.map((r) => r.sort_order + 1) });
-          if (error) throw error;
-        }
-      } else sort = targetRows.length ? Math.max(...targetRows.map((r) => r.sort_order)) + 1 : 0;
-
-      // Ao mudar de obra, VT e prêmio viagem voltam à regra da obra nova (as exceções marcadas na obra antiga saem).
-      const resetIfMoved = (fromWork: string | null | undefined) =>
-        fromWork && fromWork !== workId ? { vt_override: null, travel_bonus_override: null } : {};
-      if (fromBox) {
-        // Sai do quadro e entra na obra na mesma transação (antes: apagava o quadro e depois inseria).
-        const { error } = await supabase.rpc("schedule_entry_to_work", { _entry_id: fromBox.id, _work_id: workId, _sort: sort, _pending: issues.length > 0 });
-        if (error) throw error;
-      } else if (allocationId) {
-        const { error } = await supabase
-          .from("daily_allocations")
-          .update({
-            work_id: workId,
-            sort_order: sort,
-            has_pending_requirement: issues.length > 0,
-            ...resetIfMoved(rows.find((r) => r.id === allocationId)?.work_id),
-          })
-          .eq("id", allocationId);
-        if (error) throw error;
-      } else {
-        const existing = allocByCollaborator.get(collaboratorId);
-        if (existing) {
-          const { error } = await supabase
-            .from("daily_allocations")
-            .update({ work_id: workId, sort_order: sort, has_pending_requirement: issues.length > 0, ...resetIfMoved(existing.work_id) })
-            .eq("id", existing.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from("daily_allocations").insert({
-            schedule_id: id,
-            work_id: workId,
-            collaborator_id: collaboratorId,
-            position_id: person?.position_id ?? null,
-            driver: false,
-            source: "manual",
-            confirmation_status: "pending",
-            has_pending_requirement: issues.length > 0,
-            sort_order: sort,
-          });
-          if (error) throw error;
-        }
-      }
-      return { id, name, warn: ev.level === "warn" ? ev.reasons.join(", ") : null };
-    },
-    onSuccess: (r) => {
-      toast.success(`${r.name} alocado`);
-      if (r.warn) toast.warning(`Pendência: ${r.warn}`);
-      invalidate(r.id);
-    },
-    onError: onWriteError,
-  });
-
-  /** Escolhe o serviço do cliente: mantém o atual, senão o último usado pela pessoa nesse cliente, senão o primeiro ativo. */
-  async function dropOnGroup(p: DragPayload, g: (typeof groups)[number]) {
-    const ids = g.works.map((x) => x.id);
-    const cur = p.allocationId ? rows.find((r) => r.id === p.allocationId) : allocByCollaborator.get(p.collaboratorId);
-    let workId = cur && ids.includes(cur.work_id) ? cur.work_id : null;
-    if (!workId && ids.length > 1) {
-      const { data } = await supabase
-        .from("daily_allocations")
-        .select("work_id")
-        .eq("collaborator_id", p.collaboratorId)
-        .in("work_id", g.works.filter((x) => x.active).map((x) => x.id))
-        .order("created_at", { ascending: false })
-        .limit(1);
-      workId = data?.[0]?.work_id ?? null;
-    }
-    drop.mutate({ ...p, workId: workId ?? g.rep.id });
-  }
-
   const [clearBox, setClearBox] = useState<{ label: string; ids: string[] } | null>(null);
-  const clearRows = useMutation({
-    mutationFn: async (ids: string[]) => {
-      const { error } = await supabase.from("daily_allocations").delete().in("id", ids);
-      if (error) throw error;
-      return ids.length;
-    },
-    onSuccess: (n) => { toast.success(`${n} colaborador(es) retirados da escalação`); setClearBox(null); invalidate(); },
-    onError: onWriteError,
+  const { classify, keepOcc, dropBox, removeEntry, folgaAsk, setFolgaAsk, askRemoveEntry, drop, dropOnGroup, clearRows, removeRow } = usePlannerMutations({
+    date, c, rows, entries, personById, allocByCollaborator, allocById, entryById, entryByCollaborator, evaluate,
+    ensureSchedule, invalidate, onWriteError, setOccOpen, setClearBox,
   });
-
-  const removeRow = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("daily_allocations").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Colaborador removido da obra");
-      invalidate();
-    },
-    onError: onWriteError,
-  });
-
 
   const [confirmCopyPrev, setConfirmCopyPrev] = useState(false);
   const [openFolgas, setOpenFolgas] = useState(false);
@@ -1044,6 +804,86 @@ export function SchedulePlannerBoard({
     void copyToClipboard([`*${w.clients?.name ?? w.name}*`, dayLine(date), "", names.join("\n")].join("\n"));
   };
 
+  /** Efetivo de cada quadro de cliente (sem ausentes e agendados), em ordem alfabética; só refaz quando os dados mudam. */
+  const workRowsByGroup = useMemo(() => {
+    const m = new Map<string, PlannerRow[]>();
+    const groupOf = new Map<string, string>();
+    for (const g of groups) for (const w of g.works) groupOf.set(w.id, g.key);
+    for (const r of rows) {
+      const k = groupOf.get(r.work_id);
+      if (!k || !matchesRole(r.collaborator_id, r.position_id) || appointmentByCollaborator.has(r.collaborator_id) || c?.absences.has(r.collaborator_id)) continue;
+      m.set(k, [...(m.get(k) ?? []), r]);
+    }
+    const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
+    for (const list of m.values()) list.sort((a, b) => nameOf(a.collaborator_id).localeCompare(nameOf(b.collaborator_id), "pt-BR"));
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, rows, roleQuery, appointmentByCollaborator, c, personById, positionById]);
+
+  /** Caixas de situação exibidas no dia, com as pessoas lançadas (boxRows) e as das ausências/agendamentos (autoRows). */
+  const statusBoxes = useMemo(() => {
+    const list = [
+      // Integrações (por cliente) logo após as obras
+      ...[
+        ...new Set([
+          ...[...appointmentsByBox.keys()].filter((k) => k.startsWith(INTEGRATION_PREFIX)),
+          ...entries.map((e) => e.box_key).filter((k) => k.startsWith(INTEGRATION_PREFIX)),
+        ]),
+      ]
+        .sort((a, b) => a.localeCompare(b, "pt-BR"))
+        .map((key) => ({ key, label: boxLabelOf(key) })),
+      ...STATUS_BOXES.filter((b) => b.key !== "integracao").map((b) => ({
+        key: b.key as string,
+        label: (boxTitles.data?.get(b.key) ?? b.label) as string,
+      })),
+    ].filter(
+      (b) =>
+        visibleBoxes.has(b.key) ||
+        entries.some((e) => e.box_key === b.key) ||
+        (absenceMembers.get(b.key)?.length ?? 0) > 0 ||
+        (appointmentsByBox.get(b.key)?.length ?? 0) > 0,
+    );
+    const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
+    const byName = (a: string, b: string) => nameOf(a).localeCompare(nameOf(b), "pt-BR");
+    return list.map((b) => {
+      const boxRows = entries
+        .filter((e) => {
+          if (e.box_key !== b.key || !matchesRole(e.collaborator_id)) return false;
+          // Ausência cadastrada (ex.: atestado do RH) prevalece sobre a caixa manual.
+          const reg = c?.absences.get(e.collaborator_id);
+          const regKey = reg ? ABSENCE_BOX[reg] : undefined;
+          return !regKey || regKey === b.key;
+        })
+        .slice()
+        .sort((x, y) => byName(x.collaborator_id, y.collaborator_id));
+      const inBox = new Set(boxRows.map((r) => r.collaborator_id));
+      const autoRows = (absenceMembers.get(b.key) ?? [])
+        .filter((a) => matchesRole(a.id) && !inBox.has(a.id))
+        .slice()
+        .sort((x, y) => byName(x.id, y.id));
+      return { b, boxRows, autoRows };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointmentsByBox, entries, boxTitles.data, visibleBoxes, absenceMembers, personById, roleQuery, c]);
+
+  /** Muda quando algum dado desenhado nos quadros muda: os quadros memorizados redesenham só nessa hora. */
+  const dataVersion = [
+    date, editable, canClassify, roleQuery, allocations.dataUpdatedAt, statusEntries.dataUpdatedAt, ctx.dataUpdatedAt, pendingOcc.dataUpdatedAt,
+    nightToday.dataUpdatedAt, nightCarry.dataUpdatedAt, rdoOrigin.dataUpdatedAt, appointments.dataUpdatedAt, workVt.dataUpdatedAt,
+    benefits.workTravel.dataUpdatedAt, benefits.travelRules.dataUpdatedAt, benefits.lodgingStays.dataUpdatedAt, benefits.boxVt.dataUpdatedAt,
+    boxTitles.dataUpdatedAt, clearRows.isPending, benefits.toggleBoxTravel.isPending,
+  ].join("|");
+  const apiRef = useRef<PlannerApi>(null as unknown as PlannerApi);
+  apiRef.current = {
+    date, rows, allocById, occByKey, ctx: c, pendingOcc: pendingOcc.data ?? [], nightToday: nightToday.data instanceof Set ? (nightToday.data as Set<string>) : new Set<string>(),
+    nightCarry: nightCarry.data, rdoOrigin: rdoOrigin.data, personById, positionById, allocByCollaborator, canClassify,
+    setSelectedWork, setHoverWork, setHoverBox, setDragging, setEditingBox, setOpenEntry, setOccOpen, setClearBox,
+    readPayload, startDrag, dropOnGroup, drop, dropBox, removeRow, clearRows, askRemoveEntry, copyWorks, copyPeopleCpf, buildBoxMessage,
+    noticeTitle, noticeClass, lodgingOf, workPaysVt, workPaysTravel, allocVtOn, defaultAllocTravel, travelInfo,
+    setGroupVt, setGroupTravel, setGroupOvernight, toggleAllocVt, toggleAllocTravel, toggleOvernight, boxPaysVt, toggleBoxVt, saveBoxTitle,
+    travelDot, personBenefits,
+  };
+
   return (
     <div className="space-y-4">
       <AlertDialog open={!!clearBox} onOpenChange={(o) => !o && setClearBox(null)}>
@@ -1117,7 +957,7 @@ export function SchedulePlannerBoard({
         onOpenChange={(v) => !v && setOccOpen(null)}
         mode="classify"
         collaboratorName={occOpen ? (personById.get(occOpen.collaborator_id)?.full_name ?? "Colaborador") : ""}
-        workName={occOpen ? (() => { const w = c?.works.find((x) => x.id === occOpen.work_id); return w ? workLabel(w) : ""; })() : ""}
+        workName={occOpen ? (() => { const w = c?.worksById.get(occOpen.work_id); return w ? workLabel(w) : ""; })() : ""}
         date={occOpen?.report_date}
         reportedReason={occOpen?.reported_reason}
         reportedNote={occOpen?.reported_note}
@@ -1258,552 +1098,38 @@ export function SchedulePlannerBoard({
                 : "Nenhum cliente selecionado para este dia. Use o botão \u201cClientes\u201d."}
             </p>
           )}
-          {groups.map((g) => {
-            const w = g.rep;
-            const ids = new Set(g.works.map((x) => x.id));
-            const workRows = rows
-              .filter(
-                (r) =>
-                  ids.has(r.work_id) &&
-                  matchesRole(r.collaborator_id, r.position_id) &&
-                  !appointmentByCollaborator.has(r.collaborator_id) &&
-                  !c?.absences.has(r.collaborator_id),
-              )
-              .slice()
-              .sort((a, b) =>
-                (personById.get(a.collaborator_id)?.full_name ?? "").localeCompare(
-                  personById.get(b.collaborator_id)?.full_name ?? "",
-                  "pt-BR",
-                ),
-              );
-            const blockedTarget =
-              !!dragging &&
-              (() => {
-                const e = evaluate(dragging.collaboratorId, w.id, { ignoreEntry: true });
+          {groups.map((g) => (
+            <WorkBox
+              key={g.key}
+              g={g}
+              workRows={workRowsByGroup.get(g.key) ?? NO_ROWS}
+              selected={selectedWork === g.rep.id}
+              isHover={hoverWork === g.rep.id}
+              blockedTarget={!!dragging && (() => {
+                const e = evaluate(dragging.collaboratorId, g.rep.id, { ignoreEntry: true });
                 return e.level === "block" || !!e.hardBlock;
-              })();
-            const isHover = hoverWork === w.id;
-            return (
-              <section
-                key={g.key}
-                onClick={() => setSelectedWork((s) => (s === w.id ? null : w.id))}
-                onDragOver={(e) => {
-                  if (!editable) return;
-                  e.preventDefault();
-                  setHoverWork(w.id);
-                }}
-                onDragLeave={() => setHoverWork((h) => (h === w.id ? null : h))}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setHoverWork(null);
-                  const p = readPayload(e);
-                  setDragging(null);
-                  if (!p || !editable) return;
-                  void dropOnGroup(p, g);
-                }}
-                className={cn(
-                  "panel flex h-72 cursor-pointer flex-col overflow-hidden transition",
-                  selectedWork === w.id && "ring-2 ring-primary",
-                  isHover && !blockedTarget && "ring-2 ring-emerald-500",
-                  isHover && blockedTarget && "ring-2 ring-destructive",
-                )}
-              >
-                <header className="border-b border-border bg-secondary/60 px-2 py-1.5">
-                  <div className="flex items-start gap-1.5">
-                    <h2 className="font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide">
-                      {g.label}
-                    </h2>
-                    {(() => {
-                      // Só conta quem ainda está no quadro: tirou a pessoa do cliente, o "!" sai.
-                      const occ = (pendingOcc.data ?? []).filter((o) => ids.has(o.work_id) && rows.some((r) => r.collaborator_id === o.collaborator_id && ids.has(r.work_id)));
-                      if (!occ.length) return null;
-                      return (
-                        <button
-                          type="button"
-                          title={`${occ.length} ausência(s) aguardando classificação`}
-                          aria-label="Ocorrência pendente"
-                          className="shrink-0"
-                          onClick={(e) => { e.stopPropagation(); if (canClassify) setOccOpen(occ[0]!); }}
-                        >
-                          <AlertTriangle className="h-4 w-4 fill-destructive text-destructive-foreground" />
-                        </button>
-                      );
-                    })()}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 shrink-0"
-                      title="Copiar mensagem"
-                      aria-label="Copiar mensagem"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyWorks(w, g.works);
-                      }}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                    {editable && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
-                        title="Retirar todos os colaboradores deste quadro"
-                        aria-label="Retirar todos"
-                        disabled={workRows.length === 0 || clearRows.isPending}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setClearBox({ label: g.label, ids: workRows.map((r) => r.id) });
-                        }}
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </Button>
-                    )}
-                    <button
-                      type="button"
-                      title="Copiar nomes e CPF"
-                      aria-label="Copiar nomes e CPF"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyPeopleCpf(workRows.map((r) => r.collaborator_id));
-                      }}
-                    >
-                      <Badge variant="outline" className="shrink-0 cursor-pointer px-1 py-0 text-[10px] hover:bg-accent">
-                        <Users className="mr-0.5 h-2.5 w-2.5" />
-                        {workRows.length}
-                      </Badge>
-                    </button>
-                    <span className="flex shrink-0 flex-col items-center gap-0.5">
-                    <button
-                      type="button"
-                      disabled={!editable}
-                      title={workPaysVt(w.id) ? "VT: todos recebem (clique para desligar)" : "VT: ninguém recebe (clique para ligar)"}
-                      aria-label="Alternar VT da obra"
-                      onClick={(e) => { e.stopPropagation(); setGroupVt.mutate({ ids: g.works.map((x) => x.id), value: !workPaysVt(w.id) }); }}
-                      className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${workPaysVt(w.id) ? "bg-success" : "bg-muted-foreground/40"}`}
-                    />
-                    {(() => {
-                      // Ciclo: azul (prêmio viagem) → amarela (todos pernoite) → apagada → azul
-                      const allOn = workRows.length > 0 && workRows.every((r: any) => !!r.overnight);
-                      const tv = workPaysTravel(w.id);
-                      return (
-                        <button
-                          type="button"
-                          disabled={!editable}
-                          title={allOn ? "Pernoite: todos recebem R$ 25,00 (clique para desligar)" : tv ? "Prêmio viagem: ligado (clique para pernoite)" : "Prêmio viagem: desligado (clique para ligar)"}
-                          aria-label="Alternar prêmio viagem / pernoite da obra"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const ids = workRows.map((r) => r.id);
-                            const workIds = g.works.map((x) => x.id);
-                            if (allOn) {
-                              setGroupOvernight.mutate({ ids, value: false });
-                              setGroupTravel.mutate({ ids: workIds, value: false });
-                            } else if (tv) setGroupOvernight.mutate({ ids, value: true });
-                            else setGroupTravel.mutate({ ids: workIds, value: true });
-                          }}
-                          className={`h-2.5 w-2.5 shrink-0 rounded-full border border-border ${allOn ? "bg-warning" : tv ? "bg-info" : "bg-muted-foreground/40"}`}
-                        />
-                      );
-                    })()}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <MapPin className="h-2.5 w-2.5" />
-                    {[w.clients?.city, w.entry_time?.slice(0, 5) && `Entrada ${w.entry_time.slice(0, 5)}`]
-                      .filter(Boolean)
-                      .join(" · ") || "Sem cliente vinculado"}
-                  </p>
-                  {g.works.some((x: any) => nightToday.data instanceof Set && nightToday.data.has(x.id)) && (
-                    <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-info">
-                      <Moon className="h-2.5 w-2.5" /> Turno noturno (vira para o dia seguinte)
-                    </p>
-                  )}
-                  {(nightCarry.data?.get(w.client_id ?? "")?.length ?? 0) > 0 && (
-                    <div className="mt-1 rounded border border-info/40 bg-info/10 px-1.5 py-1 text-[10px]">
-                      <p className="flex items-center gap-1 font-medium text-info">
-                        <Moon className="h-2.5 w-2.5" /> Continuação do turno noturno de {formatBR(addDays(date, -1))}
-                      </p>
-                      <p className="text-muted-foreground">{nightCarry.data!.get(w.client_id ?? "")!.join(", ")}</p>
-                    </div>
-                  )}
-                  {isHover && blockedTarget && (
-                    <p className="mt-0.5 flex items-center gap-1 text-[10px] text-destructive">
-                      <Ban className="h-2.5 w-2.5" /> Não é possível soltar aqui
-                    </p>
-                  )}
-                </header>
-                <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
-                  {workRows.length === 0 && (
-                    <li className="px-2 py-4 text-center text-[10px] text-muted-foreground">
-                      Arraste colaboradores para cá
-                    </li>
-                  )}
-                  {workRows.map((r) => {
-                    const p = personById.get(r.collaborator_id);
-                    return (
-                      <li
-                        key={r.id}
-                        draggable={editable}
-                        onDragStart={(e) => {
-                          e.stopPropagation();
-                          startDrag(e, { collaboratorId: r.collaborator_id, allocationId: r.id });
-                        }}
-                        onDragEnd={() => setDragging(null)}
-                        onDrop={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          setHoverWork(null);
-                          const payload = readPayload(e);
-                          setDragging(null);
-                          if (!payload || !editable) return;
-                          const same = payload.allocationId ? rows.find((x) => x.id === payload.allocationId) : allocByCollaborator.get(payload.collaboratorId);
-                          drop.mutate({ ...payload, workId: same && ids.has(same.work_id) ? same.work_id : r.work_id, beforeSort: r.sort_order - 0.5 });
-                        }}
-                        title={noticeTitle(r.collaborator_id)}
-                        className={cn("flex items-center gap-1.5 px-2 py-1 text-xs", noticeClass(r.collaborator_id))}
-                      >
-                        {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
-                        <div className="min-w-0 flex-1">
-                          <p className="flex items-center gap-1 truncate text-xs font-medium leading-tight">
-                            {(() => {
-                              const st = ctx.data ? checkIntegration(ctx.data as ScheduleContext, r.work_id, r.collaborator_id, date).status : null;
-                              return st === "missing" || st === "expired" ? (
-                                <span title={st === "missing" ? "Sem integração com este cliente" : "Integração vencida"} className="shrink-0 font-bold text-destructive">!</span>
-                              ) : null;
-                            })()}
-                            <span className="truncate">{p?.full_name ?? "—"}</span>
-                          </p>
-                          <p className="truncate text-[10px] leading-tight text-muted-foreground">
-                            {(p?.position_id ? positionById.get(p.position_id) : r.position_id ? positionById.get(r.position_id) : null) ?? "Sem função"}
-                          </p>
-                        </div>
-                        {(() => {
-                          const occ = (pendingOcc.data ?? []).find((o) => o.work_id === r.work_id && o.collaborator_id === r.collaborator_id);
-                          if (!occ) return null;
-                          return (
-                            <button
-                              type="button"
-                              title="Ausência informada no RDO — clique para classificar"
-                              aria-label="Classificar ocorrência"
-                              className="shrink-0"
-                              onClick={(e) => { e.stopPropagation(); if (canClassify) setOccOpen(occ); }}
-                            >
-                              <AlertTriangle className="h-4 w-4 fill-destructive text-destructive-foreground" />
-                            </button>
-                          );
-                        })()}
-                        {(() => {
-                          const l = lodgingOf(r.collaborator_id);
-                          return l ? (
-                            <span title={`Alojamento ${LODGING_LABEL[l]}`} className="shrink-0 rounded-[3px] border border-border px-1 text-[9px] font-semibold leading-[14px] text-muted-foreground">
-                              {LODGING_TAG[l]}
-                            </span>
-                          ) : null;
-                        })()}
-                        {r.has_pending_requirement && (
-                          <Badge variant="destructive" className="shrink-0 px-1 py-0 text-[10px]">
-                            <AlertTriangle className="mr-0.5 h-2.5 w-2.5" /> Pendência
-                          </Badge>
-                        )}
-                        {editable && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0"
-                            aria-label="Remover da obra"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeRow.mutate(r.id);
-                            }}
-                          >
-                            <X className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        )}
-                        <span className="flex shrink-0 flex-col items-center gap-0.5">
-                        {(() => {
-                          const vt = allocVtOn(r.work_id, r.collaborator_id, r.vt_override);
-                          return (
-                            <button
-                              type="button"
-                              disabled={!editable}
-                              title={`${vt ? "Recebe VT" : "Sem VT"}${r.vt_override !== null && r.vt_override !== undefined ? " (exceção)" : ""}`}
-                              aria-label="Alternar VT do colaborador"
-                              onClick={(e) => { e.stopPropagation(); toggleAllocVt.mutate({ id: r.id, workId: r.work_id, collaboratorId: r.collaborator_id, current: vt }); }}
-                              className={`h-2 w-2 shrink-0 rounded-full ${vt ? "bg-success" : "bg-muted-foreground/40"}`}
-                            />
-                          );
-                        })()}
-                        {(() => {
-                          // Ciclo: azul (prêmio viagem) → amarela (pernoite R$ 25) → apagada → azul
-                          const tb = travelInfo?.off.has(r.collaborator_id) ? false : r.travel_bonus_override ?? defaultAllocTravel(r.work_id, r.collaborator_id);
-                          const on = !!(r as any).overnight;
-                          return (
-                            <button
-                              type="button"
-                              disabled={!editable}
-                              title={on ? "Pernoite: R$ 25,00 de prêmio viagem" : tb ? "Recebe prêmio viagem (clique para pernoite)" : "Sem prêmio viagem"}
-                              aria-label="Alternar prêmio viagem / pernoite do colaborador"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (on) toggleOvernight.mutate({ id: r.id, current: true, travelOff: defaultAllocTravel(r.work_id, r.collaborator_id) ? false : null });
-                                else if (tb) toggleOvernight.mutate({ id: r.id, current: false });
-                                else toggleAllocTravel.mutate({ id: r.id, workId: r.work_id, collaboratorId: r.collaborator_id, current: tb });
-                              }}
-                              className={`h-2 w-2 shrink-0 rounded-full ${on ? "bg-warning" : tb ? "bg-info" : "bg-muted-foreground/40"}`}
-                            />
-                          );
-                        })()}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            );
-          })}
+              })()}
+              editable={editable}
+              version={dataVersion}
+              apiRef={apiRef}
+            />
+          ))}
 
           {/* Caixas de situação */}
-          {[
-            // Integrações (por cliente) logo após as obras
-            ...[
-              ...new Set([
-                ...[...appointmentsByBox.keys()].filter((k) => k.startsWith(INTEGRATION_PREFIX)),
-                ...entries.map((e) => e.box_key).filter((k) => k.startsWith(INTEGRATION_PREFIX)),
-              ]),
-            ]
-              .sort((a, b) => a.localeCompare(b, "pt-BR"))
-              .map((key) => ({ key, label: boxLabelOf(key) })),
-            ...STATUS_BOXES.filter((b) => b.key !== "integracao").map((b) => ({
-              key: b.key as string,
-              label: (boxTitles.data?.get(b.key) ?? b.label) as string,
-            })),
-          ]
-            .filter(
-              (b) =>
-                visibleBoxes.has(b.key) ||
-                entries.some((e) => e.box_key === b.key) ||
-                (absenceMembers.get(b.key)?.length ?? 0) > 0 ||
-                (appointmentsByBox.get(b.key)?.length ?? 0) > 0,
-            )
-            .map((b) => {
-            const nameOf = (id: string) => personById.get(id)?.full_name ?? "";
-            const byName = (a: string, c: string) => nameOf(a).localeCompare(nameOf(c), "pt-BR");
-            const boxRows = entries
-              .filter((e) => {
-                if (e.box_key !== b.key || !matchesRole(e.collaborator_id)) return false;
-                // Ausência cadastrada (ex.: atestado do RH) prevalece sobre a caixa manual.
-                const reg = c?.absences.get(e.collaborator_id);
-                const regKey = reg ? ABSENCE_BOX[reg] : undefined;
-                return !regKey || regKey === b.key;
-              })
-              .slice()
-              .sort((x, y) => byName(x.collaborator_id, y.collaborator_id));
-            const autoRows = (absenceMembers.get(b.key) ?? [])
-              .filter((a) => matchesRole(a.id) && !boxRows.some((r) => r.collaborator_id === a.id))
-              .slice()
-              .sort((x, y) => byName(x.id, y.id));
-            const isHover = hoverBox === b.key;
-            const handleDrop = (e: React.DragEvent) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setHoverBox(null);
-              const p = readPayload(e);
-              setDragging(null);
-              if (!p || !editable) return;
-              dropBox.mutate({ ...p, boxKey: b.key });
-            };
-            const handleOver = (e: React.DragEvent) => {
-              if (!editable) return;
-              e.preventDefault();
-              e.stopPropagation();
-              setHoverBox(b.key);
-            };
-            return (
-              <section
-                key={b.key}
-                onDragOver={handleOver}
-                onDragLeave={() => setHoverBox((h) => (h === b.key ? null : h))}
-                onDrop={handleDrop}
-                className={cn(
-                  "panel flex h-72 flex-col overflow-hidden border-dashed transition",
-                  isHover && "ring-2 ring-primary",
-                )}
-              >
-                <header className="border-b border-border bg-muted/60 px-2 py-1.5">
-                  <div className="flex items-start gap-1.5">
-                    {b.key === "personalizada" && editingBox === b.key ? (
-                      <Input
-                        autoFocus
-                        defaultValue={b.label}
-                        className="h-6 flex-1 px-1 text-[11px] uppercase"
-                        onBlur={(e) => {
-                          setEditingBox(null);
-                          if (e.target.value.trim() !== b.label) saveBoxTitle.mutate({ key: b.key, title: e.target.value });
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                          if (e.key === "Escape") setEditingBox(null);
-                        }}
-                      />
-                    ) : (
-                      <h2
-                        className={cn(
-                          "font-display flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide",
-                          b.key === "personalizada" && editable && "cursor-text hover:underline",
-                        )}
-                        title={b.key === "personalizada" && editable ? "Clique para editar o título" : undefined}
-                        onClick={() => b.key === "personalizada" && editable && setEditingBox(b.key)}
-                      >
-                        {b.label}
-                      </h2>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 shrink-0"
-                      title="Copiar mensagem"
-                      aria-label="Copiar mensagem"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const people = [
-                          ...autoRows.map((a) => ({ id: a.id, name: nameOf(a.id) })),
-                          ...boxRows.map((r) => ({ id: r.collaborator_id, name: nameOf(r.collaborator_id) })),
-                        ].filter((x) => x.name);
-                        void copyToClipboard(buildBoxMessage(b.key, b.label, people.map((x) => x.name), people.map((x) => x.id)));
-                      }}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                    <button
-                      type="button"
-                      title="Copiar nomes e CPF"
-                      aria-label="Copiar nomes e CPF"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyPeopleCpf([...autoRows.map((a) => a.id), ...boxRows.map((r) => r.collaborator_id)]);
-                      }}
-                    >
-                      <Badge variant="outline" className="shrink-0 cursor-pointer px-1 py-0 text-[10px] hover:bg-accent">
-                        <Users className="mr-0.5 h-2.5 w-2.5" />
-                        {boxRows.length + autoRows.length}
-                      </Badge>
-                    </button>
-                    {vtBoxDefault(b.key) !== null && (
-                      <span className="mt-1 flex shrink-0 flex-col items-center gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={!editable}
-                        aria-label="Alternar VT da caixa"
-                        title={
-                          b.key === "aso"
-                            ? boxPaysVt(b.key)
-                              ? "VT adicional ligado: 2 VTs (clique para desligar)"
-                              : "Somente o VT do ASO: 1 VT (clique para ligar o adicional)"
-                            : boxPaysVt(b.key)
-                              ? "VT: todos recebem (clique para desligar)"
-                              : "VT: ninguém recebe (clique para ligar)"
-                        }
-                        onClick={(e) => { e.stopPropagation(); toggleBoxVt.mutate(b.key); }}
-                        className={`h-2.5 w-2.5 min-w-0 shrink-0 rounded-full border border-border p-0 ${boxPaysVt(b.key) ? "bg-success hover:bg-success" : "bg-muted-foreground/40 hover:bg-muted-foreground/40"}`}
-                      />
-                      {b.key === "personalizada" && travelDot(b.key)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">Caixa de situação do dia</p>
-                </header>
-                <ul
-                  className="min-h-0 flex-1 divide-y divide-border overflow-y-auto"
-                  onDragOver={handleOver}
-                  onDrop={handleDrop}
-                >
-                  {boxRows.length + autoRows.length === 0 && (
-                    <li
-                      className="px-2 py-4 text-center text-[10px] text-muted-foreground"
-                      onDragOver={handleOver}
-                      onDrop={handleDrop}
-                    >
-                      Arraste colaboradores para cá
-                    </li>
-                  )}
-                  {autoRows.map((a) => {
-                    const p = personById.get(a.id);
-                    return (
-                      <li
-                        key={`auto-${a.id}`}
-                        onDragOver={handleOver}
-                        onDrop={handleDrop}
-                        className="flex items-center gap-1.5 px-2 py-1 text-xs"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium leading-tight">{p?.full_name ?? "—"}</p>
-                          <p className="truncate text-[10px] leading-tight text-muted-foreground">
-                            {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={a.note === "Cadastrado" ? "secondary" : "default"}
-                          className="shrink-0 px-1 py-0 text-[9px]"
-                        >
-                          {a.note}
-                        </Badge>
-                        {vtBoxDefault(b.key) !== null && personBenefits(b.key, a.id)}
-                      </li>
-                    );
-                  })}
-                  {boxRows.map((entry) => {
-                    const p = personById.get(entry.collaborator_id);
-                    return (
-                      <li
-                        key={entry.id}
-                        draggable={editable}
-                        onDragStart={(e) =>
-                          startDrag(e, {
-                            collaboratorId: entry.collaborator_id,
-                            allocationId: null,
-                            entryId: entry.id,
-                          })
-                        }
-                        onDragEnd={() => setDragging(null)}
-                        onDragOver={handleOver}
-                        onDrop={handleDrop}
-                        title={noticeTitle(entry.collaborator_id)}
-                        className={cn("flex items-center gap-1.5 px-2 py-1 text-xs", noticeClass(entry.collaborator_id))}
-                      >
-                        {editable && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />}
-                        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setOpenEntry((s) => (s === entry.id ? null : entry.id))}>
-                          <p className="truncate text-xs font-medium leading-tight">{p?.full_name ?? "—"}</p>
-                          <p className="truncate text-[10px] leading-tight text-muted-foreground">
-                            {(p?.position_id ? positionById.get(p.position_id) : null) ?? "Sem função"}
-                          </p>
-                          {openEntry === entry.id && (
-                            <p className="text-[10px] leading-tight text-primary">
-                              {rdoOrigin.data?.get(entry.collaborator_id)?.length
-                                ? `Escalado em: ${rdoOrigin.data.get(entry.collaborator_id)!.join(", ")}`
-                                : "Não veio do RDO"}
-                            </p>
-                          )}
-                        </div>
-                        {vtBoxDefault(b.key) !== null && personBenefits(b.key, entry.collaborator_id)}
-                        {editable && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0"
-                            aria-label="Remover da caixa"
-                            onClick={() => void askRemoveEntry(entry.id)}
-                          >
-                            <X className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            );
-          })}
+          {statusBoxes.map(({ b, boxRows, autoRows }) => (
+            <StatusBox
+              key={b.key}
+              b={b}
+              boxRows={boxRows}
+              autoRows={autoRows}
+              isHover={hoverBox === b.key}
+              editing={editingBox === b.key}
+              openEntry={openEntry}
+              editable={editable}
+              version={dataVersion}
+              apiRef={apiRef}
+            />
+          ))}
         </div>
 
         {/* Painel lateral de colaboradores */}
@@ -1835,7 +1161,7 @@ export function SchedulePlannerBoard({
                 {showAll ? "Mostrando todos para" : "Aptos para"}{" "}
                 <span className="font-medium text-foreground">
                   {(() => {
-                    const w = works.find((x) => x.id === selectedWork);
+                    const w = worksById.get(selectedWork);
                     return w ? workLabel(w) : "";
                   })()}
                 </span>

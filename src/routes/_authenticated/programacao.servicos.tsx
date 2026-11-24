@@ -26,7 +26,24 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useCurrentUser } from "@/hooks/use-auth";
 import { addDays, checkAso, checkIntegration, checkRequirements, fetchScheduleContext, formatBR, pendingForWork, todayISO, workRequiresIntegration } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
+import { fetchAll } from "@/lib/fetch-all";
 import { SERVICE_BADGE_DATE, useServiceDistribution } from "@/hooks/use-service-distribution";
+
+/** Ausências e compromissos do dia (folga, férias, atestado, agendamento, quadro de treinamento/integração). */
+async function fetchDayAbsences(date: string) {
+  const { data: sched } = await supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle();
+  const [off, vac, med, trApp, trBox] = await Promise.all([
+    fetchAll<{ collaborator_id: string; date: string; end_date: string | null }>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date).or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`).order("id").range(a, b)),
+    fetchAll<{ collaborator_id: string }>((a, b) => supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date).order("id").range(a, b)),
+    fetchAll<{ collaborator_id: string }>((a, b) => supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date).order("id").range(a, b)),
+    // ASO, treinamento ou integração no dia (como na Programação): a pessoa sai dos serviços.
+    fetchAll<{ collaborator_id: string }>((a, b) => supabase.from("appointments").select("collaborator_id").eq("scheduled_date", date).in("status", ["agendado", "realizado"]).order("id").range(a, b)),
+    sched
+      ? fetchAll<{ collaborator_id: string }>((a, b) => supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).or("box_key.eq.treinamento,box_key.like.integracao:%").order("id").range(a, b))
+      : Promise.resolve([] as { collaborator_id: string }[]),
+  ]);
+  return { off, vac, med, trApp, trBox };
+}
 
 export const Route = createFileRoute("/_authenticated/programacao/servicos")({
   head: () => ({
@@ -140,17 +157,13 @@ function ServicesPage() {
             .eq("schedule_id", sched.id)
             .in("work_id", ids)).data ?? []
         : [];
-      // Quem está de folga, férias ou atestado no dia fica fora (efetivo e transporte)
-      const [{ data: off }, { data: vac }, { data: med }, { data: trApp }, { data: trBox }] = await Promise.all([
-        supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date).or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`),
-        supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date),
-        supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
-        // ASO, treinamento ou integração no dia (como na Programação): a pessoa sai dos serviços.
-        supabase.from("appointments").select("collaborator_id").eq("scheduled_date", date).in("status", ["agendado", "realizado"]),
-        sched
-          ? supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).or("box_key.eq.treinamento,box_key.like.integracao:%")
-          : Promise.resolve({ data: [] as { collaborator_id: string }[] }),
-      ]);
+      // Quem está de folga, férias ou atestado no dia fica fora (efetivo e transporte). Mesma leitura para todos os
+      // clientes do dia (chave ["day-absences", date]): trocar de cliente não relê as ausências.
+      const { off, vac, med, trApp, trBox } = await qc.fetchQuery({
+        queryKey: ["day-absences", date],
+        staleTime: 30_000,
+        queryFn: () => fetchDayAbsences(date),
+      });
       // Com agendamento (ASO, treinamento, integração) no dia: sai da aba Serviços
       const training = new Set<string>([
         ...(trApp ?? []).map((t) => t.collaborator_id),
