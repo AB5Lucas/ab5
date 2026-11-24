@@ -1170,6 +1170,13 @@
       "when": 1795463088217,
       "tag": "0172_absence_removes_allocation",
       "breakpoints": true
+    },
+    {
+      "idx": 167,
+      "version": "7",
+      "when": 1795463089217,
+      "tag": "0180_purchase_totvs_print_required",
+      "breakpoints": true
     }
   ]
 }
