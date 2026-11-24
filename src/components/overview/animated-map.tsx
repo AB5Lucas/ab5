@@ -1,3 +1,4 @@
+import type React from "react";
 /**
  * Mapa animado (Atividades): o contorno é desenhado, o mapa se inclina em 3D e os clientes surgem em sequência.
  * SP mostra também o contorno das cidades (IBGE, public/geo/sp-cities.json). Roda do mouse / botões = zoom; arrastar = mover.
@@ -24,7 +25,7 @@ const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 let citiesCache: Promise<number[][][]> | null = null;
 const loadCities = () => (citiesCache ??= fetch("/geo/sp-cities.json").then((r) => r.json()).catch(() => []));
 
-export function AnimatedMap({ clients, region, className }: { clients: MapClient[]; region: "SP" | "BR"; className?: string }) {
+export function AnimatedMap({ clients, region, className, extra }: { clients: MapClient[]; region: "SP" | "BR"; className?: string; extra?: React.ReactNode }) {
   const [run, setRun] = useState(0);
   const [hover, setHover] = useState<MapClient | null>(null);
   const [cities, setCities] = useState<number[][][]>([]);
@@ -120,6 +121,7 @@ export function AnimatedMap({ clients, region, className }: { clients: MapClient
         </div>
       )}
       <div className="absolute bottom-3 right-3 z-10 flex flex-col gap-1.5">
+        {extra}
         <button type="button" className={btn} title="Aproximar" onClick={(e) => { e.preventDefault(); e.stopPropagation(); zoom(1.5); }}><Plus className="h-3.5 w-3.5" /></button>
         <button type="button" className={btn} title="Afastar" onClick={(e) => { e.preventDefault(); e.stopPropagation(); zoom(1 / 1.5); }}><Minus className="h-3.5 w-3.5" /></button>
         <button type="button" className={btn} title="Rever animação" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRun((n) => n + 1); }}><RotateCcw className="h-3.5 w-3.5" /></button>

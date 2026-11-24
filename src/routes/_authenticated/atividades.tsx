@@ -143,6 +143,7 @@ function AtividadesOverview() {
 
     // RDOs: clientes com atividade (MO escalada) no mês = índice máximo; preenchido = clientes com RDO no dia (ou média por dia útil no mês).
     const clientOf = (wid: string) => { const w = workBy.get(wid); return w && w.client_id && !isInternalClient(w.clients?.name ?? "") ? w.client_id as string : null; };
+    const activeIds = new Set<string>(byClientId.keys());
     const activeByMonth = new Map<string, Set<string>>(), activeByDay = new Map<string, Set<string>>();
     for (const a of q.data.allocs) {
       const c = clientOf(a.work_id); if (!c) continue;
@@ -150,12 +151,14 @@ function AtividadesOverview() {
       const m = dt.slice(0, 7);
       (activeByMonth.get(m) ?? activeByMonth.set(m, new Set()).get(m)!).add(c);
       (activeByDay.get(dt) ?? activeByDay.set(dt, new Set()).get(dt)!).add(c);
+      if (dt >= P.from && dt <= P.to) activeIds.add(c);
     }
     const rdoDay = new Map<string, Map<string, boolean>>(); // dia → cliente → finalizado?
     for (const r of q.data.rdos) {
       const c = clientOf(r.work_id) ?? (r.client_id && scope.allowClient(r.client_id) ? (r.client_id as string) : null);
       if (!c) continue;
       const dt = String(r.report_date).slice(0, 10);
+      if (dt >= P.from && dt <= P.to) activeIds.add(c);
       const m = rdoDay.get(dt) ?? new Map<string, boolean>(); m.set(c, (m.get(c) ?? false) || r.status === "finalized"); rdoDay.set(dt, m);
     }
     const cols: TileCol[] = P.buckets.map((b) => {
@@ -174,7 +177,7 @@ function AtividadesOverview() {
     });
 
     return {
-      byClientId, cur, prev, ordered, openBalance, top, cols,
+      byClientId, activeIds, cur, prev, ordered, openBalance, top, cols,
       series: P.buckets.map((b) => ({ label: P.unit === "day" ? `${b.slice(8, 10)}/${b.slice(5, 7)}` : `${monthLabel(b)}/${b.slice(2, 4)}`, a: byBucket.get(b) ?? 0 })),
       activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
       statusBars: [["Planejados", "planned"], ["Ativos", "active"], ["Pausados", "paused"], ["Concluídos", "completed"]].map(([l, s]) => ({ label: l!, value: works.filter((w) => w.status === s).length })),
@@ -184,7 +187,7 @@ function AtividadesOverview() {
   // Mapa: clientes com endereço localizado (sem os internos da sede), marcador do tamanho do faturado no período.
   const mapClients = useMemo(() => (mapQ.data ?? [])
     .filter((c: any) => scope.ready && scope.allowClient(c.id) && !isInternalClient(c.name ?? ""))
-    .map((c: any) => ({ id: c.id, name: c.name, city: c.city, lat: Number(c.lat), lon: Number(c.lon), billed: d?.byClientId.get(c.id) ?? 0 })),
+    .map((c: any) => ({ id: c.id, name: c.name, city: c.city, lat: Number(c.lat), lon: Number(c.lon), billed: d?.byClientId.get(c.id) ?? 0, active: d?.activeIds.has(c.id) ?? false })),
   [mapQ.data, scope.ready, d]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const can = (u: string) => canAccess(u);
