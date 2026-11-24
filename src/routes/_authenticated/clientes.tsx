@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { generateClientImage } from "@/lib/client-images.functions";
+import { aerialMosaic, geocode } from "@/lib/client-aerial";
+import { ORIGIN_LABEL, type ImageOrigin } from "@/lib/client-images";
+import { PastePrint } from "@/components/compras/paste-print";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -129,27 +132,13 @@ function ClientsPage() {
   const [view, setView] = useState<"cards" | "list">("cards");
   useEffect(() => { try { if (localStorage.getItem("clientes-view") === "list") setView("list"); } catch { /* ignora */ } }, []);
   const changeView = (v: "cards" | "list") => { setView(v); try { localStorage.setItem("clientes-view", v); } catch { /* ignora */ } };
-  // Imagem da fachada gerada pela IA (mesmo estilo para todos): uma por vez, para não estourar o limite da IA.
-  const genImage = useServerFn(generateClientImage);
-  const [genIds, setGenIds] = useState<Set<string>>(new Set());
-  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
-  const runGen = async (id: string) => {
-    setGenIds((s) => new Set(s).add(id));
-    try { await genImage({ data: { clientId: id } }); await queryClient.invalidateQueries({ queryKey: ["clients"] }); return true; }
-    catch (e) { toast.error((e as Error).message); return false; }
-    finally { setGenIds((s) => { const n = new Set(s); n.delete(id); return n; }); }
-  };
-  const genMissing = async () => {
-    const list = (clients.data ?? []).filter((c) => !c.image_path);
-    if (!list.length) { toast.info("Todos os clientes já têm imagem"); return; }
-    setBulk({ done: 0, total: list.length });
-    for (let i = 0; i < list.length; i++) { if (!(await runGen(list[i]!.id))) break; setBulk({ done: i + 1, total: list.length }); }
-    setBulk(null);
-  };
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [addressSource, setAddressSource] = useState("");
+  // Foto de referência do cliente (colada ou link): a imagem do quadro é feita a partir dela.
+  const [refFile, setRefFile] = useState<File | null>(null);
+  const [refLink, setRefLink] = useState("");
   const [deleting, setDeleting] = useState<Client | null>(null);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -164,6 +153,53 @@ function ClientsPage() {
       return data;
     },
   });
+  // Imagem da fachada gerada pela IA (mesmo estilo para todos): uma por vez, para não estourar o limite da IA.
+  const genImage = useServerFn(generateClientImage);
+  const [genIds, setGenIds] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
+  // Sem foto de referência nem busca do Google, o navegador monta a vista aérea do satélite e grava como fonte.
+  const runGen = async (id: string) => {
+    setGenIds((s) => new Set(s).add(id));
+    try {
+      let res = await genImage({ data: { clientId: id } });
+      if (res.needAerial) {
+        const c = (clients.data ?? []).find((x) => x.id === id);
+        if (!c) throw new Error("Cliente não encontrado");
+        const geo = await geocode(c);
+        if (!geo) throw new Error(`Endereço de ${c.name} não localizado no mapa: cole uma foto de referência no cadastro.`);
+        const blob = await aerialMosaic(geo.lat, geo.lon);
+        const path = `src/${id}-aerea-${Date.now()}.jpg`;
+        const up = await supabase.storage.from("client-images").upload(path, blob, { contentType: "image/jpeg", upsert: true });
+        if (up.error) throw up.error;
+        const { error } = await supabase.from("clients").update({ image_source: path, image_source_kind: "aerea" }).eq("id", id);
+        if (error) throw error;
+        res = await genImage({ data: { clientId: id } });
+      }
+      await queryClient.invalidateQueries({ queryKey: ["clients"] });
+      return true;
+    }
+    catch (e) { toast.error((e as Error).message); return false; }
+    finally { setGenIds((s) => { const n = new Set(s); n.delete(id); return n; }); }
+  };
+  // Faltando = sem imagem ou feita pelo modo antigo (inventada, sem origem real).
+  const needsImage = (c: { image_path: string | null; image_origin: string | null }) => !c.image_path || !c.image_origin;
+  const genMissing = async (auto = false) => {
+    const list = (clients.data ?? []).filter(needsImage);
+    if (!list.length) { if (!auto) toast.info("Todos os clientes já têm imagem"); return; }
+    setBulk({ done: 0, total: list.length });
+    for (let i = 0; i < list.length; i++) { await runGen(list[i]!.id); setBulk({ done: i + 1, total: list.length }); }
+    setBulk(null);
+  };
+  // Automático: cliente novo ou com foto de referência nova gera na hora; ao abrir a página, gera as que faltam (uma vez).
+  const pendingGen = useRef(new Set<string>());
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (!canWrite || !clients.data || bulk) return;
+    const pend = [...pendingGen.current].filter((id) => (clients.data ?? []).some((c) => c.id === id && needsImage(c)));
+    pendingGen.current.clear();
+    if (pend.length) { void (async () => { for (const id of pend) await runGen(id); })(); return; }
+    if (!autoRan.current) { autoRan.current = true; void genMissing(true); }
+  }, [clients.data, canWrite]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const people = useQuery({
     queryKey: ["collaborators-min"],
@@ -255,6 +291,19 @@ function ClientsPage() {
         if (error) throw error;
         clientId = data.id;
       }
+      // Foto de referência nova (colada ou link) → vira a fonte da imagem e a imagem é refeita.
+      if (clientId && (refFile || refLink.trim())) {
+        let source = refLink.trim();
+        if (refFile) {
+          const path = `src/${clientId}-${Date.now()}.${(refFile.type.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "")}`;
+          const up = await supabase.storage.from("client-images").upload(path, refFile, { contentType: refFile.type, upsert: true });
+          if (up.error) throw up.error;
+          source = path;
+        }
+        const { error } = await supabase.from("clients").update({ image_source: source, image_source_kind: "foto", image_origin: null }).eq("id", clientId);
+        if (error) throw error;
+      }
+      if (clientId) pendingGen.current.add(clientId);
       // Treinamentos exigidos: tira os desmarcados e inclui os novos.
       if (clientId) {
         const before = new Set(requiredBy.get(clientId) ?? []);
@@ -274,6 +323,7 @@ function ClientsPage() {
     },
     onSuccess: () => {
       toast.success(editing ? "Cliente atualizado" : "Cliente cadastrado");
+      setRefFile(null); setRefLink("");
       setOpen(false);
       setEditing(null);
       setForm(emptyForm);
@@ -469,6 +519,7 @@ function ClientsPage() {
                     <p className="font-display text-lg font-semibold leading-tight drop-shadow">{c.name}</p>
                   </div>
                   {c.cc_prefix && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 font-mono text-[10px] text-white">CC {c.cc_prefix}</span>}
+                  {img && c.image_origin && <span className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[9px] text-white/85">{ORIGIN_LABEL[c.image_origin as ImageOrigin] ?? ""}</span>}
                   {canWrite && (
                     <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       {img && <Button size="icon" variant="secondary" className="h-7 w-7" disabled={busy || !!bulk} onClick={() => void runGen(c.id)} title="Gerar outra imagem"><RefreshCw className="h-3.5 w-3.5" /></Button>}
@@ -585,6 +636,12 @@ function ClientsPage() {
             <div className="space-y-1">
               <Label>Prefixo CC (4 números)</Label>
               <Input inputMode="numeric" maxLength={4} placeholder="Ex.: 2004" value={form.cc_prefix} onChange={(e) => set("cc_prefix", e.target.value.replace(/\D/g, ""))} />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Foto de referência da fachada ou da fábrica (opcional)</Label>
+              <PastePrint file={refFile} currentUrl={editing?.image_source && !/^https?:/.test(editing.image_source) && editing.image_source_kind !== "aerea" ? supabase.storage.from("client-images").getPublicUrl(editing.image_source).data.publicUrl : null} onPaste={setRefFile} />
+              <Input placeholder="ou cole o link de uma foto (https://…)" value={refLink} onChange={(e) => setRefLink(e.target.value)} />
+              <p className="text-[11px] text-muted-foreground">A imagem do quadro é feita a partir desta foto real (a IA só tira textos e anúncios). Sem foto, o sistema usa a vista aérea do satélite no endereço.</p>
             </div>
             <div className="hidden sm:block" />
             <div className="space-y-1">

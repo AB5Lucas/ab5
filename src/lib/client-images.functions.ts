@@ -1,11 +1,40 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { clientImagePath, clientImagePrompt } from "./client-images";
+import { aerialPrompt, clientImagePath, photoCleanupPrompt, type ClientForImage, type ImageOrigin } from "./client-images";
 
 const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const AI_IMAGE_MODEL = "google/gemini-2.5-flash-image-preview";
+const UA = "AB5Hub/1.0 (imagens de clientes)";
 
-/** Gera (ou refaz) a imagem da fachada do cliente pela IA da Lovable e grava no bucket client-images. */
+const toBase64 = (bytes: Uint8Array) => { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
+
+async function download(url: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  try {
+    const r = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(20000) });
+    const mime = (r.headers.get("content-type") ?? "").split(";")[0]!.trim();
+    if (!r.ok || !mime.startsWith("image/")) return null;
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    return bytes.length > 5_000 && bytes.length < 8_000_000 ? { bytes, mime } : null;
+  } catch { return null; }
+}
+
+/** Busca de imagens do Google (Programmable Search), só se as chaves estiverem configuradas. */
+async function googleImage(c: ClientForImage) {
+  const key = process.env["GOOGLE_CSE_KEY"], cx = process.env["GOOGLE_CSE_CX"];
+  if (!key || !cx) return null;
+  const q = `${c.name} ${c.city ?? ""} fábrica fachada`.trim();
+  try {
+    const r = await fetch(`https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&searchType=image&imgSize=large&num=6&q=${encodeURIComponent(q)}`, { signal: AbortSignal.timeout(15000) });
+    const j: any = await r.json();
+    for (const it of j?.items ?? []) { const img = await download(it.link); if (img) return img; }
+  } catch { /* sem busca */ }
+  return null;
+}
+
+/**
+ * Gera (ou refaz) a imagem do cliente a partir de imagem real (foto de referência, busca do Google ou satélite);
+ * a IA da Lovable só limpa/realça. Grava no bucket client-images e marca a origem.
+ */
 export const generateClientImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { clientId: string }) => {
@@ -15,16 +44,36 @@ export const generateClientImage = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: canWrite } = await context.supabase.rpc("can_write");
     if (!canWrite) throw new Error("Sem permissão para alterar clientes");
-    const { data: c, error } = await context.supabase.from("clients").select("id, name, address, number, neighborhood, city, state, notes").eq("id", data.clientId).maybeSingle();
+    const { data: c, error } = await context.supabase.from("clients").select("id, name, address, number, neighborhood, city, state, notes, image_path, image_source, image_source_kind").eq("id", data.clientId).maybeSingle();
     if (error) throw new Error(error.message);
     if (!c) throw new Error("Cliente não encontrado");
     const key = process.env["LOVABLE_API_KEY"];
     if (!key) throw new Error("IA da Lovable indisponível (LOVABLE_API_KEY)");
+
+    let src: { bytes: Uint8Array; mime: string } | null = null;
+    let origin: ImageOrigin = c.image_source_kind === "aerea" ? "aerea" : "foto";
+    if (c.image_source) {
+      if (/^https?:\/\//i.test(c.image_source)) src = await download(c.image_source);
+      else {
+        const f = await context.supabase.storage.from("client-images").download(c.image_source);
+        if (f.data) src = { bytes: new Uint8Array(await f.data.arrayBuffer()), mime: f.data.type || "image/png" };
+      }
+    }
+    if (!src) { src = await googleImage(c); origin = "busca"; }
+    // Sem foto: o navegador monta a vista aérea do satélite (lib/client-aerial.ts), grava como fonte e chama de novo.
+    if (!src) return { needAerial: true as const };
+
     const res = await fetch(AI_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(90000),
-      body: JSON.stringify({ model: AI_IMAGE_MODEL, modalities: ["image", "text"], messages: [{ role: "user", content: clientImagePrompt(c) }] }),
+      body: JSON.stringify({
+        model: AI_IMAGE_MODEL, modalities: ["image", "text"],
+        messages: [{ role: "user", content: [
+          { type: "text", text: origin === "aerea" ? aerialPrompt(c) : photoCleanupPrompt(c) },
+          { type: "image_url", image_url: { url: `data:${src.mime};base64,${toBase64(src.bytes)}` } },
+        ] }],
+      }),
     });
     if (!res.ok) {
       const body = await res.text();
@@ -35,16 +84,15 @@ export const generateClientImage = createServerFn({ method: "POST" })
     const json: any = await res.json();
     const url: string | undefined = json?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     const m = url?.match(/^data:(image\/[\w+.-]+);base64,(.+)$/);
-    if (!m) throw new Error("A IA não devolveu imagem");
-    const bin = atob(m[2]!);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    // Sem imagem da IA, usa a própria imagem real.
+    const outMime = m ? (m[1] ?? "image/png") : src.mime;
+    let out = src.bytes;
+    if (m) { const bin = atob(m[2]!); out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); }
     const path = clientImagePath(c.id);
-    const up = await context.supabase.storage.from("client-images").upload(path, bytes, { contentType: m[1] ?? "image/png", upsert: true });
+    const up = await context.supabase.storage.from("client-images").upload(path, out, { contentType: outMime, upsert: true });
     if (up.error) throw new Error(up.error.message);
-    const { data: old } = await context.supabase.from("clients").select("image_path").eq("id", c.id).maybeSingle();
-    const upd = await context.supabase.from("clients").update({ image_path: path } as never).eq("id", c.id);
+    const upd = await context.supabase.from("clients").update({ image_path: path, image_origin: origin } as never).eq("id", c.id);
     if (upd.error) throw new Error(upd.error.message);
-    if (old?.image_path && old.image_path !== path) await context.supabase.storage.from("client-images").remove([old.image_path]);
-    return { path };
+    if (c.image_path && c.image_path !== path) await context.supabase.storage.from("client-images").remove([c.image_path]);
+    return { path, origin, needAerial: false as const };
   });

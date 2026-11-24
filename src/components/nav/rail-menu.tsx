@@ -219,9 +219,11 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
   const expanded = hover || settings;
   const highlighted = expanded && openLabel ? openLabel : currentMod;
   const ease = "ease-[cubic-bezier(0.32,0.72,0,1)]";
-  const fade = cn("whitespace-nowrap transition-[opacity,transform] duration-300", expanded ? "translate-x-0 opacity-100 delay-100" : "-translate-x-1 opacity-0");
-  const rowBase = "group/row relative flex h-11 w-full items-center gap-3 rounded-full pl-1 pr-3 text-sm transition-[background-color,color,box-shadow] duration-300";
-  const iconWrap = (active: boolean) => cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors duration-300",
+  // Fechado: textos sem largura (não empurram nada) e o ícone centralizado num círculo do tamanho da faixa.
+  const fade = cn("whitespace-nowrap transition-[opacity,transform] duration-300", expanded ? "translate-x-0 opacity-100 delay-100" : "pointer-events-none w-0 -translate-x-1 overflow-hidden opacity-0");
+  const rowBase = cn("group/row relative flex h-10 items-center rounded-full text-sm transition-[background-color,color,box-shadow,width,padding] duration-300",
+    expanded ? "w-full gap-3 pl-0.5 pr-3" : "mx-auto w-10 justify-center gap-0 px-0");
+  const iconWrap = (active: boolean) => cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors duration-300",
     active ? "bg-primary text-primary-foreground" : "text-foreground/70 group-hover/row:text-foreground");
   const initials = (profile?.full_name || profile?.email || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 
@@ -230,16 +232,16 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
       <nav aria-label="Menu"
         className={cn("rail-menu flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[28px] p-1.5 transition-[width,box-shadow] duration-500", ease, GLASS, expanded ? "w-[15.5rem]" : "w-[3.25rem]")}>
         {/* Logo e a pessoa (nome e função na empresa) */}
-        <div className="mb-1.5 flex h-11 items-center gap-2.5 pl-1 pr-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-neutral-950 font-display text-[11px] font-bold tracking-tight text-white shadow-sm dark:bg-white dark:text-neutral-950">AB5</span>
+        <div className={cn("mb-1.5 flex h-11 items-center transition-[padding,gap] duration-300", expanded ? "gap-2.5 pl-0.5 pr-2" : "justify-center gap-0")}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 font-display text-[11px] font-bold tracking-tight text-white shadow-sm dark:bg-white dark:text-neutral-950">AB5</span>
           <span className={cn(fade, "min-w-0 leading-tight")}>
-            <span className="block truncate font-display text-sm font-semibold">AB5 Hub</span>
-            <span className="block truncate text-[10.5px] text-muted-foreground">{companyRole || ROLE_LABEL[role]}</span>
+            <span className="block truncate font-display text-sm font-semibold uppercase tracking-wide">AB5 HUB</span>
+            <span className="block truncate text-[10.5px] text-muted-foreground">Sistema de Gestão Corporativo</span>
           </span>
         </div>
         {/* Busca */}
         <button type="button" onClick={openMenuSearch} title="Buscar (Ctrl+K)"
-          className={cn("mb-1 flex h-10 w-full items-center gap-2 rounded-full pl-2.5 pr-2 text-sm transition-colors duration-300", expanded ? "bg-white/60 text-muted-foreground shadow-inner dark:bg-white/10" : "text-foreground/70 hover:bg-white/50")}>
+          className={cn("mb-1 flex h-10 items-center rounded-full text-sm transition-[background-color,width,padding] duration-300", expanded ? "w-full gap-2 bg-white/60 pl-3 pr-2 text-muted-foreground shadow-inner dark:bg-white/10" : "mx-auto w-10 justify-center text-foreground/70 hover:bg-white/50")}>
           <Search className="h-4 w-4 shrink-0" />
           <span className={cn(fade, "flex-1 text-left text-[13px]")}>Buscar página…</span>
           <kbd className={cn(fade, "rounded-md border border-foreground/10 bg-white/70 px-1.5 text-[10px] text-muted-foreground dark:bg-white/10")}>Ctrl K</kbd>
@@ -297,13 +299,13 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
         <Popover open={settings} onOpenChange={setSettings}>
           <PopoverTrigger asChild>
             <button type="button" className={cn(rowBase, "mt-1", settings ? "bg-white/80 shadow-sm dark:bg-white/15" : "text-foreground/80 hover:bg-white/70 dark:hover:bg-white/10")}>
-              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-white to-neutral-200 text-[11px] font-semibold text-neutral-700 shadow-sm dark:from-neutral-700 dark:to-neutral-800 dark:text-white">
+              <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-white to-neutral-200 text-[11px] font-semibold text-neutral-700 shadow-sm dark:from-neutral-700 dark:to-neutral-800 dark:text-white">
                 {initials}
                 {adminItems.some(({ item }) => badges[item.url]) && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-white/80" />}
               </span>
               <span className={cn(fade, "min-w-0 flex-1 text-left leading-tight")}>
                 <span className="block truncate text-[13px] font-medium">{profile?.full_name || profile?.email}</span>
-                <span className="block truncate text-[10.5px] text-muted-foreground">Configurações</span>
+                <span className="block truncate text-[10.5px] text-muted-foreground">{companyRole || ROLE_LABEL[role]}</span>
               </span>
               <Settings className={cn(fade, "h-4 w-4 shrink-0 opacity-60")} />
             </button>
