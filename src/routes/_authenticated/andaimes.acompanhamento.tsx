@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CountUp } from "@/components/count-up";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -55,6 +55,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { STRUCT_STATUS, inspectionState } from "@/lib/andaimes";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Apontamentos, MonthProductivity, Produtividade, RdoFilters, useRdoFilters } from "@/components/scaffold-rdo-reports";
+import { AndaimesInsights } from "@/components/insights/andaimes-insights";
 
 export const Route = createFileRoute("/_authenticated/andaimes/acompanhamento")({
   head: () => ({
@@ -66,6 +67,10 @@ export const Route = createFileRoute("/_authenticated/andaimes/acompanhamento")(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
+  }),
+  // andaime: opcional, usado pelos blocos vivos (Montados há mais tempo abre o andaime).
+  validateSearch: (s: Record<string, unknown>): { andaime?: string } => ({
+    ...(typeof s["andaime"] === "string" && s["andaime"] ? { andaime: s["andaime"] } : {}),
   }),
   component: Page,
 });
@@ -79,6 +84,8 @@ function Page() {
   const qc = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const { andaime } = Route.useSearch();
+  useEffect(() => { if (andaime) setOpen(andaime); }, [andaime]);
   const [fClient, setFClient] = useState("");
   const [fStatus, setFStatus] = useState("");
   const list = useQuery({
@@ -104,6 +111,7 @@ function Page() {
   return (
     <div className="space-y-4">
       <PageHeader title="Acompanhamento" description="Andaimes montados nas obras, apontamentos e produtividade a partir dos RDOs." />
+      <AndaimesInsights id="acompanhamento" onStructure={setOpen} />
       <Tabs pageTabs defaultValue="andaimes" className="space-y-4">
         <TabsList>
           <TabsTrigger value="andaimes">Andaimes</TabsTrigger>

@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CountUp } from "@/components/count-up";
+import { AndaimesInsights } from "@/components/insights/andaimes-insights";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -28,6 +29,10 @@ export const Route = createFileRoute("/_authenticated/andaimes/solicitacoes")({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
+  }),
+  // etapa: opcional, usada pelos blocos vivos (Solicitações por etapa abre a lista filtrada).
+  validateSearch: (s: Record<string, unknown>): { etapa?: string } => ({
+    ...(typeof s["etapa"] === "string" && s["etapa"] ? { etapa: s["etapa"] } : {}),
   }),
   component: Page,
 });
@@ -81,6 +86,10 @@ function Page() {
   const [tab, setTab] = useState("aprovacoes");
   const [fClient, setFClient] = useState(ALL);
   const [fStage, setFStage] = useState(ALL);
+  // Etapa escolhida no bloco "Solicitações por etapa" (faixa do topo ou endereço): mostra as em andamento dessa etapa.
+  const pickStage = (st: string) => { setTab("andamento"); setFStage((cur) => (cur === st ? ALL : st)); };
+  const { etapa } = Route.useSearch();
+  useEffect(() => { if (etapa) { setTab("andamento"); setFStage(etapa); } }, [etapa]);
   const [form, setForm] = useState<any>(null);
   const [open, setOpen] = useState<string | null>(null);
   const list = useQuery({
@@ -111,6 +120,7 @@ function Page() {
     <div className="space-y-4">
       <PageHeader title="Solicitações" description="Fluxo único: solicitação, aprovações, separação, romaneio de saída, obra e retorno ao pátio."
         actions={canEdit ? <Button onClick={() => setForm({ client: "", work: CANTEIRO, request_date: new Date().toISOString().slice(0, 10), needed_date: "", priority: "normal", notes: "", lines: [{ item: "", qty: "" }] })}><Plus className="mr-1 h-4 w-4" />Nova solicitação</Button> : undefined} />
+      <AndaimesInsights id="solicitacoes" onStage={pickStage} stage={fStage === ALL ? undefined : fStage} />
       <Tabs pageTabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="aprovacoes">Aprovações{myCount ? ` (${myCount})` : ""}</TabsTrigger>
