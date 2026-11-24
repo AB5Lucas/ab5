@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import { titleCase } from "@/lib/fleet-notes";
 import { LODGING_LABEL, lodgingOn, type Lodging, type LodgingStay } from "@/lib/lodging";
 

@@ -3,7 +3,7 @@ import { CountUp } from "@/components/count-up";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import { normalizePlate, registeredPlate } from "@/lib/fleet-costs";
 import { canonicalDriver, closestPlate, driverRanking, isoDay, withDateFix, matchDriverName, titleCase, NOTE_GRACE_DAYS, type RankingNote, type RankingSchedule } from "@/lib/fleet-notes";
 import { useCnhPeople, useFleetRelease } from "./liberacao";

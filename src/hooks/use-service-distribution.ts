@@ -1,9 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import { todayISO } from "@/lib/scheduling";
+import { readClientsCadastro, readWorksCadastro } from "@/lib/schedule-alerts.data";
 import { mergePendingClients, serviceDistribution, recentRange, isIndustria, isTresCoracoes, isWeekend, type DistributionAllocation, type DistributionWork } from "@/lib/service-distribution";
 
 export const SERVICE_BADGE_DATE = ["service-badge-date"];
@@ -14,6 +15,7 @@ type Alloc = DistributionAllocation & { schedule_id: string };
 export function useServiceDistribution(selectedDate?: string) {
   const { user, role, loading } = useCurrentUser();
   const { canAccess } = useAccess();
+  const qc = useQueryClient();
   const today = todayISO();
   const range = selectedDate ? { start: selectedDate, end: selectedDate } : recentRange(today);
   return useQuery({
@@ -26,9 +28,10 @@ export function useServiceDistribution(selectedDate?: string) {
       const { start, end } = range;
       const [schedules, allWorks, links, clientRows] = await Promise.all([
         fetchAll<{ id: string; schedule_date: string }>((a, b) => supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", start).lte("schedule_date", end).order("id").range(a, b)),
-        fetchAll<DistributionWork>((a, b) => supabase.from("works").select("id, client_id, active").order("id").range(a, b)),
+        // Cadastros com 5 min de cache (chave ["cadastro", …]): só os dados do dia são relidos a cada gravação.
+        readWorksCadastro(qc) as Promise<DistributionWork[]>,
         role === "admin" || role === "programmer" ? Promise.resolve(null) : fetchAll<{ works: { client_id: string | null } | null }>((a, b) => supabase.from("foreman_works").select("works(client_id)").eq("user_id", user?.id ?? "").order("id").range(a, b)),
-        fetchAll<{ id: string; name: string }>((a, b) => supabase.from("clients").select("id, name").order("id").range(a, b)),
+        readClientsCadastro(qc) as Promise<{ id: string; name: string }[]>,
       ]);
       const tres = new Set(clientRows.filter((c) => isTresCoracoes(c.name)).map((c) => c.id));
       const industria = new Set(clientRows.filter((c) => isIndustria(c.name)).map((c) => c.id));

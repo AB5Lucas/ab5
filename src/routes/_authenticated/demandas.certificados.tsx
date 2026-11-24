@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { fetchAll } from "@/lib/fetch-all";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -207,11 +208,9 @@ function GenerateTab() {
   const [addQ, setAddQ] = useState("");
   const collabs = useQuery({
     queryKey: ["cert-collabs"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("collaborators").select("id, full_name, cpf, registration_number").order("full_name");
-      if (error) throw error;
-      return data ?? [];
-    },
+    // Paginado: o cadastro inteiro passa de 1000 linhas (corte silencioso do PostgREST).
+    queryFn: () => fetchAll<{ id: string; full_name: string; cpf: string | null; registration_number: string | null }>((a, b) =>
+      supabase.from("collaborators").select("id, full_name, cpf, registration_number").order("full_name").order("id").range(a, b)),
   });
   const groups = useMemo(() => {
     const out = (day.data ?? []).map((g) => ({ ...g, people: [...g.people] }));
@@ -865,11 +864,14 @@ function TstTab() {
   const { tsts } = useBase();
   const [edit, setEdit] = useState<Partial<Tst> | null>(null);
   const counts = useQuery({
-    queryKey: ["tst-counts"],
+    queryKey: ["tst-counts", (tsts.data ?? []).map((t) => t.id).join(",")],
+    // Contagem no banco (count, sem baixar as linhas): a tabela de certificados passa de 1000 linhas.
     queryFn: async () => {
-      const { data } = await supabase.from("training_certificates").select("tst_id");
       const m = new Map<string, number>();
-      (data ?? []).forEach((r) => r.tst_id && m.set(r.tst_id, (m.get(r.tst_id) ?? 0) + 1));
+      await Promise.all((tsts.data ?? []).map(async (t) => {
+        const { count } = await supabase.from("training_certificates").select("id", { count: "exact", head: true }).eq("tst_id", t.id);
+        if (count) m.set(t.id, count);
+      }));
       return m;
     },
   });

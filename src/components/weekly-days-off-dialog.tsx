@@ -10,6 +10,7 @@ import { findDateConflicts } from "@/lib/date-conflicts";
 import { formatDateBR, todayISO } from "@/lib/scheduling";
 import { entitledToFolga, folgaDaysBy, folgaListText, folgaWeekOf } from "@/lib/weekly-days-off";
 import { Copy } from "lucide-react";
+import { invalidateScheduleDay } from "@/lib/invalidate-day";
 
 const WEEKDAY = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const dayLabel = (iso: string) => `${WEEKDAY[new Date(`${iso}T12:00:00Z`).getUTCDay()]} ${formatDateBR(iso).slice(0, 5)}`;
@@ -82,7 +83,7 @@ export function WeeklyDaysOffDialog({ date, open, onOpenChange, editable }: { da
     },
     onSuccess: ({ person, day }) => {
       toast.success(`Folga de ${person.name} agendada para ${dayLabel(day)}`);
-      qc.invalidateQueries();
+      invalidateScheduleDay(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });

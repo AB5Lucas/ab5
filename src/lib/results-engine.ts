@@ -9,6 +9,7 @@ import { buildDistanceLookup } from "@/lib/city-distance";
 import { workVtDefault } from "@/lib/transport-rules";
 import { holidaysForClient, type ClientHoliday } from "@/lib/holidays";
 import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingIndex, type LodgingStay } from "@/lib/lodging";
+import { fetchAll } from "./fetch-all";
 
 /** Motor de cálculo de Resultados — usado pela página Resultados e pelo Financeiro (mesma lógica). */
 export const TAX_RATE = 0.1867;
@@ -46,35 +47,16 @@ export function monthShare(ym: string, fromDate?: string | null, toDate?: string
   return days(a, b) / days(first, last);
 }
 
-const PAGE = 1000;
-const PARALLEL_PAGES = 8;
-/** Lê todas as páginas. Depois da primeira página cheia, busca as seguintes em grupos paralelos
- * e junta na ordem das páginas — mesmo resultado da leitura sequencial, com menos esperas. */
-export async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
-  const page = async (n: number) => {
-    const { data, error } = await build(n * PAGE, n * PAGE + PAGE - 1);
-    if (error) throw error;
-    return data ?? [];
-  };
-  const out: T[] = [...(await page(0))];
-  if (out.length < PAGE) return out;
-  for (let next = 1; ; next += PARALLEL_PAGES) {
-    const pages = await Promise.all(Array.from({ length: PARALLEL_PAGES }, (_, i) => page(next + i)));
-    for (const rows of pages) {
-      out.push(...rows);
-      if (rows.length < PAGE) return out;
-    }
-  }
-}
+export { fetchAll };
 
 const RESPLIT_AT = new Map<string, number>();
 
 /** Query-scoped shared inputs: no singleton cache across users or requests. */
 export async function loadResultShared() {
   const [people, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, allRdoWorkforce, daysOff, vacations, lodgingStays] = await Promise.all([
-    fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled, positions(name)").range(a, b)),
-    fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("schedule_id, collaborator_id, daily_schedules(schedule_date)").in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b)),
-    fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled, positions(name)").order("id").range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("schedule_id, collaborator_id, daily_schedules(schedule_date)").in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).order("id").range(a, b)),
+    fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").order("id").range(a, b)),
     supabase.from("transport_voucher_rules").select("*").eq("active", true),
     supabase.from("driver_bonus_rules").select("*").eq("active", true),
     supabase.from("travel_bonus_rules").select("*").eq("active", true),
@@ -105,18 +87,18 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       }
       const [allocs, rdoWf, progress, entries, people, siblings, vs, client] = await Promise.all([
         fetchAll<any>((a, b) =>
-          supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", workIds).range(a, b),
+          supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", workIds).order("id").range(a, b),
         ),
         fetchAll<any>((a, b) =>
-          supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, position_id, collaborators(position_id), rdos(shift)").in("work_id", workIds).range(a, b),
+          supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, position_id, collaborators(position_id), rdos(shift)").in("work_id", workIds).order("id").range(a, b),
         ),
         supabase.from("work_progress").select("*").in("work_id", workIds).order("month"),
         fetchAll<any>((a, b) => supabase.from("work_entries").select("*").eq("sync_cancelled", false).in("work_id", workIds).order("entry_date", { ascending: false }).order("id").range(a, b)),
-        shared ? Promise.resolve(shared.people) : fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled, positions(name)").range(a, b)),
+        shared ? Promise.resolve(shared.people) : fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, full_name, contract_type, no_overtime_premium, city, vt_enabled, travel_bonus_enabled, positions(name)").order("id").range(a, b)),
         w.client_id ? supabase.from("works").select("id, monthly_enabled, night_shift").eq("client_id", w.client_id) : Promise.resolve({ data: [] as any[] }),
         w.client_id
           ? fetchAll<any>((a, b) =>
-              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, place_toll, vehicles(km_rate, plate, assign_by_work), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).range(a, b),
+              supabase.from("vehicle_schedules").select("schedule_date, km, trips, client_id, work_id, driver_id, driver_bonus, is_suzano_local, place_toll, vehicles(km_rate, plate, assign_by_work), collaborators(full_name)").or(`client_id.eq.${w.client_id},is_suzano_local.eq.true`).order("id").range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
@@ -125,13 +107,13 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       ]);
       const [workVt, workTravelRows, noVtRows, leaves, vtRules, dbRules, tbRules, cityDist, daysOff, vacations] = await Promise.all([
         // VT é marcado por cliente na Programação: lê de todos os serviços do cliente
-        fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", [...new Set([...workIds, ...(((siblings as any).data ?? []) as any[]).map((x) => x.id)])]).range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("work_id", [...new Set([...workIds, ...((siblings as any).data ?? []).map((x: any) => x.id)])]).range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("work_id", [...new Set([...workIds, ...(((siblings as any).data ?? []) as any[]).map((x) => x.id)])]).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("schedule_work_travel").select("schedule_id, work_id, pays_bonus").in("work_id", [...new Set([...workIds, ...((siblings as any).data ?? []).map((x: any) => x.id)])]).order("id").range(a, b)),
         shared ? Promise.resolve(shared.noVtRows) : fetchAll<any>((a, b) =>
           supabase.from("daily_status_entries").select("schedule_id, collaborator_id, daily_schedules(schedule_date)")
-            .in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).range(a, b),
+            .in("box_key", ["folga", "ferias", "afastado", "falta", "atestado", "medico", "interjornada", "licenca", "abono"]).order("id").range(a, b),
         ),
-        shared ? Promise.resolve(shared.leaves) : fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").range(a, b)),
+        shared ? Promise.resolve(shared.leaves) : fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").order("id").range(a, b)),
         shared ? Promise.resolve(shared.vtRules) : supabase.from("transport_voucher_rules").select("*").eq("active", true),
         shared ? Promise.resolve(shared.dbRules) : supabase.from("driver_bonus_rules").select("*").eq("active", true),
         shared ? Promise.resolve(shared.tbRules) : supabase.from("travel_bonus_rules").select("*").eq("active", true),
@@ -144,25 +126,25 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
       const [sibAllocs, sibRdo, integAppts, integBoxes, clientRdos, supportRows, allRdoWorkforce, integChoices] = await Promise.all([
         sibIds.length
           ? fetchAll<any>((a, b) =>
-              supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", sibIds).range(a, b),
+              supabase.from("daily_allocations").select("work_id, collaborator_id, schedule_id, driver, vt_override, travel_bonus_override, daily_schedules(schedule_date)").in("work_id", sibIds).order("id").range(a, b),
             )
           : Promise.resolve([] as any[]),
         sibIds.length
           ? fetchAll<any>((a, b) =>
-              supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, rdos(shift)").in("work_id", sibIds).range(a, b),
+              supabase.from("rdo_workforce").select("work_id, collaborator_id, report_date, present, worked_hours, entry_time, exit_time, break_minutes, rdos(shift)").in("work_id", sibIds).order("id").range(a, b),
             )
           : Promise.resolve([] as any[]),
         w.client_id
           ? fetchAll<any>((a, b) =>
-              supabase.from("appointments").select("collaborator_id, scheduled_date, completed_date, status, pays_transport_voucher").eq("type", "integracao").eq("client_id", w.client_id!).range(a, b),
+              supabase.from("appointments").select("collaborator_id, scheduled_date, completed_date, status, pays_transport_voucher").eq("type", "integracao").eq("client_id", w.client_id!).order("id").range(a, b),
             )
           : Promise.resolve([] as any[]),
         clientName
           ? fetchAll<any>((a, b) =>
-              supabase.from("daily_status_entries").select("collaborator_id, daily_schedules(schedule_date)").eq("box_key", `integracao:${clientName}`).range(a, b),
+              supabase.from("daily_status_entries").select("collaborator_id, daily_schedules(schedule_date)").eq("box_key", `integracao:${clientName}`).order("id").range(a, b),
             )
           : Promise.resolve([] as any[]),
-        fetchAll<any>((a, b) => supabase.from("rdos").select("work_id, report_date").in("work_id", [...new Set([...workIds, ...sibIds])]).range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("rdos").select("work_id, report_date").in("work_id", [...new Set([...workIds, ...sibIds])]).order("id").range(a, b)),
         w.client_id ? supabase.from("result_support_allocations").select("collaborator_id").eq("client_id", w.client_id) : Promise.resolve({ data: [] }),
         shared ? Promise.resolve(shared.allRdoWorkforce) : Promise.resolve(null as any[] | null),
         // Integração lançada num serviço (aba Serviços): esse serviço arca com o dia todo; sem linha = rateio.

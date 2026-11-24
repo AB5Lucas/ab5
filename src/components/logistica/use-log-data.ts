@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import type { LogAddress, LogDemand, LogDriver, LogItem, LogRestriction, LogVehicle } from "@/lib/logistics";
 
 export type DemandRow = LogDemand & { client_id: string | null; work_id: string | null; created_at: string; items: (LogItem & { id: string; material_id: string | null })[] };
@@ -52,7 +52,7 @@ export function useTransportBusy(from: string, to: string) {
     queryKey: [...LOG_KEY, "transport", from, to],
     queryFn: async () => {
       const rows = await fetchAll<{ vehicle_id: string; schedule_date: string }>((a, b) => supabase.from("vehicle_schedules").select("vehicle_id, schedule_date")
-        .gte("schedule_date", from).lte("schedule_date", to).range(a, b));
+        .gte("schedule_date", from).lte("schedule_date", to).order("id").range(a, b));
       return new Set(rows.map((r) => `${r.vehicle_id}|${r.schedule_date}`));
     },
   });

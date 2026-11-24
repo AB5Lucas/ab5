@@ -12,13 +12,12 @@ import { filterPurchaseEntries } from "@/lib/purchase-policy";
 import { loadWorkData, buildBase as engineBuildBase, fetchAll, totalMargin, TAX_RATE, KM_RATE, DEFAULT_HOURS, ITEMS, entryItem, monthLabel, monthEnd, monthShare, bdiBudget, BDI_RATE, type ItemKey } from "@/lib/results-engine";
 import { resplitClient, splitDesc } from "@/lib/resplit";
 import { Switch } from "@/components/ui/switch";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { workedHours, positionLabel } from "@/lib/rdo";
 import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Trash2, Plus, Pencil, Check, X, CalendarDays, Download, Repeat2 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -51,6 +50,9 @@ const relabel = (k: string, label: string) =>
 const catLabel = (k: string) => relabel(k, CATEGORIES.find((c) => c.key === k)?.label ?? k);
 
 
+// recharts só carrega quando o gráfico aparece (chunk próprio).
+const MonthBarsChart = lazy(() => import("@/components/resultado-charts").then((m) => ({ default: m.MonthBarsChart })));
+const ItemBarsChart = lazy(() => import("@/components/resultado-charts").then((m) => ({ default: m.ItemBarsChart })));
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
 const num = (s: string) => {
@@ -919,39 +921,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
               <SectionTitle>Andamento Mensal</SectionTitle>
               <div className="mt-2 h-64">
                 {calc && calc.monthBars.length > 0 ? (
-                  <ResponsiveContainer>
-                    <BarChart data={calc.monthBars} margin={{ left: 20 }}>
-                      <CartesianGrid vertical={false} className="stroke-border" />
-                      <XAxis dataKey="label" fontSize={11} />
-                      <YAxis fontSize={11} tickFormatter={(v: number) => brl(v)} width={100} />
-                      <Tooltip
-                        content={({ active, payload, label }: any) => {
-                          if (!active || !payload?.length) return null;
-                          const p = payload[0].payload;
-                          const empty = !p.mo && !p.materiais && !p.transporte;
-                          if (empty && !p.faturamento) return null;
-                          return (
-                            <div className="rounded-md border bg-popover p-2 text-xs text-popover-foreground shadow">
-                              <p className="mb-1 font-medium">{label}</p>
-                              {empty ? (
-                                <p>Faturamento: {brl(p.faturamento)}</p>
-                              ) : (
-                                payload.map((it: any) => (
-                                  <p key={it.dataKey} style={{ color: it.color }}>
-                                    {it.name}: {brl(Number(it.value ?? 0))}
-                                  </p>
-                                ))
-                              )}
-                            </div>
-                          );
-                        }}
-                      />
-                      <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
-                      <Bar dataKey="mo" name="R$ Total MO" fill="var(--chart-blue)" />
-                      <Bar dataKey="materiais" name="R$ Total Materiais" fill="var(--muted-foreground)" />
-                      <Bar dataKey="transporte" name="R$ Total Transporte" fill="var(--foreground)" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <Suspense fallback={null}><MonthBarsChart data={calc.monthBars} /></Suspense>
                 ) : (
                   <p className="pt-10 text-center text-sm text-muted-foreground">Sem custos lançados.</p>
                 )}
@@ -968,18 +938,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
           <div className="grid gap-6 pt-5 xl:grid-cols-[1fr_2fr_1fr]">
             <div className="h-64">
               {barItems.length ? (
-                <ResponsiveContainer>
-                  <BarChart data={barItems} layout="vertical" margin={{ right: 48 }} barGap={2}>
-                    <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="label" width={80} fontSize={11} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(v: number) => brl(v)} />
-                    <Legend wrapperStyle={{ fontSize: 13 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
-                    <Bar dataKey="real" name="Custo Realizado" fill="var(--chart-blue)">
-                      <LabelList dataKey="used" position="right" fontSize={11} className="fill-foreground" formatter={(v: number) => pct(Math.round(v))} />
-                    </Bar>
-                    <Bar dataKey="budget" name="Custo Orçado" fill="var(--chart-2)" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <Suspense fallback={null}><ItemBarsChart data={barItems} /></Suspense>
               ) : (
                 <p className="pt-10 text-center text-sm text-muted-foreground">Sem orçamento por item.</p>
               )}

@@ -1,45 +1,55 @@
 import { supabase } from "@/integrations/supabase/client";
 import { transportNeedsTravel, travelActiveIds } from "@/lib/travel-active";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import { todayISO } from "@/lib/scheduling";
 import { workVtDefault } from "@/lib/transport-rules";
 import { addDaysIso, scheduleAlerts, type AlertData, type AlertWork } from "@/lib/schedule-alerts";
 import { cityHolidaysOn, type CityHoliday } from "@/lib/holidays";
+import { readCadastro } from "@/lib/cadastro-cache";
+import type { QueryClient } from "@tanstack/react-query";
 
 const safe = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
 
-/** Lê o que os avisos da Programação precisam para o dia `date` e devolve os avisos. */
-export async function fetchScheduleAlerts(date: string) {
+/** Serviços e clientes (cadastro) — mesma leitura para os avisos da Programação e a distribuição da aba Serviços. */
+export const readWorksCadastro = (qc?: QueryClient) => readCadastro(qc, "works", () =>
+  fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, active, entry_time, exit_time, exit_time_weekend, night_shift").order("id").range(a, b)));
+export const readClientsCadastro = (qc?: QueryClient) => readCadastro(qc, "clients", () =>
+  fetchAll<any>((a, b) => supabase.from("clients").select("id, name, city, distance_km, needs_company_transport, needs_transport_voucher").order("id").range(a, b)));
+
+/** Lê o que os avisos da Programação precisam para o dia `date` e devolve os avisos.
+ * Com `qc`, os cadastros (serviços, clientes, colaboradores, catálogo de feriados) vêm do cache de 5 min (readCadastro);
+ * só os dados do dia são relidos a cada gravação. */
+export async function fetchScheduleAlerts(date: string, qc?: QueryClient) {
   const prev = addDaysIso(date, -1);
   const today = todayISO();
   const [schedules, holidays, works, clients, people, vehicles, appts, future] = await Promise.all([
-    safe(fetchAll<any>((a, b) => supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", addDaysIso(date, -14)).lte("schedule_date", date).range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("holidays").select("date").gte("date", addDaysIso(today, -1)).lte("date", addDaysIso(date, 40)).range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, night_shift").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("clients").select("id, name, city, distance_km, needs_company_transport, needs_transport_voucher").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("collaborators").select("id, full_name, status, contract_type, driver_license_expiry, vt_enabled, city, notice_end, positions(name)").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("driver_id, extra_driver_ids, client_id, extra_client_ids, is_maintenance, is_external, is_suzano_local, vehicles(plate, model)").eq("schedule_date", date).range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, status, client_booked, training_id, client_id, trainings(name), clients(name)").eq("scheduled_date", date).neq("status", "cancelado").range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, training_id, client_id").eq("status", "agendado").gte("scheduled_date", today).range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("daily_schedules").select("id, schedule_date").gte("schedule_date", addDaysIso(date, -14)).lte("schedule_date", date).order("id").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("holidays").select("date").gte("date", addDaysIso(today, -1)).lte("date", addDaysIso(date, 40)).order("id").range(a, b))),
+    safe(readWorksCadastro(qc)),
+    safe(readClientsCadastro(qc)),
+    safe(readCadastro(qc, "collaborators:alerts", () => fetchAll<any>((a, b) => supabase.from("collaborators").select("id, full_name, status, contract_type, driver_license_expiry, vt_enabled, city, notice_end, positions(name)").order("id").range(a, b)))),
+    safe(fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("driver_id, extra_driver_ids, client_id, extra_client_ids, is_maintenance, is_external, is_suzano_local, vehicles(plate, model)").eq("schedule_date", date).order("id").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, status, client_booked, training_id, client_id, trainings(name), clients(name)").eq("scheduled_date", date).neq("status", "cancelado").order("id").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, training_id, client_id").eq("status", "agendado").gte("scheduled_date", today).order("id").range(a, b))),
   ]);
   const sched = schedules.find((s) => s.schedule_date === date);
   const prevSched = schedules.find((s) => s.schedule_date === prev);
   const recentIds = schedules.filter((s) => s.schedule_date < date).map((s) => s.id);
   const [allocs, prevAllocs, recentAllocs, boxes, vacations, daysOff, medical, workVt, passengers] = await Promise.all([
-    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id, work_id, vt_override, travel_bonus_override").eq("schedule_id", sched.id).range(a, b))) : [],
-    prevSched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id, work_id").eq("schedule_id", prevSched.id).range(a, b))) : [],
-    recentIds.length ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id").in("schedule_id", recentIds).range(a, b))) : [],
-    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).range(a, b))) : [],
-    safe(fetchAll<any>((a, b) => supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date).range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date).gte("date", addDaysIso(date, -60)).range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date).range(a, b))),
-    sched ? safe(fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", sched.id).range(a, b))) : [],
-    safe(fetchAll<any>((a, b) => supabase.from("transport_passengers").select("client_id").eq("schedule_date", date).range(a, b))),
+    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id, work_id, vt_override, travel_bonus_override").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
+    prevSched ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id, work_id").eq("schedule_id", prevSched.id).order("id").range(a, b))) : [],
+    recentIds.length ? safe(fetchAll<any>((a, b) => supabase.from("daily_allocations").select("collaborator_id").in("schedule_id", recentIds).order("id").range(a, b))) : [],
+    sched ? safe(fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("collaborator_id").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
+    safe(fetchAll<any>((a, b) => supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date).order("id").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", date).gte("date", addDaysIso(date, -60)).order("id").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date).order("id").range(a, b))),
+    sched ? safe(fetchAll<any>((a, b) => supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", sched.id).order("id").range(a, b))) : [],
+    safe(fetchAll<any>((a, b) => supabase.from("transport_passengers").select("client_id").eq("schedule_date", date).order("id").range(a, b))),
   ]);
   const [catalog, decisions, clientHol] = await Promise.all([
-    safe(fetchAll<any>((a, b) => supabase.from("city_holiday_catalog").select("*").range(a, b))) as Promise<CityHoliday[]>,
-    safe(fetchAll<any>((a, b) => supabase.from("holiday_alert_decisions").select("client_id").eq("date", date).range(a, b))),
-    safe(fetchAll<any>((a, b) => supabase.from("client_holidays").select("client_id").eq("date", date).range(a, b))),
+    safe(readCadastro(qc, "city_holiday_catalog", () => fetchAll<any>((a, b) => supabase.from("city_holiday_catalog").select("*").order("id").range(a, b)))) as Promise<CityHoliday[]>,
+    safe(fetchAll<any>((a, b) => supabase.from("holiday_alert_decisions").select("client_id").eq("date", date).order("client_id").range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("client_holidays").select("client_id").eq("date", date).order("client_id").range(a, b))),
   ]);
   const decided = new Set([...decisions.map((x: any) => x.client_id), ...clientHol.map((x: any) => x.client_id)]);
   const municipal = clients.filter((c) => !decided.has(c.id)).flatMap((c) =>
@@ -59,7 +69,7 @@ export async function fetchScheduleAlerts(date: string) {
   const staffIds = [...new Set(allocs.map((a: any) => a.collaborator_id as string))];
   const chunk = <T,>(l: T[], n = 150) => Array.from({ length: Math.ceil(l.length / n) }, (_, i) => l.slice(i * n, i * n + n));
   const byStaff = async (table: string, cols: string) => (await Promise.all(chunk(staffIds).map((ids) =>
-    safe(fetchAll<any>((a, b) => supabase.from(table as any).select(cols).in("collaborator_id", ids).range(a, b)))))).flat();
+    safe(fetchAll<any>((a, b) => supabase.from(table as any).select(cols).in("collaborator_id", ids).order("id").range(a, b)))))).flat();
   const [asos, ints, trns] = staffIds.length
     ? await Promise.all([byStaff("asos", "collaborator_id, expires_at"), byStaff("client_integrations", "collaborator_id, client_id, expires_at, documentation"), byStaff("collaborator_trainings", "collaborator_id, training_id, expires_at, trainings(name)")])
     : [[], [], []];

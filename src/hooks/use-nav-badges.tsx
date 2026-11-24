@@ -1,8 +1,8 @@
-import { fetchFleetBalanceParts } from "@/components/frota/use-fuel-rows";
+import { fetchFleetBalanceParts } from "@/lib/fleet-balance-data";
 import { useQuery } from "@tanstack/react-query";
 import { useAccess } from "@/hooks/use-access";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import { addDays, todayISO } from "@/lib/scheduling";
 import { useServiceDistribution } from "@/hooks/use-service-distribution";
 import { useNextBusinessDayAlerts } from "@/hooks/use-schedule-alerts";
@@ -10,8 +10,6 @@ import { useSeenAlerts } from "@/hooks/use-seen-alerts";
 import { worstAlertTone } from "@/lib/schedule-alerts";
 import { hiringBadge } from "@/lib/hiring-badge";
 import { balanceBadgeTone, fleetBalance } from "@/lib/fleet-balance";
-import { nonTicketTotal } from "@/lib/fleet-fiscal";
-import { currentMonthRange } from "@/components/date-range-picker";
 
 /** Aviso do menu: vermelho = exige ação/vencido; laranja = atenção/a vencer; label "!" = alerta de valor. detail = texto do sino e do mouse. */
 export type MenuBadge = { count: number; tone: "red" | "orange"; title?: string; label?: string; detail?: string };
@@ -43,8 +41,6 @@ function useBadgeData() {
       const today = todayISO();
       const safe = async <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
       const when = <T,>(ok: boolean, f: () => Promise<T[]>) => (ok ? safe(f()) : Promise.resolve([] as T[]));
-      // Saldo do posto como na aba Abastecimento ao abrir (período = mês atual).
-      const month = currentMonthRange();
       type Kind = { expired: number; expiring: number };
       type Counts = { byKind: Record<string, Kind>; conference: Kind; purchases: number; orders: number; billingInd: number; billingSrv: number };
       const zero = { expired: 0, expiring: 0 };
@@ -235,8 +231,11 @@ export function useWorkflowBadges() {
       const { flowPendingFor } = await import("@/lib/andaimes");
       const [flowRoles, reqs, hires] = await Promise.all([
         can.andaimes ? supabase.from("andam_flow_roles").select("key, user_id").then((r) => r.data ?? []) : Promise.resolve([]),
-        can.andaimes ? supabase.from("andam_requests").select("flow_stage, user_id").neq("flow_stage", "encerrada").then((r) => (r.data ?? []) as any[]) : Promise.resolve([] as any[]),
-        can.hiring && hiringWatcher ? supabase.from("hiring_requests").select("id, status, requester_id").then((r) => (r.data ?? []) as any[]) : Promise.resolve([] as any[]),
+        can.andaimes ? fetchAll<any>((a, b) => supabase.from("andam_requests").select("flow_stage, user_id").neq("flow_stage", "encerrada").order("id").range(a, b)) : Promise.resolve([] as any[]),
+        // Só as pendentes (mesma regra de hiringBadge) e só a coluna usada, paginado (sem o corte de 1000 linhas).
+        can.hiring && hiringWatcher
+          ? fetchAll<any>((a, b) => supabase.from("hiring_requests").select("status").or("status.is.null,status.not.in.(atendida,cancelada)").order("id").range(a, b))
+          : Promise.resolve([] as any[]),
       ]);
       const ids: any = {};
       for (const f of flowRoles as any[]) ids[f.key] = f.user_id;

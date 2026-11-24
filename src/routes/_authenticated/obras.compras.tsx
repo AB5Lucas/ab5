@@ -21,6 +21,8 @@ import { PurchaseRules } from "@/components/purchase-rules";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { assetCategory, installmentPlan, normalizePurchaseText, type PurchaseItemState } from "@/lib/purchase-policy";
 import { PURCHASE_CATEGORIES, isIndustryClient, purchaseCategory, type CcItem, type PurchaseCategory } from "@/lib/purchases";
+import { fetchAll } from "@/lib/fetch-all";
+import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/obras/compras")({
   head: () => ({
@@ -75,16 +77,15 @@ function ComprasPage() {
     queryKey: ["purchase-lines", scope.scoped, [...scope.clientIds].join(",")],
     enabled: scope.ready,
     queryFn: async () => {
-      const [l, c, w, decisions] = await Promise.all([
-        supabase.from("purchase_cc_lines").select("*").order("ref_month", { ascending: false }).order("cc_code"),
+      // Paginado e com ordem estável (id desempata): as linhas de CC passam de 1000 (corte silencioso do PostgREST).
+      const [lRows, c, wRows, decRows] = await Promise.all([
+        fetchAll<Tables<"purchase_cc_lines">>((a, b) => supabase.from("purchase_cc_lines").select("*").order("ref_month", { ascending: false }).order("cc_code").order("id").range(a, b)),
         supabase.from("clients").select("id, name, cc_prefix").order("name"),
-        supabase.from("works").select("id, name, client_id, active").order("name"),
-        supabase.from("purchase_asset_decisions").select("*"),
+        fetchAll<{ id: string; name: string; client_id: string | null; active: boolean }>((a, b) => supabase.from("works").select("id, name, client_id, active").order("name").order("id").range(a, b)),
+        fetchAll<Tables<"purchase_asset_decisions">>((a, b) => supabase.from("purchase_asset_decisions").select("*").order("id").range(a, b)),
       ]);
-      if (l.error) throw l.error;
       if (c.error) throw c.error;
-      if (w.error) throw w.error;
-      if (decisions.error) throw decisions.error;
+      const l = { data: lRows }, w = { data: wRows }, decisions = { data: decRows };
       const ids = l.data.map((x) => x.id);
       const entries: { purchase_cc_id: string | null; purchase_item_key: string | null; work_id: string; amount: number }[] = [];
       for (let i = 0; i < ids.length; i += 200) {

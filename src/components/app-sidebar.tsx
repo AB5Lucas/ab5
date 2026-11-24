@@ -10,10 +10,10 @@ import { MENU_GROUPS, menuUrlFor, type MenuGroup, type MenuItem } from "@/lib/me
 import { useAccess } from "@/hooks/use-access";
 import { useMenuBadges } from "@/hooks/use-nav-badges";
 import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
-import { companyRole } from "@/lib/company-role";
+import { companyRoleMatch, positionWithoutLevel } from "@/lib/company-role";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import { BadgePill, openMenuSearch, useFavorites, useMenuStyle, worstTone } from "@/components/nav/menu-prefs";
 
 const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
@@ -35,15 +35,23 @@ export function AppSidebar() {
   const { favs, toggle: toggleFav, isFav } = useFavorites(user?.id);
   const [, setStyle] = useMenuStyle();
   // Função na empresa (cadastro de Colaboradores, sem nível) no lugar do perfil do sistema; sem casamento, o perfil.
-  const people = useQuery({
-    queryKey: ["company-role-people"],
+  // Lê só nome/situação (sem o cargo de todos) e busca o cargo apenas do colaborador casado; guarda só o texto.
+  const companyRoleQ = useQuery({
+    queryKey: ["company-role", profile?.full_name ?? ""],
     staleTime: 30 * 60_000,
     enabled: !!profile?.full_name,
-    queryFn: async () => (await fetchAll<any>((a, b) => supabase.from("collaborators").select("full_name, status, positions(name)").order("id").range(a, b)))
-      .map((c) => ({ full_name: c.full_name as string, active: c.status === "active", position: (c.positions?.name ?? null) as string | null })),
+    queryFn: async () => {
+      const people = (await fetchAll<{ full_name: string; status: string | null; position_id: string | null }>((a, b) =>
+        supabase.from("collaborators").select("full_name, status, position_id").order("id").range(a, b)))
+        .map((c) => ({ full_name: c.full_name, active: c.status === "active", position_id: c.position_id }));
+      const hit = companyRoleMatch(profile?.full_name, people);
+      if (!hit?.position_id) return null;
+      const { data } = await supabase.from("positions").select("name").eq("id", hit.position_id).maybeSingle();
+      return positionWithoutLevel(data?.name ?? null);
+    },
   });
   // Sem cadastro em Colaboradores (casamento único pelo nome) = Externo.
-  const roleTitle = people.isLoading ? "" : companyRole(profile?.full_name, people.data ?? []) ?? "Externo";
+  const roleTitle = companyRoleQ.isLoading ? "" : companyRoleQ.data ?? "Externo";
   // Um módulo aberto por vez: o da página atual, salvo se o usuário abrir/fechar outro.
   const [openMod, setOpenMod] = useState<string | null | undefined>(undefined);
   const [fly, setFly] = useState<string | null>(null);

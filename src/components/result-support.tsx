@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UsersRound } from "lucide-react";
 import { toast } from "sonner";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 
 export function ResultSupport({ clientId, canWrite }: { clientId?: string; canWrite: boolean }) {
   const [open, setOpen] = useState(false);

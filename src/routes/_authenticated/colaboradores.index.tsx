@@ -43,6 +43,8 @@ import type { Tables } from "@/integrations/supabase/types";
 import { ImportDialog, type ImportColumn, type ImportRow } from "@/components/import-dialog";
 import { ExportCollaboratorsDialog } from "@/components/colaboradores/export-excel-dialog";
 import { createNameMatcher, emptyToNull, insertSequentially, normText, parseBool, parseDate, parseNum, titleCase, titleCaseOrNull } from "@/lib/import-helpers";
+import { fetchAll } from "@/lib/fetch-all";
+import { invalidateCollaborators } from "@/lib/invalidate-day";
 
 const CONTRACT_LABELS: Record<string, string> = {
   efetivo: "Efetivo",
@@ -258,11 +260,8 @@ function CollaboratorsPage() {
 
   const collaborators = useQuery({
     queryKey: ["collaborators"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("collaborators").select("*").order("full_name");
-      if (error) throw error;
-      return data;
-    },
+    // Paginado (sem o corte de 1000 linhas do PostgREST); id desempata nomes iguais para a ordem ser estável.
+    queryFn: () => fetchAll<Tables<"collaborators">>((a, b) => supabase.from("collaborators").select("*").order("full_name").order("id").range(a, b)),
   });
 
   const lookups = useQuery({
@@ -358,7 +357,7 @@ function CollaboratorsPage() {
     },
     onSuccess: () => {
       toast.success(editing ? "Colaborador atualizado." : "Colaborador cadastrado.");
-      queryClient.invalidateQueries();
+      invalidateCollaborators(queryClient);
       setOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -371,7 +370,7 @@ function CollaboratorsPage() {
     },
     onSuccess: () => {
       toast.success("Colaborador excluído.");
-      queryClient.invalidateQueries();
+      invalidateCollaborators(queryClient);
       setDeleting(null);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -445,7 +444,7 @@ function CollaboratorsPage() {
       },
       errors,
     );
-    await queryClient.invalidateQueries();
+    invalidateCollaborators(queryClient);
     return result;
   }
 

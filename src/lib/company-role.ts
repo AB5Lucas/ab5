@@ -11,11 +11,16 @@ export type RoleCollaborator = { full_name: string; active: boolean; position: s
 export const positionWithoutLevel = (p: string | null | undefined) =>
   (p ?? "").replace(/\s*[-–]?\s*\b(N\s?\d+|n[ií]vel\s*\d+|[IVX]{1,4})\s*$/i, "").trim() || null;
 
-export function companyRole(profileName: string | null | undefined, people: RoleCollaborator[]): string | null {
+/** Colaborador casado com o nome do usuário (único), ou null. Serve para quem lê só nome/situação e busca o cargo depois. */
+export function companyRoleMatch<T extends { full_name: string; active: boolean }>(profileName: string | null | undefined, people: T[]): T | null {
   if (!profileName?.trim()) return null;
   const active = people.filter((p) => p.active).map((p) => p.full_name);
   const name = matchDriverName(profileName, active, people.map((p) => p.full_name));
   if (!name) return null;
-  const hit = people.find((p) => p.full_name === name && p.active) ?? people.find((p) => p.full_name === name);
-  return positionWithoutLevel(hit?.position);
+  return people.find((p) => p.full_name === name && p.active) ?? people.find((p) => p.full_name === name) ?? null;
+}
+
+export function companyRole(profileName: string | null | undefined, people: RoleCollaborator[]): string | null {
+  const hit = companyRoleMatch(profileName, people);
+  return hit ? positionWithoutLevel(hit.position) : null;
 }

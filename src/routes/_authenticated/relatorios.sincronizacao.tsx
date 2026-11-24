@@ -23,7 +23,7 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { BadgeDot, useBillingBadges } from "@/hooks/use-nav-badges";
 import { BILLING_METHODS, BILLING_STATES, BILLING_START, moneyCents } from "@/lib/billing-sync";
 import { syncBillingNow } from "@/lib/billing-sync.functions";
-import { fetchAll } from "@/lib/results-engine";
+import { fetchAll } from "@/lib/fetch-all";
 import type { Database } from "@/integrations/supabase/types";
 type Note = Database["public"]["Tables"]["billing_sync_notes"]["Row"];
 export const Route = createFileRoute("/_authenticated/relatorios/sincronizacao")({ head: () => ({ meta: [
