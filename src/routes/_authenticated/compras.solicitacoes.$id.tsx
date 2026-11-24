@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { linkPurchaseOrderFile } from "@/lib/purchase-orders.functions";
+import { fetchPurchaseOrderPdf, linkPurchaseOrderFile } from "@/lib/purchase-orders.functions";
 import { orderFilePaths, splitOrders } from "@/lib/purchase-orders";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Link2, Camera, Check, Eye, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Link2, Camera, Check, Download, Eye, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
@@ -219,6 +219,24 @@ function Page() {
     onError: (e: Error) => toast.error(e.message),
   });
   const [orders, setOrders] = useState<Record<string, string>>({});
+  // PDF do pedido: o app busca no SharePoint e mostra aqui (quem não tem acesso à pasta também vê); nada fica gravado.
+  const getOrderPdf = useServerFn(fetchPurchaseOrderPdf);
+  const [orderPdf, setOrderPdf] = useState<{ loading: boolean; name?: string; url?: string }>({ loading: false });
+  const openOrder = async (item: string, index: number) => {
+    setOrderPdf({ loading: true });
+    const t = toast.loading("Buscando o pedido…");
+    try {
+      const f = await getOrderPdf({ data: { item, index } });
+      const bin = Uint8Array.from(atob(f.base64), (ch) => ch.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bin], { type: "application/pdf" }));
+      setOrderPdf({ loading: false, name: f.name, url });
+      toast.dismiss(t);
+    } catch (e) {
+      setOrderPdf({ loading: false });
+      toast.error((e as Error).message, { id: t });
+    }
+  };
+  const closeOrderPdf = () => setOrderPdf((o) => { if (o.url) URL.revokeObjectURL(o.url); return { loading: false }; });
 
   const putFile = async (file: File) => {
     const path = `${id}/${crypto.randomUUID()}-${file.name.replace(/[^\w.-]/g, "_")}`;
@@ -441,7 +459,7 @@ function Page() {
                           const files = orderFilePaths(saved.order_file_path);
                           const many = splitOrders(saved.order_number).length > 1 || files.length > 1;
                           return files.map((url, k) => url && (
-                            <Button key={k} variant="ghost" size="sm" className="h-7 px-2" title={`Abrir o pedido de compras ${splitOrders(saved.order_number)[k] ?? ""}`} onClick={() => openPhoto(url)}>
+                            <Button key={k} variant="ghost" size="sm" className="h-7 px-2" title={`Abrir o pedido de compras ${splitOrders(saved.order_number)[k] ?? ""}`} disabled={orderPdf.loading} onClick={() => void openOrder(saved.id, k)}>
                               <FileText className="h-4 w-4 text-primary" /> {many ? `Pedido ${k + 1}` : "Pedido"}
                             </Button>
                           ));
@@ -518,6 +536,16 @@ function Page() {
       </Dialog>
       <ScHeaderDialog open={editingHeader} onOpenChange={setEditingHeader} editing={r} />
       <ScRemoveDialog row={removing} onClose={() => setRemoving(null)} pending={remove.isPending} onConfirm={(x) => remove.mutate(x)} />
+      <Dialog open={!!orderPdf.url} onOpenChange={(o) => !o && closeOrderPdf()}>
+        <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col">
+          <DialogHeader><DialogTitle className="truncate pr-8">{orderPdf.name ?? "Pedido de compras"}</DialogTitle></DialogHeader>
+          {orderPdf.url && <iframe title="Pedido de compras" src={orderPdf.url} className="min-h-0 w-full flex-1 rounded border" />}
+          <div className="flex justify-end gap-2">
+            {orderPdf.url && <Button asChild variant="outline"><a href={orderPdf.url} download={orderPdf.name ?? "pedido.pdf"}><Download className="h-4 w-4" /> Baixar</a></Button>}
+            <Button onClick={closeOrderPdf}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
