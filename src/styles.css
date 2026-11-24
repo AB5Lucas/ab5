@@ -263,3 +263,12 @@
 .liquid-glass-bar { border-radius: 0; border-width: 0 0 1px 0; border-color: rgba(0,0,0,0.06);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 8px 24px -16px rgba(0,0,0,0.25); }
 .dark .liquid-glass-bar { border-color: rgba(255,255,255,0.08); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+
+/* Modo escuro: barras de rolagem escuras (sem isso o navegador desenha brancas). */
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+.dark * { scrollbar-color: rgba(255,255,255,0.22) transparent; }
+.dark ::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+.dark ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.32); }
+.dark ::-webkit-scrollbar-corner { background: transparent; }

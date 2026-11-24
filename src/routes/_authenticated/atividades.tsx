@@ -7,6 +7,8 @@ import { useAccess } from "@/hooks/use-access";
 import { useWorkScope } from "@/hooks/use-work-scope";
 import { Big, Gauge, HatchBars, LineArea, MiniBars, OverviewCard, RankBars } from "@/components/overview/charts";
 import { cn } from "@/lib/utils";
+import { ClientsMap } from "@/components/overview/clients-map";
+import { isInternalClient } from "@/lib/fleet-budget";
 
 export const Route = createFileRoute("/_authenticated/atividades")({
   head: () => ({ meta: [{ title: "Atividades | AB5 Hub" }] }),
@@ -47,6 +49,8 @@ function AtividadesOverview() {
     },
   });
 
+  const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
+
   const d = useMemo(() => {
     if (!q.data || !scope.ready) return null;
     const works = q.data.works.filter((w) => scope.allowWork(w));
@@ -70,6 +74,8 @@ function AtividadesOverview() {
     const cm = ymOf(today);
     const byClient = new Map<string, number>();
     for (const e of billing) if (String(e.entry_date).startsWith(cm)) { const n = workBy.get(e.work_id)?.clients?.name ?? "—"; byClient.set(n, (byClient.get(n) ?? 0) + Number(e.amount ?? 0)); }
+    const byClientId = new Map<string, number>();
+    for (const e of billing) if (String(e.entry_date).startsWith(cm)) { const id = workBy.get(e.work_id)?.client_id; if (id) byClientId.set(id, (byClientId.get(id) ?? 0) + Number(e.amount ?? 0)); }
     const top = [...byClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value }));
     // RDOs por dia (30 dias)
     const days: string[] = [];
@@ -78,12 +84,18 @@ function AtividadesOverview() {
     for (const r of rdos) { const x = rdoDay.get(String(r.report_date).slice(0, 10)); if (x) { x.all++; if (r.status === "finalized") x.fin++; } }
     const todayR = rdoDay.get(isoOf(today))!;
     return {
-      months, monthVals, cur, prev, ordered, billedActive, top, days, rdoDay, todayR,
+      byClientId, months, monthVals, cur, prev, ordered, billedActive, top, days, rdoDay, todayR,
       activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
       openBalance: Math.max(0, ordered - billedActive),
       statusBars: ["planned", "active", "paused", "completed"].map((s) => works.filter((w) => w.status === s).length),
     };
   }, [q.data, scope.ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mapa: clientes com endereço localizado (sem os internos da sede), marcador do tamanho do faturado no mês.
+  const mapClients = useMemo(() => (mapQ.data ?? [])
+    .filter((c: any) => scope.ready && scope.allowClient(c.id) && !isInternalClient(c.name ?? ""))
+    .map((c: any) => ({ id: c.id, name: c.name, city: c.city, lat: Number(c.lat), lon: Number(c.lon), billed: d?.byClientId.get(c.id) ?? 0 })),
+  [mapQ.data, scope.ready, d]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const can = (u: string) => canAccess(u);
   const delta = (a: number, b: number) => (b > 0 ? ((a - b) / b) * 100 : null);
@@ -163,6 +175,13 @@ function AtividadesOverview() {
               </OverviewCard>
             )}
           </div>
+
+          {can("/obras") && mapClients.length > 0 && (
+            <OverviewCard title="Clientes no mapa" to="/clientes" linkLabel="Ver clientes" hint="Marcador do tamanho do faturado no mês; Expandir abre o Brasil">
+              {/* Clicar/arrastar no mapa não abre a página (o quadro é um link). */}
+              <div onClick={(e) => e.preventDefault()}><ClientsMap clients={mapClients} /></div>
+            </OverviewCard>
+          )}
         </>
       )}
     </div>
