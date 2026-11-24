@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { MultiFilter } from "@/components/multi-filter";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -132,6 +133,7 @@ function WorksPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | WorkStatus>("all");
+  const [clientFilter, setClientFilter] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Work | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -193,13 +195,14 @@ function WorksPage() {
     const q = search.trim().toLowerCase();
     return (works.data ?? []).filter((w) => {
       if (statusFilter !== "all" && w.status !== statusFilter) return false;
+      if (clientFilter.length && !clientFilter.includes(w.client_id ?? "")) return false;
       if (!q) return true;
       const clientName = w.client_id ? (clientById.get(w.client_id)?.name ?? "") : "";
       // Também pelo pedido (número da lista de pedidos ou o pedido principal) e pelo Nº Orç.
       const orders = Array.isArray(w.orders) ? (w.orders as { number?: unknown }[]).map((o) => String(o?.number ?? "")) : [];
       return [w.name, clientName, w.order_number, w.quote_number, ...orders].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [works.data, search, statusFilter, clientById]);
+  }, [works.data, search, statusFilter, clientFilter, clientById]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -281,16 +284,22 @@ function WorksPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-52 flex-1">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Buscar por serviço, cliente, pedido ou Nº Orç."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-52 flex-1 space-y-1">
+          <Label>Buscar</Label>
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Buscar por serviço, cliente, pedido ou Nº Orç."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
+        <MultiFilter title="Clientes" options={(clients.data ?? []).map((c) => ({ value: c.id, label: c.name }))} values={clientFilter} onChange={setClientFilter} />
+        <div className="space-y-1">
+        <Label>Status</Label>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
           <SelectTrigger className="w-44">
             <SelectValue />
@@ -304,6 +313,7 @@ function WorksPage() {
             ))}
           </SelectContent>
         </Select>
+        </div>
       </div>
 
       <div className="rounded-lg border border-border">
