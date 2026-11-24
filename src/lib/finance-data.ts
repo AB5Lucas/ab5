@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { withIntegrationTravel } from "@/lib/integration-travel";
 import { activeFinancialEntries } from "./billing-sync";
 import { marginPercent } from "./result-labor";
 import { buildBase, fetchAll, hhRdoAfter, isSuzanoName, progressUntil, sliceResultRaw, totalMargin, vsClientIds, vsDriverIds, vsOfDrivers, vsTouchesClient, VS_COLS, type loadResultShared } from "./results-engine";
@@ -115,7 +116,7 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared, o
       ? fetchAll<any>((a, b) => supabase.from("appointments").select("id, client_id, collaborator_id, scheduled_date, completed_date, status, pays_transport_voucher").eq("type", "integracao").in("client_id", clientIds).order("id").range(a, b))
       : Promise.resolve([] as any[]),
     clientNames.length
-      ? fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("id, box_key, collaborator_id, daily_schedules(schedule_date)").in("box_key", clientNames.map((n) => `integracao:${n}`)).order("id").range(a, b))
+      ? fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("id, schedule_id, box_key, collaborator_id, daily_schedules(schedule_date)").in("box_key", clientNames.map((n) => `integracao:${n}`)).order("id").range(a, b)).then((rows) => withIntegrationTravel(rows, clientNames.map((n) => `integracao:${n}`)))
       : Promise.resolve([] as any[]),
     byWorks<any>(scope, (ids, a, b) => upTo(supabase.from("rdos").select("id, work_id, report_date").in("work_id", ids), "report_date").order("id").range(a, b)),
     clientIds.length ? supabase.from("result_support_allocations").select("client_id, collaborator_id").in("client_id", clientIds) : Promise.resolve({ data: [], error: null }),
@@ -176,7 +177,7 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared, o
       sibAllocs: sibIds.length ? pick(allocBy, sibIds) : [],
       sibRdo: sibIds.length ? pick(sibRdoBy, sibIds) : [],
       integAppts: w.client_id ? strip(apptBy.get(w.client_id) ?? [], ["client_id"]) : [],
-      integBoxes: client?.name ? strip(boxBy.get(`integracao:${client.name}`) ?? [], ["id", "box_key"]) : [],
+      integBoxes: client?.name ? strip(boxBy.get(`integracao:${client.name}`) ?? [], ["id", "box_key", "schedule_id"]) : [],
       integChoices: w.client_id ? strip(choiceBy.get(w.client_id) ?? [], ["client_id"]) : [],
       rdoWf: pick(rdoWfBy, workIds),
       progress: pick(progressBy, workIds).sort((a: any, b: any) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0)),

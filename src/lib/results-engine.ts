@@ -1,4 +1,6 @@
 import { resultHours, resultAbsenceCheck, marginPercent, supportDailyWeights, supportShare } from "./result-labor";
+import { withIntegrationTravel } from "@/lib/integration-travel";
+import { integrationTravelOn } from "@/lib/schedule-box-benefits";
 import { isResultMonth } from "./result-period";
 import { activeFinancialEntries } from "./billing-sync";
 import { supabase } from "@/integrations/supabase/client";
@@ -205,8 +207,8 @@ export async function loadWorkData(work: any, workIds: string[], canWrite: boole
           : Promise.resolve([] as any[]),
         clientName
           ? fetchAll<any>((a, b) =>
-              supabase.from("daily_status_entries").select("collaborator_id, daily_schedules(schedule_date)").eq("box_key", `integracao:${clientName}`).order("id").range(a, b),
-            )
+              supabase.from("daily_status_entries").select("schedule_id, box_key, collaborator_id, daily_schedules(schedule_date)").eq("box_key", `integracao:${clientName}`).order("id").range(a, b),
+            ).then((rows) => withIntegrationTravel(rows, [`integracao:${clientName}`]).then((r) => r.map(({ schedule_id: _s, box_key: _k, ...x }: any) => x)))
           : Promise.resolve([] as any[]),
         fetchAll<any>((a, b) => upTo(supabase.from("rdos").select("work_id, report_date").in("work_id", [...new Set([...workIds, ...sibIds])]), "report_date").order("id").range(a, b)),
         w.client_id ? supabase.from("result_support_allocations").select("collaborator_id").eq("client_id", w.client_id) : Promise.resolve({ data: [] }),
@@ -646,7 +648,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         const all = allByM.get(m) ?? 0;
         return all > 0 ? (myByM.get(m) ?? 0) / all : 0;
       };
-      const days = new Map<string, { id: string; date: string; paysVt: boolean }>();
+      const days = new Map<string, { id: string; date: string; paysVt: boolean; travel?: boolean | null }>();
       for (const a of raw.integAppts ?? []) {
         if (a.status === "cancelled" || a.status === "canceled") continue;
         const dt = String(a.completed_date ?? a.scheduled_date ?? "").slice(0, 10);
@@ -654,12 +656,16 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       }
       for (const e of raw.integBoxes ?? []) {
         const dt = e.daily_schedules?.schedule_date as string | undefined;
-        if (dt && okDate(dt) && !days.has(`${e.collaborator_id}|${dt}`)) days.set(`${e.collaborator_id}|${dt}`, { id: e.collaborator_id, date: dt, paysVt: true });
+        if (!dt || !okDate(dt)) continue;
+        const k = `${e.collaborator_id}|${dt}`;
+        const prev = days.get(k);
+        // A bolinha de prêmio viagem da pessoa no quadro vale também para o dia que veio do agendamento.
+        days.set(k, prev ? { ...prev, travel: e.travel ?? null } : { id: e.collaborator_id, date: dt, paysVt: true, travel: e.travel ?? null });
       }
       const rIn = (r: any, km: number) => km >= Number(r.minimum_distance ?? 0) && km <= (r.maximum_distance === null ? Infinity : Number(r.maximum_distance));
       const distF = buildDistanceLookup(d.cityDist ?? []);
       const vtCost = vtDay(false);
-      for (const { id, date, paysVt } of days.values()) {
+      for (const { id, date, paysVt, travel } of days.values()) {
         if (absent(id, date)) continue;
         const wd = new Date(`${date}T12:00:00`).getDay();
         const hours = wd >= 1 && wd <= 4 ? 9 : 8;
@@ -671,7 +677,9 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         const blockedL = lodgingBlocked(id, date);
         const vt = !paysVt || p?.vt_enabled === false || blockedL || vtNever(id, date) ? 0 : vtCost * shareF;
         const dist = distF(homeCityOf(id, date), d.client?.city ?? (work as any).city, Number(d.client?.distance_km ?? (work as any).distance_km ?? 0));
-        const tb = p?.travel_bonus_enabled === false || blockedL ? 0
+        const clientKm = Number(d.client?.distance_km ?? (work as any).distance_km ?? 0);
+        const travelOn = integrationTravelOn(travel, clientKm, (km) => (d.tbRules ?? []).some((x: any) => rIn(x, km)));
+        const tb = p?.travel_bonus_enabled === false || blockedL || !travelOn ? 0
           : (d.tbRules ?? []).filter((x: any) => rIn(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0) * shareF;
         if (mo) { addLabor(id, hours * shareF, mo); bump(date.slice(0, 7), "labor", mo); }
         if (vt) {
