@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { travelOnFor, vtBaseForDay, vtForDay, workVtDefault } from "@/lib/transport-rules";
+import { buildTransport, travelOnFor, vtBaseForDay, vtForDay, workVtDefault, type PassengerRow } from "@/lib/transport-rules";
 import { integrationTravelOn, nextBoxTravel, resolveBoxTravel } from "@/lib/schedule-box-benefits";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingOn, type LodgingStay } from "@/lib/lodging";
@@ -88,9 +88,19 @@ export function useScheduleBenefits({
     const i = vtInput(workId, collaboratorId);
     return vtBaseForDay(i) && !i.vtNever;
   };
+  // Transporte montado na aba Serviços (Montar efetivo): com o cliente montado no dia, só quem está em
+  // "Próprio (recebe VT)" fica com a bolinha verde — a mesma regra que o Fechamento paga (vtFor).
+  const builtTransport = useQuery({
+    queryKey: ["built-transport", date],
+    queryFn: async () => buildTransport(((await supabase.from("transport_passengers")
+      .select("client_id, schedule_date, collaborator_id, vehicle_schedule_id").eq("schedule_date", date)).data ?? []) as PassengerRow[]),
+  });
   /** VT que vale na bolinha (VT cheio aparece verde; Montador alojado em MGG nunca). */
   const allocVtOn = (workId: string, collaboratorId: string, override: boolean | null | undefined) =>
-    vtForDay({ ...vtInput(workId, collaboratorId), override });
+    vtForDay({
+      ...vtInput(workId, collaboratorId), override,
+      ...(builtTransport.data ? { transport: builtTransport.data, clientId: workById(workId)?.client_id ?? null, date, collaboratorId } : {}),
+    });
 
   const toggleWorkVt = useMutation({
     mutationFn: async (workId: string) => {

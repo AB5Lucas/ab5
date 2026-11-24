@@ -88,6 +88,7 @@ export function TransportBuilderDialog({
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["transport-builder"] });
     qc.invalidateQueries({ queryKey: ["allocations"] });
+    qc.invalidateQueries({ queryKey: ["built-transport"] });
   };
 
   const place = useMutation({
