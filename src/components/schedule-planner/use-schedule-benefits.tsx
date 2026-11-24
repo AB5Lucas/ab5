@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { travelOnFor, vtBaseForDay, vtForDay, workVtDefault } from "@/lib/transport-rules";
-import { nextBoxTravel, resolveBoxTravel } from "@/lib/schedule-box-benefits";
+import { integrationTravelOn, nextBoxTravel, resolveBoxTravel } from "@/lib/schedule-box-benefits";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingOn, type LodgingStay } from "@/lib/lodging";
 import type { ScheduleContext } from "@/lib/scheduling";
@@ -362,9 +362,46 @@ export function useScheduleBenefits({
       className={cn("min-w-0 shrink-0 rounded-full p-0", collaboratorId ? "h-2 w-2" : "h-2.5 w-2.5 border border-border", color)}
     />;
   };
+  // Integração: bolinha de prêmio viagem por pessoa (padrão = cliente numa faixa de prêmio, ≥ 50 km).
+  const integrationClient = (key: string) => {
+    const name = key.slice(INTEGRATION_PREFIX.length).trim().toLowerCase();
+    for (const w of ctxData?.worksById?.values() ?? []) if ((w.clients?.name ?? "").trim().toLowerCase() === name) return w.clients;
+    return undefined;
+  };
+  const integrationTravel = (key: string, collaboratorId: string) => {
+    if (people.travelOff.has(collaboratorId)) return false;
+    const person = boxVt.data?.travelPerson.get(`${key}|${collaboratorId}`)?.pays_bonus;
+    return integrationTravelOn(person, Number(integrationClient(key)?.distance_km ?? 0), (km) => travelInfo?.hit(km) ?? false);
+  };
+  const toggleIntegrationTravel = useMutation({
+    mutationFn: async ({ key, collaboratorId }: { key: string; collaboratorId: string }) => {
+      const id = await ensureSchedule();
+      const { error } = await supabase.from("schedule_person_vt").upsert({
+        schedule_id: id, box_key: key, collaborator_id: collaboratorId,
+        pays_vt: personPaysVt(key, collaboratorId), pays_bonus: !integrationTravel(key, collaboratorId), overnight: false,
+      }, { onConflict: "schedule_id,box_key,collaborator_id" });
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-vt", id] }),
+    onError: onWriteError,
+  });
+  const integrationTravelDot = (key: string, collaboratorId: string) => {
+    const on = integrationTravel(key, collaboratorId);
+    const off = people.travelOff.has(collaboratorId);
+    return <Button
+      variant="ghost" size="icon"
+      disabled={!editable || off || toggleIntegrationTravel.isPending}
+      aria-label="Alternar prêmio viagem do colaborador na integração"
+      title={off ? "Prêmio viagem desligado no cadastro" : on ? "Prêmio viagem ligado (clique para desligar)" : "Prêmio viagem desligado (clique para ligar)"}
+      onClick={(e) => { e.stopPropagation(); toggleIntegrationTravel.mutate({ key, collaboratorId }); }}
+      className={cn("h-2 w-2 min-w-0 shrink-0 rounded-full p-0", on ? "bg-info hover:bg-info" : "bg-muted-foreground/40 hover:bg-muted-foreground/40")}
+    />;
+  };
   const personBenefits = (key: string, collaboratorId: string) => <span className="flex shrink-0 flex-col items-center gap-0.5">
     {personDot(key, collaboratorId)}
     {key === "personalizada" && travelDot(key, collaboratorId)}
+    {key.startsWith(INTEGRATION_PREFIX) && integrationTravelDot(key, collaboratorId)}
   </span>;
 
   const setGroupVt = useMutation({

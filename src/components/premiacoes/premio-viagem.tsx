@@ -24,6 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { Tables, Enums } from "@/integrations/supabase/types";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { effectiveCity, lodgingBlocksBenefits, lodgingIndex, type LodgingStay } from "@/lib/lodging";
+import { integrationTravelOn } from "@/lib/schedule-box-benefits";
 
 
 type Rule = Tables<"travel_bonus_rules">;
@@ -187,7 +188,43 @@ export function BonusPage() {
       const lodgingAt = lodgingIndex((staysR ?? []) as LodgingStay[]);
       const lodgingOf = (a: any) => lodgingAt(a.collaborator_id, dateOf.get(a.schedule_id) ?? "");
 
-      return (data ?? []).filter((a: any) =>
+      // Integração (quadro "integracao:<cliente>" da Programação): bolinha da pessoa; padrão = cliente numa faixa de prêmio.
+      const integ: { collaborator_id: string; schedule_id: string; name: string; reg: string; distance: number }[] = [];
+      {
+        const busy = new Set((data as any[]).map((a) => `${a.collaborator_id}|${a.schedule_id}`));
+        const entries: any[] = [];
+        for (let from = 0; ; from += 1000) {
+          const { data: page, error } = await supabase.from("daily_status_entries")
+            .select("schedule_id, collaborator_id, box_key, collaborators(full_name, registration_number, city, travel_bonus_enabled)")
+            .in("schedule_id", ids).like("box_key", "integracao:%").order("id").range(from, from + 999);
+          if (error) throw error;
+          entries.push(...(page ?? []));
+          if (!page || page.length < 1000) break;
+        }
+        const [{ data: pv }, { data: cl }] = await Promise.all([
+          supabase.from("schedule_person_vt").select("schedule_id, box_key, collaborator_id, pays_bonus").in("schedule_id", ids).like("box_key", "integracao:%"),
+          supabase.from("clients").select("name, city, distance_km"),
+        ]);
+        const mark = new Map((pv ?? []).map((v) => [`${v.schedule_id}|${v.box_key}|${v.collaborator_id}`, v.pays_bonus]));
+        const clientBy = new Map((cl ?? []).map((c) => [String(c.name).trim().toLowerCase(), c]));
+        const seen = new Set<string>();
+        for (const e of entries) {
+          const k = `${e.collaborator_id}|${e.schedule_id}`;
+          if (busy.has(k) || seen.has(k) || e.collaborators?.travel_bonus_enabled === false) continue;
+          const client = clientBy.get(String(e.box_key).slice("integracao:".length).trim().toLowerCase());
+          if (!client) continue;
+          const lodging = lodgingAt(e.collaborator_id, dateOf.get(e.schedule_id) ?? "");
+          if (lodgingBlocksBenefits(lodging, client.name)) continue;
+          if (!integrationTravelOn(mark.get(`${e.schedule_id}|${e.box_key}|${e.collaborator_id}`), Number(client.distance_km ?? 0), (km) => rulesFor(km).length > 0)) continue;
+          seen.add(k);
+          integ.push({
+            collaborator_id: e.collaborator_id, schedule_id: e.schedule_id,
+            name: e.collaborators?.full_name ?? "—", reg: e.collaborators?.registration_number ?? "",
+            distance: distFor(effectiveCity(e.collaborators?.city, lodging), client.city, Number(client.distance_km ?? 0)),
+          });
+        }
+      }
+      return [...(data ?? []).filter((a: any) =>
         a.travel_bonus_override ?? (lodgingBlocksBenefits(lodgingOf(a), a.works?.clients?.name) ? false : (travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? rulesFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)).length > 0)),
       ).map((a) => {
         const row = a as unknown as {
@@ -207,7 +244,7 @@ export function BonusPage() {
             Number(row.works?.clients?.distance_km ?? row.works?.distance_km ?? 0),
           ),
         };
-      });
+      }), ...integ];
     },
   });
 

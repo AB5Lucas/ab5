@@ -15,3 +15,10 @@ export function resolveBoxTravel(
     overnight: person?.overnight ?? box.overnight,
   };
 }
+/**
+ * Prêmio viagem da pessoa num quadro de Integração ("integracao:<cliente>"): a marcação da pessoa vale;
+ * sem marcação, ligado quando o cliente está numa faixa de prêmio (≥ 50 km: R$ 10; ≥ 100 km: R$ 20 pelas regras).
+ */
+export function integrationTravelOn(person: boolean | null | undefined, clientDistanceKm: number, hit: (km: number) => boolean) {
+  return person ?? hit(clientDistanceKm);
+}

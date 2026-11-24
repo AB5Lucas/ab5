@@ -18,3 +18,13 @@ describe("benefícios da caixa personalizada", () => {
     expect(nextBoxTravel(overnight)).toEqual({ pays_bonus: false, overnight: false });
   });
 });
+import { integrationTravelOn } from "./schedule-box-benefits";
+describe("integrationTravelOn", () => {
+  const hit = (km: number) => km >= 50;
+  it("padrão pela distância do cliente; marcação da pessoa vale", () => {
+    expect(integrationTravelOn(null, 60, hit)).toBe(true);
+    expect(integrationTravelOn(undefined, 30, hit)).toBe(false);
+    expect(integrationTravelOn(false, 120, hit)).toBe(false);
+    expect(integrationTravelOn(true, 10, hit)).toBe(true);
+  });
+});

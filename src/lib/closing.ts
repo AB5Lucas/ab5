@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { integrationTravelOn } from "@/lib/schedule-box-benefits";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { loadBuiltTransport, driverBonusFor, vtForDay, travelOnFor, type BuiltTransport } from "@/lib/transport-rules";
 import { driverBonusDays, type BonusDay } from "@/lib/driver-bonus";
@@ -128,10 +129,10 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
       .select("collaborator_id, schedule_id, work_id, driver, overnight, vt_override, travel_bonus_override, vehicles(plate), collaborators(full_name, registration_number, city, vt_enabled, vt_always_full, travel_bonus_enabled, positions(name)), works(name, city, distance_km, client_id, clients(name, city, distance_km, needs_transport_voucher))")
       .in("schedule_id", ids).order("id").range(f, t)) : [],
     ids.length ? all<any>((f, t) => supabase.from("daily_status_entries")
-      .select("schedule_id, collaborator_id, box_key, collaborators(full_name, registration_number)").in("schedule_id", ids).order("id").range(f, t)) : [],
+      .select("schedule_id, collaborator_id, box_key, collaborators(full_name, registration_number, city, travel_bonus_enabled)").in("schedule_id", ids).order("id").range(f, t)) : [],
     ids.length ? supabase.from("schedule_work_vt").select("schedule_id, work_id, pays_vt").in("schedule_id", ids) : empty<any>(),
     ids.length ? supabase.from("schedule_box_vt").select("schedule_id, box_key, pays_vt").in("schedule_id", ids) : empty<any>(),
-    ids.length ? supabase.from("schedule_person_vt").select("schedule_id, box_key, collaborator_id, pays_vt").in("schedule_id", ids) : empty<any>(),
+    ids.length ? supabase.from("schedule_person_vt").select("schedule_id, box_key, collaborator_id, pays_vt, pays_bonus").in("schedule_id", ids) : empty<any>(),
     supabase.from("holidays").select("date, name").gte("date", start).lt("date", end),
     // Sem limite inferior a leitura cortava em 1000 linhas (folgas antigas ocupavam o lugar das do mês).
     all<any>((f, t) => supabase.from("days_off").select("collaborator_id, date, end_date").lt("date", end).or(`end_date.gte.${start},and(end_date.is.null,date.gte.${start})`).order("id").range(f, t)),
@@ -144,6 +145,8 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     supabase.from("closing_adjustments").select("*").gte("entry_date", start).lt("entry_date", end).order("entry_date"),
   ]);
   const { data: cityDist } = await supabase.from("city_distances").select("city_a, city_b, km");
+  const { data: clientsR } = await supabase.from("clients").select("name, city, distance_km");
+  const clientByName = new Map((clientsR ?? []).map((c: any) => [String(c.name).trim().toLowerCase(), c]));
   const distFor = buildDistanceLookup(cityDist ?? []);
   // Alojamentos no mês (Americana: sem VT/prêmio na Suzano; Mogi Guaçu: como morador de Mogi Guaçu).
   const { data: staysR } = await supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").lt("start_date", end).or(`end_date.is.null,end_date.gte.${start}`);
@@ -172,6 +175,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
   const vtWork = new Map((workVt.data ?? []).map((v: any) => [`${v.schedule_id}|${v.work_id}`, v.pays_vt]));
   const boxVt = new Map((boxVtR.data ?? []).map((v: any) => [`${v.schedule_id}|${v.box_key}`, v.pays_vt]));
   const personVt = new Map((personVtR.data ?? []).map((v: any) => [`${v.schedule_id}|${v.box_key}|${v.collaborator_id}`, v.pays_vt]));
+  const personTravel = new Map((personVtR.data ?? []).map((v: any) => [`${v.schedule_id}|${v.box_key}|${v.collaborator_id}`, v.pays_bonus as boolean | null]));
 
   const perDay = (driver: boolean, units: number) => (vtRules.data ?? []).reduce((s, r) => {
     if (driver ? !r.applies_to_drivers : !r.applies_to_collaborators) return s;
@@ -237,12 +241,12 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
   }
   // Dias em quadros (sem obra): aparecem no detalhamento; ASO/Treinamento/Integração podem gerar VT.
   // Vários quadros no mesmo dia não somam VT: vale o maior entre eles. Um status de ausência no dia zera o VT.
-  const boxDays = new Map<string, { e: any; date: string; labels: string[]; units: number; absent: boolean }>();
+  const boxDays = new Map<string, { e: any; date: string; labels: string[]; units: number; absent: boolean; prize: { work: string; distance: number; value: number } | null }>();
   for (const e of entries) {
     const date = dateById.get(e.schedule_id)!;
     if (rows.get(e.collaborator_id)?.seen.has(date)) continue; // dia com obra
     const key = `${e.collaborator_id}|${date}`;
-    const d = boxDays.get(key) ?? { e, date, labels: [], units: 0, absent: false };
+    const d = boxDays.get(key) ?? { e, date, labels: [] as string[], units: 0, absent: false, prize: null as { work: string; distance: number; value: number } | null };
     boxDays.set(key, d);
     const label = statusLabel(e.box_key);
     if (!d.labels.includes(label)) d.labels.push(label);
@@ -251,6 +255,18 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     if (personAbsence(e.collaborator_id, date)) continue;
     const on = personVt.get(`${e.schedule_id}|${e.box_key}|${e.collaborator_id}`) ?? boxVt.get(`${e.schedule_id}|${e.box_key}`) ?? (e.box_key === "aso" || e.box_key === "treinamento");
     d.units = Math.max(d.units, (e.box_key === "aso" ? 1 : 0) + (on ? 1 : 0));
+    // Integração: prêmio viagem pela bolinha da pessoa (padrão: cliente numa faixa de prêmio), um por dia.
+    if (e.box_key.startsWith("integracao:") && !d.prize) {
+      const client = clientByName.get(e.box_key.slice("integracao:".length).trim().toLowerCase());
+      const lodging = lodgingAt(e.collaborator_id, date);
+      const travel = e.collaborators?.travel_bonus_enabled === false || lodgingBlocksBenefits(lodging, client?.name) ? false
+        : integrationTravelOn(personTravel.get(`${e.schedule_id}|${e.box_key}|${e.collaborator_id}`), Number(client?.distance_km ?? 0), (km) => prizeFor(km) > 0);
+      if (travel && client) {
+        const dist = distFor(effectiveCity(e.collaborators?.city, lodging), client.city, Number(client.distance_km ?? 0));
+        const value = prizeFor(dist);
+        if (value > 0) d.prize = { work: `Integração - ${client.name}`, distance: dist, value };
+      }
+    }
   }
   for (const d of boxDays.values()) {
     const r = get(d.e.collaborator_id, d.e.collaborators);
@@ -258,6 +274,7 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     const label = d.labels.join(" + ");
     r.days.push({ date: d.date, work: label, status: label, counted: false, reason: label });
     if (d.units && !d.absent) r.vtRows.push({ date: d.date, work: label, pays: true, value: perDay(false, d.units) });
+    if (d.prize && !d.absent) r.prizeRows.push({ date: d.date, vehicle: "—", ...d.prize });
   }
   // Prêmio Motorista (lib/driver-bonus.ts, loadDriverBonus): somado ao VT.
   const { days: bonusDays, info: driverInfo } = await loadDriverBonus(start, end, { transport, absence: personAbsence });
