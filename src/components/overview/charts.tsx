@@ -114,7 +114,7 @@ export function HatchBars({ data, format, highlight }: { data: { label: string; 
 }
 
 /** Linha suave com área e ponto/balão ao passar o mouse; segunda série tracejada (comparação). */
-export function LineArea({ data, format }: { data: { label: string; a: number; b?: number; tip?: string }[]; format: (d: { a: number; b?: number }) => string }) {
+export function LineArea({ data, format, height = "h-44" }: { data: { label: string; a: number; b?: number; tip?: string }[]; format: (d: { a: number; b?: number }) => string; height?: string }) {
   const id = useId().replace(/:/g, "");
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...data.flatMap((d) => [d.a, d.b ?? 0]));
@@ -131,7 +131,7 @@ export function LineArea({ data, format }: { data: { label: string; a: number; b
   const [sx, sy] = pt(sel, data[sel]?.a ?? 0);
   return (
     <div className="relative">
-      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="h-44 w-full overflow-visible"
+      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className={cn(height, "w-full overflow-visible")}
         onMouseMove={(e) => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); setHover(Math.round(((e.clientX - r.left) / r.width) * n)); }}
         onMouseLeave={() => setHover(null)}>
         <defs>
@@ -142,7 +142,7 @@ export function LineArea({ data, format }: { data: { label: string; a: number; b
         </defs>
         {data.some((d) => d.b != null) && <path d={path("b")} fill="none" className="stroke-muted-foreground/60" strokeWidth="1" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />}
         <path d={`${path("a")} L 100 50 L 0 50 Z`} fill={`url(#g${id})`} className="ov-fade" />
-        <path d={path("a")} fill="none" className="ov-draw stroke-foreground" strokeWidth="2" vectorEffect="non-scaling-stroke" pathLength={1} />
+        <path d={path("a")} fill="none" className="ov-fade stroke-foreground" strokeWidth="2" vectorEffect="non-scaling-stroke" />
         <line x1={sx} x2={sx} y1={0} y2={50} className="stroke-border" strokeWidth="1" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
       </svg>
       <span className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-foreground shadow" style={{ left: `${sx}%`, top: `${(sy / 50) * 100}%` }} />
@@ -345,48 +345,54 @@ export function HoverBars({ data, format, dark, height = "h-16" }: { data: { lab
   );
 }
 
-/** Linha de margens (%) com traço no zero; balão ao passar o mouse. */
+/** Linha de margens (%) com traço no zero; balão ao passar o mouse. Escala pelos valores (pontas extremas presas). */
 export function MarginLine({ data }: { data: { label: string; pct: number }[] }) {
   const [hover, setHover] = useState<number | null>(null);
   if (!data.length) return <p className="py-4 text-center text-[11px] text-muted-foreground">Sem margens no período.</p>;
-  const clamp = (v: number) => Math.max(-30, Math.min(80, v));
-  const vals = data.map((d) => clamp(d.pct));
-  const hi = Math.max(5, ...vals), lo = Math.min(-5, ...vals);
+  const sorted = [...data.map((d) => d.pct)].sort((a, b) => a - b);
+  const q = (p: number) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.round(p * (sorted.length - 1))))]!;
+  const lo = Math.min(0, q(0.05)) - 5, hi = Math.max(0, q(0.95)) + 5;
+  const vals = data.map((d) => Math.max(lo, Math.min(hi, d.pct)));
   const n = Math.max(1, data.length - 1);
-  const y = (v: number) => 4 + ((hi - v) / (hi - lo)) * 42;
+  const y = (v: number) => 3 + ((hi - v) / (hi - lo)) * 44;
   const x = (i: number) => (data.length === 1 ? 50 : (i / n) * 100);
-  const path = vals.map((v, i) => `${i ? "L" : "M"} ${x(i)} ${y(v)}`).join(" ");
-  const sel = hover ?? null;
+  const path = vals.map((v, i) => {
+    if (!i) return `M ${x(0)} ${y(v)}`;
+    const cx = (x(i - 1) + x(i)) / 2;
+    return `C ${cx} ${y(vals[i - 1]!)}, ${cx} ${y(v)}, ${x(i)} ${y(v)}`;
+  }).join(" ");
   const fmt = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+  const sel = hover;
   return (
     <div className="relative" onMouseLeave={() => setHover(null)}>
-      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="h-16 w-full overflow-visible"
+      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="h-20 w-full overflow-visible"
         onMouseMove={(e) => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); setHover(Math.max(0, Math.min(data.length - 1, Math.round(((e.clientX - r.left) / r.width) * n)))); }}>
-        <line x1={0} x2={100} y1={y(0)} y2={y(0)} className="stroke-muted-foreground" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-        <path d={path} fill="none" className="ov-draw stroke-foreground" strokeWidth="1.8" vectorEffect="non-scaling-stroke" pathLength={1} />
+        <line x1={0} x2={100} y1={y(0)} y2={y(0)} className="stroke-muted-foreground/70" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+        <path d={path} fill="none" className="ov-fade stroke-foreground" strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
         {sel != null && <line x1={x(sel)} x2={x(sel)} y1={0} y2={50} className="stroke-border" strokeWidth="1" vectorEffect="non-scaling-stroke" />}
       </svg>
-      {sel != null && <span className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground" style={{ left: `${x(sel)}%`, top: `${(y(vals[sel]!) / 50) * 100}%` }} />}
+      <span className="pointer-events-none absolute -translate-y-1/2 text-[9px] text-muted-foreground" style={{ right: 0, top: `${(y(0) / 50) * 100}%` }}>0%</span>
+      {sel != null && <span className={cn("pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full", data[sel]!.pct < 0 ? "bg-destructive" : "bg-foreground")} style={{ left: `${x(sel)}%`, top: `${(y(vals[sel]!) / 50) * 100}%` }} />}
       <div className="mt-1 flex justify-between gap-2 text-[10px] text-muted-foreground">
         {sel != null ? <><span className="truncate">{data[sel]!.label}</span><span className="font-medium tabular-nums">{fmt(data[sel]!.pct)}</span></>
-          : <><span>— 0%</span><span>{data.length} {data.length === 1 ? "ponto" : "pontos"}</span></>}
+          : <><span>{fmt(sorted[sorted.length - 1]!)} maior</span><span>{fmt(sorted[0]!)} menor</span></>}
       </div>
     </div>
   );
 }
 
 /** Gráfico circular de uma fração (0–1) com o valor no meio. */
-export function Donut({ frac, center, sub }: { frac: number; center: string; sub?: string }) {
+export function Donut({ frac, center, sub, size = "h-28 w-28" }: { frac: number; center: string; sub?: string; size?: string }) {
   const f = Math.max(0, Math.min(1, frac)), r = 38, c = 2 * Math.PI * r;
   return (
-    <div className="relative mx-auto h-28 w-28">
+    <div className={cn("relative mx-auto", size)}>
       <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
         <circle cx="50" cy="50" r={r} fill="none" strokeWidth="12" className="stroke-muted" />
         <circle cx="50" cy="50" r={r} fill="none" strokeWidth="12" strokeLinecap="round" className="ov-gauge stroke-foreground"
           style={{ strokeDasharray: c, ["--ov-off" as string]: c * (1 - f), strokeDashoffset: c * (1 - f) }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-xl font-semibold tabular-nums">{center}</span>
+        <span className="font-display text-2xl font-semibold tabular-nums">{center}</span>
         {sub && <span className="text-[10px] text-muted-foreground">{sub}</span>}
       </div>
     </div>

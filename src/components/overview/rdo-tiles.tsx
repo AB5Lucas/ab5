@@ -8,18 +8,21 @@ import { cn } from "@/lib/utils";
 
 export type TileCol = { key: string; label: string; title: string; max: number; fin: number; draft: number; expected: number; totalFin?: number; totalDraft?: number; totalExpected?: number };
 
-const MAX_ROWS = 7;
+const MAX_ROWS = 6;
 
 export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month" }) {
   const [sel, setSel] = useState<number | null>(null);
   const top = Math.max(1, ...cols.map((c) => c.max));
   const per = Math.max(1, Math.ceil(top / MAX_ROWS)); // clientes por quadradinho
   const rows = Math.ceil(top / per);
-  const i = sel ?? cols.length - 1;
-  const c = cols[i];
-  const fin = c ? (unit === "month" ? c.totalFin ?? 0 : c.fin) : 0;
-  const draft = c ? (unit === "month" ? c.totalDraft ?? 0 : c.draft) : 0;
-  const exp = c ? (unit === "month" ? c.totalExpected ?? 0 : c.expected) : 0;
+  const i = sel ?? -1;
+  const c0 = cols[i];
+  // Sem coluna escolhida: resumo do período inteiro.
+  const sum = (f: (x: TileCol) => number) => cols.reduce((a, x) => a + f(x), 0);
+  const c = c0 ?? (cols.length ? { title: unit === "day" ? "Resumo do mês" : "Resumo do período", max: Math.max(0, ...cols.map((x) => x.max)) } as TileCol : undefined);
+  const fin = c0 ? (unit === "month" ? c0.totalFin ?? 0 : c0.fin) : sum((x) => (unit === "month" ? x.totalFin ?? 0 : x.fin));
+  const draft = c0 ? (unit === "month" ? c0.totalDraft ?? 0 : c0.draft) : sum((x) => (unit === "month" ? x.totalDraft ?? 0 : x.draft));
+  const exp = c0 ? (unit === "month" ? c0.totalExpected ?? 0 : c0.expected) : sum((x) => (unit === "month" ? x.totalExpected ?? 0 : x.expected));
   const pct = (v: number) => (exp ? `${((v / exp) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "—");
   const step = cols.length > 16 ? 2 : 1;
 
@@ -31,7 +34,7 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
             const cap = Math.ceil(col.max / per);
             const f = Math.round(col.fin / per), dr = Math.min(cap - f, Math.round(col.draft / per));
             return (
-              <button key={col.key} type="button" onClick={() => setSel(ci)} title={`${col.title}: ${col.fin + col.draft} de ${col.max} clientes`}
+              <button key={col.key} type="button" onClick={() => setSel(sel === ci ? null : ci)} title={`${col.title}: ${col.fin + col.draft} de ${col.max} clientes`}
                 className={cn("flex flex-1 flex-col items-stretch gap-[3px] rounded-md p-[2px] transition-colors", ci === i && "bg-muted ring-1 ring-border")}>
                 {Array.from({ length: rows }, (_, r) => {
                   const fromBottom = rows - 1 - r;
@@ -39,7 +42,7 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
                     : fromBottom < f ? "bg-foreground"
                     : fromBottom < f + dr ? "bg-foreground/45"
                     : "border border-dashed border-border bg-muted/40";
-                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", unit === "month" ? "h-4" : "h-2", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
+                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", unit === "month" ? "h-6" : "h-5", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
                 })}
                 <span className="mt-1 text-center text-[10px] tabular-nums text-muted-foreground">{ci % step === 0 || ci === i ? col.label : "\u00a0"}</span>
               </button>
@@ -63,7 +66,7 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
             <Row cls="bg-foreground/45" label="Rascunho" v={draft} pct={pct(draft)} />
             <Row cls="border border-dashed border-border bg-muted/40" label="Sem RDO" v={Math.max(0, exp - fin - draft)} pct={pct(Math.max(0, exp - fin - draft))} />
           </div>
-          <p className="mt-auto pt-3 text-[11px] text-muted-foreground">{c.max} clientes com equipe no mês</p>
+          <p className="mt-auto pt-3 text-[11px] text-muted-foreground">{c0 ? `${c.max} clientes com equipe no mês` : "Clique num dia para ver só ele"}</p>
         </div>
       )}
     </div>

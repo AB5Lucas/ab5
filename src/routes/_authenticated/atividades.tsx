@@ -76,7 +76,7 @@ function AtividadesOverview() {
         fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, status, active, order_value, orders, clients(name)").order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id, entry_date, amount").eq("category", "faturamento").eq("sync_cancelled", false).order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("rdos").select("id, work_id, client_id, report_date, status").gte("report_date", P.from).lte("report_date", P.to).order("id").range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("daily_allocations").select("id, work_id, daily_schedules!inner(schedule_date)")
+        fetchAll<any>((a, b) => supabase.from("daily_allocations").select("id, work_id, collaborator_id, daily_schedules!inner(schedule_date)")
           .gte("daily_schedules.schedule_date", P.from).lte("daily_schedules.schedule_date", P.to).not("work_id", "is", null).order("id").range(a, b)),
       ]);
       return { works, billing, rdos, allocs };
@@ -157,7 +157,13 @@ function AtividadesOverview() {
     const svcBy = new Map<string, Set<string>>(P.buckets.map((b) => [b, new Set<string>()]));
     const pplBy = new Map<string, number>(P.buckets.map((b) => [b, 0]));
     const svcAll = new Set<string>(), daysBy = new Map<string, Set<string>>();
+    const isPatio = (wid: string) => (workBy.get(wid)?.clients?.name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim() === "PATIO";
+    const patioBy = new Map<string, Set<string>>(P.buckets.map((b) => [b, new Set<string>()])), patioAll = new Set<string>();
     for (const a of q.data.allocs) {
+      if (a.collaborator_id && workBy.has(a.work_id) && isPatio(a.work_id)) {
+        const dt0 = String(a.daily_schedules?.schedule_date ?? "").slice(0, 10), k0 = keyOf(dt0);
+        if (patioBy.has(k0)) { patioBy.get(k0)!.add(a.collaborator_id); patioAll.add(a.collaborator_id); }
+      }
       if (!workBy.has(a.work_id)) continue;
       const dt = String(a.daily_schedules?.schedule_date ?? "").slice(0, 10); if (!dt) continue;
       const k = keyOf(dt); if (!svcBy.has(k)) continue;
@@ -191,6 +197,7 @@ function AtividadesOverview() {
     });
 
     return {
+      patioSeries: P.buckets.map((b) => ({ label: bLabel(b), value: patioBy.get(b)!.size })), patioCount: patioAll.size,
       byClientId, activeIds, svcSeries, pplSeries, svcCount: svcAll.size, cur, prev, ordered, openBalance, top, cols,
       series: P.buckets.map((b) => ({ label: P.unit === "day" ? `${b.slice(8, 10)}/${b.slice(5, 7)}` : `${monthLabel(b)}/${b.slice(2, 4)}`, a: byBucket.get(b) ?? 0 })),
       activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
@@ -241,7 +248,7 @@ function AtividadesOverview() {
               <OverviewCard title="Serviços com equipe" to="/obras" linkLabel="Ver serviços" hint="Serviços com pessoas escaladas no período (por dia no mês; por mês no ano)">
                 <Big value={d.svcCount} />
                 <p className="text-xs text-muted-foreground">serviços com alocação {P.unit === "day" ? "no mês" : "no período"}</p>
-                <div className="mt-3"><HoverBars data={d.svcSeries} format={(v) => `${v} serviços`} /></div>
+                <div className="mt-3"><LineArea height="h-16" data={d.svcSeries.map((x) => ({ label: x.label, a: x.value }))} format={(x) => `${x.a} serviços`} /></div>
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
@@ -259,56 +266,64 @@ function AtividadesOverview() {
             )}
             {can("/obras/resultado") && (
               <OverviewCard title="Saldo a faturar" to="/obras/resultado" linkLabel="Ver resultados" hint="Pedidos dos serviços ativos com data até o fim do período menos o faturado neles até essa data">
-                <div className="flex items-center gap-3">
-                  <div className="min-w-0 flex-1">
+                <div className="grid grid-cols-2 items-center gap-3">
+                  <div className="min-w-0">
                     <Big value={brl(d.openBalance)} />
                     <p className="text-xs text-muted-foreground">de {brl(d.ordered)} em pedidos até {P.to.slice(8, 10)}/{P.to.slice(5, 7)}/{P.to.slice(0, 4)}</p>
                     <p className="mt-1 text-[11px] text-muted-foreground">Faturado: {brl(d.ordered - d.openBalance)}</p>
                   </div>
-                  <Donut frac={d.ordered ? (d.ordered - d.openBalance) / d.ordered : 0} center={d.ordered ? `${Math.round(((d.ordered - d.openBalance) / d.ordered) * 100)}%` : "—"} sub="faturado" />
+                  <Donut frac={d.ordered ? (d.ordered - d.openBalance) / d.ordered : 0} center={d.ordered ? `${Math.round(((d.ordered - d.openBalance) / d.ordered) * 100)}%` : "—"} sub="faturado" size="h-36 w-36" />
                 </div>
               </OverviewCard>
             )}
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2">
             {can("/obras") && (
-              <OverviewCard title="Clientes no mapa" to="/clientes" linkLabel="Ver clientes" className="lg:col-span-2" hint="Marcador do tamanho do faturado no período; clique num cliente da lista para aproximar">
+              <OverviewCard dark title="Clientes no mapa" to="/clientes" linkLabel="Ver clientes" hint="Marcador do tamanho do faturado no período; clique num cliente da lista para aproximar">
                 {mapClients.length > 0 ? (
-                  <div onClick={(e) => e.preventDefault()}>
-                    <ClientsMap clients={mapClients} className="h-[480px] w-full rounded-xl" />
+                  <div className="dark" onClick={(e) => e.preventDefault()}>
+                    <ClientsMap clients={mapClients} className="h-[430px] w-full rounded-xl" />
                   </div>
-                ) : <p className="py-8 text-center text-xs text-muted-foreground">Nenhum cliente com endereço localizado.</p>}
+                ) : <p className="py-8 text-center text-xs text-background/70">Nenhum cliente com endereço localizado.</p>}
               </OverviewCard>
             )}
-            {can("/obras") && (
-              <OverviewCard title={`Clientes que mais faturaram — ${pLabel}`} to="/clientes" linkLabel="Ver clientes">
-                {d.top.length ? <RankBars rows={d.top} format={brl} /> : <p className="py-8 text-center text-xs text-muted-foreground">Nenhuma nota lançada no período.</p>}
-              </OverviewCard>
-            )}
+            <div className="grid gap-4">
+              {can("/externo/relatorio-diario") && (
+                <OverviewCard title={P.unit === "day" ? "RDOs por dia" : "RDOs por mês (média por dia)"} to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
+                  hint="Altura = clientes com equipe escalada no mês; cada quadradinho é um cliente com RDO">
+                  <div onClick={(e) => e.preventDefault()}><RdoTiles cols={d.cols} unit={P.unit} /></div>
+                </OverviewCard>
+              )}
+              {can("/obras/resultado") && (
+                <OverviewCard title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
+                  <LineArea height="h-24" data={d.series} format={(p) => brl(p.a)} />
+                </OverviewCard>
+              )}
+            </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
-            {can("/externo/relatorio-diario") && (
-              <OverviewCard className="lg:col-span-2" title={P.unit === "day" ? "RDOs por dia" : "RDOs por mês (média por dia)"} to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
-                hint="Altura = clientes com equipe escalada no mês; cada quadradinho é um cliente com RDO">
-                <div onClick={(e) => e.preventDefault()}><RdoTiles cols={d.cols} unit={P.unit} /></div>
+            {can("/obras") && (
+              <OverviewCard title={`Clientes que mais faturaram — ${pLabel}`} to="/clientes" linkLabel="Ver clientes">
+                {d.top.length ? <RankBars rows={d.top} format={brl} /> : <p className="py-8 text-center text-xs text-muted-foreground">Nenhuma nota lançada no período.</p>}
               </OverviewCard>
             )}
             {can("/obras") && (
               <OverviewCard title={P.unit === "day" ? "Pessoas escaladas por dia" : "Pessoas escaladas por dia (média do mês)"} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Alocações em serviços na Programação">
                 <Big value={Math.round(d.pplSeries.reduce((a, x) => a + x.value, 0) / Math.max(1, d.pplSeries.filter((x) => x.value > 0).length))} />
                 <p className="text-xs text-muted-foreground">média por dia com equipe</p>
-                <div className="mt-3"><HoverBars data={d.pplSeries} format={(v) => `${v} pessoas`} height="h-24" /></div>
+                <div className="mt-3"><HoverBars data={d.pplSeries} format={(v) => `${v} pessoas`} height="h-20" /></div>
+              </OverviewCard>
+            )}
+            {can("/obras") && (
+              <OverviewCard title="Pessoas no Pátio" to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no período">
+                <Big value={d.patioCount} />
+                <p className="text-xs text-muted-foreground">pessoas diferentes no Pátio {P.unit === "day" ? "no mês" : "no período"}</p>
+                <div className="mt-3"><HoverBars data={d.patioSeries} format={(v) => `${v} pessoas`} height="h-20" /></div>
               </OverviewCard>
             )}
           </div>
-
-          {can("/obras/resultado") && (
-            <OverviewCard title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
-              <LineArea data={d.series} format={(p) => brl(p.a)} />
-            </OverviewCard>
-          )}
         </>
       )}
     </div>
