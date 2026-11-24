@@ -75,10 +75,11 @@ function FinanceiroPage() {
   // Um carregamento em lote para todos os clientes do período (antes: ~17 consultas por cliente)
   const batchKey = useMemo(() => clientBatches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [clientBatches]);
   const raws = useQuery({
-    queryKey: ["fin-client-raw", batchKey],
+    queryKey: ["fin-client-raw", batchKey, end],
     staleTime: 60_000,
     enabled: !!shared.data && !!active.data,
-    queryFn: () => loadFinanceRaws(clientBatches, shared.data!),
+    // Lê só até o fim do último mês pedido (andamento acumulado: o começo não é cortado).
+    queryFn: () => loadFinanceRaws(clientBatches, shared.data!, { until: end }),
   });
   const rawByWork = raws.data ?? EMPTY_RAWS;
   const loading = !scope.ready || works.isLoading || active.isLoading || shared.isLoading || (list.length > 0 && raws.isPending);

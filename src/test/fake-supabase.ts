@@ -1,7 +1,8 @@
 /**
  * Cliente Supabase em memória para testes do motor de Resultados/Financeiro.
  * Suporta o subconjunto usado pelos loaders: select com relações embutidas,
- * eq, in, gte, lte, or, order, range, maybeSingle e rpc. Conta as requisições
+ * eq, in, gte, lte, gt, ilike, or (inclusive cs/ov em arrays), filtro em relação embutida
+ * (rel!inner + "rel.coluna"), order, range, maybeSingle e rpc. Conta as requisições
  * para medir quantas idas ao banco cada tela faz.
  */
 type Row = Record<string, any>;
@@ -33,6 +34,11 @@ const norm = (v: any) => (v === null || v === undefined ? v : typeof v === "bool
 function cmp(op: string, a: any, b: string) {
   if (op === "eq") return norm(a) === b;
   if (op === "in") return b.slice(1, -1).split(",").includes(norm(a));
+  if (op === "cs" || op === "ov") {
+    const want = b.slice(1, -1).split(",").filter(Boolean);
+    const have = new Set(((a ?? []) as any[]).map(norm));
+    return op === "cs" ? want.every((x) => have.has(x)) : want.some((x) => have.has(x));
+  }
   if (a === null || a === undefined) return false;
   if (op === "gte") return String(a) >= b;
   if (op === "lte") return String(a) <= b;
@@ -67,7 +73,7 @@ export class FakeSupabase {
   project(table: string, row: Row, cols: string): Row {
     const out: Row = {};
     for (const c of splitTop(cols)) {
-      const m = c.match(/^(\w+)\((.*)\)$/);
+      const m = c.match(/^(\w+)(?:!inner)?\((.*)\)$/);
       if (m) {
         const rel = m[1]!;
         const fk = EMBED_FK[table]?.[rel];
@@ -98,10 +104,24 @@ class Query {
   private single = false;
   constructor(private c: FakeSupabase, private table: string) {}
   select(cols: string) { this.cols = cols; return this; }
-  eq(col: string, v: any) { const s = norm(v); this.filters.push((r) => norm(r[col]) === s); return this; }
-  in(col: string, vs: any[]) { const s = new Set(vs.map(norm)); this.filters.push((r) => s.has(norm(r[col]))); return this; }
-  gte(col: string, v: any) { this.filters.push((r) => cmp("gte", r[col], String(v))); return this; }
-  lte(col: string, v: any) { this.filters.push((r) => cmp("lte", r[col], String(v))); return this; }
+  /** Valor da coluna; "rel.coluna" lê da relação embutida (como o filtro do PostgREST em rel!inner). */
+  private val(r: Row, col: string) {
+    const dot = col.indexOf(".");
+    if (dot < 0) return r[col];
+    const rel = col.slice(0, dot), fk = EMBED_FK[this.table]?.[rel];
+    if (!fk) throw new Error(`embed ${this.table}.${rel}`);
+    return (this.c as any).index(rel).get(r[fk])?.[col.slice(dot + 1)];
+  }
+  eq(col: string, v: any) { const s = norm(v); this.filters.push((r) => norm(this.val(r, col)) === s); return this; }
+  in(col: string, vs: any[]) { const s = new Set(vs.map(norm)); this.filters.push((r) => s.has(norm(this.val(r, col)))); return this; }
+  gte(col: string, v: any) { this.filters.push((r) => cmp("gte", this.val(r, col), String(v))); return this; }
+  lte(col: string, v: any) { this.filters.push((r) => cmp("lte", this.val(r, col), String(v))); return this; }
+  gt(col: string, v: any) { this.filters.push((r) => cmp("gt", this.val(r, col), String(v))); return this; }
+  ilike(col: string, pattern: string) {
+    const re = new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*").replace(/_/g, ".")}$`, "i");
+    this.filters.push((r) => re.test(String(r[col] ?? "")));
+    return this;
+  }
   or(expr: string) { this.filters.push(orFilter(expr)); return this; }
   order(col: string, o?: { ascending?: boolean }) { this.orders.push({ col, asc: o?.ascending !== false }); return this; }
   range(a: number, b: number) { this.rng = [a, b]; return this; }

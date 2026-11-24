@@ -1,77 +1,30 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  GripVertical,
-  Search,
-  Trash2,
-  Plus,
-  X,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, GripVertical, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { SearchSelect } from "@/components/search-select";
-import { IndustryCustomerSelect, industryKmOneWay, industryToll, useIndustryCustomers } from "@/components/industry-customer-select";
+import { industryKmOneWay, industryToll, useIndustryCustomers } from "@/components/industry-customer-select";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MultiFilter } from "@/components/multi-filter";
 import { transportNeedsTravel, travelActiveIds } from "@/lib/travel-active";
+import { dayKm } from "@/lib/fleet-costs";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VehicleCellEditor, useExistingDays, type EditorCtx } from "@/components/vehicle-timeline-editor";
+import { VehicleTimelineCell } from "@/components/vehicle-timeline-cell";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+  EMPTY_FORM, EXTERNAL_KEY, KM_EXTERNAL, KM_SUZANO_LOCAL, KM_WORK, LOGISTICS_START, MAINTENANCE_KEY, NONE, REVISION_KEY, SUZANO_LOCAL_KEY, WORK_PREFIX,
+  dateRange, driversByDay, fmtDay, isWeekend, rowDrivers, shortName, type CellForm, type VehicleScheduleRow,
+} from "@/components/vehicle-timeline-shared";
 
-export const EXTERNAL_KEY = "__external__";
-export const MAINTENANCE_KEY = "__maintenance__";
-/** Revisão do veículo: igual à Manutenção (0 km, sem prêmios), só muda o nome (maintenance_kind = revisao). */
-export const REVISION_KEY = "__revision__";
-export const SUZANO_LOCAL_KEY = "__suzano_local__";
-export const KM_SUZANO_LOCAL = 6;
-export const KM_WORK = 50;
-export const KM_EXTERNAL = 100;
-/** A logística por clientes Indústria (km de ida e pedágio do cadastro) vale a partir desta data. */
-export const LOGISTICS_START = "2026-10-26";
-
-export type VehicleScheduleRow = {
-  id: string;
-  schedule_date: string;
-  vehicle_id: string;
-  driver_id: string | null;
-  client_id: string | null;
-  is_external: boolean;
-  is_maintenance: boolean;
-  maintenance_kind?: string | null;
-  driver_bonus: boolean;
-  km: number;
-  extra_client_ids?: string[];
-  extra_driver_ids?: string[];
-  /** Caminhão/pickup: quem pediu o frete (Solicitante) e se o Motorista foi marcado; driver_id = motorista que vale (o marcado, senão o solicitante). */
-  requester_id?: string | null;
-  driver_toggle?: boolean;
-  extra_requester_ids?: string[];
-  extra_driver_toggles?: boolean[];
-  /** Local digitado por obra adicional (Indústria = viagem fora); mesma posição de extra_client_ids. */
-  extra_places?: string[];
-  /** Serviço de cada obra adicional (caminhão/pickup); vazio = rateio do cliente. Mesma posição de extra_client_ids. */
-  extra_work_ids?: string[];
-  extra_km?: number;
-  trips?: number;
-  is_suzano_local?: boolean;
-  work_id?: string | null;
-  external_place?: string | null;
-  /** Cliente ADM: local digitado no lugar do serviço (só nome, não muda km nem prêmio). */
-  adm_place?: string | null;
-};
+export {
+  EXTERNAL_KEY, MAINTENANCE_KEY, REVISION_KEY, SUZANO_LOCAL_KEY, KM_SUZANO_LOCAL, KM_WORK, KM_EXTERNAL, LOGISTICS_START,
+} from "@/components/vehicle-timeline-shared";
+export type { VehicleScheduleRow } from "@/components/vehicle-timeline-shared";
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
@@ -103,58 +56,51 @@ function weekdayOf(iso: string) {
   return WEEKDAYS[new Date(`${iso}T00:00:00`).getDay()]!;
 }
 
-function shortName(full: string) {
-  return full.trim().split(/\s+/).slice(0, 2).join(" ");
-}
+const SCHEDULE_COLS = "id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, maintenance_kind, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_work_ids, extra_km, trips, is_suzano_local, work_id, external_place, requester_id, driver_toggle, extra_requester_ids, extra_driver_toggles, adm_place, place_toll";
 
-function isWeekend(iso: string) {
-  const d = new Date(`${iso}T00:00:00`).getDay();
-  return d === 0 || d === 6;
-}
-
-function addDays(iso: string, n: number) {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
-type CellForm = {
-  driver_id: string;
-  client_id: string;
+type BuildInput = {
+  driver_id: string | null;
+  client_id: string | null;
+  is_external: boolean;
+  is_maintenance: boolean;
+  maintenance_kind?: string | null | undefined;
   driver_bonus: boolean;
-  repeat_until: string;
-  extras: string[];
-  extraDrivers: string[];
-  extraPlaces: string[];
-  extraWorks: string[];
-  trips: string;
-  external_place: string;
-  /** Km de ida digitado (só cliente ADM). */
-  km: string;
-  /** Caminhão/pickup: Solicitante e toggle Motorista (driver_id = motorista marcado; NONE = Definir). */
-  requester_id: string;
-  driver_toggle: boolean;
-  extraRequesters: string[];
-  extraToggles: boolean[];
+  extra_client_ids?: string[] | undefined;
+  extra_driver_ids?: string[] | undefined;
+  extra_places?: string[] | undefined;
+  extra_work_ids?: string[] | undefined;
+  trips?: number | undefined;
+  is_suzano_local?: boolean | undefined;
+  work_id?: string | null | undefined;
+  external_place?: string | null | undefined;
+  adm_place?: string | null | undefined;
+  km?: number | null | undefined;
+  requester_id?: string | null | undefined;
+  driver_toggle?: boolean | undefined;
+  extra_requester_ids?: string[] | undefined;
+  extra_driver_toggles?: boolean[] | undefined;
 };
-
-const NONE = "__none__";
-const WORK_PREFIX = "w:";
-const ALL_WORKS = "__all_works__";
-const SPECIAL_KEYS = new Set([EXTERNAL_KEY, MAINTENANCE_KEY, REVISION_KEY, SUZANO_LOCAL_KEY]);
+const rowInput = (s: VehicleScheduleRow): BuildInput => ({
+  driver_id: s.driver_id, client_id: s.client_id, is_external: s.is_external, is_maintenance: s.is_maintenance ?? false, maintenance_kind: s.maintenance_kind,
+  driver_bonus: s.driver_bonus, extra_client_ids: s.extra_client_ids, extra_driver_ids: s.extra_driver_ids, extra_places: s.extra_places, extra_work_ids: s.extra_work_ids,
+  trips: s.trips, is_suzano_local: s.is_suzano_local, work_id: s.work_id, external_place: s.external_place, adm_place: s.adm_place, km: s.km,
+  requester_id: s.requester_id, driver_toggle: s.driver_toggle, extra_requester_ids: s.extra_requester_ids, extra_driver_toggles: s.extra_driver_toggles,
+});
 
 export function VehicleTimeline() {
   const { canWrite } = useCurrentUser();
   const queryClient = useQueryClient();
   const [month, setMonth] = useState(monthKeyNow);
   const [vehicleSearch, setVehicleSearch] = useState("");
-  const [driverSearch, setDriverSearch] = useState("");
-  const [cell, setCell] = useState<{ vehicleId: string; date: string } | null>(null);
-  const [form, setForm] = useState<CellForm>({ driver_id: NONE, client_id: NONE, driver_bonus: false, repeat_until: "", extras: [], extraDrivers: [], extraPlaces: [], extraWorks: [], trips: "1", external_place: "", km: "", requester_id: NONE, driver_toggle: false, extraRequesters: [], extraToggles: [] });
+  const [cell, setCell] = useState<{ vehicleId: string; date: string; vehicleCnh: string | null; byWork: boolean } | null>(null);
+  const [editorInitial, setEditorInitial] = useState<CellForm>(EMPTY_FORM);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState("");
   const [copyStart, setCopyStart] = useState("");
   const [copyEnd, setCopyEnd] = useState("");
+  const [copySkipWeekend, setCopySkipWeekend] = useState(false);
+  const [recalcOpen, setRecalcOpen] = useState(false);
+  const [recalcAll, setRecalcAll] = useState(false);
   const [rowDragId, setRowDragId] = useState<string | null>(null);
   const [rowDragOver, setRowDragOver] = useState<string | null>(null);
   const [needsDate, setNeedsDate] = useState(() => {
@@ -220,7 +166,8 @@ export function VehicleTimeline() {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const saved = sessionStorage.getItem(SCROLL_KEY);
+    let saved: string | null = null;
+    try { saved = sessionStorage.getItem(SCROLL_KEY); } catch { /* ignora */ }
     if (!saved) return;
     const { left, top } = JSON.parse(saved) as { left?: number; top?: number };
     const t = setTimeout(() => {
@@ -241,11 +188,11 @@ export function VehicleTimeline() {
   });
 
   const drivers = useQuery({
-    queryKey: ["timeline-drivers"],
+    queryKey: ["timeline-drivers", "cnh"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("collaborators")
-        .select("id, full_name")
+        .select("id, full_name, driver_license_category, driver_license_expiry")
         .eq("is_driver", true)
         .eq("status", "active")
         .order("full_name");
@@ -319,7 +266,7 @@ export function VehicleTimeline() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, maintenance_kind, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_work_ids, extra_km, trips, is_suzano_local, work_id, external_place, requester_id, driver_toggle, extra_requester_ids, extra_driver_toggles, adm_place")
+        .select(SCHEDULE_COLS)
         .gte("schedule_date", days[0]!)
         .lte("schedule_date", days[days.length - 1]!);
       if (error) throw error;
@@ -328,11 +275,29 @@ export function VehicleTimeline() {
     enabled: days.length > 0,
   });
 
+  // Demandas da Logística programadas para os veículos no mês (ícone na célula).
+  const logDemands = useQuery({
+    queryKey: ["vehicle-timeline-logistics", month],
+    enabled: days.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("log_demands").select("id, title, vehicle_id, scheduled_date, departure_time, status")
+        .not("vehicle_id", "is", null).gte("scheduled_date", days[0]!).lte("scheduled_date", days[days.length - 1]!).neq("status", "cancelada");
+      if (error) throw error;
+      const map = new Map<string, string[]>();
+      for (const d of data ?? []) {
+        const k = `${d.vehicle_id}|${d.scheduled_date}`;
+        map.set(k, [...(map.get(k) ?? []), `${d.departure_time ? `${String(d.departure_time).slice(0, 5)} ` : ""}${d.title}`]);
+      }
+      return map;
+    },
+  });
+
   const byCell = useMemo(() => {
     const map = new Map<string, VehicleScheduleRow>();
     (schedules.data ?? []).forEach((s) => map.set(`${s.vehicle_id}|${s.schedule_date}`, s));
     return map;
   }, [schedules.data]);
+  const dayDrivers = useMemo(() => driversByDay(schedules.data ?? []), [schedules.data]);
 
   const driverName = useMemo(() => {
     const map = new Map<string, string>();
@@ -346,7 +311,6 @@ export function VehicleTimeline() {
     return map;
   }, [clients.data]);
 
-  // O KM exibido é apenas a distância de ida cadastrada no cliente.
   const worksQ = useQuery({
     queryKey: ["vehicle-timeline-works"],
     queryFn: async () => {
@@ -355,19 +319,15 @@ export function VehicleTimeline() {
     },
   });
   const workById = useMemo(() => new Map((worksQ.data ?? []).map((w) => [w.id, w])), [worksQ.data]);
-  const workLabel = (id: string) => {
-    const w = workById.get(id);
-    return w ? `${w.clients?.name ? `${w.clients.name} - ` : ""}${w.name}` : "—";
-  };
-  const byWorkVehicle = (vehicleId: string) =>
-    !!(vehicles.data ?? []).find((v: any) => v.id === vehicleId)?.assign_by_work;
+  const vehicleById = useMemo(() => new Map((vehicles.data ?? []).map((v) => [v.id, v])), [vehicles.data]);
+  const byWorkVehicle = (vehicleId: string) => !!vehicleById.get(vehicleId)?.assign_by_work;
 
   // Indústria com local escrito (antigo "Externo"): 100 km fixos no dia e sem prêmio de motorista.
   const industryIds = useMemo(() => new Set((clients.data ?? []).filter((c) => /ind[uú]stria/i.test(c.name ?? "")).map((c) => c.id)), [clients.data]);
-  const isIndustryClient = (id: string | null | undefined) => !!id && industryIds.has(id);
+  const isIndustryClient = useCallback((id: string | null | undefined) => !!id && industryIds.has(id), [industryIds]);
   // ADM: o km do dia é digitado na escala (vale para o Prêmio Motorista), não vem da distância do cliente.
   const admIds = useMemo(() => new Set((clients.data ?? []).filter((c) => /^adm$/i.test((c.name ?? "").trim())).map((c) => c.id)), [clients.data]);
-  const isAdmClient = (id: string | null | undefined) => !!id && admIds.has(id);
+  const isAdmClient = useCallback((id: string | null | undefined) => !!id && admIds.has(id), [admIds]);
 
   const industryCustomers = useIndustryCustomers();
   const clientKm = useMemo(() => {
@@ -413,18 +373,21 @@ export function VehicleTimeline() {
     savePrefs.mutate({ order: next });
   }
 
+  const invalidateSchedules = () => {
+    queryClient.invalidateQueries({ queryKey: ["vehicle-schedules"] });
+    queryClient.invalidateQueries({ queryKey: ["km-report"] });
+    queryClient.invalidateQueries({ queryKey: ["vehicle-existing-days"] });
+  };
+
   const upsert = useMutation({
-    mutationFn: async (rows: Omit<VehicleScheduleRow, "id">[]) => {
+    mutationFn: async (rows: ReturnType<typeof buildRow>[]) => {
       if (rows.length === 0) return;
       const { error } = await supabase
         .from("vehicle_schedules")
         .upsert(rows, { onConflict: "schedule_date,vehicle_id" });
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vehicle-schedules"] });
-      queryClient.invalidateQueries({ queryKey: ["km-report"] });
-    },
+    onSuccess: invalidateSchedules,
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -434,8 +397,7 @@ export function VehicleTimeline() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vehicle-schedules"] });
-      queryClient.invalidateQueries({ queryKey: ["km-report"] });
+      invalidateSchedules();
       toast.success("Programação removida.");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -462,45 +424,7 @@ export function VehicleTimeline() {
     return clientName.get(id) ?? "—";
   }
 
-  function clientOptions() {
-    const list = clients.data ?? [];
-    let idx = list.findIndex((c) => /^suzano$/i.test((c.name ?? "").trim()));
-    if (idx < 0) idx = list.findIndex((c) => /suzano/i.test(c.name ?? ""));
-    const out: ReactNode[] = [];
-    list.forEach((c, i) => {
-      out.push(<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>);
-      if (i === idx) out.push(<SelectItem key={SUZANO_LOCAL_KEY} value={SUZANO_LOCAL_KEY}>SUZANO LOCAL</SelectItem>);
-    });
-    if (idx < 0) out.push(<SelectItem key={SUZANO_LOCAL_KEY} value={SUZANO_LOCAL_KEY}>SUZANO LOCAL</SelectItem>);
-    return out;
-  }
-
-  function buildRow(
-    vehicleId: string,
-    date: string,
-    f: {
-      driver_id: string | null;
-      client_id: string | null;
-      is_external: boolean;
-      is_maintenance: boolean;
-      maintenance_kind?: string | null | undefined;
-      driver_bonus: boolean;
-      extra_client_ids?: string[] | undefined;
-      extra_driver_ids?: string[] | undefined;
-      extra_places?: string[] | undefined;
-      extra_work_ids?: string[] | undefined;
-      trips?: number | undefined;
-      is_suzano_local?: boolean | undefined;
-      work_id?: string | null | undefined;
-      external_place?: string | null | undefined;
-      adm_place?: string | null | undefined;
-      km?: number | null | undefined;
-      requester_id?: string | null | undefined;
-      driver_toggle?: boolean | undefined;
-      extra_requester_ids?: string[] | undefined;
-      extra_driver_toggles?: boolean[] | undefined;
-    },
-  ) {
+  function buildRow(vehicleId: string, date: string, f: BuildInput) {
     const workId = f.work_id ?? null;
     if (workId) f = { ...f, client_id: workById.get(workId)?.client_id ?? f.client_id };
     const special = f.is_external || f.is_maintenance || !!f.is_suzano_local;
@@ -552,7 +476,7 @@ export function VehicleTimeline() {
     const req = current?.requester_id ?? current?.driver_id ?? NONE;
     const chosen = (d: string | null | undefined, r: string, on: boolean) => (on && d && d !== r ? d : NONE);
     const extraReq = (current?.extra_client_ids ?? []).map((_, i) => current?.extra_requester_ids?.[i] || current?.extra_driver_ids?.[i] || NONE);
-    setForm({
+    setEditorInitial({
       requester_id: bw ? req : NONE,
       driver_toggle: bw ? !!current?.driver_toggle : false,
       extraRequesters: bw ? extraReq : (current?.extra_client_ids ?? []).map(() => NONE),
@@ -571,6 +495,7 @@ export function VehicleTimeline() {
         : NONE,
       driver_bonus: current?.driver_bonus ?? false,
       repeat_until: "",
+      skip_weekend: true,
       extras: [...(current?.extra_client_ids ?? [])],
       extraDrivers: (current?.extra_client_ids ?? []).map((_, i) => bw
         ? chosen(current?.extra_driver_ids?.[i], extraReq[i]!, !!current?.extra_driver_toggles?.[i])
@@ -581,11 +506,10 @@ export function VehicleTimeline() {
       external_place: current?.external_place ?? current?.adm_place ?? "",
       km: current && isAdmClient(current.client_id) ? String(current.km ?? "") : "",
     });
-    setDriverSearch("");
-    setCell({ vehicleId, date });
+    setCell({ vehicleId, date, vehicleCnh: (vehicleById.get(vehicleId) as { cnh_category?: string | null } | undefined)?.cnh_category ?? null, byWork: bw });
   }
 
-  function saveCell() {
+  function saveCell(form: CellForm, repeatTargets: string[]) {
     if (!cell) return;
     if (form.client_id === NONE) {
       toast.error("Selecione a obra/cliente ou MANUTENÇÃO.");
@@ -597,12 +521,12 @@ export function VehicleTimeline() {
     const isLocal = form.client_id === SUZANO_LOCAL_KEY;
     const workId = form.client_id.startsWith(WORK_PREFIX) ? form.client_id.slice(WORK_PREFIX.length) : null;
     // Caminhão/pickup: o motorista que vale (prêmio, CNH, ranking) é o marcado no toggle; sem ele, o solicitante.
-    const bw = byWorkVehicle(cell.vehicleId);
+    const bw = cell.byWork;
     // Sem motorista marcado, o solicitante só vale como motorista se for motorista (senão fica a definir).
     const isDriver = new Set((drivers.data ?? []).map((d) => d.id));
     const eff = (on: boolean, d: string, r: string) => (bw ? (on && d !== NONE ? d : isDriver.has(r) ? r : NONE) : d);
     const mainDriver = eff(form.driver_toggle, form.driver_id, form.requester_id);
-    const base = {
+    const base: BuildInput = {
       work_id: workId,
       driver_id: mainDriver === NONE ? null : mainDriver,
       requester_id: bw && form.requester_id !== NONE ? form.requester_id : null,
@@ -623,14 +547,7 @@ export function VehicleTimeline() {
       external_place: form.external_place,
       km: form.km.trim() === "" ? null : Number(form.km.replace(",", ".")),
     };
-    const targets: string[] = [cell.date];
-    if (form.repeat_until && form.repeat_until > cell.date) {
-      let d = addDays(cell.date, 1);
-      while (d <= form.repeat_until) {
-        targets.push(d);
-        d = addDays(d, 1);
-      }
-    }
+    const targets = [cell.date, ...repeatTargets];
     upsert.mutate(targets.map((d) => buildRow(cell.vehicleId, d, base)));
     setCell(null);
   }
@@ -639,71 +556,106 @@ export function VehicleTimeline() {
     if (!canWrite) return;
     try {
       const src = JSON.parse(payload) as VehicleScheduleRow;
-      upsert.mutate([
-        buildRow(vehicleId, date, {
-          driver_id: src.driver_id,
-          client_id: src.client_id,
-          is_external: src.is_external,
-          is_maintenance: src.is_maintenance ?? false, maintenance_kind: src.maintenance_kind,
-          driver_bonus: src.driver_bonus,
-          extra_client_ids: src.extra_client_ids,
-          extra_driver_ids: src.extra_driver_ids,
-          extra_places: src.extra_places,
-          extra_work_ids: src.extra_work_ids,
-          trips: src.trips,
-          is_suzano_local: src.is_suzano_local,
-          work_id: src.work_id,
-          external_place: src.external_place, adm_place: src.adm_place,
-          km: src.km,
-          requester_id: src.requester_id, driver_toggle: src.driver_toggle, extra_requester_ids: src.extra_requester_ids, extra_driver_toggles: src.extra_driver_toggles,
-        }),
-      ]);
+      upsert.mutate([buildRow(vehicleId, date, rowInput(src))]);
     } catch {
       /* ignore */
     }
   }
+
+  // Callbacks estáveis para as células memorizadas (sempre chamam a versão atual).
+  const openRef = useRef(openCell);
+  openRef.current = openCell;
+  const dropRef = useRef(onDrop);
+  dropRef.current = onDrop;
+  const onOpenCell = useCallback((v: string, d: string) => openRef.current(v, d), []);
+  const onDropCell = useCallback((v: string, d: string, p: string) => dropRef.current(v, d, p), []);
+
+  // ---- Copiar dia: prévia dos dias que já têm programação (serão sobrescritos) ----
+  const copySource = useQuery({
+    queryKey: ["vehicle-copy-source", copyFrom],
+    enabled: copyOpen && !!copyFrom,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("vehicle_schedules").select(SCHEDULE_COLS).eq("schedule_date", copyFrom);
+      if (error) throw error;
+      return (data ?? []) as VehicleScheduleRow[];
+    },
+  });
+  const copyLast = copyEnd && copyEnd >= copyStart ? copyEnd : copyStart;
+  const copyTargets = copyStart ? dateRange(copyStart, copyLast, copySkipWeekend) : [];
+  const copyVehicleIds = useMemo(() => (copySource.data ?? []).map((s) => s.vehicle_id), [copySource.data]);
+  const copyExisting = useExistingDays(copyVehicleIds, copyOpen && copyVehicleIds.length ? copyStart : "", copyOpen && copyVehicleIds.length ? copyLast : "");
+  const copyOverwritten = useMemo(() => {
+    const t = new Set(copyTargets);
+    const by = new Map<string, number>();
+    for (const r of copyExisting.data ?? []) if (t.has(r.schedule_date)) by.set(r.schedule_date, (by.get(r.schedule_date) ?? 0) + 1);
+    return [...by.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [copyExisting.data, copyTargets.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function runCopyDay() {
     if (!copyFrom || !copyStart) {
       toast.error("Informe a data de origem e o destino.");
       return;
     }
-    const source = (schedules.data ?? []).filter((s) => s.schedule_date === copyFrom);
+    const source = copySource.data ?? [];
     if (source.length === 0) {
       toast.error("Não há programação na data de origem.");
       return;
     }
-    const end = copyEnd && copyEnd >= copyStart ? copyEnd : copyStart;
-    const rows: Omit<VehicleScheduleRow, "id">[] = [];
-    let d = copyStart;
-    while (d <= end) {
-      for (const s of source) {
-        rows.push(
-          buildRow(s.vehicle_id, d, {
-            driver_id: s.driver_id,
-            client_id: s.client_id,
-            is_external: s.is_external,
-            is_maintenance: s.is_maintenance ?? false, maintenance_kind: s.maintenance_kind,
-            driver_bonus: s.driver_bonus,
-            extra_client_ids: s.extra_client_ids,
-            extra_driver_ids: s.extra_driver_ids,
-            extra_places: s.extra_places,
-            extra_work_ids: s.extra_work_ids,
-            trips: s.trips,
-            is_suzano_local: s.is_suzano_local,
-            work_id: s.work_id,
-            external_place: s.external_place, adm_place: s.adm_place,
-            km: s.km,
-            requester_id: s.requester_id, driver_toggle: s.driver_toggle, extra_requester_ids: s.extra_requester_ids, extra_driver_toggles: s.extra_driver_toggles,
-          }),
-        );
-      }
-      d = addDays(d, 1);
+    const rows = copyTargets.filter((d) => d !== copyFrom).flatMap((d) => source.map((s) => buildRow(s.vehicle_id, d, rowInput(s))));
+    if (!rows.length) {
+      toast.error("Nenhum dia de destino.");
+      return;
     }
     upsert.mutate(rows);
     toast.success(`${rows.length} programações copiadas.`);
     setCopyOpen(false);
   }
+
+  // ---- Recalcular km Indústria (antes rodava sozinho ao abrir a página e mexia em meses fechados) ----
+  const currentPeriodStart = monthDays(monthKeyNow())[0]!;
+  const recalcFrom = recalcAll || currentPeriodStart < LOGISTICS_START ? LOGISTICS_START : currentPeriodStart;
+  const placesSig = (industryCustomers.data ?? []).map((c) => `${c.name}|${c.km_one_way}|${c.has_toll}|${c.toll_amount}`).join(";");
+  const recalcPreview = useQuery({
+    queryKey: ["industry-km-recalc", recalcFrom, placesSig],
+    enabled: recalcOpen && !!industryCustomers.data && !!clients.data && !!worksQ.data,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("vehicle_schedules").select(SCHEDULE_COLS)
+        .gte("schedule_date", recalcFrom).or("external_place.not.is.null,extra_places.neq.{}").order("schedule_date");
+      if (error) throw error;
+      const out: { row: VehicleScheduleRow; km: number; extra_km: number; place_toll: number | null }[] = [];
+      const same = (x: number | null | undefined, y: number | null | undefined) => (x == null && y == null) || Number(x) === Number(y);
+      for (const s of (data ?? []) as VehicleScheduleRow[]) {
+        if (s.is_external) continue;
+        // Só os dias com algum local cadastrado; o resto fica como foi lançado.
+        if (![s.external_place, ...(s.extra_places ?? [])].some((p) => p && (industryKmOneWay(industryCustomers.data, p) != null || industryToll(industryCustomers.data, p) != null))) continue;
+        const b = buildRow(s.vehicle_id, s.schedule_date, { ...rowInput(s), trips: s.trips ?? 1 });
+        if (same(b.km, s.km) && same(b.extra_km, s.extra_km) && same(b.place_toll, s.place_toll)) continue;
+        out.push({ row: s, km: b.km, extra_km: b.extra_km, place_toll: b.place_toll });
+      }
+      return out;
+    },
+  });
+  const applyRecalc = useMutation({
+    mutationFn: async () => {
+      const list = recalcPreview.data ?? [];
+      // Gravação em lote: só km, km extra e pedágio do local (as demais colunas não mudam).
+      for (let i = 0; i < list.length; i += 200) {
+        const { error } = await supabase.from("vehicle_schedules").upsert(
+          list.slice(i, i + 200).map((c) => ({ schedule_date: c.row.schedule_date, vehicle_id: c.row.vehicle_id, km: c.km, extra_km: c.extra_km, place_toll: c.place_toll })),
+          { onConflict: "schedule_date,vehicle_id" },
+        );
+        if (error) throw error;
+      }
+      return list.length;
+    },
+    onSuccess: (n) => {
+      invalidateSchedules();
+      queryClient.invalidateQueries({ queryKey: ["industry-km-recalc"] });
+      toast.success(`Km/pedágio de ${n} dia(s) atualizados pelo cadastro de clientes Indústria`);
+      setRecalcOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   // ---- Necessidades de transporte ----
   const needs = useQuery({
@@ -816,204 +768,61 @@ export function VehicleTimeline() {
     return rows.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [clients.data, needs.data, capacityOf]);
 
-  // Clientes Indústria valem desde LOGISTICS_START: os dias com local já lançados são recalculados (km, km extra e
-  // pedágio) sempre que o cadastro muda; só grava o que ficou diferente. Locais sem cadastro seguem com 100 km.
-  const placesSig = (industryCustomers.data ?? []).map((c) => `${c.name}|${c.km_one_way}|${c.has_toll}|${c.toll_amount}`).join(";");
-  const placesDone = useRef("");
-  useEffect(() => {
-    if (!canWrite || !industryCustomers.data?.length || !clients.data || !worksQ.data || placesDone.current === placesSig) return;
-    placesDone.current = placesSig;
-    void (async () => {
-      const { data, error } = await supabase.from("vehicle_schedules")
-        .select("id, schedule_date, vehicle_id, driver_id, client_id, is_external, is_maintenance, maintenance_kind, driver_bonus, km, extra_client_ids, extra_driver_ids, extra_places, extra_km, trips, is_suzano_local, work_id, external_place, place_toll")
-        .gte("schedule_date", LOGISTICS_START).or("external_place.not.is.null,extra_places.neq.{}");
-      if (error || !data) return;
-      let changed = 0;
-      for (const s of data as (VehicleScheduleRow & { place_toll: number | null })[]) {
-        if (s.is_external) continue;
-        // Só mexe nos dias com algum local cadastrado; o resto fica como foi lançado.
-        if (![s.external_place, ...(s.extra_places ?? [])].some((p) => p && industryKmOneWay(industryCustomers.data, p) != null || (p && industryToll(industryCustomers.data, p) != null))) continue;
-        const b = buildRow(s.vehicle_id, s.schedule_date, { ...s, trips: s.trips ?? 1 });
-        const same = (x: number | null | undefined, y: number | null | undefined) => (x == null && y == null) || Number(x) === Number(y);
-        if (same(b.km, s.km) && same(b.extra_km, s.extra_km) && same(b.place_toll, s.place_toll)) continue;
-        const { error: e } = await supabase.from("vehicle_schedules").update({ km: b.km, extra_km: b.extra_km, place_toll: b.place_toll }).eq("id", s.id);
-        if (!e) changed++;
-      }
-      if (changed) {
-        queryClient.invalidateQueries({ queryKey: ["vehicle-schedules"] });
-        queryClient.invalidateQueries({ queryKey: ["km-report"] });
-        toast.success(`Km/pedágio de ${changed} dia(s) desde ${LOGISTICS_START.split("-").reverse().join("/")} atualizados pelo cadastro de clientes Indústria`);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canWrite, placesSig, clients.data, worksQ.data]);
-
-  // Caminhão (atribuído por serviço): cliente escolhido, vindo do serviço quando há um.
-  const byWork = !!cell && byWorkVehicle(cell.vehicleId);
-  const truckClient = form.client_id.startsWith(WORK_PREFIX) ? workById.get(form.client_id.slice(WORK_PREFIX.length))?.client_id ?? NONE : form.client_id;
-  const filteredDrivers = useMemo(() => {
-    const q = driverSearch.trim().toLowerCase();
-    return (drivers.data ?? []).filter((d) => !q || d.full_name.toLowerCase().includes(q));
-  }, [drivers.data, driverSearch]);
-
-  // ---- Fretes do dia no editor: o principal (form.client_id/driver_id/external_place) + obras adicionais, como uma lista ----
-  type Freight = { client: string; driver: string; place: string; requester: string; toggle: boolean };
-  function getFreights(f: CellForm): Freight[] {
-    const main: Freight = { client: f.client_id, driver: f.driver_id, place: f.external_place, requester: f.requester_id, toggle: f.driver_toggle };
-    const extras = f.extras.map((c, i) => ({ client: f.extraWorks[i] ? WORK_PREFIX + f.extraWorks[i] : c, driver: f.extraDrivers[i] ?? NONE, place: f.extraPlaces[i] ?? "",
-      requester: f.extraRequesters[i] ?? NONE, toggle: !!f.extraToggles[i] }));
-    return [main, ...extras];
-  }
-  function setFreights(f: CellForm, list: Freight[]): CellForm {
-    const [main, ...rest] = list.length ? list : [{ client: NONE, driver: NONE, place: "", requester: NONE, toggle: false }];
-    const baseOf = (c: string) => (c.startsWith(WORK_PREFIX) ? workById.get(c.slice(WORK_PREFIX.length))?.client_id ?? NONE : c);
-    return {
-      ...f,
-      client_id: main!.client, driver_id: main!.driver, external_place: main!.place, requester_id: main!.requester, driver_toggle: main!.toggle,
-      extraRequesters: rest.map((x) => x.requester),
-      extraToggles: rest.map((x) => x.toggle),
-      // O km digitado (ADM) é do frete principal: some se outro frete passar a ser o principal.
-      km: main!.client === f.client_id ? f.km : "",
-      extras: rest.map((x) => baseOf(x.client)),
-      extraWorks: rest.map((x) => (x.client.startsWith(WORK_PREFIX) ? x.client.slice(WORK_PREFIX.length) : "")),
-      extraDrivers: rest.map((x) => x.driver),
-      extraPlaces: rest.map((x) => x.place),
-    };
-  }
-  const patchFreight = (i: number, patch: Partial<Freight>) => setForm((f) => setFreights(f, getFreights(f).map((x, j) => (j === i ? { ...x, ...patch } : x))));
-  const [dragFreight, setDragFreight] = useState<number | null>(null);
-  const moveFreight = (from: number, to: number) => setForm((f) => {
-    const list = getFreights(f);
-    const [item] = list.splice(from, 1);
-    list.splice(to, 0, item!);
-    return setFreights(f, list);
-  });
   // Toggle Motorista ligado e ainda em "Definir" (sem motorista escolhido, ou igual ao solicitante) em algum frete do dia.
   const driverUndefined = (r: VehicleScheduleRow) =>
     (!!r.driver_toggle && (!r.driver_id || r.driver_id === r.requester_id))
     || (!!r.requester_id && !r.driver_id)
     || (r.extra_client_ids ?? []).some((_, i) => !!r.extra_driver_toggles?.[i] && (!r.extra_driver_ids?.[i] || r.extra_driver_ids[i] === r.extra_requester_ids?.[i]));
-  const driverOptions = useMemo(() => [{ value: NONE, label: "Sem motorista" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
-  const requesterOptions = useMemo(() => [{ value: NONE, label: "Sem solicitante" }, ...(people.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [people.data]);
-  const pickDriverOptions = useMemo(() => [{ value: NONE, label: "Definir" }, ...(drivers.data ?? []).map((d) => ({ value: d.id, label: d.full_name }))], [drivers.data]);
 
-  function freightKmText(fr: Freight, i: number) {
-    const base = fr.client.startsWith(WORK_PREFIX) ? workById.get(fr.client.slice(WORK_PREFIX.length))?.client_id ?? "" : fr.client;
-    if (fr.client === NONE) return "";
-    if (fr.client === MAINTENANCE_KEY) return "Manutenção: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem.";
-    if (fr.client === REVISION_KEY) return "Revisão: 0 km no dia, sem prêmio de motorista e sem prêmio de viagem.";
-    if (fr.client === SUZANO_LOCAL_KEY) return `Suzano Local: ${KM_SUZANO_LOCAL} km de ida por viagem (${KM_SUZANO_LOCAL * 2} km ida e volta).`;
-    if (fr.client === EXTERNAL_KEY) return `Externo: ${KM_EXTERNAL} km no dia, sem prêmio de motorista e sem prêmio de viagem.`;
-    if (isAdmClient(base)) return i === 0 ? "ADM: digite o km de ida do dia; é ele que define a faixa do Prêmio Motorista." : `${extraKm(base)} km (ADM)`;
-    if (isIndustryClient(base) && fr.place.trim()) {
-      const known = industryKmOneWay(industryCustomers.data, fr.place) != null;
-      return i === 0
-        ? `Indústria com local: ${known ? `${placeKmOneWay(fr.place)} km de ida (× 2)` : `${KM_EXTERNAL} km (local sem km cadastrado)`}, sem prêmio de motorista. O combustível vai para o CC da Indústria.`
-        : `${placeExtraKm(fr.place.trim())} km`;
-    }
-    return i === 0 ? `${clientKm.get(base) ?? 0} km no dia (distância cadastrada do cliente).` : `${extraKm(base)} km`;
+  const plateOf = useCallback((id: string) => vehicleById.get(id)?.plate ?? "—", [vehicleById]);
+  const editorCtx: EditorCtx = useMemo(() => ({
+    clients: (clients.data ?? []).map((c) => ({ id: c.id, name: c.name })),
+    works: worksQ.data ?? [],
+    workById,
+    drivers: drivers.data ?? [],
+    people: people.data ?? [],
+    isIndustryClient,
+    isAdmClient,
+    clientKm,
+    industryCustomers: industryCustomers.data,
+    plateOf,
+    driversOn: (date: string) => dayDrivers.get(date) ?? new Map<string, Set<string>>(),
+  }), [clients.data, worksQ.data, workById, drivers.data, people.data, isIndustryClient, isAdmClient, clientKm, industryCustomers.data, plateOf, dayDrivers]);
+
+  /** Textos prontos da célula (a célula é memorizada e só redesenha quando eles mudam). */
+  function cellProps(vehicleId: string, d: string) {
+    const row = byCell.get(`${vehicleId}|${d}`);
+    const logistics = logDemands.data?.get(`${vehicleId}|${d}`)?.join(" · ");
+    if (!row) return { row, driverText: "", placeText: "", extrasTitle: undefined, extrasCount: 0, km: 0, bonusTone: "none" as const, dupDriver: undefined, logistics };
+    const dup = rowDrivers(row).filter((id) => (dayDrivers.get(d)?.get(id)?.size ?? 0) > 1);
+    return {
+      row,
+      driverText: row.driver_id ? shortName(driverName.get(row.driver_id) ?? personName.get(row.driver_id) ?? "—") : row.requester_id ? `${shortName(personName.get(row.requester_id) ?? "—")} · solic.` : "Sem motorista",
+      placeText: row.is_maintenance
+        ? row.maintenance_kind === "revisao" ? "REVISÃO" : "MANUTENÇÃO"
+        : row.is_external
+          ? (row.external_place || "EXTERNO").toUpperCase()
+          : row.is_suzano_local
+            ? "SUZANO LOCAL"
+            : row.external_place && isIndustryClient(row.client_id)
+              ? row.external_place.toUpperCase()
+              : row.adm_place && isAdmClient(row.client_id)
+                ? row.adm_place.toUpperCase()
+                : clientName.get(row.client_id ?? "") ?? "—",
+      extrasTitle: (row.extra_client_ids ?? []).length
+        ? `+ ${(row.extra_client_ids ?? []).map((id, i) => { const dr = row.extra_driver_ids?.[i]; return `${extraName(id, row.extra_places?.[i])}${dr ? ` (${driverName.get(dr) ?? "—"})` : ""}`; }).join(", ")}`
+        : undefined,
+      extrasCount: (row.extra_client_ids ?? []).length,
+      km: dayKm({ km: row.km, trips: row.trips ?? 1, extra_km: row.extra_km ?? 0 }),
+      bonusTone: driverUndefined(row) ? "undefined" as const : row.driver_bonus ? "bonus" as const : "none" as const,
+      dupDriver: dup.length
+        ? `${dup.map((id) => driverName.get(id) ?? personName.get(id) ?? "Motorista").join(", ")} também é motorista de outro veículo neste dia: ${dup.flatMap((id) => [...(dayDrivers.get(d)?.get(id) ?? [])].filter((v) => v !== vehicleId)).map(plateOf).join(", ")}`
+        : undefined,
+      logistics,
+    };
   }
 
-  function renderFreight(fr: Freight, i: number, total: number) {
-    const base = fr.client.startsWith(WORK_PREFIX) ? workById.get(fr.client.slice(WORK_PREFIX.length))?.client_id ?? NONE : fr.client;
-    return (
-      <div key={i}
-        onDragOver={(e) => { if (dragFreight !== null) e.preventDefault(); }}
-        onDrop={(e) => { e.preventDefault(); if (dragFreight !== null && dragFreight !== i) moveFreight(dragFreight, i); setDragFreight(null); }}
-        className={`space-y-2 rounded-md border p-2.5 ${dragFreight === i ? "border-primary opacity-60" : "border-border"}`}>
-        <div className="flex items-center gap-2">
-          {total > 1 && (
-            <span draggable onDragStart={(e) => { setDragFreight(i); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => setDragFreight(null)}
-              className="cursor-grab text-muted-foreground active:cursor-grabbing" title="Arraste para mudar a ordem" aria-label="Arrastar frete">
-              <GripVertical className="h-4 w-4" />
-            </span>
-          )}
-          <span className="text-sm font-semibold">Frete {i + 1}{i === 0 && total > 1 ? " (principal)" : ""}</span>
-          {total > 1 && (
-            <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-destructive" title="Excluir este frete"
-              onClick={() => setForm((f) => setFreights(f, getFreights(f).filter((_, j) => j !== i)))}>
-              <Trash2 className="h-3.5 w-3.5" /> Excluir frete
-            </Button>
-          )}
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-        {byWork ? (
-          <div className="space-y-1">
-            <Label>Solicitante</Label>
-            <SearchSelect value={fr.requester} onChange={(v) => patchFreight(i, { requester: v })} options={requesterOptions} placeholder="Selecione o solicitante" searchPlaceholder="Buscar solicitante" />
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <Label>Motorista</Label>
-            <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={driverOptions} placeholder="Selecione o motorista" searchPlaceholder="Buscar motorista" />
-          </div>
-        )}
-        <div className="space-y-1">
-          <Label>{byWork ? "Cliente" : "Obra / Cliente"}</Label>
-          {/* Caminhão: primeiro o cliente, depois (opcional) o serviço. Só o cliente = rateio pelas horas dos serviços dele. */}
-          <Select value={byWork ? base : fr.client} onValueChange={(v) => patchFreight(i, { client: v, place: "" })}>
-            <SelectTrigger><SelectValue placeholder={byWork ? "Selecione o cliente" : "Selecione a obra"} /></SelectTrigger>
-            <SelectContent>
-              {clientOptions()}
-              <SelectItem value={MAINTENANCE_KEY}>MANUTENÇÃO</SelectItem>
-              <SelectItem value={REVISION_KEY}>REVISÃO</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {byWork && base !== NONE && !SPECIAL_KEYS.has(base) && !isAdmClient(base) && (
-          <div className="space-y-1">
-            <Label>Serviço</Label>
-            <Select value={fr.client.startsWith(WORK_PREFIX) ? fr.client : ALL_WORKS} onValueChange={(v) => patchFreight(i, { client: v === ALL_WORKS ? base : v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_WORKS}>Todos os serviços do cliente (rateio por horas)</SelectItem>
-                {(worksQ.data ?? []).filter((w) => w.client_id === base).map((w) => (
-                  <SelectItem key={w.id} value={WORK_PREFIX + w.id}>{w.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        {isAdmClient(base) && (
-          <div className="space-y-1">
-            <Label htmlFor={`freight-adm-place-${i}`}>Local</Label>
-            <Input id={`freight-adm-place-${i}`} placeholder="Ex.: Banco, Cartório, Fornecedor X" value={fr.place} onChange={(e) => patchFreight(i, { place: e.target.value })} />
-          </div>
-        )}
-        {(fr.client === EXTERNAL_KEY || isIndustryClient(base)) && (
-          <div className="space-y-1">
-            <Label>Local</Label>
-            {byWork && fr.client !== EXTERNAL_KEY
-              ? <IndustryCustomerSelect value={fr.place} onChange={(name) => patchFreight(i, { place: name })} />
-              : <Input placeholder="Ex.: Campinas, São Paulo, Bahia" value={fr.place} onChange={(e) => patchFreight(i, { place: e.target.value })} />}
-          </div>
-        )}
-        {i === 0 && isAdmClient(base) && (
-          <div className="space-y-1">
-            <Label htmlFor="vehicle-adm-km">Km do dia (ida)</Label>
-            <Input id="vehicle-adm-km" inputMode="decimal" placeholder="Ex.: 35" value={form.km}
-              onChange={(e) => setForm((f) => ({ ...f, km: e.target.value.replace(/[^\d,.]/g, "") }))} />
-          </div>
-        )}
-        {/* Caminhão/pickup: toggle Motorista embaixo dos seletores; ligado, a lista fica na 2ª coluna. */}
-        {byWork && (
-          <div className="flex min-h-10 items-center gap-2 sm:col-start-1">
-            <Switch id={`freight-driver-${i}`} checked={fr.toggle} onCheckedChange={(v) => patchFreight(i, { toggle: v, driver: v ? fr.driver : NONE })} />
-            <Label htmlFor={`freight-driver-${i}`}>Motorista</Label>
-            {!fr.toggle && <span className="text-xs text-muted-foreground">(sem marcar, vale o solicitante)</span>}
-          </div>
-        )}
-        {byWork && fr.toggle && (
-          <SearchSelect value={fr.driver} onChange={(v) => patchFreight(i, { driver: v })} options={pickDriverOptions} placeholder="Definir" searchPlaceholder="Buscar motorista" />
-        )}
-        </div>
-        <p className="text-xs text-muted-foreground">{freightKmText(fr, i) || "A quilometragem vem da distância cadastrada do cliente."}</p>
-        {byWork && i === 0 && base !== NONE && !SPECIAL_KEYS.has(base) && !fr.client.startsWith(WORK_PREFIX) && (
-          <p className="text-xs text-muted-foreground">O custo do caminhão no dia é dividido entre os serviços do cliente pelas horas trabalhadas em cada um.</p>
-        )}
-      </div>
-    );
-  }
+  const currentRow = cell ? byCell.get(`${cell.vehicleId}|${cell.date}`) : undefined;
 
   return (
     <div className="space-y-4">
@@ -1059,6 +868,9 @@ export function VehicleTimeline() {
 
         <Button variant="outline" onClick={() => setCopyOpen(true)} disabled={!canWrite}>
           <Copy className="h-4 w-4" /> Copiar dia
+        </Button>
+        <Button variant="outline" onClick={() => setRecalcOpen(true)} disabled={!canWrite} title="Recalcula km, km extra e pedágio dos dias com local Indústria cadastrado, com prévia antes de gravar.">
+          <RefreshCw className="h-4 w-4" /> Recalcular km Indústria
         </Button>
       </div>
 
@@ -1135,75 +947,18 @@ export function VehicleTimeline() {
                     </div>
                   </div>
                 </td>
-                {days.map((d) => {
-                  const row = byCell.get(`${v.id}|${d}`);
-                  return (
-                    <td
-                      key={d}
-                      className={`w-24 min-w-24 border-b border-r border-border p-0 align-middle ${isWeekend(d) ? "bg-muted/40" : ""}`}
-                      onDragOver={(e) => {
-                        if (canWrite) e.preventDefault();
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        onDrop(v.id, d, e.dataTransfer.getData("text/plain"));
-                      }}
-                    >
-                      <button
-                        type="button"
-                        draggable={!!row && canWrite}
-                        onDragStart={(e) => row && e.dataTransfer.setData("text/plain", JSON.stringify(row))}
-                        onClick={() => openCell(v.id, d)}
-                        className="h-9 w-full cursor-pointer px-1 text-left leading-tight hover:bg-accent/40"
-                      >
-                        {row ? (
-                          <>
-                            <div className="flex items-center gap-1">
-                              <span
-                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${driverUndefined(row) ? "bg-destructive" : row.driver_bonus ? "bg-success" : "bg-muted-foreground/40"}`}
-                                title={driverUndefined(row) ? "Motorista a definir" : row.driver_bonus ? "Com prêmio de motorista" : "Sem prêmio de motorista"}
-                              />
-                              <span className="truncate text-[10px] font-medium">
-                                {row.driver_id ? shortName(driverName.get(row.driver_id) ?? "—") : row.requester_id ? `${shortName(personName.get(row.requester_id) ?? "—")} · solic.` : "Sem motorista"}
-                              </span>
-                            </div>
-                            <div
-                              className="truncate text-[10px] uppercase text-muted-foreground"
-                              title={
-                                (row.extra_client_ids ?? []).length
-                                  ? `+ ${(row.extra_client_ids ?? []).map((id, i) => { const dr = row.extra_driver_ids?.[i]; return `${extraName(id, row.extra_places?.[i])}${dr ? ` (${driverName.get(dr) ?? "—"})` : ""}`; }).join(", ")}`
-                                  : undefined
-                              }
-                            >
-                              {Number(row.km) + Number(row.extra_km ?? 0)}km{" "}
-                              {row.is_maintenance
-                                ? row.maintenance_kind === "revisao" ? "REVISÃO" : "MANUTENÇÃO"
-                                : row.is_external
-                                  ? (row.external_place || "EXTERNO").toUpperCase()
-                                  : row.is_suzano_local
-                                    ? "SUZANO LOCAL"
-                                  : row.external_place && isIndustryClient(row.client_id)
-                                    ? row.external_place.toUpperCase()
-                                  : row.adm_place && isAdmClient(row.client_id)
-                                    ? row.adm_place.toUpperCase()
-                                  : clientName.get(row.client_id ?? "") ?? "—"}
-                              {(row.extra_client_ids ?? []).length > 0 && (
-                                <span className="font-semibold text-primary"> +{row.extra_client_ids!.length}</span>
-                              )}
-                            </div>
-                          </>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground/60">—</span>
-                        )}
-                      </button>
-                    </td>
-                  );
-                })}
+                {days.map((d) => (
+                  <VehicleTimelineCell key={d} vehicleId={v.id} date={d} weekend={isWeekend(d)} canWrite={canWrite}
+                    onOpen={onOpenCell} onDropRow={onDropCell} {...cellProps(v.id, d)} />
+                ))}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <p className="text-[11px] text-muted-foreground">
+        Km na célula = km rodados no dia (ida e volta × viagens + fretes extras), o mesmo da Frota. Ícone de caixa = demanda da Logística no veículo; triângulo = motorista em mais de um veículo no dia.
+      </p>
 
       <div className="panel space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1236,69 +991,17 @@ export function VehicleTimeline() {
         )}
       </div>
 
-      {/* Editor da célula */}
-      <Dialog open={!!cell} onOpenChange={(o) => !o && setCell(null)}>
-        <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col gap-3">
-          <DialogHeader>
-            <DialogTitle>Programação do veículo</DialogTitle>
-          </DialogHeader>
-          <div className="-mx-1 min-h-0 flex-1 space-y-3 overflow-y-auto px-1">
-            {/* Cada frete do dia é uma caixa igual (motorista, cliente, serviço, local, km); o 1º é o principal.
-                Dá para excluir qualquer um e arrastar pela alça para mudar a ordem. */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label>Fretes do dia</Label>
-                <Button variant="outline" size="sm" onClick={() => setForm((f) => setFreights(f, [...getFreights(f), byWork
-                  ? { client: NONE, driver: NONE, place: "", requester: f.requester_id, toggle: false }
-                  : { client: NONE, driver: f.driver_id, place: "", requester: NONE, toggle: false }]))}>
-                  <Plus className="h-4 w-4" /> Adicionar frete
-                </Button>
-              </div>
-              {getFreights(form).map((fr, i, list) => renderFreight(fr, i, list.length))}
-              {getFreights(form).length > 1 && (
-                <p className="text-xs text-muted-foreground">O 1º frete é o principal (prêmios e viagens); o km dos outros é somado no relatório da frota.</p>
-              )}
-            </div>
-            <div className="grid gap-3 rounded-md border border-border p-2.5 sm:grid-cols-3">
-              <div className="space-y-1" title="Na 1ª viagem vai a lotação cheia; nas seguintes, uma pessoa a menos (ex.: Suzano, 6 e 5).">
-                <Label htmlFor="vehicle-trips">Viagens no dia</Label>
-                <Input id="vehicle-trips" type="number" min={1} step="1" value={form.trips} onChange={(e) => setForm((f) => ({ ...f, trips: e.target.value }))} />
-              </div>
-              <div className="space-y-1" title="Verde = recebe · Cinza = não recebe">
-                <Label className="block">Prêmio de Motorista</Label>
-                <div className="flex h-10 items-center">
-                  <Switch
-                    checked={form.driver_bonus && form.client_id !== EXTERNAL_KEY && form.client_id !== MAINTENANCE_KEY && form.client_id !== REVISION_KEY && !(isIndustryClient(truckClient) && form.external_place.trim())}
-                    disabled={form.client_id === EXTERNAL_KEY || form.client_id === MAINTENANCE_KEY || form.client_id === REVISION_KEY || (isIndustryClient(truckClient) && !!form.external_place.trim())}
-                    onCheckedChange={(v) => setForm((f) => ({ ...f, driver_bonus: v }))}
-                  />
-                </div>
-              </div>
-              <div className="space-y-1" title="Aplica a mesma programação nos dias seguintes até a data escolhida.">
-                <Label htmlFor="vehicle-repeat">Repetir até (opcional)</Label>
-                <Input id="vehicle-repeat" type="date" value={form.repeat_until} onChange={(e) => setForm((f) => ({ ...f, repeat_until: e.target.value }))} />
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="justify-between sm:justify-between">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                const row = cell && byCell.get(`${cell.vehicleId}|${cell.date}`);
-                if (row) remove.mutate(row.id);
-                setCell(null);
-              }}
-              disabled={!cell || !byCell.get(`${cell.vehicleId}|${cell.date}`)}
-            >
-              <Trash2 className="h-4 w-4 text-destructive" /> Remover
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setCell(null)}>Cancelar</Button>
-              <Button onClick={saveCell} disabled={upsert.isPending}>Salvar</Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <VehicleCellEditor
+        key={cell ? `${cell.vehicleId}|${cell.date}` : "closed"}
+        cell={cell}
+        initial={editorInitial}
+        ctx={editorCtx}
+        hasRow={!!currentRow}
+        saving={upsert.isPending}
+        onClose={() => setCell(null)}
+        onRemove={() => { if (currentRow) remove.mutate(currentRow.id); setCell(null); }}
+        onSave={saveCell}
+      />
 
       {/* Copiar dia */}
       <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
@@ -1310,6 +1013,7 @@ export function VehicleTimeline() {
             <div className="space-y-1">
               <Label>Copiar de</Label>
               <Input type="date" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} />
+              {copyFrom && copySource.data && <p className="text-xs text-muted-foreground">{copySource.data.length} veículo(s) programado(s) nesse dia.</p>}
             </div>
             <div className="space-y-1">
               <Label>Para (início)</Label>
@@ -1319,10 +1023,74 @@ export function VehicleTimeline() {
               <Label>Para (fim, opcional)</Label>
               <Input type="date" value={copyEnd} onChange={(e) => setCopyEnd(e.target.value)} />
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={copySkipWeekend} onCheckedChange={(v) => setCopySkipWeekend(!!v)} />
+              Pular sábado e domingo
+            </label>
+            {copyTargets.length > 0 && (
+              <div className={`rounded-md border p-2 text-xs ${copyOverwritten.length ? "border-warning/50 bg-warning/10" : "border-border text-muted-foreground"}`}>
+                <p>Copiar para {copyTargets.length} dia(s): {copyTargets.map(fmtDay).join(", ")}.</p>
+                {copyOverwritten.length > 0 ? (
+                  <p className="mt-1 font-medium">
+                    Já têm programação desses veículos e serão sobrescritos: {copyOverwritten.map(([d, n]) => `${fmtDay(d)} (${n})`).join(", ")}.
+                  </p>
+                ) : copyExisting.isFetching ? <p className="mt-1">Conferindo dias já programados…</p> : <p className="mt-1">Nenhum desses dias tem programação dos veículos copiados.</p>}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCopyOpen(false)}>Cancelar</Button>
-            <Button onClick={runCopyDay}>Copiar</Button>
+            <Button onClick={runCopyDay} disabled={!copySource.data?.length || copyExisting.isFetching}>
+              {copyOverwritten.length ? `Copiar e sobrescrever ${copyOverwritten.length} dia(s)` : "Copiar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Recalcular km Indústria */}
+      <Dialog open={recalcOpen} onOpenChange={setRecalcOpen}>
+        <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col">
+          <DialogHeader>
+            <DialogTitle>Recalcular km Indústria</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Dias com local do cadastro de clientes Indústria: km de ida, km extra e pedágio do local voltam a ser os do cadastro.
+            Por padrão só a partir de {fmtDay(recalcFrom)}/{recalcFrom.slice(0, 4)} (período atual), para não mexer em meses fechados.
+          </p>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={recalcAll} onCheckedChange={(v) => setRecalcAll(!!v)} />
+            Incluir meses anteriores (desde {LOGISTICS_START.split("-").reverse().join("/")})
+          </label>
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border">
+            {recalcPreview.isFetching ? (
+              <p className="p-3 text-sm text-muted-foreground">Calculando…</p>
+            ) : (recalcPreview.data ?? []).length === 0 ? (
+              <p className="p-3 text-sm text-muted-foreground">Nada a mudar: os dias já estão com o km e o pedágio do cadastro.</p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50 text-left">
+                  <tr><th className="px-2 py-1">Dia</th><th className="px-2 py-1">Veículo</th><th className="px-2 py-1">Local</th><th className="px-2 py-1 text-right">Km ida</th><th className="px-2 py-1 text-right">Km extra</th><th className="px-2 py-1 text-right">Pedágio</th></tr>
+                </thead>
+                <tbody>
+                  {(recalcPreview.data ?? []).map((c) => (
+                    <tr key={c.row.id} className="border-t border-border">
+                      <td className="px-2 py-1">{fmtDay(c.row.schedule_date)}</td>
+                      <td className="px-2 py-1 font-mono">{plateOf(c.row.vehicle_id)}</td>
+                      <td className="px-2 py-1">{[c.row.external_place, ...(c.row.extra_places ?? [])].filter(Boolean).join(", ")}</td>
+                      <td className="px-2 py-1 text-right">{Number(c.row.km)} → {c.km}</td>
+                      <td className="px-2 py-1 text-right">{Number(c.row.extra_km ?? 0)} → {c.extra_km}</td>
+                      <td className="px-2 py-1 text-right">{c.row.place_toll ?? "—"} → {c.place_toll ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecalcOpen(false)}>Cancelar</Button>
+            <Button onClick={() => applyRecalc.mutate()} disabled={applyRecalc.isPending || recalcPreview.isFetching || !(recalcPreview.data ?? []).length}>
+              {applyRecalc.isPending ? "Gravando…" : `Gravar ${(recalcPreview.data ?? []).length} dia(s)`}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

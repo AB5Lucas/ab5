@@ -119,6 +119,10 @@ export type AlertCtx = {
   origin?: LogAddress | null | undefined; dest?: LogAddress | null | undefined; rules: LogRestriction[];
   /** Veículo já escalado na Transporte no mesmo dia. */
   transportBusy?: boolean | undefined;
+  /** Veículo em Manutenção/Revisão na Transporte no mesmo dia. */
+  transportMaintenance?: boolean | undefined;
+  /** Motorista já escalado como motorista na Transporte no mesmo dia (principal ou frete extra). */
+  transportDriverBusy?: boolean | undefined;
   /** Outras demandas do mesmo veículo no mesmo horário. */
   overlapVehicle?: number | undefined;
   /** Outras demandas no mesmo local no mesmo horário. */
@@ -145,7 +149,8 @@ export function demandAlerts(d: LogDemand, c: AlertCtx): LogAlert[] {
     if (d.scheduled_date) {
       const r = rodizio(v.plate, d.scheduled_date, [c.origin?.city, c.dest?.city], c.rules);
       if (r) out.push({ tone: inWindows(d.departure_time, r.windows) ? "red" : "orange", text: `Rodízio em ${r.city}: placa final ${plateEnding(v.plate)} não roda das ${windowsLabel(r.windows)}` });
-      if (c.transportBusy) out.push({ tone: "orange", text: "Conflito: veículo também escalado na Transporte neste dia" });
+      if (c.transportMaintenance) out.push({ tone: "red", text: "Veículo em manutenção/revisão na Transporte neste dia" });
+      else if (c.transportBusy) out.push({ tone: "orange", text: "Conflito: veículo também escalado na Transporte neste dia" });
       if (c.overlapVehicle) out.push({ tone: "red", text: `Horário batendo com mais ${c.overlapVehicle} demanda(s) do mesmo veículo` });
     }
   }
@@ -158,6 +163,7 @@ export function demandAlerts(d: LogDemand, c: AlertCtx): LogAlert[] {
   if (c.driver && v && own) {
     if (!cnhCovers(c.driver.driver_license_category, v.cnh_category)) out.push({ tone: "red", text: `CNH ${c.driver.driver_license_category ?? "não cadastrada"} não cobre a categoria ${v.cnh_category} do veículo` });
     if (c.driver.driver_license_expiry && d.scheduled_date && c.driver.driver_license_expiry < d.scheduled_date) out.push({ tone: "red", text: "CNH do motorista vencida na data" });
+    if (c.transportDriverBusy && d.scheduled_date) out.push({ tone: "orange", text: "Conflito: motorista também escalado na Transporte neste dia" });
   }
   for (const [label, a] of [["carga", c.origin], ["descarga", c.dest]] as const) {
     if (!a) continue;

@@ -20,7 +20,7 @@ const sortDeep = (v: any): any => {
 };
 const KEYS = ["billed", "mo", "transport", "materials", "margin", "total", "progress"] as const;
 
-async function compare(db: FakeDb, yms: string[]) {
+async function compare(db: FakeDb, yms: string[], until?: string) {
   fake.setDb(db);
   const start = `${yms[0]}-01`, end = monthEnd(yms[yms.length - 1]!);
   const works = (await fake.from("works").select("*, clients(name)").order("name")).data as any[];
@@ -32,12 +32,12 @@ async function compare(db: FakeDb, yms: string[]) {
   fake.requests = [];
   const legacy = new Map<string, any>();
   for (const b of batches) {
-    const raw = await loadWorkData(b.work, b.ids, false, shared);
+    const raw = await loadWorkData(b.work, b.ids, false, shared, { until });
     for (const id of b.ids) legacy.set(id, sliceResultRaw(raw, id));
   }
   const legacyReq = fake.requests.length;
   fake.requests = []; fake.rpcCalls = [];
-  const bulk = await loadFinanceRaws(batches, shared);
+  const bulk = await loadFinanceRaws(batches, shared, { until });
   const bulkReq = fake.requests.length;
   const rpcIds = fake.rpcCalls.flatMap((c) => c.args._work_ids);
 
@@ -111,6 +111,10 @@ const synthetic = (): FakeDb => ({
     { id: "vs1", schedule_date: "2026-10-05", km: 40, trips: 1, client_id: C1, work_id: W1, driver_id: "p2", vehicle_id: "v1", driver_bonus: true, is_suzano_local: false },
     { id: "vs2", schedule_date: "2026-10-06", km: 15, trips: 2, client_id: null, work_id: null, driver_id: "p2", vehicle_id: "v1", driver_bonus: false, is_suzano_local: true },
     { id: "vs3", schedule_date: "2026-10-06", km: 60, trips: 1, client_id: C2, work_id: W3, driver_id: null, vehicle_id: null, driver_bonus: false, is_suzano_local: false },
+    // Frete principal na Beta e extra na Alfa com outro motorista (p1)
+    { id: "vs4", schedule_date: "2026-10-05", km: 30, trips: 1, client_id: C2, work_id: null, driver_id: "p2", vehicle_id: "v1", driver_bonus: true, is_suzano_local: false, extra_client_ids: [C1], extra_driver_ids: ["p1"], extra_work_ids: [""], extra_places: [""], extra_km: 10 },
+    // Depois do período de outubro
+    { id: "vs5", schedule_date: "2026-11-03", km: 40, trips: 1, client_id: C1, work_id: W1, driver_id: "p2", vehicle_id: "v1", driver_bonus: true, is_suzano_local: false },
   ],
   schedule_work_vt: [{ schedule_id: "s1", work_id: W1, pays_vt: true }, { schedule_id: "s2", work_id: W3, pays_vt: false }],
   schedule_work_travel: [{ schedule_id: "s1", work_id: W2, pays_bonus: true }],
@@ -122,7 +126,8 @@ const synthetic = (): FakeDb => ({
   // Integração do p2 em 06/10 lançada no serviço W1 (arca com 100%).
   integration_service_choices: [{ id: "ic1", schedule_date: "2026-10-06", collaborator_id: "p2", client_id: C1, work_id: W1 }],
   medical_leaves: [], days_off: [{ id: "o1", collaborator_id: "p2", date: "2026-10-07", end_date: null }], vacations: [],
-  transport_voucher_rules: [], driver_bonus_rules: [], travel_bonus_rules: [], city_distances: [{ city_a: "Suzano", city_b: "Mogi", km: 20 }],
+  transport_voucher_rules: [], driver_bonus_rules: [{ id: "db1", amount: 13, minimum_distance: 0, maximum_distance: 69, calculation_type: "daily", active: true }, { id: "db2", amount: 18, minimum_distance: 70, maximum_distance: null, calculation_type: "daily", active: true }], travel_bonus_rules: [],
+  transport_passengers: [], city_distances: [{ city_a: "Suzano", city_b: "Mogi", km: 20 }],
 });
 
 describe("Financeiro: carregamento em lote", () => {
@@ -131,6 +136,11 @@ describe("Financeiro: carregamento em lote", () => {
     expect(r.clients).toBe(3);
     expect(r.lines.length).toBeGreaterThan(0);
     expect(r.bulkReq).toBeLessThan(r.legacyReq);
+  });
+  it("lendo só até o fim do período (until) dá os mesmos totais do período", async () => {
+    const full = await compare(synthetic(), ["2026-10"]);
+    const cut = await compare(synthetic(), ["2026-10"], "2026-10-31");
+    expect(cut.lines).toEqual(full.lines);
   });
   it("vale também para vários meses e para mês sem movimento", async () => {
     await compare(synthetic(), ["2026-09", "2026-10", "2026-11"]);

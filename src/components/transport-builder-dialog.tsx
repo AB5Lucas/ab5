@@ -43,14 +43,18 @@ export function TransportBuilderDialog({
       const [{ data: vs }, { data: tp }, { data: drivers }] = await Promise.all([
         supabase
           .from("vehicle_schedules")
-          .select("id, vehicle_id, driver_id, client_id, extra_client_ids, is_maintenance, vehicles(plate, brand, model, passenger_capacity)")
+          .select("id, vehicle_id, driver_id, client_id, extra_client_ids, extra_driver_ids, is_maintenance, vehicles(plate, brand, model, passenger_capacity)")
           .eq("schedule_date", date)
           .eq("is_maintenance", false)
           .or(`client_id.eq.${clientId},extra_client_ids.cs.{${clientId}}`),
         supabase.from("transport_passengers").select("id, vehicle_schedule_id, collaborator_id, created_at").eq("schedule_date", date).eq("client_id", clientId),
         supabase.from("collaborators").select("id, full_name").eq("is_driver", true).eq("status", "active").order("full_name"),
       ]);
-      const cars = (vs ?? []).slice().sort((a, b) => (a.vehicles?.plate ?? "").localeCompare(b.vehicles?.plate ?? ""));
+      // Motorista do frete DESTE cliente: o principal (driver_id) ou, se o cliente é obra adicional do carro, o do extra.
+      const cars = (vs ?? []).slice().sort((a, b) => (a.vehicles?.plate ?? "").localeCompare(b.vehicles?.plate ?? "")).map((c) => {
+        const i = c.client_id === clientId ? -1 : (c.extra_client_ids ?? []).indexOf(clientId);
+        return { ...c, driver_id: i < 0 ? c.driver_id : (c.extra_driver_ids?.[i] || null) };
+      });
       return { cars, passengers: tp ?? [], drivers: drivers ?? [] };
     },
   });
@@ -103,13 +107,14 @@ export function TransportBuilderDialog({
 
   const changeDriver = useMutation({
     mutationFn: async ({ vsId, driverId }: { vsId: string; driverId: string | null }) => {
-      const { error } = await supabase.rpc("set_vehicle_driver", { _vs_id: vsId, _driver_id: driverId as string });
+      // Frete do cliente certo: principal ou obra adicional (extra_driver_ids[i]).
+      const { error } = await supabase.rpc("set_vehicle_driver_for_client", { _vs_id: vsId, _driver_id: driverId as string, _client_id: clientId });
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Motorista atualizado também na aba Transporte");
       refresh();
-      qc.invalidateQueries();
+      for (const key of ["vehicle-schedules", "km-report", "transport-builder-fleet", "schedule-alerts", "driver-bonus-calc-v3", "transport-needs"]) qc.invalidateQueries({ queryKey: [key] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -123,13 +128,13 @@ export function TransportBuilderDialog({
     queryFn: async () => {
       const [{ data: v }, { data: used }, { data: sched }] = await Promise.all([
         supabase.from("vehicles").select("id, plate, brand, model, status").order("plate"),
-        supabase.from("vehicle_schedules").select("vehicle_id, driver_id, clients(name)").eq("schedule_date", date),
+        supabase.from("vehicle_schedules").select("vehicle_id, driver_id, extra_driver_ids, clients(name)").eq("schedule_date", date),
         supabase.from("daily_schedules").select("id").eq("schedule_date", date).maybeSingle(),
       ]);
       const where = new Map<string, string>();
       (used ?? []).forEach((u: any) => where.set(u.vehicle_id, u.clients?.name ?? "outro uso"));
       const busyDrv = new Map<string, string>();
-      (used ?? []).forEach((u: any) => u.driver_id && busyDrv.set(u.driver_id, `dirige outro veículo (${u.clients?.name ?? "—"})`));
+      (used ?? []).forEach((u: any) => [u.driver_id, ...(u.extra_driver_ids ?? [])].forEach((d: string | null) => d && busyDrv.set(d, `dirige outro veículo (${u.clients?.name ?? "—"})`)));
       if (sched) {
         const { data: al } = await supabase.from("daily_allocations").select("collaborator_id, works(client_id, client)").eq("schedule_id", sched.id);
         (al ?? []).forEach((a: any) => a.works?.client_id !== clientId && busyDrv.set(a.collaborator_id, `escalado em ${a.works?.client ?? "outra obra"}`));

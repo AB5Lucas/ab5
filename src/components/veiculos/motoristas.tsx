@@ -51,21 +51,24 @@ export function DriversPage() {
   const schedule = useQuery({
     queryKey: ["driver-today", today],
     queryFn: async () => {
-      const { data: sched } = await supabase
-        .from("daily_schedules")
-        .select("id")
-        .eq("schedule_date", today)
-        .maybeSingle();
-      if (!sched) return {} as Record<string, string>;
-      const [{ data: transports }, { data: works }] = await Promise.all([
-        supabase.from("transport_allocations").select("driver_id, work_id").eq("schedule_id", sched.id),
-        supabase.from("works").select("id, name"),
+      // Obra de hoje pela aba Transporte (vehicle_schedules): frete principal e obras adicionais de cada motorista.
+      const [{ data: rows }, { data: clients }] = await Promise.all([
+        supabase.from("vehicle_schedules").select("driver_id, client_id, extra_client_ids, extra_driver_ids, extra_places, is_maintenance, maintenance_kind, is_suzano_local, external_place, adm_place, vehicles(plate)").eq("schedule_date", today),
+        supabase.from("clients").select("id, name"),
       ]);
-      const workName = new Map((works ?? []).map((w) => [w.id, w.name]));
+      const clientName = new Map((clients ?? []).map((c) => [c.id, c.name]));
+      const label = (clientId: string | null | undefined, place?: string | null) =>
+        place?.trim() ? place.trim().toUpperCase() : clientId === "__suzano_local__" ? "SUZANO LOCAL" : clientId?.startsWith("__") ? "EXTERNO" : (clientId ? clientName.get(clientId) : null) ?? "—";
       const map: Record<string, string> = {};
-      (transports ?? []).forEach((t) => {
-        if (t.driver_id) map[t.driver_id] = (t.work_id ? workName.get(t.work_id) : null) ?? "Obra";
-      });
+      const add = (driver: string | null | undefined, text: string) => {
+        if (!driver) return;
+        map[driver] = map[driver] ? `${map[driver]} · ${text}` : text;
+      };
+      for (const r of (rows ?? []) as any[]) {
+        const plate = r.vehicles?.plate ? ` (${r.vehicles.plate})` : "";
+        add(r.driver_id, `${r.is_maintenance ? (r.maintenance_kind === "revisao" ? "REVISÃO" : "MANUTENÇÃO") : r.is_suzano_local ? "SUZANO LOCAL" : label(r.client_id, r.external_place ?? r.adm_place)}${plate}`);
+        ((r.extra_client_ids ?? []) as string[]).forEach((c, i) => add(r.extra_driver_ids?.[i], `${label(c, r.extra_places?.[i])}${plate}`));
+      }
       return map;
     },
   });

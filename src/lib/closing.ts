@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildDistanceLookup } from "@/lib/city-distance";
-import { loadBuiltTransport, vtFor, driverBonusFor, workVtDefault } from "@/lib/transport-rules";
+import { loadBuiltTransport, driverBonusFor, vtForDay, travelOnFor, type BuiltTransport } from "@/lib/transport-rules";
+import { driverBonusDays, type BonusDay } from "@/lib/driver-bonus";
 import { effectiveCity, lodgingBlocksBenefits, lodgingBlocksVtAlways, lodgingIndex, type LodgingStay } from "@/lib/lodging";
 
 /** Fechamento: competência = dia 26 do mês anterior até 25 do mês selecionado. */
@@ -44,6 +45,76 @@ async function all<T>(build: (from: number, to: number) => PromiseLike<{ data: T
 }
 
 export const OVERNIGHT_PRIZE = 25;
+
+/** Ausências cadastradas (atestado, férias, folga) entre start e end (exclusivo), indexadas por pessoa. */
+export async function loadAbsenceIndex(start: string, end: string) {
+  const [daysOff, vacations, leaves] = await Promise.all([
+    all<any>((f, t) => supabase.from("days_off").select("collaborator_id, date, end_date").lt("date", end).order("id").range(f, t)),
+    all<any>((f, t) => supabase.from("vacations").select("collaborator_id, start_date, end_date").lt("start_date", end).gte("end_date", start).order("id").range(f, t)),
+    all<any>((f, t) => supabase.from("medical_leaves").select("collaborator_id, start_date, end_date").lt("start_date", end).gte("end_date", start).order("id").range(f, t)),
+  ]);
+  return absenceIndex(leaves, vacations, daysOff);
+}
+
+function absenceIndex(leaves: any[] | null | undefined, vacations: any[] | null | undefined, daysOff: any[] | null | undefined) {
+  const inRange = (d: string, s: string, e: string | null) => d >= s && d <= (e ?? s);
+  const byPerson = <T extends { collaborator_id: string }>(rows: T[] | null | undefined) => {
+    const m = new Map<string, T[]>();
+    for (const r of rows ?? []) { const l = m.get(r.collaborator_id); if (l) l.push(r); else m.set(r.collaborator_id, [r]); }
+    return m;
+  };
+  const leavesBy = byPerson(leaves), vacationsBy = byPerson(vacations), daysOffBy = byPerson(daysOff);
+  return (cid: string, d: string): string | null => {
+    if ((leavesBy.get(cid) ?? []).some((l) => inRange(d, l.start_date, l.end_date))) return "Atestado";
+    if ((vacationsBy.get(cid) ?? []).some((l) => inRange(d, l.start_date, l.end_date))) return "Férias";
+    if ((daysOffBy.get(cid) ?? []).some((l) => inRange(d, l.date, l.end_date))) return "Folga";
+    return null;
+  };
+}
+
+export type DriverBonusDay = BonusDay<any> & { toll: number };
+/**
+ * Prêmio Motorista do período (start inclusive, end exclusivo) — a regra paga no Fechamento e mostrada na tela
+ * Benefícios › Prêmio Motorista: lib/driver-bonus.ts com elegibilidade = sem ausência no dia e
+ * (transporte montado do cliente do frete → motorista não PJ; senão o botão Prêmio de Motorista da linha).
+ * Também devolve o pedágio do dia de cada motorista (ida e volta por viagem; local Indústria com pedágio próprio substitui o do cliente).
+ */
+export async function loadDriverBonus(start: string, end: string, ctx: { transport?: BuiltTransport; absence?: (id: string, date: string) => string | null } = {}) {
+  const [vsch, { data: dbr }, { data: clients }, transport, absence] = await Promise.all([
+    all<any>((f, t) => supabase.from("vehicle_schedules").select("driver_id, client_id, work_id, driver_bonus, schedule_date, km, trips, extra_km, extra_client_ids, extra_driver_ids, extra_places, extra_work_ids, is_external, is_maintenance, external_place, is_suzano_local, place_toll")
+      .gte("schedule_date", start).lt("schedule_date", end).order("id").range(f, t)),
+    supabase.from("driver_bonus_rules").select("*").eq("active", true),
+    supabase.from("clients").select("id, name, has_toll, toll_amount"),
+    ctx.transport ? Promise.resolve(ctx.transport) : loadBuiltTransport(start, end),
+    ctx.absence ? Promise.resolve(ctx.absence) : loadAbsenceIndex(start, end),
+  ]);
+  const clientBy = new Map((clients ?? []).map((c) => [c.id, c]));
+  const industry = new Set((clients ?? []).filter((c) => /ind[uú]stria/i.test(c.name ?? "")).map((c) => c.id));
+  const ids = [...new Set(vsch.flatMap((v) => [v.driver_id, ...(v.extra_driver_ids ?? [])]).filter(Boolean))] as string[];
+  const info = new Map<string, any>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await supabase.from("collaborators").select("id, full_name, registration_number, contract_type").in("id", ids.slice(i, i + 200));
+    for (const c of data ?? []) info.set(c.id, c);
+  }
+  const days = driverBonusDays(vsch, (dbr ?? []) as any[], {
+    monthly: true,
+    isIndustry: (c) => !!c && industry.has(c),
+    eligible: (f) => !absence(f.driverId, f.date)
+      && driverBonusFor(transport, { client_id: f.clientId, schedule_date: f.date, driver_id: f.driverId, driver_bonus: !!f.schedule.driver_bonus }, info.get(f.driverId)?.contract_type === "pj"),
+  });
+  const clientToll = (id: string | null | undefined) => { const c = id ? clientBy.get(id) : undefined; return c?.has_toll ? Number(c.toll_amount ?? 0) || 0 : 0; };
+  const out: DriverBonusDay[] = days.map((d) => ({
+    ...d,
+    toll: d.freights.reduce((s, f) => {
+      const v = f.schedule;
+      if (f.index > 0) return s + ((v.extra_places?.[f.index - 1] ?? "").trim() ? 0 : clientToll(f.clientId) * 2);
+      if (v.is_suzano_local) return s;
+      const oneWay = v.place_toll != null ? Number(v.place_toll) : clientToll(v.client_id);
+      return s + oneWay * 2 * Math.max(1, Number(v.trips ?? 1) || 1);
+    }, 0),
+  }));
+  return { days: out, info };
+}
 
 export async function loadClosing(month: string): Promise<ClosingRow[]> {
   const { start, end } = periodOf(month);
@@ -90,13 +161,8 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     if (o) return o.is_holiday ? o.name ?? "feriado do cliente" : null;
     return holiday.get(date) ?? null;
   };
-  const inRange = (d: string, s: string, e: string | null) => d >= s && d <= (e ?? s);
-  const personAbsence = (cid: string, d: string): string | null => {
-    if ((leaves.data ?? []).some((l) => l.collaborator_id === cid && inRange(d, l.start_date, l.end_date))) return "Atestado";
-    if ((vacations.data ?? []).some((l) => l.collaborator_id === cid && inRange(d, l.start_date, l.end_date))) return "Férias";
-    if ((daysOff.data ?? []).some((l) => l.collaborator_id === cid && inRange(d, l.date, l.end_date))) return "Folga";
-    return null;
-  };
+  // Ausências indexadas por pessoa (antes: varredura das listas inteiras a cada dia de cada pessoa).
+  const personAbsence = absenceIndex(leaves.data, vacations.data, daysOff.data);
   const rdoAbsent = new Map<string, string>();
   for (const r of rdoWf) {
     const cls = r.final_classification ?? (r.present ? null : r.reported_reason ?? "falta");
@@ -150,13 +216,20 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     const lodging = lodgingAt(a.collaborator_id, date);
     const blocked = lodgingBlocksBenefits(lodging, a.works?.clients?.name);
     const homeCity = effectiveCity(cc?.city, lodging);
-    const base = cc?.vt_enabled === false || blocked ? false : (workVtDefault(vtWork.get(`${a.schedule_id}|${a.work_id}`), a.works?.clients?.needs_transport_voucher) || (homeCity ?? "").toLowerCase().includes("pouso alegre"));
-    // VT cheio (cadastro): todo dia trabalhado paga VT, em qualquer obra, com ou sem transporte da empresa.
-    // Montador alojado em Mogi Guaçu: nunca VT (vale mais que VT cheio e marcação à mão).
-    const pays = lodgingBlocksVtAlways(lodging, cc?.positions?.name) ? false : cc?.vt_always_full ? true : vtFor(transport, a.works?.client_id, date, a.collaborator_id, !!(a.vt_override ?? base));
+    // Regra única do VT (lib/transport-rules.ts vtForDay): Montador alojado em Mogi Guaçu nunca; VT cheio sempre;
+    // senão transporte montado ou marcação da pessoa ?? (cadastro/alojamento, marcação da obra ?? padrão do cliente, Pouso Alegre).
+    const pays = vtForDay({
+      vtEnabled: cc?.vt_enabled, lodgingBlocks: blocked, vtNever: lodgingBlocksVtAlways(lodging, cc?.positions?.name), alwaysFull: cc?.vt_always_full,
+      workMark: vtWork.get(`${a.schedule_id}|${a.work_id}`), clientDefault: a.works?.clients?.needs_transport_voucher, homeCity,
+      override: a.vt_override, transport, clientId: a.works?.client_id, date, collaboratorId: a.collaborator_id,
+    });
     r.vtRows.push({ date, work, pays: !!pays, value: pays ? perDay(a.driver, 1) : 0 });
     const dist = distFor(homeCity, a.works?.clients?.city ?? a.works?.city, Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0));
-    const travelOn = a.travel_bonus_override ?? (blocked ? false : (travelWork.get(`${a.schedule_id}|${a.work_id}`) ?? prizeFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)) > 0));
+    // Prêmio viagem (travelOnFor): cadastro com prêmio desligado nunca recebe (como a Programação e os Resultados).
+    const travelOn = travelOnFor({
+      enabled: cc?.travel_bonus_enabled, override: a.travel_bonus_override, lodgingBlocks: blocked,
+      workMark: travelWork.get(`${a.schedule_id}|${a.work_id}`), workDefault: prizeFor(Number(a.works?.clients?.distance_km ?? a.works?.distance_km ?? 0)) > 0,
+    });
     const prize = travelOn && !a.overnight ? prizeFor(dist) : 0;
     if (prize > 0) r.prizeRows.push({ date, vehicle: a.vehicles?.plate ?? "—", work, distance: dist, value: prize });
     if (a.overnight) r.prizeRows.push({ date, vehicle: "—", work: `Pernoite - ${work}`, distance: 0, value: OVERNIGHT_PRIZE });
@@ -185,33 +258,11 @@ export async function loadClosing(month: string): Promise<ClosingRow[]> {
     r.days.push({ date: d.date, work: label, status: label, counted: false, reason: label });
     if (d.units && !d.absent) r.vtRows.push({ date: d.date, work: label, pays: true, value: perDay(false, d.units) });
   }
-  // Prêmio Motorista: 1 por dia dirigido (faixa pela km do dia), somado ao VT
-  const [{ data: vsch }, { data: dbr }] = await Promise.all([
-    supabase.from("vehicle_schedules").select("driver_id, client_id, driver_bonus, schedule_date, km, collaborators(full_name, registration_number, contract_type)")
-      .gte("schedule_date", start).lt("schedule_date", end).eq("is_external", false).is("external_place", null), // Indústria com local = sem prêmio
-    supabase.from("driver_bonus_rules").select("*").eq("active", true),
-  ]);
-  const dDays = new Map<string, { c: any; days: Map<string, number> }>();
-  for (const v of (vsch ?? []) as any[]) {
-    if (personAbsence(v.driver_id, v.schedule_date)) continue;
-    if (!driverBonusFor(transport, v, v.collaborators?.contract_type === "pj")) continue;
-    const e = dDays.get(v.driver_id) ?? { c: v.collaborators, days: new Map<string, number>() };
-    e.days.set(v.schedule_date, (e.days.get(v.schedule_date) ?? 0) + (Number(v.km ?? 0) || 0));
-    dDays.set(v.driver_id, e);
-  }
-  for (const [id, e] of dDays) {
-    const r = get(id, e.c);
-    const fixed = new Set<string>();
-    for (const [date, km] of e.days) {
-      let val = 0;
-      for (const rule of (dbr ?? []) as any[]) {
-        const max = rule.maximum_distance === null ? Infinity : Number(rule.maximum_distance);
-        if (km < Number(rule.minimum_distance ?? 0) || km > max) continue;
-        if (rule.calculation_type === "fixed_monthly") { if (fixed.has(rule.id)) continue; fixed.add(rule.id); }
-        val += Number(rule.amount);
-      }
-      if (val) r.vtRows.push({ date, work: "Prêmio Motorista", pays: true, value: val });
-    }
+  // Prêmio Motorista (lib/driver-bonus.ts, loadDriverBonus): somado ao VT.
+  const { days: bonusDays, info: driverInfo } = await loadDriverBonus(start, end, { transport, absence: personAbsence });
+  for (const d of bonusDays) {
+    if (!d.amount) continue;
+    get(d.driverId, driverInfo.get(d.driverId)).vtRows.push({ date: d.date, work: "Prêmio Motorista", pays: true, value: d.amount });
   }
   for (const adj of (adjs.data ?? []) as Adjustment[]) {
     const r = rows.get(adj.collaborator_id) ?? get(adj.collaborator_id, null);

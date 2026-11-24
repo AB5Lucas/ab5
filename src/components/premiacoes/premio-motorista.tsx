@@ -1,4 +1,4 @@
-import { loadBuiltTransport, driverBonusFor } from "@/lib/transport-rules";
+import { loadDriverBonus, periodOf } from "@/lib/closing";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -112,108 +112,26 @@ export function DriverBonusPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Mesma regra paga no Fechamento (lib/closing.ts loadDriverBonus → lib/driver-bonus.ts): por motorista e dia, soma do
+  // km de ida dos fretes que ele dirigiu (principal e extras), sem ausências, transporte montado ou botão da linha.
   const calc = useQuery({
-    queryKey: ["driver-bonus-calc-v2", month],
+    queryKey: ["driver-bonus-calc-v3", month],
     queryFn: async () => {
-      // Período de fechamento: dia 26 do mês anterior até 25 do mês selecionado
-      const y = Number(month.slice(0, 4));
-      const m = Number(month.slice(5, 7));
-      const startDate = new Date(y, m - 2, 26);
-      const endDate = new Date(y, m - 1, 26);
-      const fmt = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      const start = fmt(startDate);
-      const end = fmt(endDate);
-
-      const { data, error } = await supabase
-        .from("vehicle_schedules")
-        .select(
-          "driver_id, client_id, schedule_date, is_external, driver_bonus, km, trips, collaborators(full_name, registration_number, contract_type), clients(has_toll, toll_amount, trips_per_day)",
-        )
-        .gte("schedule_date", start)
-        .lt("schedule_date", end)
-        .eq("is_external", false)
-        .is("external_place", null); // Indústria com local (antigo Externo) não dá prêmio
-      if (error) throw error;
-      const transport = await loadBuiltTransport(start, end);
-
-      type Entry = { name: string; reg: string; days: Map<string, { km: number; toll: number }> };
-      const map = new Map<string, Entry>();
-      for (const r of data ?? []) {
-        const row = r as unknown as {
-          driver_id: string | null;
-          schedule_date: string;
-          km: number | null;
-          collaborators: { full_name: string; registration_number: string } | null;
-          clients: { has_toll: boolean | null; toll_amount: number | null; trips_per_day: number | null } | null;
-        };
-        if (!driverBonusFor(transport, r as any, (r as any).collaborators?.contract_type === "pj")) continue;
-        if (!row.driver_id) continue;
-        const entry =
-          map.get(row.driver_id) ?? {
-            name: row.collaborators?.full_name ?? "—",
-            reg: row.collaborators?.registration_number ?? "",
-            days: new Map<string, { km: number; toll: number }>(),
-          };
-        const trips = Math.max(1, Number((row as { trips?: number }).trips ?? 1) || 1);
-        // O pedágio cadastrado é de ida: ida e volta em cada viagem do dia.
-        const toll = row.clients?.has_toll ? (Number(row.clients.toll_amount ?? 0) || 0) * 2 * trips : 0;
-        const prev = entry.days.get(row.schedule_date) ?? { km: 0, toll: 0 };
-        entry.days.set(row.schedule_date, {
-          km: prev.km + (Number(row.km ?? 0) || 0),
-          toll: prev.toll + toll,
-        });
-        map.set(row.driver_id, entry);
+      const { start, end } = periodOf(month);
+      const { days, info } = await loadDriverBonus(start, end);
+      const by = new Map<string, { name: string; reg: string; count: number; km: number; toll: number; amount: number }>();
+      for (const d of days) {
+        const c = info.get(d.driverId);
+        const e = by.get(d.driverId) ?? { name: c?.full_name ?? "—", reg: c?.registration_number ?? "", count: 0, km: 0, toll: 0, amount: 0 };
+        e.count++; e.km += d.km; e.toll += d.toll; e.amount += d.amount;
+        by.set(d.driverId, e);
       }
-      return [...map.values()]
-        .map((e) => ({
-          name: e.name,
-          reg: e.reg,
-          days: [...e.days.values()],
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      return [...by.values()].sort((x, y) => x.name.localeCompare(y.name, "pt-BR"));
     },
   });
 
   const activeRules = useMemo(() => (rules.data ?? []).filter((r) => r.active), [rules.data]);
-
-  const rulesFor = (distance: number) =>
-    activeRules.filter((r) => {
-      const min = Number(r.minimum_distance ?? 0);
-      const max = r.maximum_distance === null ? Infinity : Number(r.maximum_distance);
-      return distance >= min && distance <= max;
-    });
-
-  // O prêmio é pago uma vez por dia programado, conforme a faixa de distância do dia.
-  const amountFor = (days: { km: number; toll: number }[]) => {
-    let total = 0;
-    const fixedApplied = new Set<string>();
-    for (const day of days) {
-      for (const rule of rulesFor(day.km)) {
-        const value = Number(rule.amount);
-        if (rule.calculation_type === "fixed_monthly") {
-          if (!fixedApplied.has(rule.id)) {
-            fixedApplied.add(rule.id);
-            total += value;
-          }
-        } else {
-          total += value;
-        }
-      }
-    }
-    return total;
-  };
-
-  const rows = useMemo(
-    () =>
-      (calc.data ?? []).map((r) => {
-        const days = Array.isArray(r.days) ? r.days : [];
-        const km = days.reduce((s, d) => s + d.km, 0);
-        const toll = days.reduce((s, d) => s + d.toll, 0);
-        return { name: r.name, reg: r.reg, count: days.length, km, toll, amount: amountFor(days) };
-      }),
-    [calc.data, activeRules],
-  );
+  const rows = calc.data ?? [];
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const totalToll = rows.reduce((s, r) => s + r.toll, 0);
@@ -241,7 +159,7 @@ export function DriverBonusPage() {
     <div className="space-y-6">
       <PageHeader
         title="Prêmio de Motorista"
-        description="Faixas por distância do dia (ida e volta) apuradas pelas programações da frota com o prêmio ativado. Programações externas nunca geram prêmio."
+        description="Um prêmio por motorista por dia: a faixa é a soma do km de ida dos fretes que ele dirigiu no dia (principal e obras adicionais), nas programações com o prêmio ativado ou com transporte montado. Externo, Indústria com local e Manutenção/Revisão não geram prêmio. É o mesmo valor do Fechamento."
         actions={canWrite ? (<Button onClick={openNew}><Plus className="h-4 w-4" /> Nova faixa</Button>) : null}
       />
 
@@ -280,7 +198,7 @@ export function DriverBonusPage() {
                   <TableHead>Motorista</TableHead>
                   <TableHead>Matrícula</TableHead>
                   <TableHead>Dias com prêmio</TableHead>
-                  <TableHead className="text-right">KM no mês</TableHead>
+                  <TableHead className="text-right">KM de ida no mês</TableHead>
                   <TableHead className="text-right">Pedágio</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                 </TableRow>
@@ -315,7 +233,7 @@ export function DriverBonusPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Regra</TableHead>
-                  <TableHead>Faixa (km ida e volta)</TableHead>
+                  <TableHead>Faixa (km de ida no dia)</TableHead>
                   <TableHead>Cálculo</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Situação</TableHead>
@@ -372,11 +290,11 @@ export function DriverBonusPage() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <Label htmlFor="min-pm">Distância mínima (km)</Label>
+                <Label htmlFor="min-pm">Km de ida no dia — mínimo</Label>
                 <Input id="min-pm" value={form.minimum_distance} onChange={(e) => set("minimum_distance", e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="max-pm">Distância máxima (km)</Label>
+                <Label htmlFor="max-pm">Km de ida no dia — máximo</Label>
                 <Input
                   id="max-pm"
                   placeholder="deixe vazio para sem limite"
