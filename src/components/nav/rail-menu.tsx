@@ -23,8 +23,8 @@ import { cn } from "@/lib/utils";
 
 const dotClass = (tone: string) => (tone === "red" ? "bg-destructive" : "bg-warning");
 /** Vidro (como o iOS): fundo translúcido com desfoque e saturação, borda clara e sombra suave. */
-const GLASS = "border border-white/50 bg-white/55 text-foreground shadow-[0_10px_40px_-10px_rgba(0,0,0,0.25)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-neutral-900/55";
-const GLASS_POP = "border border-white/50 bg-white/70 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-neutral-900/70";
+const GLASS = "liquid-glass text-foreground";
+const GLASS_POP = "liquid-glass liquid-glass-strong";
 const ACTIVE = "bg-white/95 text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)] dark:bg-white/15";
 const IDLE = "text-foreground/70 hover:bg-white/50 hover:text-foreground dark:hover:bg-white/10";
 
@@ -228,10 +228,10 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
   return (
     <div onMouseEnter={enter} onMouseLeave={leave} className="fixed left-3 top-1/2 z-40 hidden -translate-y-1/2 md:block">
       <nav aria-label="Menu"
-        className={cn("rail-menu flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[28px] p-2 transition-[width,box-shadow] duration-500", ease, GLASS, expanded ? "w-[15.75rem]" : "w-[3.5rem]")}>
+        className={cn("rail-menu relative flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[28px] p-2 transition-[width,box-shadow] duration-500", ease, GLASS, expanded ? "w-[15.75rem]" : "w-[3.5rem]")}>
         {/* Logo e a pessoa (nome e função na empresa) */}
         <div className={cn("mb-1.5 flex h-11 items-center transition-[padding,gap] duration-300", expanded ? "gap-2.5 pl-0.5 pr-2" : "justify-center gap-0")}>
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-950 font-display text-[11px] font-bold tracking-tight text-white shadow-sm dark:bg-white dark:text-neutral-950">AB5</span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-white to-neutral-200 text-[11px] font-semibold text-neutral-700 shadow-sm dark:from-neutral-700 dark:to-neutral-800 dark:text-white">HUB</span></span>
           <span className={cn(fade, "min-w-0 leading-tight", !expanded && "hidden")}>
             <span className="block truncate font-display text-sm font-semibold uppercase tracking-wide">AB5 HUB</span>
             <span className="block truncate text-[10.5px] text-muted-foreground">Sistema de Gestão Corporativo</span>
