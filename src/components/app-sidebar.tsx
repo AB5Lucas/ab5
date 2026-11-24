@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, LayoutList, PanelLeftClose, PanelLeftOpen, Search, Star } from "lucide-react";
+import { Bell, ChevronDown, LayoutList, PanelLeftClose, PanelLeftOpen, Search, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -134,6 +134,9 @@ export function AppSidebar() {
             <DropdownMenuSeparator />
           </>
         )}
+        <DropdownMenuItem asChild>
+          <Link to="/notificacoes" search={{ aba: "preferencias" }} onClick={closeMobile}><Bell className="h-4 w-4" /> Notificações</Link>
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={openMenuSearch}><Search className="h-4 w-4" /> Buscar <span className="ml-auto text-xs text-muted-foreground">{isMac ? "⌘" : "Ctrl"} K</span></DropdownMenuItem>
         <DropdownMenuItem onSelect={() => setStyle("classic")}><LayoutList className="h-4 w-4" /> Usar menu clássico</DropdownMenuItem>
       </DropdownMenuContent>

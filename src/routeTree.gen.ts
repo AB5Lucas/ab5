@@ -20,6 +20,7 @@ import { Route as AuthenticatedConsultaRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedFechamentoRouteImport } from './routes/_authenticated/fechamento'
 import { Route as AuthenticatedLogisticaRouteImport } from './routes/_authenticated/logistica'
+import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authenticated/notificacoes'
 import { Route as AuthenticatedTreinamentosRouteImport } from './routes/_authenticated/treinamentos'
 import { Route as AuthenticatedAdminAcessosRouteImport } from './routes/_authenticated/admin.acessos'
 import { Route as AuthenticatedAdminConfiguracoesRouteImport } from './routes/_authenticated/admin.configuracoes'
@@ -70,6 +71,7 @@ import { Route as AuthenticatedVeiculosTransporteRouteImport } from './routes/_a
 import { Route as AuthenticatedComprasSolicitacoesIndexRouteImport } from './routes/_authenticated/compras.solicitacoes.index'
 import { Route as AuthenticatedComprasSolicitacoesIdRouteImport } from './routes/_authenticated/compras.solicitacoes.$id'
 import { Route as ApiPublicJobsBillingSyncRouteImport } from './routes/api/public/jobs/billing-sync'
+import { Route as ApiPublicJobsNotificationsRouteImport } from './routes/api/public/jobs/notifications'
 import { Route as ApiPublicJobsRecurringEntriesRouteImport } from './routes/api/public/jobs/recurring-entries'
 
 const IndexRoute = IndexRouteImport.update({
@@ -128,6 +130,12 @@ const AuthenticatedLogisticaRoute = AuthenticatedLogisticaRouteImport.update({
   path: '/logistica',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedNotificacoesRoute =
+  AuthenticatedNotificacoesRouteImport.update({
+    id: '/notificacoes',
+    path: '/notificacoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTreinamentosRoute =
   AuthenticatedTreinamentosRouteImport.update({
     id: '/treinamentos',
@@ -426,6 +434,12 @@ const ApiPublicJobsBillingSyncRoute =
     path: '/api/public/jobs/billing-sync',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicJobsNotificationsRoute =
+  ApiPublicJobsNotificationsRouteImport.update({
+    id: '/api/public/jobs/notifications',
+    path: '/api/public/jobs/notifications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicJobsRecurringEntriesRoute =
   ApiPublicJobsRecurringEntriesRouteImport.update({
     id: '/api/public/jobs/recurring-entries',
@@ -444,6 +458,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
   '/logistica': typeof AuthenticatedLogisticaRoute
+  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
@@ -493,6 +508,7 @@ export interface FileRoutesByFullPath {
   '/veiculos/': typeof AuthenticatedVeiculosIndexRoute
   '/compras/solicitacoes/$id': typeof AuthenticatedComprasSolicitacoesIdRoute
   '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
+  '/api/public/jobs/notifications': typeof ApiPublicJobsNotificationsRoute
   '/api/public/jobs/recurring-entries': typeof ApiPublicJobsRecurringEntriesRoute
   '/compras/solicitacoes/': typeof AuthenticatedComprasSolicitacoesIndexRoute
 }
@@ -507,6 +523,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
   '/logistica': typeof AuthenticatedLogisticaRoute
+  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
@@ -556,6 +573,7 @@ export interface FileRoutesByTo {
   '/veiculos': typeof AuthenticatedVeiculosIndexRoute
   '/compras/solicitacoes/$id': typeof AuthenticatedComprasSolicitacoesIdRoute
   '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
+  '/api/public/jobs/notifications': typeof ApiPublicJobsNotificationsRoute
   '/api/public/jobs/recurring-entries': typeof ApiPublicJobsRecurringEntriesRoute
   '/compras/solicitacoes': typeof AuthenticatedComprasSolicitacoesIndexRoute
 }
@@ -572,6 +590,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/fechamento': typeof AuthenticatedFechamentoRoute
   '/_authenticated/logistica': typeof AuthenticatedLogisticaRoute
+  '/_authenticated/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/_authenticated/treinamentos': typeof AuthenticatedTreinamentosRoute
   '/_authenticated/admin/acessos': typeof AuthenticatedAdminAcessosRoute
   '/_authenticated/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
@@ -621,6 +640,7 @@ export interface FileRoutesById {
   '/_authenticated/veiculos/': typeof AuthenticatedVeiculosIndexRoute
   '/_authenticated/compras/solicitacoes/$id': typeof AuthenticatedComprasSolicitacoesIdRoute
   '/api/public/jobs/billing-sync': typeof ApiPublicJobsBillingSyncRoute
+  '/api/public/jobs/notifications': typeof ApiPublicJobsNotificationsRoute
   '/api/public/jobs/recurring-entries': typeof ApiPublicJobsRecurringEntriesRoute
   '/_authenticated/compras/solicitacoes/': typeof AuthenticatedComprasSolicitacoesIndexRoute
 }
@@ -637,6 +657,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/fechamento'
     | '/logistica'
+    | '/notificacoes'
     | '/treinamentos'
     | '/admin/acessos'
     | '/admin/configuracoes'
@@ -686,6 +707,7 @@ export interface FileRouteTypes {
     | '/veiculos/'
     | '/compras/solicitacoes/$id'
     | '/api/public/jobs/billing-sync'
+    | '/api/public/jobs/notifications'
     | '/api/public/jobs/recurring-entries'
     | '/compras/solicitacoes/'
   fileRoutesByTo: FileRoutesByTo
@@ -700,6 +722,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/fechamento'
     | '/logistica'
+    | '/notificacoes'
     | '/treinamentos'
     | '/admin/acessos'
     | '/admin/configuracoes'
@@ -749,6 +772,7 @@ export interface FileRouteTypes {
     | '/veiculos'
     | '/compras/solicitacoes/$id'
     | '/api/public/jobs/billing-sync'
+    | '/api/public/jobs/notifications'
     | '/api/public/jobs/recurring-entries'
     | '/compras/solicitacoes'
   id:
@@ -764,6 +788,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/fechamento'
     | '/_authenticated/logistica'
+    | '/_authenticated/notificacoes'
     | '/_authenticated/treinamentos'
     | '/_authenticated/admin/acessos'
     | '/_authenticated/admin/configuracoes'
@@ -813,6 +838,7 @@ export interface FileRouteTypes {
     | '/_authenticated/veiculos/'
     | '/_authenticated/compras/solicitacoes/$id'
     | '/api/public/jobs/billing-sync'
+    | '/api/public/jobs/notifications'
     | '/api/public/jobs/recurring-entries'
     | '/_authenticated/compras/solicitacoes/'
   fileRoutesById: FileRoutesById
@@ -823,6 +849,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiPublicJobsBillingSyncRoute: typeof ApiPublicJobsBillingSyncRoute
+  ApiPublicJobsNotificationsRoute: typeof ApiPublicJobsNotificationsRoute
   ApiPublicJobsRecurringEntriesRoute: typeof ApiPublicJobsRecurringEntriesRoute
 }
 
@@ -903,6 +930,13 @@ declare module '@tanstack/react-router' {
       path: '/logistica'
       fullPath: '/logistica'
       preLoaderRoute: typeof AuthenticatedLogisticaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/notificacoes': {
+      id: '/_authenticated/notificacoes'
+      path: '/notificacoes'
+      fullPath: '/notificacoes'
+      preLoaderRoute: typeof AuthenticatedNotificacoesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/treinamentos': {
@@ -1255,6 +1289,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicJobsBillingSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs/notifications': {
+      id: '/api/public/jobs/notifications'
+      path: '/api/public/jobs/notifications'
+      fullPath: '/api/public/jobs/notifications'
+      preLoaderRoute: typeof ApiPublicJobsNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/jobs/recurring-entries': {
       id: '/api/public/jobs/recurring-entries'
       path: '/api/public/jobs/recurring-entries'
@@ -1273,6 +1314,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFechamentoRoute: typeof AuthenticatedFechamentoRoute
   AuthenticatedLogisticaRoute: typeof AuthenticatedLogisticaRoute
+  AuthenticatedNotificacoesRoute: typeof AuthenticatedNotificacoesRoute
   AuthenticatedTreinamentosRoute: typeof AuthenticatedTreinamentosRoute
   AuthenticatedAdminAcessosRoute: typeof AuthenticatedAdminAcessosRoute
   AuthenticatedAdminConfiguracoesRoute: typeof AuthenticatedAdminConfiguracoesRoute
@@ -1332,6 +1374,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFechamentoRoute: AuthenticatedFechamentoRoute,
   AuthenticatedLogisticaRoute: AuthenticatedLogisticaRoute,
+  AuthenticatedNotificacoesRoute: AuthenticatedNotificacoesRoute,
   AuthenticatedTreinamentosRoute: AuthenticatedTreinamentosRoute,
   AuthenticatedAdminAcessosRoute: AuthenticatedAdminAcessosRoute,
   AuthenticatedAdminConfiguracoesRoute: AuthenticatedAdminConfiguracoesRoute,
@@ -1408,6 +1451,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiPublicJobsBillingSyncRoute: ApiPublicJobsBillingSyncRoute,
+  ApiPublicJobsNotificationsRoute: ApiPublicJobsNotificationsRoute,
   ApiPublicJobsRecurringEntriesRoute: ApiPublicJobsRecurringEntriesRoute,
 }
 export const routeTree = rootRouteImport
