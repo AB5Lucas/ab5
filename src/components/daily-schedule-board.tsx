@@ -154,14 +154,11 @@ export function DailyScheduleBoard({
 
   async function ensureSchedule() {
     if (scheduleId) return scheduleId;
-    const { data, error } = await supabase
-      .from("daily_schedules")
-      .insert({ schedule_date: date, status: "draft", created_by: user?.id ?? null })
-      .select("id")
-      .single();
+    // Cria ou devolve a do dia numa só chamada (sem erro de duplicidade com outro usuário no mesmo dia).
+    const { data, error } = await supabase.rpc("ensure_schedule", { _date: date });
     if (error) throw error;
     await qc.invalidateQueries({ queryKey: ["schedule", date] });
-    return data.id;
+    return data as string;
   }
 
   function invalidate(id?: string | null) {

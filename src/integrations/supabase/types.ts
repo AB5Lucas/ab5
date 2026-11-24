@@ -4883,6 +4883,12 @@ export type Database = {
           },
         ]
       }
+      schedule_presence: {
+        Row: { schedule_date: string; seen_at: string; user_id: string }
+        Insert: { schedule_date: string; seen_at?: string; user_id: string }
+        Update: { schedule_date?: string; seen_at?: string; user_id?: string }
+        Relationships: []
+      }
       schedule_client_visibility: {
         Row: {
           client_id: string
@@ -6614,6 +6620,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      classify_occurrence: {
+        Args: { _workforce_id: string; _key: string }
+        Returns: string
+      }
+      schedule_entry_to_work: {
+        Args: { _entry_id: string; _work_id: string; _sort: number; _pending: boolean }
+        Returns: string
+      }
+      ensure_schedule: {
+        Args: { _date: string }
+        Returns: string
+      }
+      reorder_allocations: {
+        Args: { _ids: string[]; _orders: number[] }
+        Returns: undefined
+      }
+      schedule_presence_ping: {
+        Args: { _date: string }
+        Returns: { user_id: string; full_name: string }[]
+      }
+      schedule_presence_leave: {
+        Args: { _date: string }
+        Returns: undefined
+      }
       appointment_complete: {
         Args: { _date: string; _id: string; _time?: string }
         Returns: string

@@ -74,45 +74,9 @@ export type PendingOccurrence = {
  * Classifica definitivamente a ocorrência: tira o colaborador da obra naquele dia
  * e o coloca na caixa correspondente da Programação (sem duplicar).
  */
-export async function classifyOccurrence(occ: PendingOccurrence, finalKey: string, userId: string | null) {
-  const { data: sched } = await supabase
-    .from("daily_schedules")
-    .select("id")
-    .eq("schedule_date", occ.report_date)
-    .maybeSingle();
-  let scheduleId = sched?.id;
-  if (!scheduleId) {
-    const { data, error } = await supabase
-      .from("daily_schedules")
-      .insert({ schedule_date: occ.report_date })
-      .select("id")
-      .single();
-    if (error) throw error;
-    scheduleId = data.id;
-  }
-  const { error: delErr } = await supabase
-    .from("daily_allocations")
-    .delete()
-    .eq("schedule_id", scheduleId)
-    .eq("collaborator_id", occ.collaborator_id)
-    .eq("work_id", occ.work_id);
-  if (delErr) throw delErr;
-  const { error: upErr } = await supabase
-    .from("daily_status_entries")
-    .upsert(
-      { schedule_id: scheduleId, collaborator_id: occ.collaborator_id, box_key: finalKey, sort_order: Date.now() / 1e10 },
-      { onConflict: "schedule_id,collaborator_id" },
-    );
-  if (upErr) throw upErr;
-  const { error } = await supabase
-    .from("rdo_workforce")
-    .update({
-      final_classification: finalKey,
-      occurrence_status: "classified",
-      classified_by: userId,
-      classified_at: new Date().toISOString(),
-    })
-    .eq("id", occ.id);
+export async function classifyOccurrence(occ: PendingOccurrence, finalKey: string, _userId?: string | null) {
+  // Uma transação no banco (classify_occurrence): tira da obra, põe no quadro e marca o RDO juntos.
+  const { error } = await supabase.rpc("classify_occurrence", { _workforce_id: occ.id, _key: finalKey });
   if (error) throw error;
 }
 

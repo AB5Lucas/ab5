@@ -55,6 +55,8 @@ import {
 } from "@/lib/scheduling";
 import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
+import { scheduleWriteError } from "@/lib/schedule-write-error";
+import { SchedulePresence } from "@/components/schedule-planner/schedule-presence";
 import { formatCpf } from "@/lib/copy-names";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
@@ -262,6 +264,8 @@ export function SchedulePlannerBoard({
 }) {
   const { canWrite, user } = useCurrentUser();
   const qc = useQueryClient();
+  /** Duplicidade (outro usuário gravou o mesmo dia) vira aviso e releitura; o resto mostra a mensagem. */
+  const onWriteError = (e: unknown) => scheduleWriteError(qc, e);
   const [search, setSearch] = useState("");
   const [roleSearch, setRoleSearch] = useState("");
   const [filters, setFilters] = useState<Set<FilterKey>>(new Set());
@@ -415,7 +419,7 @@ export function SchedulePlannerBoard({
       qc.invalidateQueries({ queryKey: ["allocations"] });
       qc.invalidateQueries({ queryKey: ["status-entries"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
   const keepOcc = useMutation({
     mutationFn: async (occ: PendingOccurrence) => {
@@ -430,7 +434,7 @@ export function SchedulePlannerBoard({
       setOccOpen(null);
       qc.invalidateQueries({ queryKey: ["rdo-pending", date] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   const statusEntries = useQuery({
@@ -538,7 +542,7 @@ export function SchedulePlannerBoard({
       return id;
     },
     onSuccess: (id) => qc.invalidateQueries({ queryKey: ["work-vt", id] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   const workTravel = useQuery({
@@ -599,7 +603,7 @@ export function SchedulePlannerBoard({
       return id;
     },
     onSuccess: (id) => qc.invalidateQueries({ queryKey: ["work-travel", id] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
   const toggleAllocTravel = useMutation({
     mutationFn: async ({ id, workId, collaboratorId, current }: { id: string; workId: string; collaboratorId: string; current: boolean }) => {
@@ -609,7 +613,7 @@ export function SchedulePlannerBoard({
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
   const toggleOvernight = useMutation({
     mutationFn: async ({ id, current, travelOff }: { id: string; current: boolean; travelOff?: boolean | null }) => {
@@ -619,7 +623,7 @@ export function SchedulePlannerBoard({
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
   const setGroupOvernight = useMutation({
     mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
@@ -630,7 +634,7 @@ export function SchedulePlannerBoard({
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
 
@@ -642,7 +646,7 @@ export function SchedulePlannerBoard({
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   /** VT dos quadros de ASO / Treinamento / Integração. */
@@ -705,7 +709,7 @@ export function SchedulePlannerBoard({
       return id;
     },
     onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-titles", id] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
   const [editingBox, setEditingBox] = useState<string | null>(null);
   const toggleBoxVt = useMutation({
@@ -722,7 +726,7 @@ export function SchedulePlannerBoard({
       return id;
     },
     onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-vt", id] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
   const togglePersonVt = useMutation({
     mutationFn: async ({ key, collaboratorId }: { key: string; collaboratorId: string }) => {
@@ -738,7 +742,7 @@ export function SchedulePlannerBoard({
       return id;
     },
     onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-vt", id] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   const personDot = (key: string, collaboratorId: string) => {
@@ -784,7 +788,7 @@ export function SchedulePlannerBoard({
       return id;
     },
     onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-vt", id] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
   const travelDot = (key: string, collaboratorId?: string) => {
     const state = boxTravel(key, collaboratorId);
@@ -1007,7 +1011,7 @@ export function SchedulePlannerBoard({
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["client-visibility", date] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   const positionById = useMemo(() => {
@@ -1216,14 +1220,11 @@ export function SchedulePlannerBoard({
 
   async function ensureSchedule() {
     if (scheduleId) return scheduleId;
-    const { data, error } = await supabase
-      .from("daily_schedules")
-      .insert({ schedule_date: date, status: "draft", created_by: user?.id ?? null })
-      .select("id")
-      .single();
+    // Cria ou devolve a do dia numa só chamada: dois usuários no mesmo dia vazio não batem na chave única.
+    const { data, error } = await supabase.rpc("ensure_schedule", { _date: date });
     if (error) throw error;
     await qc.invalidateQueries({ queryKey: ["schedule", date] });
-    return data.id;
+    return data as string;
   }
 
   function invalidate(id?: string | null) {
@@ -1279,7 +1280,7 @@ export function SchedulePlannerBoard({
         qc.invalidateQueries({ queryKey: ["days_off"] });
       }
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   const removeEntry = useMutation({
@@ -1301,7 +1302,7 @@ export function SchedulePlannerBoard({
       invalidate();
       qc.invalidateQueries();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   const drop = useMutation({
@@ -1321,18 +1322,15 @@ export function SchedulePlannerBoard({
 
       const issues = checkRequirements(c, workId, collaboratorId, date);
       const id = await ensureSchedule();
-      if (fromBox) {
-        const { error } = await supabase.from("daily_status_entries").delete().eq("id", fromBox.id);
-        if (error) throw error;
-      }
       const targetRows = rows.filter((r) => r.work_id === workId && r.collaborator_id !== collaboratorId);
       // Solto em cima de alguém: entra no lugar dele e quem está dali para baixo desce uma posição (sort_order é inteiro).
       let sort: number;
       if (beforeSort != null) {
         sort = Math.ceil(beforeSort);
         const below = targetRows.filter((r) => r.sort_order >= sort);
-        for (const r of below) {
-          const { error } = await supabase.from("daily_allocations").update({ sort_order: r.sort_order + 1 }).eq("id", r.id);
+        if (below.length) {
+          // Uma transação só: falha no meio não deixa a ordem pela metade.
+          const { error } = await supabase.rpc("reorder_allocations", { _ids: below.map((r) => r.id), _orders: below.map((r) => r.sort_order + 1) });
           if (error) throw error;
         }
       } else sort = targetRows.length ? Math.max(...targetRows.map((r) => r.sort_order)) + 1 : 0;
@@ -1340,7 +1338,11 @@ export function SchedulePlannerBoard({
       // Ao mudar de obra, VT e prêmio viagem voltam à regra da obra nova (as exceções marcadas na obra antiga saem).
       const resetIfMoved = (fromWork: string | null | undefined) =>
         fromWork && fromWork !== workId ? { vt_override: null, travel_bonus_override: null } : {};
-      if (allocationId) {
+      if (fromBox) {
+        // Sai do quadro e entra na obra na mesma transação (antes: apagava o quadro e depois inseria).
+        const { error } = await supabase.rpc("schedule_entry_to_work", { _entry_id: fromBox.id, _work_id: workId, _sort: sort, _pending: issues.length > 0 });
+        if (error) throw error;
+      } else if (allocationId) {
         const { error } = await supabase
           .from("daily_allocations")
           .update({
@@ -1381,7 +1383,7 @@ export function SchedulePlannerBoard({
       if (r.warn) toast.warning(`Pendência: ${r.warn}`);
       invalidate(r.id);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   /** Escolhe o serviço do cliente: mantém o atual, senão o último usado pela pessoa nesse cliente, senão o primeiro ativo. */
@@ -1412,7 +1414,7 @@ export function SchedulePlannerBoard({
       return id;
     },
     onSuccess: (id) => qc.invalidateQueries({ queryKey: ["work-vt", id] }),
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   const [clearBox, setClearBox] = useState<{ label: string; ids: string[] } | null>(null);
@@ -1423,7 +1425,7 @@ export function SchedulePlannerBoard({
       return ids.length;
     },
     onSuccess: (n) => { toast.success(`${n} colaborador(es) retirados da escalação`); setClearBox(null); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
   const removeRow = useMutation({
@@ -1435,7 +1437,7 @@ export function SchedulePlannerBoard({
       toast.success("Colaborador removido da obra");
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
 
@@ -1509,19 +1511,30 @@ export function SchedulePlannerBoard({
           sort_order: rows.length + i,
         }));
       if (inserts.length === 0) throw new Error("Nada novo para copiar dos quadros selecionados");
-      const { error } = await supabase.from("daily_allocations").insert(inserts);
+      // Quem foi escalado por outro usuário no meio da cópia é pulado (chave única pessoa × dia), sem derrubar o lote.
+      const { data: inserted, error } = await supabase.from("daily_allocations")
+        .upsert(inserts, { onConflict: "schedule_id,collaborator_id", ignoreDuplicates: true })
+        .select("collaborator_id");
       if (error) throw error;
-      await supabase.from("daily_schedules").update({ copied_from_schedule_id: prevSchedule }).eq("id", id);
-      const { data: prevVt } = await supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", prevSchedule);
+      const { error: copiedErr } = await supabase.from("daily_schedules").update({ copied_from_schedule_id: prevSchedule }).eq("id", id);
+      if (copiedErr) throw copiedErr;
+      const { data: prevVt, error: prevVtErr } = await supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", prevSchedule);
+      if (prevVtErr) throw prevVtErr;
       if (prevVt && prevVt.length) {
         const current = workVt.data ?? new Map<string, boolean>();
         const vtRows = prevVt.filter((v) => selectedWorkIds.has(v.work_id) && !current.has(v.work_id)).map((v) => ({ schedule_id: id, work_id: v.work_id, pays_vt: v.pays_vt }));
-        if (vtRows.length) await supabase.from("schedule_work_vt").upsert(vtRows, { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
+        if (vtRows.length) {
+          const { error: vtErr } = await supabase.from("schedule_work_vt").upsert(vtRows, { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
+          if (vtErr) throw vtErr;
+        }
       }
       qc.invalidateQueries({ queryKey: ["work-vt", id] });
-      const { data: prevTr } = await supabase.from("schedule_work_travel").select("work_id, pays_bonus").eq("schedule_id", prevSchedule);
-      if (prevTr && prevTr.length) {
-        await supabase.from("schedule_work_travel").upsert(prevTr.filter((v) => selectedWorkIds.has(v.work_id)).map((v) => ({ schedule_id: id, work_id: v.work_id, pays_bonus: v.pays_bonus })), { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
+      const { data: prevTr, error: prevTrErr } = await supabase.from("schedule_work_travel").select("work_id, pays_bonus").eq("schedule_id", prevSchedule);
+      if (prevTrErr) throw prevTrErr;
+      const trRows = (prevTr ?? []).filter((v) => selectedWorkIds.has(v.work_id)).map((v) => ({ schedule_id: id, work_id: v.work_id, pays_bonus: v.pays_bonus }));
+      if (trRows.length) {
+        const { error: trErr } = await supabase.from("schedule_work_travel").upsert(trRows, { onConflict: "schedule_id,work_id", ignoreDuplicates: true });
+        if (trErr) throw trErr;
       }
       const clientIds = [...new Set(prevRows.map((r) => r.works?.client_id).filter((id): id is string => !!id))];
       if (clientIds.length) {
@@ -1533,14 +1546,14 @@ export function SchedulePlannerBoard({
         qc.invalidateQueries({ queryKey: ["client-visibility", date] });
       }
       qc.invalidateQueries({ queryKey: ["work-travel", id] });
-      return { count: inserts.length, id };
+      return { count: inserted?.length ?? inserts.length, id };
     },
     onSuccess: (r) => {
       toast.success(`${r.count} alocação(ões) copiadas de ${formatDateBR(copyFrom)}`);
       setConfirmCopyPrev(false);
       invalidate(r.id);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: onWriteError,
   });
 
 
@@ -1807,6 +1820,9 @@ export function SchedulePlannerBoard({
           <WeeklyDaysOffDialog date={date} open={openFolgas} onOpenChange={setOpenFolgas} editable={editable} />
           <LodgingDialog date={date} open={openLodging} onOpenChange={setOpenLodging} editable={editable} />
           <ScheduleAlertsButton date={date} />
+        </div>
+        <div className="order-4 basis-full empty:hidden">
+          <SchedulePresence date={date} />
         </div>
       </div>
 
