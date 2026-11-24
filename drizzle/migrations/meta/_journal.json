@@ -1072,6 +1072,13 @@
       "when": 1795463074217,
       "tag": "0152_drop_timeclock_adjustments",
       "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1795463075217,
+      "tag": "0153_client_manager",
+      "breakpoints": true
     }
   ]
 }

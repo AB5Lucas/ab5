@@ -5,7 +5,6 @@
  * é dividido em novas linhas de pedido dos serviços do contrato, na proporção da medição anterior.
  */
 export const MARS_CLIENT = "MARS MM";
-export const MARS_MANAGER = "Felipe Hideki Oki";
 /** Pedido do contrato recorrente: os serviços que têm esse pedido recebem as linhas de cada medição. */
 export const MARS_CONTRACT_ORDER = "4500777910";
 export const MARS_CONTRACT_VALUE = 188131.05;

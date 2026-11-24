@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
 import {
-  MARS_CLIENT, MARS_CONTRACT_ORDER, MARS_CONTRACT_VALUE, MARS_MANAGER, contractMeasured, marsFile, marsSheetName, matchWork,
+  MARS_CLIENT, MARS_CONTRACT_ORDER, MARS_CONTRACT_VALUE, contractMeasured, marsFile, marsSheetName, matchWork,
   findBoilerWork, findScaffoldWork, isBoilerRow, isQuote, isScaffoldRow, norm, parseMarsSheet, prevMonth, rowsToSync, splitContract, type MarsOrder, type MarsRow, type MarsWork,
 } from "./mars-sync";
 
@@ -85,7 +85,6 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
   const { data: client, error: ce } = await supabaseAdmin.from("clients").select("id").eq("name", MARS_CLIENT).maybeSingle();
   if (ce) throw dbError("clientes", ce);
   if (!client) throw new Error(`Cliente ${MARS_CLIENT} não encontrado`);
-  const { data: mgr } = await supabaseAdmin.from("collaborators").select("id").eq("full_name", MARS_MANAGER).maybeSingle();
   const { data: worksData, error: we } = await supabaseAdmin.from("works").select("id, name, quote_number, orders, active, order_number, order_value, cc_suffix").eq("client_id", client.id);
   if (we) throw dbError("serviços da MARS", we);
   const works = (worksData ?? []) as (MarsWork & { order_number: string | null; order_value: number | null; cc_suffix?: string | null })[];
@@ -170,7 +169,7 @@ async function applyMars(parsed: MarsRow[], ym: string, overwriteSuffix = false)
     newWorks.push({
       id, client_id: client.id, name: r.description.slice(0, 200), quote_number: r.quote || null, order_number: r.order, order_value: r.value,
       orders, budget_items: EMPTY_BUDGET, status: "active", active: true, monthly_enabled: false, cc_suffix: r.suffix || null,
-      manager_id: mgr?.id ?? null, supervisor_id: null,
+      supervisor_id: null,
       notes: [`MARS: ${r.requester}`, r.category].filter(Boolean).join(" · ") || null,
     });
     // Entra na lista para casar repetições na mesma leitura (mesmo pedido em outro orçamento continua sendo serviço próprio).

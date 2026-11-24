@@ -88,7 +88,12 @@ type FormState = {
   toll_amount: string;
   trips_per_day: string;
   cc_prefix: string;
+  manager_id: string;
+  substitute_manager_id: string;
 };
+
+const NONE = "__none__";
+const ref = (v: string) => (v === NONE ? null : v);
 
 const emptyForm: FormState = {
   name: "",
@@ -107,6 +112,8 @@ const emptyForm: FormState = {
   toll_amount: "",
   trips_per_day: "1",
   cc_prefix: "",
+  manager_id: NONE,
+  substitute_manager_id: NONE,
 };
 
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
@@ -131,6 +138,16 @@ function ClientsPage() {
       return data;
     },
   });
+
+  const people = useQuery({
+    queryKey: ["collaborators-min"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("collaborators").select("id, full_name").eq("status", "active").order("full_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const nameById = useMemo(() => new Map((people.data ?? []).map((p) => [p.id, p.full_name])), [people.data]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -162,6 +179,8 @@ function ClientsPage() {
         toll_amount: form.has_toll ? Number(form.toll_amount.replace(",", ".")) || 0 : 0,
         trips_per_day: Math.max(1, Number(form.trips_per_day) || 1),
         cc_prefix: nn(form.cc_prefix),
+        manager_id: ref(form.manager_id),
+        substitute_manager_id: ref(form.substitute_manager_id),
       };
       if (editing) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editing.id);
@@ -255,6 +274,8 @@ function ClientsPage() {
       toll_amount: c.toll_amount != null ? String(c.toll_amount) : "",
       trips_per_day: String(c.trips_per_day ?? 1),
       cc_prefix: c.cc_prefix ?? "",
+      manager_id: c.manager_id ?? NONE,
+      substitute_manager_id: c.substitute_manager_id ?? NONE,
     });
     setOpen(true);
   }
@@ -340,6 +361,7 @@ function ClientsPage() {
               <TableHead className="hidden md:table-cell">Endereço</TableHead>
               <TableHead className="hidden lg:table-cell">Cidade</TableHead>
               <TableHead className="hidden lg:table-cell">Distância</TableHead>
+              <TableHead className="hidden xl:table-cell">Gestor</TableHead>
               <TableHead>Integração</TableHead>
               <TableHead className="w-24" />
             </TableRow>
@@ -347,14 +369,14 @@ function ClientsPage() {
           <TableBody>
             {clients.isLoading && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             )}
             {!clients.isLoading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                   Nenhum cliente encontrado.
                 </TableCell>
               </TableRow>
@@ -372,6 +394,7 @@ function ClientsPage() {
                 <TableCell className="hidden lg:table-cell">
                   {c.distance_km != null ? `${c.distance_km} km` : "—"}
                 </TableCell>
+                <TableCell className="hidden xl:table-cell">{c.manager_id ? (nameById.get(c.manager_id) ?? "—") : "—"}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     <Badge variant={c.requires_integration ? "outline" : "secondary"} className="text-[10px]">
@@ -419,6 +442,36 @@ function ClientsPage() {
             <div className="space-y-1">
               <Label>Prefixo CC (4 números)</Label>
               <Input inputMode="numeric" maxLength={4} placeholder="Ex.: 2004" value={form.cc_prefix} onChange={(e) => set("cc_prefix", e.target.value.replace(/\D/g, ""))} />
+            </div>
+            <div className="hidden sm:block" />
+            <div className="space-y-1">
+              <Label>Gestor</Label>
+              <Select value={form.manager_id} onValueChange={(v) => set("manager_id", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Nenhum</SelectItem>
+                  {(people.data ?? []).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Substituto do gestor (opcional)</Label>
+              <Select value={form.substitute_manager_id} onValueChange={(v) => set("substitute_manager_id", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Nenhum</SelectItem>
+                  {(people.data ?? []).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Valida as solicitações de compra enquanto o gestor está de férias (ou se ele não tem usuário).</p>
             </div>
             <div className="space-y-1 sm:col-span-2">
               {!editing && (

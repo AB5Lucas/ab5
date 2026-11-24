@@ -1579,6 +1579,8 @@ export type Database = {
           active: boolean
           address: string | null
           cc_prefix: string | null
+          manager_id: string | null
+          substitute_manager_id: string | null
           city: string | null
           created_at: string
           distance_km: number | null
@@ -1601,6 +1603,8 @@ export type Database = {
           active?: boolean
           address?: string | null
           cc_prefix?: string | null
+          manager_id?: string | null
+          substitute_manager_id?: string | null
           city?: string | null
           created_at?: string
           distance_km?: number | null
@@ -1623,6 +1627,8 @@ export type Database = {
           active?: boolean
           address?: string | null
           cc_prefix?: string | null
+          manager_id?: string | null
+          substitute_manager_id?: string | null
           city?: string | null
           created_at?: string
           distance_km?: number | null

@@ -82,8 +82,6 @@ type FormState = {
   exit_time_weekend: string;
   status: WorkStatusValue;
   supervisor_id: string;
-  manager_id: string;
-  substitute_manager_id: string;
   active: boolean;
   night_shift: boolean;
   notes: string;
@@ -98,8 +96,6 @@ const emptyForm: FormState = {
   exit_time_weekend: DEFAULT_EXIT_WEEKEND,
   status: "active",
   supervisor_id: NONE,
-  manager_id: NONE,
-  substitute_manager_id: NONE,
   active: true,
   night_shift: false,
   notes: "",
@@ -115,8 +111,6 @@ function toForm(w: Work): FormState {
     exit_time_weekend: w.exit_time_weekend ? String(w.exit_time_weekend).slice(0, 5) : DEFAULT_EXIT_WEEKEND,
     status: w.status,
     supervisor_id: w.supervisor_id ?? NONE,
-    manager_id: w.manager_id ?? NONE,
-    substitute_manager_id: w.substitute_manager_id ?? NONE,
     active: w.active,
     night_shift: !!w.night_shift,
     notes: w.notes ?? "",
@@ -164,7 +158,7 @@ function WorksPage() {
   const clients = useQuery({
     queryKey: ["clients-min"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clients").select("id, name, city, state, cc_prefix").order("name");
+      const { data, error } = await supabase.from("clients").select("id, name, city, state, cc_prefix, manager_id").order("name");
       if (error) throw error;
       return data;
     },
@@ -190,8 +184,8 @@ function WorksPage() {
   }, [people.data]);
 
   const clientById = useMemo(() => {
-    const map = new Map<string, { name: string; city: string | null; state: string | null; cc_prefix: string | null }>();
-    (clients.data ?? []).forEach((c) => map.set(c.id, { name: c.name, city: c.city, state: c.state, cc_prefix: c.cc_prefix }));
+    const map = new Map<string, { name: string; city: string | null; state: string | null; cc_prefix: string | null; manager_id: string | null }>();
+    (clients.data ?? []).forEach((c) => map.set(c.id, { name: c.name, city: c.city, state: c.state, cc_prefix: c.cc_prefix, manager_id: c.manager_id }));
     return map;
   }, [clients.data]);
 
@@ -222,8 +216,6 @@ function WorksPage() {
         exit_time_weekend: form.exit_time_weekend || DEFAULT_EXIT_WEEKEND,
         status: form.status,
         supervisor_id: ref(form.supervisor_id),
-        manager_id: ref(form.manager_id),
-        substitute_manager_id: ref(form.substitute_manager_id),
         active: form.active,
         notes: nn(form.notes),
         cc_suffix: nn(form.cc_suffix),
@@ -361,7 +353,7 @@ function WorksPage() {
                     {`${String(w.entry_time ?? DEFAULT_ENTRY).slice(0, 5)} - ${String(w.exit_time_weekend ?? DEFAULT_EXIT_WEEKEND).slice(0, 5)}`}
                   </TableCell>
                   <TableCell className="hidden xl:table-cell">
-                    {w.manager_id ? (nameById.get(w.manager_id) ?? "—") : "—"}
+                    {c?.manager_id ? (nameById.get(c.manager_id) ?? "—") : "—"}
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(w.status)}>{WORK_STATUS_LABEL[w.status]}</Badge>
@@ -470,39 +462,6 @@ function WorksPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Gestor</Label>
-              <Select value={form.manager_id} onValueChange={(v) => set("manager_id", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Nenhum</SelectItem>
-                  {(people.data ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Substituto do gestor (opcional)</Label>
-              <Select value={form.substitute_manager_id} onValueChange={(v) => set("substitute_manager_id", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Nenhum</SelectItem>
-                  {(people.data ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Valida as solicitações de compra enquanto o gestor está de férias (ou se ele não tem usuário).</p>
             </div>
             <div className="flex items-center gap-2 sm:col-span-2">
               <Switch checked={form.active} onCheckedChange={(v) => set("active", v)} id="work-active" />
