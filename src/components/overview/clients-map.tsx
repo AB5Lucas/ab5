@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import { Maximize2 } from "lucide-react";
+import { AnimatedMap } from "./animated-map";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export type MapClient = { id: string; name: string; lat: number; lon: number; city?: string | null; billed?: number; marginPct?: number | null };
@@ -41,9 +42,22 @@ function LeafletMap({ clients, bounds, className }: { clients: MapClient[]; boun
 
 export function ClientsMap({ clients }: { clients: MapClient[] }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"3d" | "classic">("3d");
+  useEffect(() => { if (localStorage.getItem("clients-map-mode") === "classic") setMode("classic"); }, []);
+  const pick = (m: "3d" | "classic") => { setMode(m); localStorage.setItem("clients-map-mode", m); };
   return (
     <div className="relative">
-      <LeafletMap clients={clients} bounds={SP} className="h-[340px] w-full overflow-hidden rounded-xl border grayscale-[0.2]" />
+      {mode === "3d"
+        ? <AnimatedMap clients={clients} region="SP" className="h-[340px] w-full rounded-xl border" />
+        : <LeafletMap clients={clients} bounds={SP} className="h-[340px] w-full overflow-hidden rounded-xl border grayscale-[0.2]" />}
+      <div className="absolute left-2 top-2 z-[400] flex rounded-full border bg-background/90 p-0.5 text-xs shadow-sm backdrop-blur">
+        {(["3d", "classic"] as const).map((m) => (
+          <button key={m} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); pick(m); }}
+            className={`rounded-full px-2.5 py-0.5 ${mode === m ? "bg-foreground text-background" : "text-muted-foreground"}`}>
+            {m === "3d" ? "Animado" : "Clássico"}
+          </button>
+        ))}
+      </div>
       <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
         className="absolute right-2 top-2 z-[400] flex items-center gap-1.5 rounded-full border bg-background/90 px-3 py-1 text-xs shadow-sm backdrop-blur transition-colors hover:bg-background">
         <Maximize2 className="h-3.5 w-3.5" /> Expandir (Brasil)
@@ -51,7 +65,9 @@ export function ClientsMap({ clients }: { clients: MapClient[] }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col">
           <DialogHeader><DialogTitle>Clientes no mapa</DialogTitle></DialogHeader>
-          {open && <LeafletMap clients={clients} bounds={BR} className="min-h-0 w-full flex-1 overflow-hidden rounded-xl border" />}
+          {open && (mode === "3d"
+            ? <AnimatedMap clients={clients} region="BR" className="min-h-0 w-full flex-1 rounded-xl border" />
+            : <LeafletMap clients={clients} bounds={BR} className="min-h-0 w-full flex-1 overflow-hidden rounded-xl border" />)}
         </DialogContent>
       </Dialog>
     </div>
