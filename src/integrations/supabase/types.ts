@@ -6620,6 +6620,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      day_off_remove_day: {
+        Args: { _collaborator_id: string; _date: string; _whole?: boolean }
+        Returns: number
+      }
       classify_occurrence: {
         Args: { _workforce_id: string; _key: string }
         Returns: string

@@ -56,6 +56,7 @@ import {
 import type { AsoStatus, IntegrationStatus, ScheduleContext } from "@/lib/scheduling";
 import { cn } from "@/lib/utils";
 import { scheduleWriteError } from "@/lib/schedule-write-error";
+import { invalidateScheduleDay } from "@/lib/invalidate-day";
 import { SchedulePresence } from "@/components/schedule-planner/schedule-presence";
 import { formatCpf } from "@/lib/copy-names";
 import { buildDistanceLookup } from "@/lib/city-distance";
@@ -1284,26 +1285,37 @@ export function SchedulePlannerBoard({
   });
 
   const removeEntry = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, folga }: { id: string; folga?: "day" | "all" }) => {
       const entry = entries.find((e) => e.id === id);
       const { error } = await supabase.from("daily_status_entries").delete().eq("id", id);
       if (error) throw error;
       if (entry?.box_key === "folga") {
-        await supabase
-          .from("days_off")
-          .delete()
-          .eq("collaborator_id", entry.collaborator_id)
-          .eq("date", date)
-          .is("end_date", null);
+        // Só o dia: encurta ou divide o período da folga; inteira: apaga o registro (day_off_remove_day, uma transação).
+        const { error: offErr } = await supabase.rpc("day_off_remove_day", { _collaborator_id: entry.collaborator_id, _date: date, _whole: folga === "all" });
+        if (offErr) throw offErr;
       }
     },
     onSuccess: () => {
       toast.success("Registro removido da caixa");
+      setFolgaAsk(null);
       invalidate();
-      qc.invalidateQueries();
+      invalidateScheduleDay(qc);
     },
     onError: onWriteError,
   });
+  /** Folga de vários dias: pergunta se tira só o dia aberto ou a folga inteira. */
+  const [folgaAsk, setFolgaAsk] = useState<{ id: string; name: string; start: string; end: string } | null>(null);
+  async function askRemoveEntry(id: string) {
+    const entry = entries.find((e) => e.id === id);
+    if (entry?.box_key !== "folga") { removeEntry.mutate({ id }); return; }
+    const { data, error } = await supabase.from("days_off").select("date, end_date")
+      .eq("collaborator_id", entry.collaborator_id).lte("date", date)
+      .or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`);
+    if (error) { onWriteError(error); return; }
+    const long = (data ?? []).find((o) => (o.end_date ?? o.date) !== o.date);
+    if (!long) { removeEntry.mutate({ id, folga: "day" }); return; }
+    setFolgaAsk({ id, name: personById.get(entry.collaborator_id)?.full_name ?? "Colaborador", start: long.date, end: long.end_date ?? long.date });
+  }
 
   const drop = useMutation({
     mutationFn: async ({
@@ -1621,6 +1633,21 @@ export function SchedulePlannerBoard({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <Button variant="destructive" disabled={clearRows.isPending} onClick={() => clearBox && clearRows.mutate(clearBox.ids)}>Retirar todos</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={!!folgaAsk} onOpenChange={(o) => !o && setFolgaAsk(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tirar da folga</AlertDialogTitle>
+            <AlertDialogDescription>
+              {folgaAsk?.name} está de folga de {formatDateBR(folgaAsk?.start)} a {formatDateBR(folgaAsk?.end)}. Tirar só deste dia ou a folga inteira?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" disabled={removeEntry.isPending} onClick={() => folgaAsk && removeEntry.mutate({ id: folgaAsk.id, folga: "day" })}>Só deste dia</Button>
+            <Button variant="destructive" disabled={removeEntry.isPending} onClick={() => folgaAsk && removeEntry.mutate({ id: folgaAsk.id, folga: "all" })}>A folga inteira</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -2374,7 +2401,7 @@ export function SchedulePlannerBoard({
                             size="icon"
                             className="h-6 w-6 shrink-0"
                             aria-label="Remover da caixa"
-                            onClick={() => removeEntry.mutate(entry.id)}
+                            onClick={() => void askRemoveEntry(entry.id)}
                           >
                             <X className="h-3.5 w-3.5 text-destructive" />
                           </Button>
@@ -2402,7 +2429,7 @@ export function SchedulePlannerBoard({
             const p = readPayload(e);
             setDragging(null);
             if (!p || !editable) return;
-            if (p.entryId) removeEntry.mutate(p.entryId);
+            if (p.entryId) void askRemoveEntry(p.entryId);
             else if (p.allocationId) removeRow.mutate(p.allocationId);
           }}
           className={cn(
