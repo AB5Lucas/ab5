@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { HolidaysSettings } from "@/components/holidays-settings";
+import { NotificationSettingsPanel } from "@/components/notifications/notification-settings";
 
 export const Route = createFileRoute("/_authenticated/admin/configuracoes")({
   head: () => ({
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/_authenticated/admin/configuracoes")({
 });
 
 function Page() {
-  const { canWrite } = useCurrentUser();
+  const { canWrite, isAdmin } = useCurrentUser();
   const counts = useQuery({
     queryKey: ["system-counts"],
     queryFn: async () => {
@@ -62,6 +63,8 @@ function Page() {
 
         <HolidaysSettings canWrite={canWrite} />
       </div>
+
+      <NotificationSettingsPanel canEdit={isAdmin} />
     </div>
   );
 }

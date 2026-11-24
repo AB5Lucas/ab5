@@ -105,7 +105,7 @@ function AuthenticatedLayout() {
               </Link>
             )}
             <div className="ml-auto flex items-center gap-3">
-              {modern && <NotificationsBell />}
+              <NotificationsBell showMenuAlerts={modern} />
               <Badge variant="secondary" className="hidden sm:inline-flex">
                 {ROLE_LABEL[role]}
               </Badge>

@@ -3894,6 +3894,227 @@ export type Database = {
           },
         ]
       }
+      notification_deliveries: {
+        Row: {
+          attempts: number
+          channel: string
+          created_at: string
+          error: string | null
+          id: string
+          locked_until: string | null
+          notification_id: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          channel: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          locked_until?: string | null
+          notification_id: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          channel?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          locked_until?: string | null
+          notification_id?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_digests: {
+        Row: {
+          body: string | null
+          created_at: string
+          day: string
+          error: string | null
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          day: string
+          error?: string | null
+          sent_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          day?: string
+          error?: string | null
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_prefs: {
+        Row: {
+          digest_days: number[]
+          digest_enabled: boolean
+          digest_time: string
+          email_enabled: boolean
+          push_enabled: boolean
+          updated_at: string
+          user_id: string
+          whatsapp_enabled: boolean
+          whatsapp_phone: string | null
+        }
+        Insert: {
+          digest_days?: number[]
+          digest_enabled?: boolean
+          digest_time?: string
+          email_enabled?: boolean
+          push_enabled?: boolean
+          updated_at?: string
+          user_id: string
+          whatsapp_enabled?: boolean
+          whatsapp_phone?: string | null
+        }
+        Update: {
+          digest_days?: number[]
+          digest_enabled?: boolean
+          digest_time?: string
+          email_enabled?: boolean
+          push_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+          whatsapp_enabled?: boolean
+          whatsapp_phone?: string | null
+        }
+        Relationships: []
+      }
+      notification_settings: {
+        Row: {
+          advance_days: number
+          id: number
+          started_at: string
+          updated_at: string
+          updated_by: string | null
+          urgent_days: number
+        }
+        Insert: {
+          advance_days?: number
+          id?: number
+          started_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          urgent_days?: number
+        }
+        Update: {
+          advance_days?: number
+          id?: number
+          started_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          urgent_days?: number
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          dedupe_key: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          kind: string
+          link: string | null
+          module: string
+          read_at: string | null
+          ref: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          dedupe_key: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          kind: string
+          link?: string | null
+          module: string
+          read_at?: string | null
+          ref?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          dedupe_key?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          kind?: string
+          link?: string | null
+          module?: string
+          read_at?: string | null
+          ref?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_ok_at: string | null
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_ok_at?: string | null
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_ok_at?: string | null
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       purchase_approvers: {
         Row: {
           approver_id: string | null
@@ -6830,6 +7051,59 @@ export type Database = {
       }
       purchase_item_set_file: {
         Args: { _item: string; _path: string }
+        Returns: undefined
+      }
+      notification_deliveries_claim: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          body: string
+          channel: string
+          email: string
+          id: string
+          kind: string
+          link: string
+          phone: string
+          ref: string
+          title: string
+          user_id: string
+        }[]
+      }
+      notification_digest_rows: {
+        Args: { _user: string }
+        Returns: {
+          client_name: string
+          due_date: string
+          id: string
+          number: string
+          role: string
+          status: string
+        }[]
+      }
+      notification_digests_due: {
+        Args: never
+        Returns: {
+          day: string
+          full_name: string
+          phone: string
+          user_id: string
+        }[]
+      }
+      notification_my_contact: {
+        Args: never
+        Returns: {
+          collaborator_phone: string
+          email: string
+        }[]
+      }
+      notification_send_test: { Args: never; Returns: string }
+      purchase_deadline_level: {
+        Args: { _advance: number; _due: string; _today: string; _urgent: number }
+        Returns: string
+      }
+      purchase_notify_deadlines: { Args: never; Returns: number }
+      push_subscription_save: {
+        Args: { _auth: string; _endpoint: string; _p256dh: string; _ua?: string }
         Returns: undefined
       }
       purchase_my_pending_validation: {
