@@ -31,7 +31,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { expiryFrom, formatDateBR } from "@/lib/scheduling";
+import { formatDateBR } from "@/lib/scheduling";
+import { integrationExpiry, trainingExpiry } from "@/lib/doc-status";
+import { fetchAll } from "@/lib/results-engine";
 import { normText } from "@/lib/import-helpers";
 import { APPOINTMENT_TYPE_LABEL } from "@/components/appointment-dialog";
 import type { AppointmentType } from "@/components/appointment-dialog";
@@ -97,37 +99,37 @@ function ConferencePage() {
   const items = useQuery({
     queryKey: ["conference", "items"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<Item>((a, b) => supabase
         .from("conference_items")
         .select(
           "id, appointment_id, collaborator_id, type, training_id, client_id, document_date, status, notes, completed_at, completed_by, created_at",
         )
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as unknown as Item[];
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(a, b) as never);
     },
   });
 
   const checks = useQuery({
     queryKey: ["conference", "checks"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<CheckRow>((a, b) => supabase
         .from("conference_checks")
-        .select("id, item_id, client_id, approved, approved_at, next_check_date");
-      if (error) throw error;
-      return data as unknown as CheckRow[];
+        .select("id, item_id, client_id, approved, approved_at, next_check_date")
+        .order("id")
+        .range(a, b));
     },
   });
 
   const collaborators = useQuery({
     queryKey: ["collaborators-min"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<{ id: string; full_name: string; registration_number: string }>((a, b) => supabase
         .from("collaborators")
         .select("id, full_name, registration_number")
-        .order("full_name");
-      if (error) throw error;
-      return data;
+        .order("full_name")
+        .order("id")
+        .range(a, b));
     },
   });
 
@@ -264,87 +266,116 @@ function ConferencePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Atualiza o cadastro do colaborador com a data do documento conferido
+  // Atualiza o cadastro do colaborador com a data do documento conferido. Um registro por pessoa × documento
+  // (ASO por pessoa, treinamento por pessoa + treinamento, integração por pessoa + cliente — índices únicos no banco):
+  // upsert grava por cima do existente, sem duplicar e sem engolir erro.
   const applyToRecords = async (item: Item, date: string) => {
     if (item.type === "aso") {
-      const { data: existing } = await supabase
+      const { error } = await supabase
         .from("asos")
-        .select("id")
-        .eq("collaborator_id", item.collaborator_id)
-        .maybeSingle();
-      const payload = { collaborator_id: item.collaborator_id, exam_date: date };
-      const { error } = existing
-        ? await supabase.from("asos").update(payload).eq("id", existing.id)
-        : await supabase.from("asos").insert(payload);
+        .upsert({ collaborator_id: item.collaborator_id, exam_date: date }, { onConflict: "collaborator_id" });
       if (error) throw error;
     } else if (item.type === "treinamento" && item.training_id) {
-      const months = validityById.get(item.training_id) ?? 12;
-      const payload = {
-        collaborator_id: item.collaborator_id,
-        training_id: item.training_id,
-        completed_at: date,
-        expires_at: months ? addMonths(date, months) : null,
-      };
-      const { data: existing } = await supabase
-        .from("collaborator_trainings")
-        .select("id")
-        .eq("collaborator_id", item.collaborator_id)
-        .eq("training_id", item.training_id)
-        .maybeSingle();
-      const { error } = existing
-        ? await supabase.from("collaborator_trainings").update(payload).eq("id", existing.id)
-        : await supabase.from("collaborator_trainings").insert(payload);
+      const { error } = await supabase.from("collaborator_trainings").upsert(
+        {
+          collaborator_id: item.collaborator_id,
+          training_id: item.training_id,
+          completed_at: date,
+          expires_at: trainingExpiry(date, validityById.get(item.training_id)),
+        },
+        { onConflict: "collaborator_id,training_id" },
+      );
       if (error) throw error;
     } else if (item.type === "integracao" && item.client_id) {
-      const payload = {
-        collaborator_id: item.collaborator_id,
-        client_id: item.client_id,
-        integration_date: date,
-        expires_at: addMonths(date, 12),
-      };
-      const { data: existing } = await supabase
-        .from("client_integrations")
-        .select("id")
-        .eq("collaborator_id", item.collaborator_id)
-        .eq("client_id", item.client_id)
-        .maybeSingle();
-      const { error } = existing
-        ? await supabase.from("client_integrations").update(payload).eq("id", existing.id)
-        : await supabase.from("client_integrations").insert(payload);
+      const { error } = await supabase.from("client_integrations").upsert(
+        {
+          collaborator_id: item.collaborator_id,
+          client_id: item.client_id,
+          integration_date: date,
+          expires_at: integrationExpiry(date),
+        },
+        { onConflict: "collaborator_id,client_id" },
+      );
       if (error) throw error;
     }
   };
 
-  const conclude = useMutation({
+  /** Conclui: confere no banco que nenhum cliente ficou pendente, atualiza o cadastro e fecha o item. */
+  const doConclude = async (item: Item) => {
+    const { data: pending, error: pErr } = await supabase
+      .from("conference_checks")
+      .select("id")
+      .eq("item_id", item.id)
+      .eq("approved", false)
+      .limit(1);
+    if (pErr) throw pErr;
+    if ((pending ?? []).length) throw new Error("Ainda há clientes com o documento pendente");
 
+    // Agora sim: atualiza o cadastro do colaborador com a data do documento
+    await applyToRecords(item, item.document_date);
+
+    const { error } = await supabase
+      .from("conference_items")
+      .update({
+        status: "concluido",
+        completed_at: new Date().toISOString(),
+        completed_by: user?.id ?? null,
+      })
+      .eq("id", item.id);
+    if (error) throw error;
+  };
+
+  const afterConclude = () => {
+    invalidate();
+    qc.invalidateQueries({ queryKey: ["asos"] });
+    qc.invalidateQueries({ queryKey: ["collaborator-trainings"] });
+    qc.invalidateQueries({ queryKey: ["client-integrations"] });
+    qc.invalidateQueries({ queryKey: ["training-records"] });
+    qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
+    qc.invalidateQueries({ queryKey: ["release-by-client"] });
+  };
+
+  const conclude = useMutation({
     mutationFn: async (item: Item) => {
       if (!allApproved(item.id)) throw new Error("Ainda há clientes com o documento pendente");
-
-      // Agora sim: atualiza o cadastro do colaborador com a data do documento
-      await applyToRecords(item, item.document_date);
-
-      const { error } = await supabase
-        .from("conference_items")
-        .update({
-          status: "concluido",
-          completed_at: new Date().toISOString(),
-          completed_by: user?.id ?? null,
-        })
-        .eq("id", item.id);
-      if (error) throw error;
+      await doConclude(item);
     },
     onSuccess: () => {
       toast.success("Conferência concluída e cadastro atualizado");
-      invalidate();
-      qc.invalidateQueries({ queryKey: ["asos"] });
-      qc.invalidateQueries({ queryKey: ["collaborator-trainings"] });
-      qc.invalidateQueries({ queryKey: ["client-integrations"] });
-      qc.invalidateQueries({ queryKey: ["training-records"] });
-      qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
+      afterConclude();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Aceita o documento em todos os clientes do item e, se pedido, já conclui no mesmo passo. */
+  const approveAll = useMutation({
+    mutationFn: async ({ item, andConclude }: { item: Item; andConclude: boolean }) => {
+      const { error } = await supabase
+        .from("conference_checks")
+        .update({ approved: true, approved_at: new Date().toISOString() })
+        .eq("item_id", item.id)
+        .eq("approved", false);
+      if (error) throw error;
+      if (andConclude) await doConclude(item);
+      return andConclude;
+    },
+    onSuccess: (concluded) => {
+      toast.success(concluded ? "Documento aceito em todos os clientes e conferência concluída" : "Documento aceito em todos os clientes");
+      if (concluded) {
+        setCheckItem(null);
+        setDateDraft({});
+        afterConclude();
+      } else {
+        invalidate();
+        qc.invalidateQueries({ queryKey: ["schedule-ctx"] });
+        qc.invalidateQueries({ queryKey: ["servicos-weekend-ctx"] });
+      }
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      invalidate();
+    },
+  });
 
   const remove = useMutation({
     mutationFn: async (item: Item) => {
@@ -366,13 +397,12 @@ function ConferencePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Treinamento sem validade no catálogo não vence (mesma regra da aba Treinamentos; antes aqui valia 12 meses).
   const validityById = useMemo(() => {
-    const m = new Map<string, number>();
-    (trainings.data ?? []).forEach((t) => m.set(t.id, t.validity_months ?? 12));
+    const m = new Map<string, number | null>();
+    (trainings.data ?? []).forEach((t) => m.set(t.id, t.validity_months ?? null));
     return m;
   }, [trainings.data]);
-
-  const addMonths = expiryFrom;
 
   const saveDocDate = useMutation({
     mutationFn: async ({ item, date }: { item: Item; date: string }) => {
@@ -648,7 +678,7 @@ function ConferencePage() {
             ))}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-wrap gap-2">
             <Button
               variant="ghost"
               onClick={() => {
@@ -658,6 +688,24 @@ function ConferencePage() {
             >
               Fechar
             </Button>
+            {checkItem && checkItem.status !== "concluido" && modalChecks.some((c) => !c.approved) && (
+              <>
+                <Button variant="outline" disabled={approveAll.isPending} onClick={() => approveAll.mutate({ item: checkItem, andConclude: false })}>
+                  <Check className="h-4 w-4" /> Aceitar todos os clientes
+                </Button>
+                <Button disabled={approveAll.isPending} onClick={() => approveAll.mutate({ item: checkItem, andConclude: true })}>
+                  <ClipboardCheck className="h-4 w-4" /> Aceitar todos e concluir
+                </Button>
+              </>
+            )}
+            {checkItem && checkItem.status !== "concluido" && modalChecks.every((c) => c.approved) && (
+              <Button
+                disabled={conclude.isPending}
+                onClick={() => conclude.mutate(checkItem, { onSuccess: () => { setCheckItem(null); setDateDraft({}); } })}
+              >
+                <ClipboardCheck className="h-4 w-4" /> Concluir conferência
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -39,6 +39,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { addDays, formatDateBR, todayISO } from "@/lib/scheduling";
 import { normText } from "@/lib/import-helpers";
+import { fetchAll } from "@/lib/results-engine";
+import { OnboardingPendingNotice, onboardingPendingWarning } from "@/components/controles/onboarding-pending";
 import type { AppointmentType } from "@/components/appointment-dialog";
 import { APPOINTMENT_TYPE_LABEL } from "@/components/appointment-dialog";
 import { Tabs as SubTabs, TabsContent as SubTabsContent, TabsList as SubTabsList, TabsTrigger as SubTabsTrigger } from "@/components/ui/tabs";
@@ -131,24 +133,25 @@ export function AppointmentsPage() {
   const appointments = useQuery({
     queryKey: ["appointments", "all"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Em páginas (ordem estável): sem isso a lista cortava em 1000 e sumiam os agendamentos mais recentes.
+      return (await fetchAll<Row>((a, b) => supabase
         .from("appointments")
         .select(SELECT_COLS)
-        .order("scheduled_date", { ascending: true });
-      if (error) throw error;
-      return data as unknown as Row[];
+        .order("scheduled_date", { ascending: true })
+        .order("id")
+        .range(a, b) as never));
     },
   });
 
   const collaborators = useQuery({
     queryKey: ["collaborators-min"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<{ id: string; full_name: string; registration_number: string }>((a, b) => supabase
         .from("collaborators")
         .select("id, full_name, registration_number")
-        .order("full_name");
-      if (error) throw error;
-      return data;
+        .order("full_name")
+        .order("id")
+        .range(a, b));
     },
   });
 
@@ -180,32 +183,29 @@ export function AppointmentsPage() {
   const collabTrainings = useQuery({
     queryKey: ["collab-trainings-min"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<{ id: string; collaborator_id: string; training_id: string; completed_at: string | null; expires_at: string | null }>((a, b) => supabase
         .from("collaborator_trainings")
-        .select("id, collaborator_id, training_id, completed_at, expires_at");
-      if (error) throw error;
-      return data;
+        .select("id, collaborator_id, training_id, completed_at, expires_at")
+        .order("id")
+        .range(a, b));
     },
   });
 
   const asoRecs = useQuery({
     queryKey: ["asos-min-validity"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("asos").select("collaborator_id, expires_at").range(0, 9999);
-      if (error) throw error;
-      return data;
+      return fetchAll<{ collaborator_id: string; expires_at: string | null }>((a, b) => supabase.from("asos").select("collaborator_id, expires_at").order("id").range(a, b));
     },
   });
 
   const integrationRecs = useQuery({
     queryKey: ["integrations-min-validity"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<{ collaborator_id: string; client_id: string; expires_at: string | null }>((a, b) => supabase
         .from("client_integrations")
         .select("collaborator_id, client_id, expires_at")
-        .range(0, 9999);
-      if (error) throw error;
-      return data;
+        .order("id")
+        .range(a, b));
     },
   });
 
@@ -349,10 +349,12 @@ export function AppointmentsPage() {
         notes: form.notes.trim() || null,
       });
       if (error) throw error;
-      return replaced;
+      const warn = form.type === "integracao" ? await onboardingPendingWarning(form.collaborator_id, form.client_id) : null;
+      return { replaced, warn };
     },
-    onSuccess: (replaced) => {
+    onSuccess: ({ replaced, warn }) => {
       toast.success(`Agendamento criado${replacedText(replaced ?? [])}`);
+      if (warn) toast.warning(warn);
       setOpenNew(false);
       setForm(emptyForm());
       setPersonQuery("");
@@ -361,74 +363,16 @@ export function AppointmentsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  /** Confirma a realização e manda para a Conferência (uma linha; o "todos" repete por linha). */
+  /**
+   * Confirma a realização e manda para a Conferência (uma linha; o "todos" repete por linha).
+   * Tudo numa transação no banco (appointment_complete): marca realizado, cria o item da Conferência e os aceites por
+   * cliente; repetir não duplica o item. O cadastro (ASO, treinamento, integração) só muda ao concluir a Conferência.
+   */
   const doComplete = async (row: Row, date: string) => {
-      if (!date) throw new Error("Informe a data real de realização");
-      if (row.type === "integracao" && !row.client_id)
-        throw new Error("O agendamento não tem cliente vinculado");
-
-      // O cadastro do colaborador (ASO, treinamento, integração) só é atualizado
-      // quando o documento for aprovado e concluído na aba Conferência.
-
-      const { error } = await supabase
-        .from("appointments")
-        .update({
-          status: "realizado",
-          completed_date: date,
-          completed_time: row.scheduled_time,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", row.id);
-      if (error) throw error;
-
-
-      // Envia o item para a Conferência
-      const { data: item, error: itemError } = await supabase
-        .from("conference_items")
-        .insert({
-          appointment_id: row.id,
-          collaborator_id: row.collaborator_id,
-          type: row.type,
-          training_id: row.training_id,
-          client_id: row.client_id,
-          document_date: date,
-          notes: row.notes,
-        })
-        .select("id")
-        .single();
-      if (itemError) throw itemError;
-
-      let clientIds: string[] = [];
-      if (row.type === "integracao") {
-        // Integração: confere somente o cliente do agendamento
-        clientIds = row.client_id ? [row.client_id] : [];
-      } else {
-        const [{ data: integrations }, { data: scheduled }] = await Promise.all([
-          supabase.from("client_integrations").select("client_id").eq("collaborator_id", row.collaborator_id),
-          // Integrações agendadas também entram: o aceite libera a escalação nesse cliente.
-          supabase
-            .from("appointments")
-            .select("client_id, type")
-            .eq("collaborator_id", row.collaborator_id)
-            .eq("status", "agendado")
-            .not("client_id", "is", null),
-        ]);
-        clientIds = [
-          ...new Set<string>([
-            ...(integrations ?? []).map((i) => i.client_id),
-            ...(scheduled ?? [])
-              .filter((a) => String(a.type).toLowerCase().startsWith("integ"))
-              .map((a) => a.client_id as string),
-          ]),
-        ];
-      }
-      if (clientIds.length > 0) {
-        const { error: checksError } = await supabase
-          .from("conference_checks")
-          .insert(clientIds.map((client_id) => ({ item_id: item.id, client_id })));
-        if (checksError) throw checksError;
-      }
-
+    if (!date) throw new Error("Informe a data real de realização");
+    if (row.type === "integracao" && !row.client_id) throw new Error("O agendamento não tem cliente vinculado");
+    const { error } = await supabase.rpc("appointment_complete", { _id: row.id, _date: date, ...(row.scheduled_time ? { _time: row.scheduled_time } : {}) });
+    if (error) throw new Error(error.message);
   };
   const complete = useMutation({
     mutationFn: ({ row, date }: { row: Row; date: string }) => doComplete(row, date),
@@ -904,6 +848,7 @@ export function AppointmentsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <OnboardingPendingNotice collaboratorId={form.collaborator_id} clientId={form.client_id} />
                 <label className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm">
                   <span>Pagar VT para a pessoa</span>
                   <Switch

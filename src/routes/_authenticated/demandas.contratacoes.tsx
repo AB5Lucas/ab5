@@ -18,6 +18,11 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { SearchSelect } from "@/components/search-select";
+import { fetchAll } from "@/lib/results-engine";
+import { findDateConflicts } from "@/lib/date-conflicts";
+import { futureSameKind, replacedText } from "@/lib/appointment-replace";
+import { todayISO } from "@/lib/scheduling";
 
 export const Route = createFileRoute("/_authenticated/demandas/contratacoes")({
   head: () => ({
@@ -61,6 +66,8 @@ type Req = {
   requester_name: string | null; client_id: string; work_id: string; position_id: string | null;
   position_name: string; quantity: number; filled: number; reason: string; desired_date: string | null;
   priority: string; notes: string | null; status: string; rh_owner_id: string | null; rh_owner_name: string | null;
+  /** Colaborador contratado para a vaga (vinculado pelo RH). */
+  collaborator_id?: string | null;
 };
 
 function useBase() {
@@ -201,7 +208,7 @@ function Requests({ isRh }: { isRh: boolean }) {
             <TableHead className="w-8"><Checkbox checked={rows.length > 0 && rows.every((r) => picked.has(r.id))} onCheckedChange={(c) => setPicked(c ? new Set(rows.map((r) => r.id)) : new Set())} /></TableHead>
             <TableHead>Nº</TableHead><TableHead>Abertura</TableHead><TableHead>Cliente</TableHead><TableHead>Serviço</TableHead>
             <TableHead>Função</TableHead><TableHead>Vagas</TableHead><TableHead>Prioridade</TableHead><TableHead>Solicitante</TableHead>
-            <TableHead>Status</TableHead><TableHead>Atualizado</TableHead>
+            <TableHead>Status</TableHead><TableHead>Contratado</TableHead><TableHead>Atualizado</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {rows.map((r) => (
@@ -216,10 +223,11 @@ function Requests({ isRh }: { isRh: boolean }) {
                 <TableCell>{PRIORITY[r.priority]}</TableCell>
                 <TableCell>{r.requester_name ?? "—"}</TableCell>
                 <TableCell><Badge variant={STATUS_VARIANT[r.status]}>{STATUS[r.status]}</Badge></TableCell>
+                <TableCell><LinkedName id={r.collaborator_id ?? null} /></TableCell>
                 <TableCell>{dt(r.updated_at)}</TableCell>
               </TableRow>
             ))}
-            {!rows.length && <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>}
+            {!rows.length && <TableRow><TableCell colSpan={12} className="py-8 text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
@@ -385,6 +393,7 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
     ["Função", req.position_name], ["Vagas", `${req.filled} atendidas de ${req.quantity} (${req.quantity - req.filled} pendentes)`],
     ["Prioridade", PRIORITY[req.priority]],
     ["Responsável RH", req.rh_owner_name ?? "—"], ["Status", <Badge key="s" variant={STATUS_VARIANT[req.status]}>{STATUS[req.status]}</Badge>],
+    ["Colaborador contratado", <LinkedName key="c" id={req.collaborator_id ?? null} />],
   ];
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -416,6 +425,8 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
           </div>
         )}
 
+        {isRh && <LinkCollaborator req={req} cName={cName} />}
+
         <div className="space-y-2">
           <p className="font-display text-sm uppercase tracking-wide">Histórico</p>
           {(events.data ?? []).map((e) => (
@@ -445,6 +456,113 @@ function Detail({ req, isRh, onClose, cName, wName }: { req: Req; isRh: boolean;
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type Person = { id: string; full_name: string; registration_number: string | null; status: string };
+function usePeople() {
+  return useQuery({
+    queryKey: ["hiring-people"],
+    staleTime: 5 * 60_000,
+    queryFn: () => fetchAll<Person>((a, b) => supabase.from("collaborators").select("id, full_name, registration_number, status").order("full_name").order("id").range(a, b)),
+  });
+}
+
+function LinkedName({ id }: { id: string | null }) {
+  const people = usePeople();
+  if (!id) return <>—</>;
+  return <>{people.data?.find((p) => p.id === id)?.full_name ?? "—"}</>;
+}
+
+/**
+ * RH vincula o colaborador contratado à vaga e, no mesmo passo, pode agendar o ASO admissional e abrir o
+ * acompanhamento em Documentação › Novos Clientes no cliente da vaga.
+ */
+function LinkCollaborator({ req, cName }: { req: Req; cName: (id: string) => string }) {
+  const qc = useQueryClient();
+  const { user, profile } = useCurrentUser();
+  const people = usePeople();
+  const [personId, setPersonId] = useState(req.collaborator_id ?? "");
+  const [aso, setAso] = useState(!req.collaborator_id);
+  const [asoDate, setAsoDate] = useState(todayISO());
+  const [asoTime, setAsoTime] = useState("07:00");
+  const [onboarding, setOnboarding] = useState(!req.collaborator_id && !!req.client_id);
+  const options = useMemo(
+    () => (people.data ?? []).filter((p) => p.status === "active" || p.id === req.collaborator_id)
+      .map((p) => ({ value: p.id, label: p.full_name, hint: p.registration_number ?? undefined })),
+    [people.data, req.collaborator_id],
+  );
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!personId) throw new Error("Escolha o colaborador contratado.");
+      if (aso && (!asoDate || !asoTime)) throw new Error("Informe data e horário do ASO admissional.");
+      const name = profile?.full_name || user?.email || null;
+      const person = people.data?.find((p) => p.id === personId)?.full_name ?? "";
+      const notes: string[] = [];
+      if (personId !== req.collaborator_id) {
+        const { error } = await supabase.from("hiring_requests").update({ collaborator_id: personId }).eq("id", req.id);
+        if (error) throw error;
+        notes.push(`Colaborador vinculado: ${person}`);
+      }
+      if (aso) {
+        const conflicts = await findDateConflicts(personId, asoDate, asoDate, undefined, asoTime, { type: "aso" });
+        if (conflicts.length) throw new Error(`ASO não agendado: ${conflicts.join("; ")}`);
+        const replaced = await futureSameKind({ collaborator_id: personId, type: "aso" });
+        const { error } = await supabase.from("appointments").insert({
+          type: "aso", collaborator_id: personId, scheduled_date: asoDate, scheduled_time: asoTime,
+          original_date: asoDate, original_time: asoTime, notes: `ASO admissional · contratação ${num(req.number)}`,
+        });
+        if (error) throw error;
+        notes.push(`ASO admissional agendado para ${asoDate.split("-").reverse().join("/")} às ${asoTime}${replacedText(replaced)}`);
+      }
+      if (onboarding && req.client_id) {
+        const { error } = await supabase.from("client_onboardings").insert({
+          client_id: req.client_id, collaborator_id: personId, status: "pendente",
+          notes: `Contratação ${num(req.number)}`,
+        });
+        if (error && error.code !== "23505") throw error;
+        notes.push(error ? `Novos Clientes: já havia acompanhamento aberto em ${cName(req.client_id)}` : `Incluído em Novos Clientes (${cName(req.client_id)})`);
+      }
+      if (!notes.length) throw new Error("Nada para atualizar.");
+      const ev = await supabase.from("hiring_request_events").insert({
+        request_id: req.id, user_id: user!.id, user_name: name, event: "observacao",
+        old_status: req.status, new_status: req.status, filled: req.filled, note: notes.join(" · "),
+      });
+      if (ev.error) throw ev.error;
+      return notes;
+    },
+    onSuccess: (notes) => {
+      toast.success(notes.join(" · "));
+      setAso(false);
+      setOnboarding(false);
+      qc.invalidateQueries({ queryKey: ["hiring-requests"] });
+      qc.invalidateQueries({ queryKey: ["hiring-events", req.id] });
+      qc.invalidateQueries({ queryKey: ["appointments"] });
+      qc.invalidateQueries({ queryKey: ["client-onboarding"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="panel space-y-3 p-3">
+      <p className="font-display text-sm uppercase tracking-wide">Colaborador contratado (RH)</p>
+      <div className="space-y-1">
+        <Label className="block">Colaborador</Label>
+        <SearchSelect value={personId} onChange={setPersonId} options={options} placeholder="Selecione o colaborador" searchPlaceholder="Nome ou matrícula" />
+      </div>
+      <label className="flex items-center gap-2 text-sm"><Checkbox checked={aso} onCheckedChange={(c) => setAso(!!c)} />Agendar ASO admissional</label>
+      {aso && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1"><Label>Data do ASO</Label><Input type="date" value={asoDate} onChange={(e) => setAsoDate(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Horário</Label><Input type="time" value={asoTime} onChange={(e) => setAsoTime(e.target.value)} /></div>
+        </div>
+      )}
+      {req.client_id && (
+        <label className="flex items-center gap-2 text-sm"><Checkbox checked={onboarding} onCheckedChange={(c) => setOnboarding(!!c)} />Incluir em Novos Clientes ({cName(req.client_id)})</label>
+      )}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>{req.collaborator_id ? "Salvar" : "Vincular colaborador"}</Button>
+      </div>
+    </div>
   );
 }
 

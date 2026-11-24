@@ -44,8 +44,10 @@ import { AppointmentDialog } from "@/components/appointment-dialog";
 import { useInConference, useScheduled } from "@/hooks/use-scheduled";
 import { FollowUpFilter, followUpApplies, matchesFollowUp, type FollowUp } from "@/components/controles/follow-up-filter";
 import { emptyToNull, normText, parseDate } from "@/lib/import-helpers";
-import { asoStatusOf, expiryFrom, formatDateBR, todayISO, ASO_LABEL, type AsoStatus } from "@/lib/scheduling";
+import { asoStatusOf, formatDateBR, todayISO, ASO_LABEL, type AsoStatus } from "@/lib/scheduling";
 import { pendingFirst } from "@/lib/pending-first";
+import { fetchAll } from "@/lib/results-engine";
+import { asoExpiry } from "@/lib/doc-status";
 
 
 type Row = {
@@ -81,7 +83,7 @@ type FormState = { collaborator_id: string; exam_date: string; notes: string };
 const emptyForm: FormState = { collaborator_id: "", exam_date: todayISO(), notes: "" };
 
 /** Vencimento = 1 ano após a realização − 1 dia (mesma regra do banco). */
-const expiryOf = (examDate: string) => expiryFrom(examDate, 12);
+const expiryOf = asoExpiry;
 
 export function AsosPage() {
   const { canWrite, isAdmin } = useCurrentUser();
@@ -104,25 +106,25 @@ export function AsosPage() {
   const asos = useQuery({
     queryKey: ["asos"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<Row>((a, b) => supabase
         .from("asos")
         .select("id, collaborator_id, exam_date, expires_at, notes")
-        .order("exam_date", { ascending: false });
-      if (error) throw error;
-      return data as Row[];
+        .order("exam_date", { ascending: false })
+        .order("id")
+        .range(a, b));
     },
   });
 
   const collaborators = useQuery({
     queryKey: ["collaborators-min-active-aso"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      return fetchAll<{ id: string; full_name: string; registration_number: string; position_id: string | null }>((a, b) => supabase
         .from("collaborators")
         .select("id, full_name, registration_number, position_id")
         .eq("status", "active")
-        .order("full_name");
-      if (error) throw error;
-      return data;
+        .order("full_name")
+        .order("id")
+        .range(a, b));
     },
   });
 
@@ -152,7 +154,12 @@ export function AsosPage() {
 
   const filtered = useMemo(() => {
     const q = normText(search);
-    return pendingFirst((asos.data ?? []).filter((r) => {
+    // Ativos sem nenhum ASO entram como pendentes ("Sem ASO cadastrado"), no topo junto dos vencidos.
+    const withAso = new Set((asos.data ?? []).map((r) => r.collaborator_id));
+    const missing: Row[] = asos.data
+      ? (collaborators.data ?? []).filter((p) => !withAso.has(p.id)).map((p) => ({ id: `missing:${p.id}`, collaborator_id: p.id, exam_date: "", expires_at: "", notes: null }))
+      : [];
+    return pendingFirst([...missing, ...(asos.data ?? [])].filter((r) => {
       const p = personById.get(r.collaborator_id);
       if (!p) return false;
       const status = asoStatusOf(r.expires_at, today);
@@ -164,18 +171,19 @@ export function AsosPage() {
         if (!hit) return false;
       }
       return true;
-    }), (r) => asoStatusOf(r.expires_at, today), (r) => r.expires_at, {
+    }), (r) => { const st = asoStatusOf(r.expires_at, today); return st === "missing" ? "expired" : st; }, (r) => r.expires_at, {
       handled: (r) => scheduled.has(r.collaborator_id) || inConf.has(r.collaborator_id),
       name: (r) => personById.get(r.collaborator_id)?.full_name ?? "",
     });
-  }, [asos.data, search, statusFilter, followUp, scheduled, inConf, personById, today]);
+  }, [asos.data, collaborators.data, search, statusFilter, followUp, scheduled, inConf, personById, today]);
 
   const summary = useMemo(() => {
-    const s = { total: filtered.length, valid: 0, expiring: 0, expired: 0 };
+    const s = { total: filtered.length, valid: 0, expiring: 0, expired: 0, missing: 0 };
     filtered.forEach((r) => {
       const st = asoStatusOf(r.expires_at, today);
       if (st === "valid") s.valid++;
       else if (st === "expiring") s.expiring++;
+      else if (st === "missing") s.missing++;
       else s.expired++;
     });
     return s;
@@ -184,11 +192,13 @@ export function AsosPage() {
   const peopleOptions = useMemo(() => {
     const q = normText(personQuery);
     const list = collaborators.data ?? [];
-    if (!q) return list.slice(0, 50);
-    return list
+    const out = !q ? list.slice(0, 50) : list
       .filter((p) => normText(p.full_name).includes(q) || normText(p.registration_number).includes(q))
       .slice(0, 50);
-  }, [collaborators.data, personQuery]);
+    // O colaborador já escolhido (ex.: "Registrar ASO" de quem está sem ASO) aparece mesmo fora dos 50 primeiros.
+    const sel = form.collaborator_id ? list.find((p) => p.id === form.collaborator_id) : undefined;
+    return sel && !out.some((p) => p.id === sel.id) ? [sel, ...out] : out;
+  }, [collaborators.data, personQuery, form.collaborator_id]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -238,9 +248,9 @@ export function AsosPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  function openNew() {
+  function openNew(collaboratorId?: string) {
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, collaborator_id: collaboratorId ?? "" });
     setPersonQuery("");
     setOpen(true);
   }
@@ -329,7 +339,7 @@ export function AsosPage() {
               />
             )}
             {canWrite && (
-              <Button size="sm" onClick={openNew}>
+              <Button size="sm" onClick={() => openNew()}>
                 <Plus className="h-4 w-4" /> Novo ASO
               </Button>
             )}
@@ -342,6 +352,7 @@ export function AsosPage() {
         <Badge variant="outline">Válidos: {summary.valid}</Badge>
         <Badge variant="secondary">Próximos a vencer: {summary.expiring}</Badge>
         <Badge variant="destructive">Vencidos: {summary.expired}</Badge>
+        <Badge variant="destructive">Sem ASO: {summary.missing}</Badge>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -369,6 +380,7 @@ export function AsosPage() {
               <SelectItem value="valid">Válidos</SelectItem>
               <SelectItem value="expiring">Próximos a vencer</SelectItem>
               <SelectItem value="expired">Vencidos</SelectItem>
+              <SelectItem value="missing">Sem ASO</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -418,12 +430,17 @@ export function AsosPage() {
                   <TableCell>
                     <div className="flex justify-end gap-1">
                       <AppointmentDialog type="aso" iconOnly initialValues={{ collaborator_id: r.collaborator_id }} />
-                      {canWrite && (
+                      {canWrite && r.id.startsWith("missing:") && (
+                        <Button size="icon" variant="ghost" onClick={() => openNew(r.collaborator_id)} aria-label="Registrar ASO" title="Registrar ASO">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canWrite && !r.id.startsWith("missing:") && (
                         <Button size="icon" variant="ghost" onClick={() => openEdit(r)} aria-label="Editar">
                           <Pencil className="h-4 w-4" />
                         </Button>
                       )}
-                      {canWrite && (
+                      {canWrite && !r.id.startsWith("missing:") && (
                         <Button
                           size="icon"
                           variant="ghost"

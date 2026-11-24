@@ -3,6 +3,7 @@
  * Vermelho = alto impacto; laranja = pequeno impacto. Regras escolhidas pelo usuário:
  * V1 treinamento sem TST no ADM · V8 veículo sem motorista / CNH vencida · V9 cliente sem transporte ·
  * V10 descanso < 11h entre jornadas · V11 programação do próximo dia útil não criada após o horário de corte ·
+ * V13 documento já vencido de escalado (ASO, integração no cliente, treinamento exigido pelo cliente) ·
  * L1 documentos vencendo em 7 dias · L2 agendamento sem confirmação na plataforma · L5 pessoas sem escalação (sem intermitentes e PJ).
  * (L4, manutenção de veículo, aguarda a aba Manutenção estar alimentada.)
  */
@@ -55,6 +56,8 @@ export type AlertData = {
   asos: { collaborator_id: string; expires_at: string | null }[];
   integrations: { collaborator_id: string; client_id: string; expires_at: string | null; documentation: boolean | null }[];
   trainings: { collaborator_id: string; training_id: string; name: string; expires_at: string | null }[];
+  /** Treinamentos exigidos por cliente (client_id → training_ids), do cadastro do cliente. */
+  required?: Map<string, Set<string>>;
   /** Quem está fora do dia por quadro (falta, folga...), férias, folga, atestado ou agendamento. */
   accounted: Set<string>;
   /** Quem trabalhou nos 14 dias anteriores. */
@@ -152,6 +155,22 @@ export function scheduleAlerts(d: AlertData): ScheduleAlert[] {
   for (const x of latestBy(d.trainings.filter((x) => staff.has(x.collaborator_id)), (x) => `${x.collaborator_id}|${x.training_id}`).values())
     if (soon(x.expires_at) && !d.covered.has(`trn|${x.collaborator_id}|${x.training_id}`)) expiring.push(`${name(x.collaborator_id)} · ${x.name} vence ${br(x.expires_at!)}`);
   if (expiring.length) out.push({ key: "l1", tone: "orange", title: `${expiring.length} documento(s) de escalados vencendo em até 7 dias`, people: expiring.sort() });
+
+  // V13: documento JÁ VENCIDO de quem está escalado — ASO, integração no cliente escalado ou treinamento exigido por ele.
+  // Agendamento do mesmo documento (ou realizado aguardando a Conferência) cobre.
+  const expired: string[] = [];
+  const gone = (e: string | null) => !!e && e < d.date;
+  for (const x of latestBy(d.asos.filter((x) => staff.has(x.collaborator_id)), (x) => x.collaborator_id).values())
+    if (gone(x.expires_at) && !d.covered.has(`aso|${x.collaborator_id}`)) expired.push(`${name(x.collaborator_id)} · ASO vencido em ${br(x.expires_at!)}`);
+  for (const x of latestBy(d.integrations.filter((x) => !x.documentation && clientsOf.get(x.collaborator_id)?.has(x.client_id)), (x) => `${x.collaborator_id}|${x.client_id}`).values())
+    if (gone(x.expires_at) && !d.covered.has(`int|${x.collaborator_id}|${x.client_id}`)) expired.push(`${name(x.collaborator_id)} · integração ${d.clients.get(x.client_id)?.name ?? ""} vencida em ${br(x.expires_at!)}`);
+  const requiredFor = (cid: string, tid: string) => [...(clientsOf.get(cid) ?? [])].some((c) => d.required?.get(c)?.has(tid));
+  // Sem vencimento no registro mais recente = não vence (latestBy compara "" < data, então trata à parte).
+  const noExpiry = new Set(d.trainings.filter((x) => !x.expires_at).map((x) => `${x.collaborator_id}|${x.training_id}`));
+  for (const x of latestBy(d.trainings.filter((x) => staff.has(x.collaborator_id) && requiredFor(x.collaborator_id, x.training_id)), (x) => `${x.collaborator_id}|${x.training_id}`).values())
+    if (gone(x.expires_at) && !noExpiry.has(`${x.collaborator_id}|${x.training_id}`) && !d.covered.has(`trn|${x.collaborator_id}|${x.training_id}`))
+      expired.push(`${name(x.collaborator_id)} · ${x.name} vencido em ${br(x.expires_at!)}`);
+  if (expired.length) out.push({ key: "v13", tone: "red", title: `${expired.length} documento(s) vencido(s) de escalados`, people: expired.sort() });
 
   // L2: integração agendada no dia sem confirmação na plataforma do cliente (só integrações têm a bolinha verde).
   const unbooked = d.appointments.filter((a) => a.type === "integracao" && a.status === "agendado" && !a.client_booked);

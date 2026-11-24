@@ -22,6 +22,13 @@ export async function fetchScheduleAlerts(date: string) {
     safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, status, client_booked, training_id, client_id, trainings(name), clients(name)").eq("scheduled_date", date).neq("status", "cancelado").range(a, b))),
     safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, training_id, client_id").eq("status", "agendado").gte("scheduled_date", today).range(a, b))),
   ]);
+  // Também cobrem: realizados nos últimos 60 dias (documento aguardando a Conferência) e os treinamentos exigidos pelos clientes.
+  const [doneRecent, requiredRows] = await Promise.all([
+    safe(fetchAll<any>((a, b) => supabase.from("appointments").select("collaborator_id, type, training_id, client_id").eq("status", "realizado").gte("scheduled_date", addDaysIso(today, -60)).range(a, b))),
+    safe(fetchAll<any>((a, b) => supabase.from("client_required_trainings").select("client_id, training_id").range(a, b))),
+  ]);
+  const required = new Map<string, Set<string>>();
+  for (const r of requiredRows) required.set(r.client_id, new Set([...(required.get(r.client_id) ?? []), r.training_id]));
   const sched = schedules.find((s) => s.schedule_date === date);
   const prevSched = schedules.find((s) => s.schedule_date === prev);
   const recentIds = schedules.filter((s) => s.schedule_date < date).map((s) => s.id);
@@ -66,7 +73,7 @@ export async function fetchScheduleAlerts(date: string) {
 
   const kind = (t: string) => { const s = String(t).toLowerCase(); return s.includes("aso") ? "aso" : s.startsWith("trein") ? "trn" : s.startsWith("integ") ? "int" : ""; };
   const covered = new Set<string>();
-  for (const a of future) {
+  for (const a of [...future, ...doneRecent]) {
     const k = kind(a.type);
     if (k === "aso") covered.add(`aso|${a.collaborator_id}`);
     if (k === "trn" && a.training_id) covered.add(`trn|${a.collaborator_id}|${a.training_id}`);
@@ -100,7 +107,7 @@ export async function fetchScheduleAlerts(date: string) {
       label: kind(a.type) === "trn" ? `treinamento ${a.trainings?.name ?? ""}`.trim() : kind(a.type) === "int" ? `integração ${a.clients?.name ?? ""}`.trim() : "ASO",
     })),
     covered,
-    asos, integrations: ints,
+    asos, integrations: ints, required,
     trainings: trns.map((t: any) => ({ collaborator_id: t.collaborator_id, training_id: t.training_id, name: t.trainings?.name ?? "treinamento", expires_at: t.expires_at })),
     accounted: new Set([
       ...boxes.map((x: any) => x.collaborator_id), ...vacations.map((x: any) => x.collaborator_id), ...medical.map((x: any) => x.collaborator_id),

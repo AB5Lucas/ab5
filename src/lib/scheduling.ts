@@ -1,26 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAll } from "@/lib/results-engine";
+import { addDays, DOC_WARN_DAYS, docStatus, expiryFrom } from "@/lib/doc-status";
+
+export { addDays, expiryFrom };
 
 export const todayISO = () => {
   const d = new Date();
   const off = d.getTimezoneOffset();
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
-};
-
-export const addDays = (iso: string, days: number) => {
-  const d = new Date(iso + "T12:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-};
-
-/**
- * Vencimento = realização + validade (meses) − 1 dia.
- * Ex.: 15/01/2026 + 12 meses → 14/01/2027. Válido até o próprio dia do vencimento.
- */
-export const expiryFrom = (iso: string, months: number) => {
-  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
-  const dt = new Date(Date.UTC(y!, m! - 1 + months, d!));
-  dt.setUTCDate(dt.getUTCDate() - 1);
-  return dt.toISOString().slice(0, 10);
 };
 
 /** Dia anterior de programação: numa segunda-feira, volta para a sexta. */
@@ -81,7 +68,7 @@ export type Aso = {
 };
 
 /** Dias de antecedência para considerar a integração "próxima do vencimento". */
-export const INTEGRATION_WARN_DAYS = 30;
+export const INTEGRATION_WARN_DAYS = DOC_WARN_DAYS;
 
 export type AsoStatus = "valid" | "expiring" | "expired" | "missing";
 
@@ -94,10 +81,7 @@ export const ASO_LABEL: Record<AsoStatus, string> = {
 
 /** Status do ASO mais recente do colaborador (não depende da obra). */
 export function asoStatusOf(expires: string | null | undefined, date: string): AsoStatus {
-  if (!expires) return "missing";
-  if (expires < date) return "expired";
-  if (expires <= addDays(date, INTEGRATION_WARN_DAYS)) return "expiring";
-  return "valid";
+  return expires ? docStatus(expires, date, INTEGRATION_WARN_DAYS) : "missing";
 }
 
 export type IntegrationStatus =
@@ -117,15 +101,25 @@ export const INTEGRATION_LABEL: Record<IntegrationStatus, string> = {
   not_required: "Integração não exigida",
 };
 
+/** Clientes em que ASO vencido/ausente não bloqueia a escalação: o Pátio é a espera de quem ainda não foi liberado. */
+const ASO_FREE_CLIENTS = new Set(["PATIO"]);
+const plainName = (s: string | null | undefined) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+
+type CtxWork = {
+  id: string; name: string; client_id: string | null; entry_time: string | null; exit_time: string | null; exit_time_weekend: string | null;
+  status: string | null; active: boolean | null;
+  clients: { name: string; city: string | null; distance_km: number | null; requires_integration: boolean | null; needs_transport_voucher: boolean | null } | null;
+};
+
 /** Data needed to build a schedule for a given date. */
 export async function fetchScheduleContext(date: string) {
+  // Listas que passam de 1000 linhas são lidas em páginas (antes cortava em silêncio no limite do Supabase).
   const [
     works,
     collaborators,
     positions,
     vehicles,
     baseTeams,
-    requirements,
     trainings,
     collabTrainings,
     vacations,
@@ -134,18 +128,20 @@ export async function fetchScheduleContext(date: string) {
     holidays,
     integrations,
     asos,
+    required,
+    confChecks,
   ] = await Promise.all([
-    supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, active, clients(name, city, distance_km, requires_integration, needs_transport_voucher)").order("name"),
-    supabase
+    fetchAll<CtxWork>((f, t) => supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, active, clients(name, city, distance_km, requires_integration, needs_transport_voucher)").order("name").order("id").range(f, t) as never),
+    fetchAll<Collaborator>((f, t) => supabase
       .from("collaborators")
       .select("id, full_name, cpf, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type, notice_start, notice_end")
-      .order("full_name"),
+      .order("full_name").order("id").range(f, t)),
     supabase.from("positions").select("id, name").order("name"),
     supabase.from("vehicles").select("id, plate, model, passenger_capacity, status").order("plate"),
     supabase.from("work_base_teams").select("*").eq("active", true).lte("start_date", date),
-    Promise.resolve({ data: [] }),
     supabase.from("trainings").select("id, name, validity_months"),
-    supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at"),
+    fetchAll<{ collaborator_id: string; training_id: string; expires_at: string | null }>((f, t) =>
+      supabase.from("collaborator_trainings").select("collaborator_id, training_id, expires_at").order("id").range(f, t)),
     supabase.from("vacations").select("collaborator_id").lte("start_date", date).gte("end_date", date),
     supabase.from("medical_leaves").select("collaborator_id").lte("start_date", date).gte("end_date", date),
     supabase
@@ -154,21 +150,25 @@ export async function fetchScheduleContext(date: string) {
       .lte("date", date)
       .or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`),
     supabase.from("holidays").select("name").eq("date", date),
-    supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at, documentation"),
-    supabase.from("asos").select("collaborator_id, exam_date, expires_at"),
+    fetchAll<Integration>((f, t) => supabase.from("client_integrations").select("collaborator_id, client_id, integration_date, expires_at, documentation").order("id").range(f, t)),
+    fetchAll<Aso>((f, t) => supabase.from("asos").select("collaborator_id, exam_date, expires_at").order("id").range(f, t)),
+    // Treinamentos exigidos pelo cliente (cadastro do cliente). Falha (ex.: tabela ainda não criada) = nenhum exigido.
+    fetchAll<{ client_id: string; training_id: string }>((f, t) =>
+      supabase.from("client_required_trainings").select("client_id, training_id").order("client_id").order("training_id").range(f, t)).catch(() => []),
+    // Aceites parciais da Conferência: documento aceito por um cliente libera só aquele cliente.
+    fetchAll<{
+      client_id: string;
+      approved: boolean;
+      conference_items: { collaborator_id: string; type: string; training_id: string | null; status: string } | null;
+    }>((f, t) => supabase
+      .from("conference_checks")
+      .select("client_id, approved, conference_items!inner(collaborator_id, type, training_id, status)")
+      .order("id").range(f, t) as never),
   ]);
 
-  // Aceites parciais da Conferência: documento aceito por um cliente libera só aquele cliente.
-  const confChecks = await supabase
-    .from("conference_checks")
-    .select("client_id, approved, conference_items!inner(collaborator_id, type, training_id, status)");
   const conferenceAccepted = new Set<string>();
   const conferencePending = new Set<string>();
-  for (const r of (confChecks.data ?? []) as unknown as {
-    client_id: string;
-    approved: boolean;
-    conference_items: { collaborator_id: string; type: string; training_id: string | null; status: string } | null;
-  }[]) {
+  for (const r of confChecks) {
     const it = r.conference_items;
     if (!it || it.status === "concluido") continue;
     const kind = String(it.type).toLowerCase().includes("aso") ? "aso" : `t:${it.training_id ?? ""}`;
@@ -181,26 +181,51 @@ export async function fetchScheduleContext(date: string) {
   (leaves.data ?? []).forEach((v) => absences.set(v.collaborator_id, "Atestado"));
   (daysOff.data ?? []).forEach((v) => absences.set(v.collaborator_id, "Folga"));
 
-  const allPeople = (collaborators.data ?? []) as Collaborator[];
+  const allPeople = collaborators;
+  const trainingList = trainings.data ?? [];
+  const trainingName = new Map(trainingList.map((t) => [t.id, t.name]));
+  const requiredByClient = new Map<string, string[]>();
+  for (const r of required) requiredByClient.set(r.client_id, [...(requiredByClient.get(r.client_id) ?? []), r.training_id]);
 
   return {
-    works: works.data ?? [],
+    works,
     collaborators: allPeople.filter((p) => p.status === "active"),
     /** Inativos: só entram na tela quando já estavam escalados no dia. */
     inactiveCollaborators: allPeople.filter((p) => p.status !== "active"),
     positions: positions.data ?? [],
     vehicles: vehicles.data ?? [],
     baseTeams: (baseTeams.data ?? []).filter((b) => !b.end_date || b.end_date >= date),
-    requirements: [] as Requirement[], // aba Requisitos removida
-    trainings: trainings.data ?? [],
-    collabTrainings: collabTrainings.data ?? [],
+    /** Requisitos de cada serviço = treinamentos exigidos pelo cliente do serviço (bloqueiam a escalação). */
+    requirements: requirementsFrom(works, requiredByClient, trainingName),
+    /** Treinamentos exigidos por cliente (client_id → training_ids). */
+    requiredTrainings: requiredByClient,
+    trainings: trainingList,
+    collabTrainings,
     absences,
     holiday: holidays.data?.[0]?.name ?? null,
-    integrations: (integrations.data ?? []) as Integration[],
-    asos: (asos.data ?? []) as Aso[],
+    integrations,
+    asos,
     conferenceAccepted,
     conferencePending,
   };
+}
+
+/** Um requisito de treinamento (bloqueante) por serviço × treinamento exigido pelo cliente do serviço. */
+export function requirementsFrom(
+  works: { id: string; client_id: string | null }[],
+  requiredByClient: Map<string, string[]>,
+  trainingName: Map<string, string>,
+): Requirement[] {
+  const out: Requirement[] = [];
+  for (const w of works) {
+    if (!w.client_id) continue;
+    for (const tid of requiredByClient.get(w.client_id) ?? [])
+      out.push({
+        id: `${w.client_id}|${tid}|${w.id}`, work_id: w.id, requirement_type: "training", requirement_id: tid,
+        requirement_label: trainingName.get(tid) ?? "Treinamento", mandatory: true, blocking: true, active: true,
+      });
+  }
+  return out;
 }
 
 /** Documento aceito na Conferência para o cliente do serviço (ainda não concluída). */
@@ -294,12 +319,10 @@ export function checkRequirements(
 
     switch (req.requirement_type) {
       case "training": {
-        label = `Treinamento: ${trainingName ?? req.requirement_label ?? "—"}`;
-        const rec = ctx.collabTrainings.find(
-          (t) => t.collaborator_id === collaboratorId && t.training_id === req.requirement_id,
-        );
-        ok = (!!rec && (!rec.expires_at || rec.expires_at >= date)) ||
-          acceptedForWork(ctx, collaboratorId, `t:${req.requirement_id ?? ""}`, workId);
+        const st = checkTraining(ctx, collaboratorId, req.requirement_id ?? "", date, workId);
+        const name = trainingName ?? req.requirement_label ?? "Treinamento";
+        ok = st.status === "valid" || st.status === "expiring";
+        label = st.status === "expired" ? `${name} vencida em ${formatDateBR(st.expiresAt)}` : `Sem ${name}`;
         break;
       }
       case "position": {
@@ -321,7 +344,47 @@ export function checkRequirements(
 
     if (!ok) issues.push({ label, blocking: req.blocking });
   }
+
+  // ASO vencido/ausente bloqueia em todo cliente. Nos que exigem integração o evaluate da Programação já bloqueia
+  // (asoBad); aqui entram os demais (ADM, Indústria, Comercial...), menos o Pátio (espera de liberação).
+  if (asoBlocksWork(ctx, workId) && !workRequiresIntegration(ctx, workId)) {
+    const aso = checkAso(ctx, collaboratorId, date, workId);
+    if (aso.status === "expired") issues.push({ label: `ASO vencido em ${formatDateBR(aso.expiresAt)}`, blocking: true });
+    if (aso.status === "missing") issues.push({ label: "Não possui ASO válido", blocking: true });
+  }
   return issues;
+}
+
+/** ASO vencido/ausente bloqueia a escalação neste serviço? Todo serviço com cliente, menos o Pátio. */
+export function asoBlocksWork(ctx: ScheduleContext, workId: string): boolean {
+  const work = ctx.works.find((w) => w.id === workId);
+  if (!work?.client_id) return false;
+  return !ASO_FREE_CLIENTS.has(plainName(work.clients?.name));
+}
+
+export type TrainingCheck = { status: "valid" | "expiring" | "expired" | "missing"; expiresAt: string | null };
+
+/**
+ * Treinamento do colaborador na data (registro de vencimento mais distante; sem vencimento = não vence).
+ * Vencido/ausente com documento aceito na Conferência por este cliente conta como válido.
+ */
+export function checkTraining(
+  ctx: ScheduleContext,
+  collaboratorId: string,
+  trainingId: string,
+  date: string,
+  workId?: string | null,
+): TrainingCheck {
+  let best: { expires_at: string | null } | null = null;
+  for (const t of ctx.collabTrainings)
+    if (t.collaborator_id === collaboratorId && t.training_id === trainingId && (!best || (t.expires_at ?? "9999-12-31") > (best.expires_at ?? "9999-12-31"))) best = t;
+  const status: TrainingCheck["status"] = !best ? "missing"
+    : !best.expires_at ? "valid"
+      : best.expires_at < date ? "expired"
+        : best.expires_at <= addDays(date, INTEGRATION_WARN_DAYS) ? "expiring" : "valid";
+  if ((status === "expired" || status === "missing") && acceptedForWork(ctx, collaboratorId, `t:${trainingId}`, workId))
+    return { status: "valid", expiresAt: best?.expires_at ?? null };
+  return { status, expiresAt: best?.expires_at ?? null };
 }
 
 export const formatDateBR = (iso?: string | null) => {
