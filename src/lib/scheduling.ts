@@ -38,6 +38,11 @@ export type Collaborator = {
   /** Aviso prévio (RH): início e fim; depois do fim não pode ser escalado em obras. */
   notice_start?: string | null;
   notice_end?: string | null;
+  /** Benefícios (Programação: bolinhas de VT e prêmio viagem). */
+  city?: string | null;
+  vt_enabled?: boolean | null;
+  vt_always_full?: boolean | null;
+  travel_bonus_enabled?: boolean | null;
 };
 
 export type Requirement = {
@@ -134,7 +139,7 @@ export async function fetchScheduleContext(date: string) {
     fetchAll<CtxWork>((f, t) => supabase.from("works").select("id, name, client_id, entry_time, exit_time, exit_time_weekend, status, active, clients(name, city, distance_km, requires_integration, needs_transport_voucher)").order("name").order("id").range(f, t) as never),
     fetchAll<Collaborator>((f, t) => supabase
       .from("collaborators")
-      .select("id, full_name, cpf, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type, notice_start, notice_end")
+      .select("id, full_name, cpf, registration_number, position_id, status, is_driver, driver_license_category, driver_license_expiry, contract_type, notice_start, notice_end, city, vt_enabled, vt_always_full, travel_bonus_enabled")
       .order("full_name").order("id").range(f, t)),
     supabase.from("positions").select("id, name").order("name"),
     supabase.from("vehicles").select("id, plate, model, passenger_capacity, status").order("plate"),
@@ -186,17 +191,29 @@ export async function fetchScheduleContext(date: string) {
   const trainingName = new Map(trainingList.map((t) => [t.id, t.name]));
   const requiredByClient = new Map<string, string[]>();
   for (const r of required) requiredByClient.set(r.client_id, [...(requiredByClient.get(r.client_id) ?? []), r.training_id]);
+  const requirements = requirementsFrom(works, requiredByClient, trainingName);
+  const activePeople = allPeople.filter((p) => p.status === "active");
+
+  // Índices para as checagens por pessoa (antes cada chamada percorria todos os ASOs/treinamentos/integrações).
+  const asosBy = new Map<string, Aso[]>();
+  for (const a of asos) asosBy.set(a.collaborator_id, [...(asosBy.get(a.collaborator_id) ?? []), a]);
+  const integrationBy = new Map<string, Integration>();
+  for (const i of integrations) { const k = `${i.collaborator_id}|${i.client_id}`; if (!integrationBy.has(k)) integrationBy.set(k, i); }
+  const collabTrainingsBy = new Map<string, typeof collabTrainings>();
+  for (const t of collabTrainings) collabTrainingsBy.set(t.collaborator_id, [...(collabTrainingsBy.get(t.collaborator_id) ?? []), t]);
+  const requirementsByWork = new Map<string, Requirement[]>();
+  for (const r of requirements) requirementsByWork.set(r.work_id, [...(requirementsByWork.get(r.work_id) ?? []), r]);
 
   return {
     works,
-    collaborators: allPeople.filter((p) => p.status === "active"),
+    collaborators: activePeople,
     /** Inativos: só entram na tela quando já estavam escalados no dia. */
     inactiveCollaborators: allPeople.filter((p) => p.status !== "active"),
     positions: positions.data ?? [],
     vehicles: vehicles.data ?? [],
     baseTeams: (baseTeams.data ?? []).filter((b) => !b.end_date || b.end_date >= date),
     /** Requisitos de cada serviço = treinamentos exigidos pelo cliente do serviço (bloqueiam a escalação). */
-    requirements: requirementsFrom(works, requiredByClient, trainingName),
+    requirements,
     /** Treinamentos exigidos por cliente (client_id → training_ids). */
     requiredTrainings: requiredByClient,
     trainings: trainingList,
@@ -207,8 +224,20 @@ export async function fetchScheduleContext(date: string) {
     asos,
     conferenceAccepted,
     conferencePending,
+    worksById: new Map(works.map((w) => [w.id, w])),
+    activeById: new Map(activePeople.map((p) => [p.id, p])),
+    trainingById: new Map(trainingList.map((t) => [t.id, t])),
+    positionById: new Map((positions.data ?? []).map((p) => [p.id, p])),
+    asosBy,
+    integrationBy,
+    collabTrainingsBy,
+    requirementsByWork,
   };
 }
+
+/** Serviço do contexto pelo id (índice quando existe). */
+const ctxWork = (ctx: ScheduleContext, workId: string | null | undefined) =>
+  workId ? (ctx.worksById?.get(workId) ?? ctx.works.find((w) => w.id === workId)) : undefined;
 
 /** Um requisito de treinamento (bloqueante) por serviço × treinamento exigido pelo cliente do serviço. */
 export function requirementsFrom(
@@ -236,14 +265,14 @@ export function acceptedForWork(
   workId?: string | null,
 ): boolean {
   if (!workId) return false;
-  const clientId = ctx.works.find((w) => w.id === workId)?.client_id;
+  const clientId = ctxWork(ctx, workId)?.client_id;
   if (!clientId) return false;
   return (ctx.conferenceAccepted ?? new Set()).has(`${collaboratorId}|${kind}|${clientId}`);
 }
 
 /** Documento aguardando aceite deste cliente na Conferência. */
 export function pendingForWork(ctx: ScheduleContext, collaboratorId: string, workId?: string | null): boolean {
-  const clientId = workId ? ctx.works.find((w) => w.id === workId)?.client_id : null;
+  const clientId = ctxWork(ctx, workId)?.client_id;
   if (!clientId) return false;
   for (const k of ctx.conferencePending ?? []) if (k.startsWith(`${collaboratorId}|`) && k.endsWith(`|${clientId}`)) return true;
   return false;
@@ -256,7 +285,7 @@ export function checkAso(
   date: string,
   workId?: string | null,
 ): { status: AsoStatus; expiresAt: string | null } {
-  const recs = (ctx.asos ?? []).filter((a) => a.collaborator_id === collaboratorId);
+  const recs = ctx.asosBy ? (ctx.asosBy.get(collaboratorId) ?? []) : (ctx.asos ?? []).filter((a) => a.collaborator_id === collaboratorId);
   const latest = recs.length ? recs.reduce((a, b) => (b.expires_at > a.expires_at ? b : a)) : null;
   const status = latest ? asoStatusOf(latest.expires_at, date) : "missing";
   if ((status === "expired" || status === "missing") && acceptedForWork(ctx, collaboratorId, "aso", workId))
@@ -267,7 +296,7 @@ export function checkAso(
 
 /** A obra exige integração (e, portanto, ASO válido)? */
 export function workRequiresIntegration(ctx: ScheduleContext, workId: string): boolean {
-  const work = ctx.works.find((w) => w.id === workId);
+  const work = ctxWork(ctx, workId);
   if (!work?.client_id) return false;
   return work.clients?.requires_integration !== false;
 }
@@ -279,11 +308,13 @@ export function checkIntegration(
   collaboratorId: string,
   date: string,
 ): { status: IntegrationStatus; expiresAt: string | null } {
-  const work = ctx.works.find((w) => w.id === workId);
+  const work = ctxWork(ctx, workId);
   const clientId = work?.client_id ?? null;
   if (!clientId) return { status: "no_client", expiresAt: null };
   if (work?.clients?.requires_integration === false) return { status: "not_required", expiresAt: null };
-  const rec = ctx.integrations.find((i) => i.collaborator_id === collaboratorId && i.client_id === clientId);
+  const rec = ctx.integrationBy
+    ? ctx.integrationBy.get(`${collaboratorId}|${clientId}`)
+    : ctx.integrations.find((i) => i.collaborator_id === collaboratorId && i.client_id === clientId);
   // Em Documentação, segue liberada enquanto não vence (pode ser marcada já perto do vencimento).
   if (!rec || (rec.documentation && (!rec.expires_at || rec.expires_at < date))) {
     // Integração agendada + documento aceito por este cliente na Conferência: libera a escalação.
@@ -307,13 +338,13 @@ export function checkRequirements(
   collaboratorId: string,
   date: string,
 ): { label: string; blocking: boolean }[] {
-  const person = ctx.collaborators.find((c) => c.id === collaboratorId);
+  const person = ctx.activeById ? ctx.activeById.get(collaboratorId) : ctx.collaborators.find((c) => c.id === collaboratorId);
   if (!person) return [];
   const issues: { label: string; blocking: boolean }[] = [];
 
-  for (const req of ctx.requirements.filter((r) => r.work_id === workId)) {
-    const trainingName = ctx.trainings.find((t) => t.id === req.requirement_id)?.name;
-    const positionName = ctx.positions.find((p) => p.id === req.requirement_id)?.name;
+  for (const req of ctx.requirementsByWork ? (ctx.requirementsByWork.get(workId) ?? []) : ctx.requirements.filter((r) => r.work_id === workId)) {
+    const trainingName = (ctx.trainingById?.get(req.requirement_id ?? "") ?? ctx.trainings.find((t) => t.id === req.requirement_id))?.name;
+    const positionName = (ctx.positionById?.get(req.requirement_id ?? "") ?? ctx.positions.find((p) => p.id === req.requirement_id))?.name;
     let ok = true;
     let label = req.requirement_label ?? "Requisito";
 
@@ -357,7 +388,7 @@ export function checkRequirements(
 
 /** ASO vencido/ausente bloqueia a escalação neste serviço? Todo serviço com cliente, menos o Pátio. */
 export function asoBlocksWork(ctx: ScheduleContext, workId: string): boolean {
-  const work = ctx.works.find((w) => w.id === workId);
+  const work = ctxWork(ctx, workId);
   if (!work?.client_id) return false;
   return !ASO_FREE_CLIENTS.has(plainName(work.clients?.name));
 }
@@ -376,7 +407,7 @@ export function checkTraining(
   workId?: string | null,
 ): TrainingCheck {
   let best: { expires_at: string | null } | null = null;
-  for (const t of ctx.collabTrainings)
+  for (const t of ctx.collabTrainingsBy ? (ctx.collabTrainingsBy.get(collaboratorId) ?? []) : ctx.collabTrainings)
     if (t.collaborator_id === collaboratorId && t.training_id === trainingId && (!best || (t.expires_at ?? "9999-12-31") > (best.expires_at ?? "9999-12-31"))) best = t;
   const status: TrainingCheck["status"] = !best ? "missing"
     : !best.expires_at ? "valid"

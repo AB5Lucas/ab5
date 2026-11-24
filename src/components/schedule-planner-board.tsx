@@ -59,6 +59,7 @@ import { cn } from "@/lib/utils";
 import { scheduleWriteError } from "@/lib/schedule-write-error";
 import { invalidateScheduleDay } from "@/lib/invalidate-day";
 import { SchedulePresence } from "@/components/schedule-planner/schedule-presence";
+import { useScheduleBenefits } from "@/components/schedule-planner/use-schedule-benefits";
 import { formatCpf } from "@/lib/copy-names";
 import { buildDistanceLookup } from "@/lib/city-distance";
 import { classifyOccurrence, type PendingOccurrence } from "@/lib/rdo";
@@ -78,184 +79,34 @@ import {
 } from "@/components/ui/alert-dialog";
 
 
-type Level = "ok" | "warn" | "block" | "busy";
-
-type Evaluation = {
-  level: Level;
-  reasons: string[];
-  integration: IntegrationStatus | null;
-  aso: AsoStatus | null;
-  reqIssues: number;
-  reqBlocked: boolean;
-  fit: boolean;
-  /** Indisponível por ausência/compromisso/caixa: aparece como ocupado, mas não pode ser alocado. */
-  hardBlock?: boolean;
-};
-
-type DragPayload = { collaboratorId: string; allocationId: string | null; entryId?: string | null };
-
-/** Caixas de situação que podem ser exibidas junto aos cards de obra. */
-const STATUS_BOXES = [
-  // Compromissos logo após as obras
-  { key: "integracao", label: "INTEGRAÇÃO" },
-  { key: "aso", label: "ASO" },
-  { key: "treinamento", label: "TREINAMENTO" },
-  // Depois ausências e situações
-  { key: "folga", label: "FOLGAS" },
-  { key: "atestado", label: "ATESTADO" },
-  { key: "ferias", label: "FÉRIAS" },
-  { key: "medico", label: "MÉDICO" },
-  { key: "afastado", label: "AFASTADO" },
-  { key: "falta", label: "FALTA" },
-  { key: "interjornada", label: "INTERJORNADA" },
-  { key: "licenca", label: "LICENÇA" },
-  { key: "abono", label: "ABONO" },
-  { key: "personalizada", label: "PERSONALIZADA" },
-] as const;
-
-const BOX_LABEL: Record<string, string> = Object.fromEntries(STATUS_BOXES.map((b) => [b.key, b.label]));
-
-/** Caixas alimentadas automaticamente (ausências e agendamentos) — não aparecem no menu. */
-const AUTO_BOX_KEYS = ["aso", "treinamento", "integracao", "ferias"];
-
-/** Caixas que o usuário liga manualmente pelo botão "Caixas". */
-const MANUAL_BOXES = STATUS_BOXES.filter((b) => !AUTO_BOX_KEYS.includes(b.key)).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-
-/** Ausências cadastradas → caixa correspondente (alimentada automaticamente). */
-const ABSENCE_BOX: Record<string, string> = {
-  "Férias": "ferias",
-  "Atestado": "atestado",
-  "Folga": "folga",
-};
-const BOXES_STORAGE_KEY = "planner-status-boxes";
-
-/** Sábado ou domingo: o dia começa sem nenhum cliente marcado (sem herança da sexta). */
-function isWeekendDate(iso: string) {
-  const [y = 1970, m = 1, d = 1] = iso.split("-").map(Number);
-  const wd = new Date(y, m - 1, d).getDay();
-  return wd === 0 || wd === 6;
-}
-
-/** Tipo de agendamento → caixa correspondente na programação. */
-const APPOINTMENT_BOX: Record<string, string> = {
-  aso: "aso",
-  treinamento: "treinamento",
-  integracao: "integracao",
-};
-
-/** Prefixo das caixas de integração (uma por cliente). */
-const INTEGRATION_PREFIX = "integracao:";
-
-/** Nome do cliente da caixa de integração. */
-function integrationClientOf(boxKey: string) {
-  return boxKey.slice(INTEGRATION_PREFIX.length);
-}
-
-/** Rótulo de uma caixa (inclui as dinâmicas de integração por cliente). */
-function boxLabelOf(boxKey: string): string {
-  if (boxKey.startsWith(INTEGRATION_PREFIX))
-    return `INTEGRAÇÃO - ${integrationClientOf(boxKey).toUpperCase()}`;
-  return BOX_LABEL[boxKey] ?? boxKey;
-}
-
-type AppointmentRow = {
-  type: string;
-  collaborator_id: string;
-  scheduled_time?: string | null;
-  notes?: string | null;
-  trainings: { name: string } | null;
-  clients: { name: string } | null;
-};
-
-/** Nome do cliente do agendamento de integração. */
-function appointmentClientName(a: AppointmentRow): string {
-  return a.clients?.name ?? "—";
-}
-
-const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-
-/** "2026-09-16" → "Dia 16/09 - Quarta" */
-function dayLine(iso: string): string {
-  const [y = 1970, m = 1, d = 1] = iso.split("-").map(Number);
-  const wd = WEEKDAYS[new Date(y, m - 1, d).getDay()];
-  return `Dia ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")} - ${wd}`;
-}
-
-/** "07:00:00" → "07h"; "07:30" → "07h30" */
-function hourLabel(time?: string | null): string {
-  if (!time) return "";
-  const [h, min] = time.split(":");
-  return min && min !== "00" ? `${h}h${min}` : `${h}h`;
-}
-
-const ASO_FOOTER = `👉ATENÇÃO👈
-
-👉Lembre-se de fazer jejum de 12 horas para não alterar os resultados dos exames.
-
-👉Solicitamos que após realização de exame periódico peçam à recepção da clínica uma declaração de comparecimento, constando data e o horário de chegada e saída, para fins de abono de horas.
-
-👉Após o exame retornar a INDUSTRIA.`;
-
-const ASO_ADDRESS =
-  "Av. Bandeirantes, 1.645, no piso superior do Boulevard Bandeiras, no Parque Cidade Nova.";
-
-async function copyToClipboard(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast.success("Mensagem copiada!");
-  } catch {
-    toast.error("Não foi possível copiar a mensagem");
-  }
-}
-
-/** Texto do box do compromisso agendado. */
-function appointmentLabel(a: AppointmentRow): string {
-  if (a.type === "aso") return "Exame ASO";
-  if (a.type === "treinamento") return `Treinamento - ${a.trainings?.name ?? "—"}`;
-  return `Integração - ${appointmentClientName(a)}`;
-}
-
-/** Caixa do agendamento — integrações são separadas por cliente. */
-function appointmentBoxKey(a: AppointmentRow): string | null {
-  if (a.type === "integracao") return `${INTEGRATION_PREFIX}${appointmentClientName(a)}`;
-  return APPOINTMENT_BOX[a.type] ?? null;
-}
-
-/** Padrão de VT dos quadros de compromisso (null = quadro sem VT). */
-function vtBoxDefault(key: string): boolean | null {
-  if (key === "aso" || key === "treinamento") return true;
-  if (key === "integracao" || key.startsWith(INTEGRATION_PREFIX)) return false;
-  if (key === "personalizada") return false;
-  return null;
-}
-
-const FILTERS = [
-  { key: "allocated", label: "Já alocados" },
-  { key: "unallocated", label: "Não alocados" },
-  { key: "warn", label: "Com pendência" },
-  { key: "blocked", label: "Bloqueados" },
-  { key: "pj_int", label: "Intermitentes/PJs" },
-] as const;
-
-
-/** Contratos ocultos por padrão na lista lateral. */
-const HIDDEN_CONTRACTS = ["pj", "intermitente"];
-
-type FilterKey = (typeof FILTERS)[number]["key"];
-
-const LEVEL_DOT: Record<Level, string> = {
-  ok: "bg-emerald-500",
-  warn: "bg-amber-500",
-  block: "bg-destructive",
-  busy: "bg-sky-500",
-};
-
-const LEVEL_TEXT: Record<Level, string> = {
-  ok: "Apto",
-  warn: "Pendência",
-  block: "Bloqueado",
-  busy: "Alocado",
-};
+import {
+  STATUS_BOXES,
+  BOX_LABEL,
+  AUTO_BOX_KEYS,
+  MANUAL_BOXES,
+  ABSENCE_BOX,
+  BOXES_STORAGE_KEY,
+  isWeekendDate,
+  APPOINTMENT_BOX,
+  INTEGRATION_PREFIX,
+  integrationClientOf,
+  boxLabelOf,
+  appointmentClientName,
+  WEEKDAYS,
+  dayLine,
+  hourLabel,
+  ASO_FOOTER,
+  ASO_ADDRESS,
+  copyToClipboard,
+  appointmentLabel,
+  appointmentBoxKey,
+  vtBoxDefault,
+  FILTERS,
+  HIDDEN_CONTRACTS,
+  LEVEL_DOT,
+  LEVEL_TEXT,
+} from "@/components/schedule-planner/boxes";
+import type { Level, Evaluation, DragPayload, AppointmentRow, FilterKey } from "@/components/schedule-planner/boxes";
 
 export function SchedulePlannerBoard({
   date,
@@ -475,340 +326,6 @@ export function SchedulePlannerBoard({
   });
   const [openEntry, setOpenEntry] = useState<string | null>(null);
 
-  const workVt = useQuery({
-    queryKey: ["work-vt", scheduleId],
-    enabled: !!scheduleId,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("schedule_work_vt").select("work_id, pays_vt").eq("schedule_id", scheduleId!);
-      if (error) throw error;
-      return new Map((data ?? []).map((r) => [r.work_id, r.pays_vt]));
-    },
-  });
-  const workPaysVt = (workId: string) => workVtDefault(workVt.data?.get(workId), ctx.data?.works.find((w) => w.id === workId)?.clients?.needs_transport_voucher);
-  // Colaboradores de Pouso Alegre recebem VT por padrão quando escalados em obra.
-  // Colaboradores com "Vale Transporte" desligado no cadastro começam sempre sem VT.
-  const pousoIds = useQuery({
-    queryKey: ["pouso-alegre-collabs"],
-    queryFn: async () => {
-      const { data } = await supabase.from("collaborators").select("id, city, vt_enabled, vt_always_full, positions(name)");
-      const city = new Map<string, string | null>();
-      const noVt = new Set<string>();
-      const full = new Set<string>();
-      const position = new Map<string, string>();
-      for (const r of data ?? []) {
-        position.set(r.id, (r.positions as { name: string } | null)?.name ?? "");
-        city.set(r.id, r.city ?? null);
-        if (r.vt_enabled === false) noVt.add(r.id);
-        if (r.vt_always_full) full.add(r.id);
-      }
-      return { city, noVt, full, position };
-    },
-  });
-  // Alojamentos no dia (Americana: sem VT/prêmio na Suzano; Mogi Guaçu: como morador de Mogi Guaçu).
-  const lodgingStays = useQuery({
-    queryKey: ["lodging-stays", date],
-    queryFn: async () => ((await supabase.from("lodging_stays").select("collaborator_id, lodging, start_date, end_date").lte("start_date", date).or(`end_date.is.null,end_date.gte.${date}`)).data ?? []) as LodgingStay[],
-  });
-  const lodgingOf = (collaboratorId: string) => lodgingOn(lodgingStays.data ?? [], collaboratorId, date);
-  const lodgingBlocked = (workId: string, collaboratorId: string) =>
-    lodgingBlocksBenefits(lodgingOf(collaboratorId), ctx.data?.works.find((w) => w.id === workId)?.clients?.name);
-  /** Entrada da regra única de VT (lib/transport-rules.ts) para a pessoa na obra no dia. */
-  const vtInput = (workId: string, collaboratorId: string) => {
-    const lodging = lodgingOf(collaboratorId);
-    return {
-      vtEnabled: !pousoIds.data?.noVt.has(collaboratorId),
-      lodgingBlocks: lodgingBlocked(workId, collaboratorId),
-      vtNever: lodgingBlocksVtAlways(lodging, pousoIds.data?.position.get(collaboratorId)),
-      alwaysFull: pousoIds.data?.full.has(collaboratorId) ?? false,
-      workMark: workVt.data?.get(workId),
-      clientDefault: ctx.data?.works.find((w) => w.id === workId)?.clients?.needs_transport_voucher,
-      // Alojado vale a cidade do alojamento (não a do cadastro) para a regra de Pouso Alegre.
-      homeCity: effectiveCity(pousoIds.data?.city.get(collaboratorId), lodging),
-    };
-  };
-  const defaultAllocVt = (workId: string, collaboratorId: string) => {
-    const i = vtInput(workId, collaboratorId);
-    return vtBaseForDay(i) && !i.vtNever;
-  };
-  /** VT que vale na bolinha (VT cheio aparece verde; Montador alojado em MGG nunca). */
-  const allocVtOn = (workId: string, collaboratorId: string, override: boolean | null | undefined) =>
-    vtForDay({ ...vtInput(workId, collaboratorId), override });
-
-  const toggleWorkVt = useMutation({
-    mutationFn: async (workId: string) => {
-      const id = await ensureSchedule();
-      const { error } = await supabase
-        .from("schedule_work_vt")
-        .upsert({ schedule_id: id, work_id: workId, pays_vt: !workPaysVt(workId) }, { onConflict: "schedule_id,work_id" });
-      if (error) throw error;
-      return id;
-    },
-    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["work-vt", id] }),
-    onError: onWriteError,
-  });
-
-  const workTravel = useQuery({
-    queryKey: ["work-travel", scheduleId],
-    enabled: !!scheduleId,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("schedule_work_travel").select("work_id, pays_bonus").eq("schedule_id", scheduleId!);
-      if (error) throw error;
-      return new Map((data ?? []).map((r) => [r.work_id, r.pays_bonus]));
-    },
-  });
-  // Prêmio viagem: por padrão segue as regras da aba Prêmio de Viagem (distância mínima cadastrada).
-  const travelInfo = useQuery({
-    queryKey: ["travel-info"],
-    queryFn: async () => {
-      const [rules, people, dist] = await Promise.all([
-        supabase.from("travel_bonus_rules").select("minimum_distance, maximum_distance").eq("active", true),
-        supabase.from("collaborators").select("id, city, travel_bonus_enabled"),
-        supabase.from("city_distances").select("city_a, city_b, km"),
-      ]);
-      const ranges = (rules.data ?? []).map((r) => ({ min: Number(r.minimum_distance), max: r.maximum_distance === null ? Infinity : Number(r.maximum_distance) }));
-      return {
-        hit: (km: number) => ranges.some((r) => km >= r.min && km <= r.max),
-        city: new Map((people.data ?? []).map((c) => [c.id, c.city])),
-        off: new Set((people.data ?? []).filter((c) => c.travel_bonus_enabled === false).map((c) => c.id)),
-        distFor: buildDistanceLookup(dist.data ?? []),
-      };
-    },
-  });
-  const workOf = (workId: string) => ctx.data?.works.find((w) => w.id === workId);
-  const workTravelDefault = (workId: string) => {
-    const t = travelInfo.data;
-    if (!t) return false;
-    return t.hit(Number(workOf(workId)?.clients?.distance_km ?? 0));
-  };
-  const workPaysTravel = (workId: string) => workTravel.data?.get(workId) ?? workTravelDefault(workId);
-  const defaultAllocTravel = (workId: string, collaboratorId: string) => {
-    const t = travelInfo.data;
-    if (!t) return false;
-    const on = travelOnFor({
-      enabled: !t.off.has(collaboratorId),
-      lodgingBlocks: lodgingBlocked(workId, collaboratorId),
-      workMark: workTravel.data?.get(workId),
-      workDefault: workTravelDefault(workId),
-    });
-    if (!on) return false;
-    const w = workOf(workId);
-    const km = t.distFor(effectiveCity(t.city.get(collaboratorId), lodgingOf(collaboratorId)), w?.clients?.city, Number(w?.clients?.distance_km ?? 0));
-    return t.hit(km);
-  };
-  const setGroupTravel = useMutation({
-    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
-      const id = await ensureSchedule();
-      const { error } = await supabase
-        .from("schedule_work_travel")
-        .upsert(ids.map((work_id) => ({ schedule_id: id, work_id, pays_bonus: value })), { onConflict: "schedule_id,work_id" });
-      if (error) throw error;
-      return id;
-    },
-    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["work-travel", id] }),
-    onError: onWriteError,
-  });
-  const toggleAllocTravel = useMutation({
-    mutationFn: async ({ id, workId, collaboratorId, current }: { id: string; workId: string; collaboratorId: string; current: boolean }) => {
-      const next = !current;
-      const override = next === defaultAllocTravel(workId, collaboratorId) ? null : next;
-      const { error } = await supabase.from("daily_allocations").update({ travel_bonus_override: override }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
-    onError: onWriteError,
-  });
-  const toggleOvernight = useMutation({
-    mutationFn: async ({ id, current, travelOff }: { id: string; current: boolean; travelOff?: boolean | null }) => {
-      const patch: { overnight: boolean; travel_bonus_override?: boolean | null } = { overnight: !current };
-      if (current && travelOff !== undefined) patch.travel_bonus_override = travelOff;
-      const { error } = await supabase.from("daily_allocations").update(patch).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
-    onError: onWriteError,
-  });
-  const setGroupOvernight = useMutation({
-    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
-      if (!ids.length) return;
-      const patch: { overnight: boolean; travel_bonus_override?: null } = { overnight: value };
-      if (!value) patch.travel_bonus_override = null;
-      const { error } = await supabase.from("daily_allocations").update(patch).in("id", ids);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
-    onError: onWriteError,
-  });
-
-
-  const toggleAllocVt = useMutation({
-    mutationFn: async ({ id, workId, collaboratorId, current }: { id: string; workId: string; collaboratorId: string; current: boolean }) => {
-      const next = !current;
-      const override = next === defaultAllocVt(workId, collaboratorId) ? null : next;
-      const { error } = await supabase.from("daily_allocations").update({ vt_override: override }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["allocations", scheduleId] }),
-    onError: onWriteError,
-  });
-
-  /** VT dos quadros de ASO / Treinamento / Integração. */
-  const boxVt = useQuery({
-    queryKey: ["box-vt", scheduleId],
-    enabled: !!scheduleId,
-    queryFn: async () => {
-      const [b, p] = await Promise.all([
-        supabase.from("schedule_box_vt").select("box_key, pays_vt, pays_bonus, overnight").eq("schedule_id", scheduleId!),
-        supabase.from("schedule_person_vt").select("box_key, collaborator_id, pays_vt, pays_bonus, overnight").eq("schedule_id", scheduleId!),
-      ]);
-      if (b.error) throw b.error;
-      if (p.error) throw p.error;
-      return {
-        box: new Map((b.data ?? []).map((r) => [r.box_key, r.pays_vt])),
-        person: new Map((p.data ?? []).map((r) => [`${r.box_key}|${r.collaborator_id}`, r.pays_vt])),
-        travelBox: new Map((b.data ?? []).map((r) => [r.box_key, r])),
-        travelPerson: new Map((p.data ?? []).map((r) => [`${r.box_key}|${r.collaborator_id}`, r])),
-      };
-    },
-  });
-  const boxPaysVt = (key: string) => boxVt.data?.box.get(key) ?? vtBoxDefault(key) ?? false;
-  const personPaysVt = (key: string, collaboratorId: string) => {
-    const o = boxVt.data?.person.get(`${key}|${collaboratorId}`);
-    if (o !== undefined) return o;
-    if (key.startsWith(INTEGRATION_PREFIX)) {
-      const a = (appointments.data ?? []).find(
-        (x) => x.collaborator_id === collaboratorId && x.type === "integracao",
-      );
-      if (a?.pays_transport_voucher) return true;
-    }
-    return boxPaysVt(key);
-  };
-  /** Títulos editáveis das caixas (ex.: caixa personalizada). */
-  const boxTitles = useQuery({
-    queryKey: ["box-titles", scheduleId],
-    enabled: !!scheduleId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("schedule_box_titles")
-        .select("box_key, title")
-        .eq("schedule_id", scheduleId!);
-      if (error) throw error;
-      return new Map((data ?? []).map((r) => [r.box_key, r.title]));
-    },
-  });
-  const saveBoxTitle = useMutation({
-    mutationFn: async ({ key, title }: { key: string; title: string }) => {
-      const id = await ensureSchedule();
-      const t = title.trim();
-      if (!t) {
-        const { error } = await supabase.from("schedule_box_titles").delete().eq("schedule_id", id).eq("box_key", key);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("schedule_box_titles")
-          .upsert({ schedule_id: id, box_key: key, title: t }, { onConflict: "schedule_id,box_key" });
-        if (error) throw error;
-      }
-      return id;
-    },
-    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-titles", id] }),
-    onError: onWriteError,
-  });
-  const [editingBox, setEditingBox] = useState<string | null>(null);
-  const toggleBoxVt = useMutation({
-    mutationFn: async (key: string) => {
-      const id = await ensureSchedule();
-      const next = !boxPaysVt(key);
-      const { error } = await supabase
-        .from("schedule_box_vt")
-        .upsert({ schedule_id: id, box_key: key, pays_vt: next }, { onConflict: "schedule_id,box_key" });
-      if (error) throw error;
-      // o quadro vale para todos: limpa exceções individuais do quadro
-      const { error: personError } = await supabase.from("schedule_person_vt").update({ pays_vt: next }).eq("schedule_id", id).eq("box_key", key);
-      if (personError) throw personError;
-      return id;
-    },
-    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-vt", id] }),
-    onError: onWriteError,
-  });
-  const togglePersonVt = useMutation({
-    mutationFn: async ({ key, collaboratorId }: { key: string; collaboratorId: string }) => {
-      const id = await ensureSchedule();
-      const next = !personPaysVt(key, collaboratorId);
-      const { error } = await supabase
-        .from("schedule_person_vt")
-        .upsert(
-          { schedule_id: id, box_key: key, collaborator_id: collaboratorId, pays_vt: next },
-          { onConflict: "schedule_id,box_key,collaborator_id" },
-        );
-      if (error) throw error;
-      return id;
-    },
-    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-vt", id] }),
-    onError: onWriteError,
-  });
-
-  const personDot = (key: string, collaboratorId: string) => {
-    const on = personPaysVt(key, collaboratorId);
-    const exception = boxVt.data?.person.has(`${key}|${collaboratorId}`) ?? false;
-    const label = key === "aso" ? (on ? "2 VTs (ASO + adicional)" : "1 VT (ASO)") : on ? "Recebe VT" : "Sem VT";
-    return (
-      <Button
-        variant="ghost"
-        size="icon"
-        disabled={!editable}
-        aria-label="Alternar VT do colaborador na caixa"
-        title={`${label}${exception ? " (exceção)" : ""}`}
-        onClick={(e) => { e.stopPropagation(); togglePersonVt.mutate({ key, collaboratorId }); }}
-        className={`h-2 w-2 min-w-0 shrink-0 rounded-full p-0 ${on ? "bg-success hover:bg-success" : "bg-muted-foreground/40 hover:bg-muted-foreground/40"}`}
-      />
-    );
-  };
-
-  const boxTravel = (key: string, collaboratorId?: string) => resolveBoxTravel(
-    boxVt.data?.travelBox.get(key) ?? { pays_bonus: false, overnight: false },
-    collaboratorId ? boxVt.data?.travelPerson.get(`${key}|${collaboratorId}`) : undefined,
-  );
-  const toggleBoxTravel = useMutation({
-    mutationFn: async ({ key, collaboratorId }: { key: string; collaboratorId?: string }) => {
-      const id = await ensureSchedule();
-      const next = nextBoxTravel(boxTravel(key, collaboratorId));
-      if (collaboratorId) {
-        const { error } = await supabase.from("schedule_person_vt").upsert({
-          schedule_id: id, box_key: key, collaborator_id: collaboratorId,
-          pays_vt: personPaysVt(key, collaboratorId), ...next,
-        }, { onConflict: "schedule_id,box_key,collaborator_id" });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("schedule_box_vt").upsert({
-          schedule_id: id, box_key: key, pays_vt: boxPaysVt(key), ...next,
-        }, { onConflict: "schedule_id,box_key" });
-        if (error) throw error;
-        const { error: personError } = await supabase.from("schedule_person_vt")
-          .update({ pays_bonus: null, overnight: null }).eq("schedule_id", id).eq("box_key", key);
-        if (personError) throw personError;
-      }
-      return id;
-    },
-    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["box-vt", id] }),
-    onError: onWriteError,
-  });
-  const travelDot = (key: string, collaboratorId?: string) => {
-    const state = boxTravel(key, collaboratorId);
-    const color = state.overnight ? "bg-warning hover:bg-warning" : state.pays_bonus ? "bg-info hover:bg-info" : "bg-muted-foreground/40 hover:bg-muted-foreground/40";
-    return <Button
-      variant="ghost" size="icon"
-      disabled={!editable || toggleBoxTravel.isPending}
-      aria-label={collaboratorId ? "Alternar prêmio viagem / pernoite do colaborador na caixa" : "Alternar prêmio viagem / pernoite da caixa"}
-      title={state.overnight ? "Pernoite: R$ 25,00 (clique para desligar)" : state.pays_bonus ? "Prêmio viagem ligado (clique para pernoite)" : "Prêmio viagem desligado (clique para ligar)"}
-      onClick={(e) => { e.stopPropagation(); toggleBoxTravel.mutate(collaboratorId ? { key, collaboratorId } : { key }); }}
-      className={cn("min-w-0 shrink-0 rounded-full p-0", collaboratorId ? "h-2 w-2" : "h-2.5 w-2.5 border border-border", color)}
-    />;
-  };
-  const personBenefits = (key: string, collaboratorId: string) => <span className="flex shrink-0 flex-col items-center gap-0.5">
-    {personDot(key, collaboratorId)}
-    {key === "personalizada" && travelDot(key, collaboratorId)}
-  </span>;
-
   /** Agendamentos (ASO, treinamento, integração) marcados para esta data. */
   const appointments = useQuery({
     queryKey: ["appointments-day", date],
@@ -824,6 +341,15 @@ export function SchedulePlannerBoard({
       return data;
     },
   });
+
+  const benefits = useScheduleBenefits({
+    date, scheduleId, ctx: ctx.data, appointments: appointments.data, editable, ensureSchedule, onWriteError,
+  });
+  const {
+    workVt, workPaysVt, lodgingOf, allocVtOn, travelInfo, workPaysTravel, defaultAllocTravel, setGroupTravel, toggleAllocTravel,
+    toggleOvernight, setGroupOvernight, toggleAllocVt, boxPaysVt, boxTitles, saveBoxTitle, toggleBoxVt, travelDot, personBenefits, setGroupVt,
+  } = benefits;
+  const [editingBox, setEditingBox] = useState<string | null>(null);
 
   /** Ausências cadastradas (férias, atestado, folga) alimentam automaticamente as caixas. */
   const absenceMembers = useMemo(() => {
@@ -1417,19 +943,6 @@ export function SchedulePlannerBoard({
     drop.mutate({ ...p, workId: workId ?? g.rep.id });
   }
 
-  const setGroupVt = useMutation({
-    mutationFn: async ({ ids, value }: { ids: string[]; value: boolean }) => {
-      const id = await ensureSchedule();
-      const { error } = await supabase
-        .from("schedule_work_vt")
-        .upsert(ids.map((work_id) => ({ schedule_id: id, work_id, pays_vt: value })), { onConflict: "schedule_id,work_id" });
-      if (error) throw error;
-      return id;
-    },
-    onSuccess: (id) => qc.invalidateQueries({ queryKey: ["work-vt", id] }),
-    onError: onWriteError,
-  });
-
   const [clearBox, setClearBox] = useState<{ label: string; ids: string[] } | null>(null);
   const clearRows = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -2022,7 +1535,7 @@ export function SchedulePlannerBoard({
                         })()}
                         {(() => {
                           // Ciclo: azul (prêmio viagem) → amarela (pernoite R$ 25) → apagada → azul
-                          const tb = travelInfo.data?.off.has(r.collaborator_id) ? false : r.travel_bonus_override ?? defaultAllocTravel(r.work_id, r.collaborator_id);
+                          const tb = travelInfo?.off.has(r.collaborator_id) ? false : r.travel_bonus_override ?? defaultAllocTravel(r.work_id, r.collaborator_id);
                           const on = !!(r as any).overnight;
                           return (
                             <button
