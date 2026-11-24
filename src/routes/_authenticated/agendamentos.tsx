@@ -7,6 +7,7 @@ import { EpiSheetsPage } from "@/components/controles/fichas-epi";
 import { NewClientDocsPage } from "@/components/controles/novos-clientes";
 import { ClientReleasePage } from "@/components/controles/liberacao-cliente";
 import { useControlBadges } from "@/hooks/use-nav-badges";
+import { DocsInsights } from "@/components/insights/docs-insights";
 
 export const Route = createFileRoute("/_authenticated/agendamentos")({
   head: () => ({
@@ -26,8 +27,12 @@ export const Route = createFileRoute("/_authenticated/agendamentos")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>): { tab?: CtrlTab } =>
-    CTRL_TABS.some((t) => t.v === s["tab"]) ? { tab: s["tab"] as CtrlTab } : {},
+  // cliente/busca: opcionais, usados pelos blocos vivos (abrem a Liberação por cliente ou a lista já filtrada).
+  validateSearch: (s: Record<string, unknown>): { tab?: CtrlTab; cliente?: string; busca?: string } => ({
+    ...(CTRL_TABS.some((t) => t.v === s["tab"]) ? { tab: s["tab"] as CtrlTab } : {}),
+    ...(typeof s["cliente"] === "string" && s["cliente"] ? { cliente: s["cliente"] } : {}),
+    ...(typeof s["busca"] === "string" && s["busca"] ? { busca: s["busca"] } : {}),
+  }),
   component: ControlsPage,
 });
 
@@ -42,10 +47,12 @@ const CTRL_TABS = [
 type CtrlTab = (typeof CTRL_TABS)[number]["v"];
 
 function ControlsPage() {
-  const { tab = "asos" } = Route.useSearch();
+  const { tab = "asos", cliente = "", busca = "" } = Route.useSearch();
   const navigate = Route.useNavigate();
   const badges = useControlBadges();
   return (
+    <div className="space-y-4">
+    <DocsInsights />
     <SubTabs pageTabs value={tab} onValueChange={(v) => navigate({ search: v === "asos" ? {} : { tab: v as CtrlTab }, replace: true })}>
       <SubTabsList>
         {CTRL_TABS.map((t) => {
@@ -62,13 +69,14 @@ function ControlsPage() {
           );
         })}
       </SubTabsList>
-      <SubTabsContent value="asos" className="mt-4"><AsosPage /></SubTabsContent>
-      <SubTabsContent value="integracoes" className="mt-4"><IntegrationsPage /></SubTabsContent>
-      <SubTabsContent value="treinamentos" className="mt-4"><TrainingsPage /></SubTabsContent>
+      <SubTabsContent value="asos" className="mt-4"><AsosPage key={busca} initialSearch={busca} /></SubTabsContent>
+      <SubTabsContent value="integracoes" className="mt-4"><IntegrationsPage key={busca} initialSearch={busca} /></SubTabsContent>
+      <SubTabsContent value="treinamentos" className="mt-4"><TrainingsPage key={busca} initialSearch={busca} /></SubTabsContent>
       <SubTabsContent value="novos-clientes" className="mt-4"><NewClientDocsPage /></SubTabsContent>
-      <SubTabsContent value="liberacao" className="mt-4"><ClientReleasePage /></SubTabsContent>
+      <SubTabsContent value="liberacao" className="mt-4"><ClientReleasePage key={`${cliente}|${busca}`} initialClientId={cliente} initialSearch={busca} /></SubTabsContent>
       <SubTabsContent value="epi" className="mt-4"><EpiSheetsPage /></SubTabsContent>
     </SubTabs>
+    </div>
   );
 }
 

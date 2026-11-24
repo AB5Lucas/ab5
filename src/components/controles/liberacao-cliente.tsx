@@ -36,11 +36,12 @@ const ONBOARDING_LABEL: Record<string, string> = { pendente: "Pendente", liberad
 type Cell = { status: CellStatus; expires: string | null; title?: string | undefined };
 type Booking = { type: AppointmentType; collaboratorId: string; trainingId?: string | undefined; clientId?: string | undefined; key: string };
 
-export function ClientReleasePage() {
+/** initialClientId/initialSearch: abertos pelos blocos vivos (Bloqueados para amanhã, Prontidão por cliente). */
+export function ClientReleasePage({ initialClientId = "", initialSearch = "" }: { initialClientId?: string; initialSearch?: string } = {}) {
   const { canWrite } = useCurrentUser();
   const today = todayISO();
-  const [clientId, setClientId] = useState("");
-  const [search, setSearch] = useState("");
+  const [clientId, setClientId] = useState(initialClientId);
+  const [search, setSearch] = useState(initialSearch);
   const [onlyPending, setOnlyPending] = useState(true);
   const [booking, setBooking] = useState<Booking | null>(null);
   const schedAso = useScheduled("aso");

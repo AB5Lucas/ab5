@@ -2,7 +2,7 @@ import { TrainingDateInput } from "@/components/training-date-input";
 import { LeaveNotice } from "@/components/leave-notice";
 import { findDateConflicts } from "@/lib/date-conflicts";
 import { futureSameKind, replacedText } from "@/lib/appointment-replace";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CalendarClock, Check, Copy, Minus, Plus, X } from "lucide-react";
@@ -102,7 +102,8 @@ const emptyForm = (): FormState => ({
 });
 
 /** Agendamentos de ASO, treinamento e integração (página própria em Documentos › Agendamentos). */
-export function AppointmentsPage() {
+/** initialDay/initialTrainingId: abertos pelos blocos vivos (Turmas se formando) já filtrados pelo dia e treinamento. */
+export function AppointmentsPage({ initialDay, initialTrainingId }: { initialDay?: string | undefined; initialTrainingId?: string | undefined } = {}) {
   const { canWrite } = useCurrentUser();
   const qc = useQueryClient();
   const today = todayISO();
@@ -118,9 +119,9 @@ export function AppointmentsPage() {
   const [redoTime, setRedoTime] = useState("07:00");
   const [deleteRow, setDeleteRow] = useState<Row | null>(null);
 
-  const [fPeriod, setFPeriod] = useState("all");
+  const [fPeriod, setFPeriod] = useState(initialDay ? "day" : "all");
   /** Dia escolhido quando o Período é "Dia específico". */
-  const [fDay, setFDay] = useState(todayISO());
+  const [fDay, setFDay] = useState(initialDay ?? todayISO());
   const [fType, setFType] = useState("all");
   const [fWork, setFWork] = useState("all");
   /** Treinamentos escolhidos (pelo nome; vazio = todos). */
@@ -225,6 +226,13 @@ export function AppointmentsPage() {
     );
     return m;
   }, [trainings.data]);
+
+  // Treinamento pedido pelo endereço (id): vira o filtro pelo nome assim que o catálogo chega.
+  useEffect(() => {
+    if (!initialTrainingId) return;
+    const label = trainingById.get(initialTrainingId)?.label;
+    if (label) setFTrainings([label]);
+  }, [initialTrainingId, trainingById]);
 
   const clientById = useMemo(() => {
     const m = new Map<string, string>();

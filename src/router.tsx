@@ -3,7 +3,8 @@ import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
 /** Consultas dos avisos do menu (use-nav-badges, use-schedule-alerts, use-service-distribution). */
-const MENU_BADGE_KEYS = [["menu-badges"], ["schedule-alerts"], ["service-distribution"], ["client-onboarding"]];
+/** ["insights"] = blocos vivos das páginas (components/insights): relidos depois de gravar, como os avisos. */
+const MENU_BADGE_KEYS = [["menu-badges"], ["schedule-alerts"], ["service-distribution"], ["client-onboarding"], ["insights"]];
 
 /** Login vencido (aba aberta muito tempo / computador dormiu): o Supabase responde "JWT expired". */
 const isJwtExpired = (e: unknown) => {
