@@ -18,11 +18,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchSelect } from "@/components/search-select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pill, ScHeaderDialog, ScRemoveDialog, todayISO, useClientsList, useScRemove, useScUsers, type ScRow } from "@/components/compras/sc-shared";
+import { PRINT_REQUIRED, Pill, ScHeaderDialog, ScRemoveDialog, todayISO, useClientsList, useScRemove, useScUsers, type ScRow } from "@/components/compras/sc-shared";
 import {
   SC_ITEM_STATUSES, SC_UNITS, itemStatusClass, STAGE_LABEL, brDate, brl, budgetMissing, deadlineControl, deliveryLabel, priorityClass, statusClass, statusDot, type ScStage,
 } from "@/lib/purchase-requests";
 import type { Tables } from "@/integrations/supabase/types";
+import { useEditHistory } from "@/hooks/use-edit-history";
+import { UndoRedoButtons } from "@/components/compras/undo-redo";
+import { ScImportButtons, type ScImportItem } from "@/components/compras/sc-import-dialog";
+import { PastePrint } from "@/components/compras/paste-print";
 
 export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")({
   head: () => ({ meta: [{ title: "Solicitação de Compra | AB5 Hub" }, { name: "description", content: "Itens da solicitação de compra (modelo FR-CPS-SC)." }] }),
@@ -40,6 +44,13 @@ const toDraft = (i: Item): Draft => ({
   notes: i.notes ?? "", work_id: i.work_id ?? RATEIO, cc: i.cc_code ?? "", photo_path: i.photo_path, quote_path: i.quote_path, link: i.link_url ?? "",
 });
 const emptyDraft = (): Draft => ({ quantity: "", unit: "UN", description: "", budget: "", notes: "", work_id: RATEIO, cc: "", photo_path: null, quote_path: null, link: "" });
+const isBlank = (x: Draft) => !x.id && !x.description.trim() && !x.quantity.trim() && !x.budget.trim() && !x.notes.trim() && !x.photo_path && !x.quote_path && !x.link;
+/** Estado em edição na página (desfazer/refazer): linhas de itens e verba total. */
+type Snap = { rows: Draft[]; total: string };
+const FIELD_LABEL: Record<string, string> = {
+  quantity: "Qtd", unit: "Un. medida", description: "Descrição", budget: "Verba", notes: "Observações", work_id: "Centro de custo", cc: "CC",
+  photo_path: "Foto", quote_path: "Cotação", link: "Link de referência",
+};
 
 /**
  * Página da solicitação (modelo FR-CPS-SC): cabeçalho já preenchido pelo controle e a tabela de itens
@@ -127,6 +138,22 @@ function Page() {
 
   const [rows, setRows] = useState<Draft[]>([]);
   const [total, setTotal] = useState("");
+  // Desfazer/refazer (Ctrl+Z / Ctrl+Y): só o rascunho em edição na tela; nada vai ao banco até Salvar itens.
+  const history = useEditHistory<Snap>(500);
+  const snapRef = useRef<Snap>({ rows, total });
+  snapRef.current = { rows, total };
+  const apply = (next: Snap, label: string, key?: string) => {
+    history.push(snapRef.current, label, key);
+    snapRef.current = next;
+    setRows(next.rows); setTotal(next.total); setDirty(true);
+  };
+  const restore = (snap: Snap | null) => {
+    if (!snap) return;
+    snapRef.current = snap;
+    setRows(snap.rows); setTotal(snap.total); setDirty(true);
+  };
+  const undo = (steps = 1) => restore(history.undo(snapRef.current, steps));
+  const redo = (steps = 1) => restore(history.redo(snapRef.current, steps));
   const [dirty, setDirty] = useState(false);
   const [editingHeader, setEditingHeader] = useState(false);
   const [removing, setRemoving] = useState<ScRow | null>(null);
@@ -154,9 +181,41 @@ function Page() {
     setRows(items.data.length ? items.data.map(toDraft) : editable ? [emptyDraft()] : []);
     setTotal(r.total_budget == null ? "" : String(r.total_budget).replace(".", ","));
     setDirty(false);
+    history.clear(); // recarregou (salvou, enviou ou saiu da edição): começa um histórico novo
   }, [items.data, r?.id, r?.total_budget, editable]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const change = (i: number, patch: Partial<Draft>) => { setRows((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x))); setDirty(true); };
+  const change = (i: number, patch: Partial<Draft>) => {
+    const fields = Object.keys(patch);
+    const label = `${fields.map((f) => FIELD_LABEL[f] ?? f).filter((v, k, a) => a.indexOf(v) === k).join(", ")} (item ${i + 1})`;
+    const cur = snapRef.current;
+    apply({ ...cur, rows: cur.rows.map((x, j) => (j === i ? { ...x, ...patch } : x)) }, label, `row:${i}:${fields.join(",")}`);
+  };
+  const addRow = () => apply({ ...snapRef.current, rows: [...snapRef.current.rows, emptyDraft()] }, "Adicionar item");
+  const removeRow = (i: number) => apply({ ...snapRef.current, rows: snapRef.current.rows.filter((_, j) => j !== i) }, `Tirar item ${i + 1}`);
+  const setTotalField = (v: string) => apply({ ...snapRef.current, total: v }, "Verba total", "total");
+  const importRows = (list: ScImportItem[]) => {
+    const kept = snapRef.current.rows.filter((x) => !isBlank(x));
+    apply({ ...snapRef.current, rows: [...kept, ...list.map((it) => ({ ...emptyDraft(), ...it }))] }, `Importar planilha (${list.length} itens)`);
+  };
+  // Atalhos na página inteira (também com o foco num campo); quadros abertos (cabeçalho, prévia, listas) ficam de fora.
+  const keyRef = useRef({ undo, redo });
+  keyRef.current = { undo, redo };
+  useEffect(() => {
+    if (!editable) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      const isUndo = k === "z" && !e.shiftKey;
+      const isRedo = k === "y" || (k === "z" && e.shiftKey);
+      if (!isUndo && !isRedo) return;
+      const t = e.target as Element | null;
+      if (t?.closest?.("[role=dialog], [role=alertdialog], [data-radix-popper-content-wrapper]")) return;
+      e.preventDefault();
+      if (isUndo) keyRef.current.undo(); else keyRef.current.redo();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [editable]);
   const itemsTotal = rows.reduce((s, x) => s + (num(x.budget) ?? 0), 0);
 
   const saveItems = async () => {
@@ -183,8 +242,9 @@ function Page() {
   const save = useMutation({ mutationFn: saveItems, onSuccess: () => { toast.success("Itens salvos"); refresh(); }, onError: (e: Error) => toast.error(e.message) });
   const send = useMutation({
     mutationFn: async () => {
+      if (r!.system === "TOTVS" && !r!.photo_path) throw new Error(PRINT_REQUIRED);
       const filled = rows.filter((x) => x.description.trim() || x.quantity.trim());
-      if (budgetMissing(r!.nature, num(total), filled.map((x) => num(x.budget)))) throw new Error("Informe a verba de cada item ou a verba total (só a natureza PROGRAMADA dispensa).");
+      if (r!.system !== "TOTVS" && budgetMissing(r!.nature, num(total), filled.map((x) => num(x.budget)))) throw new Error("Informe a verba de cada item ou a verba total (só a natureza PROGRAMADA dispensa).");
       await saveItems();
       const { data, error } = await supabase.rpc("purchase_request_send", { _id: id });
       if (error) throw error;
@@ -265,6 +325,24 @@ function Page() {
     change(i, { quote_path: path });
     toast.success("Cotação anexada (salve os itens)");
   };
+  // Print da SC do TOTVS: prévia (link assinado) e troca colando outro (grava no mesmo bucket/coluna).
+  const printUrl = useQuery({
+    queryKey: ["sc-print-url", r?.photo_path],
+    enabled: !!r?.photo_path && !/^https?:\/\//.test(r?.photo_path ?? ""),
+    staleTime: 5 * 60_000,
+    queryFn: async () => (await supabase.storage.from("purchase-photos").createSignedUrl(r!.photo_path!, 600)).data?.signedUrl ?? null,
+  });
+  const savePrint = useMutation({
+    mutationFn: async (file: File) => {
+      const path = `totvs/${crypto.randomUUID()}-${file.name.replace(/[^\w.-]/g, "_")}`;
+      const up = await supabase.storage.from("purchase-photos").upload(path, file);
+      if (up.error) throw up.error;
+      const { error } = await supabase.from("purchase_requests").update({ photo_path: path }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Print da solicitação trocado"); qc.invalidateQueries({ queryKey: ["sc-request", id] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const openPhoto = async (path: string) => {
     if (/^https?:\/\//.test(path)) { window.open(path, "_blank", "noopener"); return; } // arquivo do SharePoint
     const { data, error } = await supabase.storage.from("purchase-photos").createSignedUrl(path, 600);
@@ -300,6 +378,7 @@ function Page() {
         <h1 className="font-display text-xl font-semibold uppercase tracking-wide">{r.number}</h1>
         <div className="ml-auto flex gap-2">
           {canEdit && !editMode && <Button variant="outline" size="sm" onClick={() => setEditMode(true)}><Pencil className="h-4 w-4" /> Editar</Button>}
+          {editable && <UndoRedoButtons undoLabels={history.undoLabels} redoLabels={history.redoLabels} onUndo={undo} onRedo={redo} />}
           {editable && <Button variant="outline" size="sm" onClick={() => setEditingHeader(true)}><Pencil className="h-4 w-4" /> Editar cabeçalho</Button>}
           {editable && <Button variant="outline" size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}><Save className="h-4 w-4" /> Salvar itens</Button>}
           {canSendDraft && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
@@ -347,7 +426,13 @@ function Page() {
         {r.notes && <p className="mt-3 rounded-md bg-muted p-2 text-xs"><b>Observações:</b> {r.notes}</p>}
         {r.return_notes && (r.stage === "rascunho" || (r.stage === "aprovacao" && r.return_notes.startsWith("Comprador (ao validador)"))) && <p className="mt-2 rounded-md bg-destructive/10 p-2 text-xs text-destructive"><b>Devolvida</b> · {r.return_notes}</p>}
         {r.approver_notes && r.stage !== "rascunho" && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Validador:</b> {r.approver_notes}</p>}
-        {r.photo_path && <Button variant="outline" size="sm" className="mt-2" onClick={() => openPhoto(r.photo_path!)}><ImageIcon className="h-4 w-4" /> Foto da SC do TOTVS</Button>}
+        {r.system === "TOTVS" && canSendDraft && editMode ? (
+          // Rascunho do TOTVS (ex.: devolvido): o print só se troca colando; obrigatório para enviar.
+          <div className="mt-3 max-w-xl space-y-1">
+            <Label className="block">Print da solicitação <span className="text-destructive">*</span></Label>
+            <PastePrint file={null} currentUrl={printUrl.data ?? null} disabled={savePrint.isPending} onPaste={(f) => savePrint.mutate(f)} />
+          </div>
+        ) : r.photo_path && <Button variant="outline" size="sm" className="mt-2" onClick={() => openPhoto(r.photo_path!)}><ImageIcon className="h-4 w-4" /> Print da SC do TOTVS</Button>}
         <p className="mt-2 text-xs text-muted-foreground"><b>Observadores:</b> {(r.observer_ids ?? []).map((u) => userName.get(u) ?? "…").join(", ") || "—"}</p>
         {r.buyer_notes && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Comprador:</b> {r.buyer_notes}</p>}
       </div>
@@ -475,7 +560,7 @@ function Page() {
                   </TableCell>
                   {editable && (
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Tirar item" onClick={() => { setRows((s) => s.filter((_, j) => j !== i)); setDirty(true); }}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Tirar item" onClick={() => removeRow(i)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -495,11 +580,14 @@ function Page() {
       </div>
 
       <div className="flex flex-wrap items-end gap-4">
-        {editable && <Button variant="outline" size="sm" onClick={() => { setRows((s) => [...s, emptyDraft()]); setDirty(true); }}><Plus className="h-4 w-4" /> Adicionar item</Button>}
+        {editable && <Button variant="outline" size="sm" onClick={addRow}><Plus className="h-4 w-4" /> Adicionar item</Button>}
+        {editable && (
+          <ScImportButtons works={(works.data ?? []).filter((w) => w.active)} workLabel={(wid) => workName.get(wid) ?? "—"} onImport={importRows} />
+        )}
         <div className="space-y-1">
           <Label htmlFor="sc-total" className="text-xs">Verba (R$) total</Label>
           {editable
-            ? <Input id="sc-total" className="w-44" inputMode="decimal" placeholder="0,00" value={total} onChange={(e) => { setTotal(e.target.value); setDirty(true); }} />
+            ? <Input id="sc-total" className="w-44" inputMode="decimal" placeholder="0,00" value={total} onChange={(e) => setTotalField(e.target.value)} />
             : <p className="text-sm font-medium">{brl(r.total_budget)}</p>}
         </div>
         <div className="flex items-center gap-1">

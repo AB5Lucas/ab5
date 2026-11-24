@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchSelect } from "@/components/search-select";
-import { Camera, Lock, Send, X } from "lucide-react";
+import { Lock, Send, X } from "lucide-react";
+import { PastePrint } from "@/components/compras/paste-print";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
@@ -27,6 +28,8 @@ import type { Tables } from "@/integrations/supabase/types";
 
 export type ScRow = Tables<"purchase_requests">;
 const RATEIO_KEY = "__rateio__";
+/** Print da solicitação (imagem colada) é obrigatório para enviar a SC do TOTVS. */
+export const PRINT_REQUIRED = "O print da solicitação é obrigatório.";
 export const todayISO = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 
 export function useClientsList() {
@@ -206,7 +209,7 @@ export function ObserversField({ value, onChange, requesterId }: { value: string
 /**
  * Formulário de controle (cabeçalho da SC). Novo: cria pela função purchase_request_create (número
  * SC-NOME-001 e solicitante automáticos) e abre a página da solicitação; edição: só enquanto está com o solicitante.
- * TOTVS: só o número da SC do TOTVS e a foto; Enviar manda direto para o Comprador.
+ * TOTVS: o número da SC do TOTVS e o print colado (obrigatório); Enviar manda direto para o Comprador.
  */
 export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean; onOpenChange: (o: boolean) => void; editing?: ScRow | null }) {
   const qc = useQueryClient();
@@ -262,7 +265,7 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
       checkHeader();
       if (isTotvs) {
         if (!totvs.number.trim()) throw new Error("Informe o número da SC do TOTVS.");
-        if (!totvs.file) throw new Error("Anexe a foto da SC do TOTVS.");
+        if (!totvs.file) throw new Error(PRINT_REQUIRED);
         const path = `totvs/${crypto.randomUUID()}-${totvs.file.name.replace(/[^\w.-]/g, "_")}`;
         const up = await supabase.storage.from("purchase-photos").upload(path, totvs.file);
         if (up.error) throw up.error;
@@ -318,7 +321,7 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
         <DialogHeader>
           <DialogTitle>{editing ? `Editar ${editing.number}` : isTotvs && totvsStep ? "SC do TOTVS" : "Nova solicitação de compra"}</DialogTitle>
           <DialogDescription>
-            {editing ? "Controle da solicitação." : isTotvs && totvsStep ? "Informe o número da SC aberta no TOTVS, a foto e o centro de custo. Ela vai para o validador (ou direto ao Comprador, se você não precisa de validador)."
+            {editing ? "Controle da solicitação." : isTotvs && totvsStep ? "Informe o número da SC aberta no TOTVS, cole o print da solicitação e escolha o centro de custo. Ela vai para o validador (ou direto ao Comprador, se você não precisa de validador)."
               : "Data, solicitante e número (SC-NOME-001) são preenchidos sozinhos. Depois de salvar, você inclui os itens."}
           </DialogDescription>
         </DialogHeader>
@@ -330,11 +333,8 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
               <Input id="sc-totvs" value={totvs.number} onChange={(e) => setTotvs((t) => ({ ...t, number: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label className="block">Foto</Label>
-              <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input px-3 text-sm hover:bg-accent">
-                <Camera className="h-4 w-4" /> {totvs.file ? totvs.file.name : "Escolher foto"}
-                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const file = e.target.files?.[0] ?? null; setTotvs((t) => ({ ...t, file })); e.target.value = ""; }} />
-              </label>
+              <Label className="block">Print da solicitação <span className="text-destructive">*</span></Label>
+              <PastePrint file={totvs.file} onPaste={(file) => setTotvs((t) => ({ ...t, file }))} />
             </div>
             <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
               <div className="space-y-1">
