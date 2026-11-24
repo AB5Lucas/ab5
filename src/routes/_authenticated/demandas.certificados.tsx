@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Eye, FileDown, Pencil, Plus, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentUser } from "@/hooks/use-auth";
+import { matchDriverName } from "@/lib/fleet-notes";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,6 +106,19 @@ function useBase() {
     },
   });
   return { trainings, certData, tsts };
+}
+
+/**
+ * TST logado: o nome do usuário é casado com o cadastro de TSTs como na Liberação do posto ("Matheus Braz" =
+ * "Matheus Jonathan Braz de Viveiros"); só vale se um único TST ativo combinar. Vira o padrão dos seletores de TST.
+ */
+function useMyTst(tsts: Tst[]): string | null {
+  const { profile } = useCurrentUser();
+  return useMemo(() => {
+    const active = tsts.filter((t) => t.active);
+    const name = matchDriverName((profile as { full_name?: string | null } | null)?.full_name, active.map((t) => t.full_name));
+    return name ? active.find((t) => t.full_name === name)?.id ?? null : null;
+  }, [tsts, profile]);
 }
 
 /** Treinamentos realizados no dia (registros de Treinamentos), agrupados. */
@@ -243,6 +258,8 @@ function GenerateTab() {
   });
 
   const activeTsts = (tsts.data ?? []).filter((t) => t.active);
+  const myTst = useMyTst(tsts.data ?? []);
+  const tstOf = (trainingId: string) => tstBy[trainingId] ?? myTst ?? "";
   const key = (t: string, c: string) => `${t}|${c}`;
 
   const selected = useMemo(() => {
@@ -255,7 +272,7 @@ function GenerateTab() {
   const snaps: { s: CertSnapshot; trainingId: string; collabId: string; tstId: string; kind: "inicial" | "renovacao"; manual: boolean }[] = [];
   for (const { g, p } of selected) {
     const cd = certData.data?.get(g.trainingId);
-    const tst = activeTsts.find((t) => t.id === tstBy[g.trainingId]);
+    const tst = activeTsts.find((t) => t.id === tstOf(g.trainingId));
     const k = kindBy[key(g.trainingId, p.collabId)] ?? (p.kind === "conferir" ? undefined : p.kind);
     if (!cd?.cert_phrase || !cd.legal_basis || !cd.workload_hours || !cd.program)
       pending.push(`${g.name}: complete os dados do treinamento (frase, norma, carga horária e conteúdo)`);
@@ -427,7 +444,7 @@ function GenerateTab() {
                 <span className="text-muted-foreground">(certificado em {brDate(periodOf(g.trainingId).end || date)})</span>
               </div>
               <div className="ml-auto w-64">
-                <Select value={tstBy[g.trainingId] ?? ""} onValueChange={(v) => setTstBy((s) => ({ ...s, [g.trainingId]: v }))}>
+                <Select value={tstOf(g.trainingId)} onValueChange={(v) => setTstBy((s) => ({ ...s, [g.trainingId]: v }))}>
                   <SelectTrigger><SelectValue placeholder="TST responsável" /></SelectTrigger>
                   <SelectContent>
                     {activeTsts.map((t) => <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>)}
@@ -548,6 +565,8 @@ function AttendanceTab() {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [tstBy, setTstBy] = useState<Record<string, string>>({});
   const activeTsts = (tsts.data ?? []).filter((t) => t.active);
+  const myTst = useMyTst(tsts.data ?? []);
+  const tstOf = (trainingId: string) => tstBy[trainingId] ?? myTst ?? "";
 
   const lists = useQuery({
     queryKey: ["att-lists", date],
@@ -601,13 +620,13 @@ function AttendanceTab() {
     setOff((s) => ({ ...s, ...Object.fromEntries(g.people.map((p) => [pk(g.trainingId, p.collabId), !keep(p)])) }));
 
   const chosen = groups.filter((g) => sel[g.trainingId] && picked(g).length);
-  const missing = chosen.filter((g) => !tstBy[g.trainingId]).map((g) => g.name);
+  const missing = chosen.filter((g) => !tstOf(g.trainingId)).map((g) => g.name);
 
   const gen = useMutation({
     mutationFn: async () => {
       const snaps: { trainingId: string; tstId: string; s: ListSnapshot }[] = chosen.map((g) => {
         const cd = certData.data?.get(g.trainingId);
-        const t = activeTsts.find((x) => x.id === tstBy[g.trainingId])!;
+        const t = activeTsts.find((x) => x.id === tstOf(g.trainingId))!;
         return {
           trainingId: g.trainingId,
           tstId: t.id,
@@ -663,7 +682,7 @@ function AttendanceTab() {
                 {open[g.trainingId] ? "Ocultar pessoas" : "Escolher pessoas"}
               </Button>
               <div className="ml-auto w-64">
-                <Select value={tstBy[g.trainingId] ?? ""} onValueChange={(v) => setTstBy((s) => ({ ...s, [g.trainingId]: v }))}>
+                <Select value={tstOf(g.trainingId)} onValueChange={(v) => setTstBy((s) => ({ ...s, [g.trainingId]: v }))}>
                   <SelectTrigger><SelectValue placeholder="Instrutor / TST" /></SelectTrigger>
                   <SelectContent>{activeTsts.map((t) => <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>)}</SelectContent>
                 </Select>
