@@ -290,3 +290,46 @@
 @media (prefers-reduced-motion: reduce) { .amap-stage, .amap-line, .amap-pin { animation-duration: 1ms; animation-delay: 0ms; } }
 .amap-cities { fill: none; stroke: var(--muted-foreground); stroke-opacity: 0.35; opacity: 0; animation: amap-show 0.8s ease-out 1.5s forwards; }
 @keyframes amap-show { to { opacity: 1; } }
+
+/* Bloco com tokens do tema claro dentro do modo escuro (quadro do mapa de Atividades, invertido em relação ao tema). */
+.dark .light-inverse {
+  --radius: 0.5rem;
+  --background: oklch(0.975 0.002 20);
+  --foreground: oklch(0.17 0.006 20);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.17 0.006 20);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.17 0.006 20);
+  --primary: oklch(0.52 0.21 27);
+  --primary-foreground: oklch(0.99 0.004 20);
+  --secondary: oklch(0.945 0.004 20);
+  --secondary-foreground: oklch(0.25 0.01 20);
+  --muted: oklch(0.955 0.003 20);
+  --muted-foreground: oklch(0.5 0.01 20);
+  --accent: oklch(0.6 0.22 27);
+  --accent-foreground: oklch(0.99 0.004 20);
+  --destructive: oklch(0.52 0.21 27);
+  --destructive-foreground: oklch(0.99 0.004 20);
+  --success: oklch(0.58 0.13 152);
+  --info: oklch(0.6 0.17 250);
+  --success-foreground: oklch(0.99 0.005 150);
+  --warning: oklch(0.78 0.15 78);
+  --warning-foreground: oklch(0.24 0.04 70);
+  --border: oklch(0.9 0.004 20);
+  --input: oklch(0.9 0.004 20);
+  --ring: oklch(0.52 0.21 27);
+  --chart-1: oklch(0.52 0.21 27);
+  --chart-2: oklch(0.32 0.01 20);
+  --chart-3: oklch(0.68 0.16 30);
+  --chart-4: oklch(0.6 0.01 20);
+  --chart-5: oklch(0.42 0.14 25);
+  --chart-blue: oklch(0.74 0.13 248);
+  --sidebar: oklch(0.16 0.006 20);
+  --sidebar-foreground: oklch(0.88 0.004 20);
+  --sidebar-primary: oklch(0.55 0.22 27);
+  --sidebar-primary-foreground: oklch(0.99 0.004 20);
+  --sidebar-accent: oklch(0.24 0.02 22);
+  --sidebar-accent-foreground: oklch(0.97 0.003 20);
+  --sidebar-border: oklch(0.28 0.015 22);
+  --sidebar-ring: oklch(0.55 0.22 27);
+}

@@ -134,7 +134,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   const inv = 1 / view.k;
   const btn = "flex h-7 w-7 items-center justify-center rounded-full border bg-background/90 shadow-sm hover:bg-background";
   return (
-    <div ref={boxRef} className={`relative overflow-hidden bg-card text-foreground ${className ?? ""}`} style={{ perspective: "1400px" }}
+    <div ref={boxRef} className={`relative overflow-hidden text-foreground ${className ?? ""}`} style={{ perspective: "1400px" }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
       <div key={run} className="amap-stage h-full w-full">
         <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${W / view.k} ${H / view.k}`} shapeRendering="geometricPrecision" className="h-full w-full cursor-grab touch-none active:cursor-grabbing" preserveAspectRatio="xMidYMid meet"

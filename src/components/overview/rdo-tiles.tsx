@@ -8,12 +8,11 @@ import { cn } from "@/lib/utils";
 
 export type TileCol = { key: string; label: string; title: string; max: number; fin: number; draft: number; expected: number; totalFin?: number; totalDraft?: number; totalExpected?: number };
 
-const MAX_ROWS = 6;
 
 export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month" }) {
   const [sel, setSel] = useState<number | null>(null);
   const top = Math.max(1, ...cols.map((c) => c.max));
-  const per = Math.max(1, Math.ceil(top / MAX_ROWS)); // clientes por quadradinho
+  const per = 2; // clientes por quadradinho (fixo)
   const rows = Math.ceil(top / per);
   const i = sel ?? -1;
   const c0 = cols[i];
@@ -42,7 +41,7 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
                     : fromBottom < f ? "bg-foreground"
                     : fromBottom < f + dr ? "bg-foreground/45"
                     : "border border-dashed border-border bg-muted/40";
-                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", unit === "month" ? "h-8" : "h-7", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
+                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", unit === "month" ? "h-6" : "h-5", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
                 })}
                 <span className="mt-1 text-center text-[10px] tabular-nums text-muted-foreground">{ci % step === 0 || ci === i ? col.label : "\u00a0"}</span>
               </button>

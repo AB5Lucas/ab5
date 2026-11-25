@@ -3,7 +3,7 @@ import type React from "react";
  * Mapa dos clientes (Atividades): desenho próprio (sem API). Por padrão só clientes com atividade no período
  * (faturamento, escala ou RDO); o olho mostra todos. Botão de expandir alterna SP/Brasil no próprio quadro.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff, Maximize2, Minimize2 } from "lucide-react";
 import { AnimatedMap, inState } from "./animated-map";
 
@@ -11,9 +11,21 @@ export type MapClient = { id: string; name: string; lat: number; lon: number; ci
 
 const btn = "flex h-7 w-7 items-center justify-center rounded-full border bg-background/90 shadow-sm hover:bg-background";
 
+/** O quadro do mapa é invertido em relação ao tema (escuro no claro, claro no escuro): acompanha a troca. */
+function useInvertedTheme() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const el = document.documentElement, upd = () => setDark(el.classList.contains("dark"));
+    upd(); const mo = new MutationObserver(upd); mo.observe(el, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, []);
+  return dark ? "light-inverse" : "dark";
+}
+
 export function ClientsMap({ clients, className }: { clients: MapClient[]; className?: string }) {
   const [region, setRegion] = useState<"SP" | "BR">("SP");
   const [all, setAll] = useState(false);
+  const themeCls = useInvertedTheme();
   const base = all ? clients : clients.filter((c) => c.active);
   const list = region === "SP" ? base.filter((c) => inState("SP", c.lon, c.lat)) : base;
   const [focus, setFocus] = useState<{ lon: number; lat: number; n: number } | null>(null);
@@ -28,7 +40,7 @@ export function ClientsMap({ clients, className }: { clients: MapClient[]; class
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
   const stop = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); };
   return (
-    <div className="grid gap-3 md:grid-cols-[1fr_240px]"><div className="relative">
+    <div className={`${themeCls} grid gap-3 text-foreground md:grid-cols-[1fr_240px]`}><div className="relative">
       <AnimatedMap clients={list} region={region} className={className ?? "h-[340px] w-full rounded-xl border"} extra={<>
         <button type="button" className={btn} title={region === "SP" ? "Expandir (Brasil)" : "Voltar para SP"} onClick={(e) => { stop(e); setRegion((r) => (r === "SP" ? "BR" : "SP")); }}>
           {region === "SP" ? <Maximize2 className="h-3.5 w-3.5" /> : <Minimize2 className="h-3.5 w-3.5" />}

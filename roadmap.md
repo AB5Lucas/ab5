@@ -55,3 +55,4 @@
 - [x] Programação: bolinhas de VT e Prêmio Viagem na caixa personalizada e nos funcionários; 8 testes aprovados, alternância individual e persistência conferidas na tela autenticada, sem alterar cálculos de benefícios.
 - [x] Atividades: troca de filtro sem tela branca
 - [x] RDOs: legendas só na lateral
+- [x] Mapa acompanha modo claro/escuro

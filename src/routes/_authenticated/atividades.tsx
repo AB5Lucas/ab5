@@ -282,7 +282,7 @@ function AtividadesOverview() {
             {can("/obras") && (
               <OverviewCard dark title="Clientes no mapa" to="/clientes" linkLabel="Ver clientes" hint="Marcador do tamanho do faturado no período; clique num cliente da lista para aproximar">
                 {mapClients.length > 0 ? (
-                  <div className="dark" onClick={(e) => e.preventDefault()}>
+                  <div onClick={(e) => e.preventDefault()}>
                     <ClientsMap clients={mapClients} className="h-[430px] w-full rounded-xl" />
                   </div>
                 ) : <p className="py-8 text-center text-xs text-background/70">Nenhum cliente com endereço localizado.</p>}
@@ -297,7 +297,7 @@ function AtividadesOverview() {
               )}
               {can("/obras/resultado") && (
                 <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
-                  <LineArea height="h-40" data={d.series} format={(p) => brl(p.a)} />
+                  <LineArea height="h-44" data={d.series} format={(p) => brl(p.a)} />
                 </OverviewCard>
               )}
             </div>
