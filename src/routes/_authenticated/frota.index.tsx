@@ -388,7 +388,7 @@ function MaintenanceYear({ rows, year }: { rows: { schedule_date: string; mainte
   const revision = current?.revision ?? rows.filter((r) => r.maintenance_kind === "revisao").length;
   return <div className="flex h-full min-h-0 gap-3">
     <div className="grid min-h-0 min-w-0 flex-1 grid-cols-12 gap-px">{months.map((m, ci) => <Button variant="ghost" key={m.label} onClick={() => setSelected(selected === ci ? null : ci)} title={`${m.label}: ${m.total - m.revision} manutenções · ${m.revision} revisões`} className={cn("flex h-full min-h-0 min-w-0 flex-col gap-1 rounded-sm p-0", selected === ci && "bg-muted")}>
-      <div className="grid min-h-0 w-full flex-1 grid-rows-6 gap-px">{Array.from({ length: 6 }, (_, i) => { const level = 5 - i, filled = Math.ceil(m.total / max * 6); return <span key={i} className={cn("ov-grow h-full w-full rounded-[2px]", level < filled ? "bg-foreground" : "border border-dashed border-border bg-muted/40")} />; })}</div>
+      <div className="grid min-h-0 w-full flex-1 grid-rows-6 gap-px">{Array.from({ length: 6 }, (_, i) => { const level = 5 - i, filled = Math.ceil(m.total / max * 6); return <span key={i} className={cn("ov-grow h-full w-full rounded-[4px]", level < filled ? "bg-foreground" : "border border-dashed border-border bg-muted/40")} />; })}</div>
       <span className="text-center text-[9px] capitalize text-muted-foreground">{m.label.slice(0, 3)}</span>
     </Button>)}</div>
     <div className="flex w-28 shrink-0 flex-col gap-2 border-l border-border pl-3">
