@@ -1,0 +1,355 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { AlertTriangle, Check, FileText, Loader2, Paperclip, RefreshCw, Trash2, Upload } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { readPurchaseQuote } from "@/lib/purchase-quotes.functions";
+import { priceInScUnit, quoteUnitPrice, type QuoteItemLite, type QuoteLite } from "@/lib/purchase-quotes";
+import { brl } from "@/lib/purchase-requests";
+import type { ScRow } from "@/components/compras/sc-shared";
+
+export type RecItem = {
+  id: string; item_no: number; quantity: number; unit: string; description: string; budget: number | null; notes: string | null;
+  work_id: string | null; cc_code: string | null; rec_quote_item_id: string | null; status: string; quote_path: string | null;
+};
+export type RecData = {
+  req: ScRow; items: RecItem[]; quotes: QuoteLite[]; qItems: QuoteItemLite[];
+  prefix: string | null; works: { id: string; name: string; cc_suffix: string | null }[];
+};
+
+/** Tudo o que a Recomendação precisa de uma SC: cabeçalho, itens, cotações lidas e itens das cotações. */
+export function useRecData(id: string | null) {
+  return useQuery({
+    queryKey: ["sc-rec", id],
+    enabled: !!id,
+    queryFn: async (): Promise<RecData | null> => {
+      const [r, it, q] = await Promise.all([
+        supabase.from("purchase_requests").select("*").eq("id", id!).maybeSingle(),
+        supabase.from("purchase_request_items").select("id, item_no, quantity, unit, description, budget, notes, work_id, cc_code, rec_quote_item_id, status, quote_path").eq("request_id", id!).order("item_no"),
+        supabase.from("purchase_quotes").select("*").eq("request_id", id!).order("created_at"),
+      ]);
+      if (r.error) throw r.error;
+      if (!r.data) return null;
+      const quotes = (q.data ?? []) as QuoteLite[];
+      const qi = quotes.length
+        ? (await supabase.from("purchase_quote_items").select("*").in("quote_id", quotes.map((x) => x.id)).order("line_no")).data ?? []
+        : [];
+      const [pre, works] = r.data.client_id
+        ? await Promise.all([
+          supabase.from("clients").select("cc_prefix").eq("id", r.data.client_id).maybeSingle(),
+          supabase.from("works").select("id, name, cc_suffix").eq("client_id", r.data.client_id),
+        ])
+        : [null, null];
+      return {
+        req: r.data as ScRow, items: (it.data ?? []) as RecItem[], quotes, qItems: qi as QuoteItemLite[],
+        prefix: pre?.data?.cc_prefix ?? null, works: works?.data ?? [],
+      };
+    },
+  });
+}
+
+/** Abre o arquivo da cotação (link assinado do bucket). */
+export async function openQuoteFile(path: string) {
+  if (/^https?:\/\//.test(path)) { window.open(path, "_blank", "noopener"); return; }
+  const { data, error } = await supabase.storage.from("purchase-photos").createSignedUrl(path, 600);
+  if (error || !data) { toast.error(error?.message ?? "Arquivo indisponível"); return; }
+  window.open(data.signedUrl, "_blank", "noopener");
+}
+
+const baseName = (p: string) => p.split("/").pop()!.replace(/^[0-9a-f-]{36}-/, "");
+
+/** Cotações anexadas pelo solicitante (no item ou na verba total) entram na recomendação como as do comprador. */
+async function ensureRequesterQuotes(d: RecData): Promise<string[]> {
+  const known = new Set(d.quotes.map((q) => q.file_path));
+  const paths = [d.req.quote_path, ...d.items.map((i) => i.quote_path)].filter((p): p is string => !!p && !/^https?:\/\//.test(p) && !known.has(p));
+  const uniq = [...new Set(paths)];
+  if (!uniq.length) return [];
+  const { data, error } = await supabase.from("purchase_quotes")
+    .upsert(uniq.map((p) => ({ request_id: d.req.id, file_path: p, file_name: baseName(p), source: "solicitante" })), { onConflict: "request_id,file_path", ignoreDuplicates: true })
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).map((x) => x.id);
+}
+
+const ACCEPT = ".pdf,image/*,.xlsx,.xls,.xlsm,.csv";
+
+/**
+ * Clipe do Comprador: anexar cotações (PDF, foto ou Excel). Cada arquivo é lido pela IA (fornecedor, condições e
+ * itens); as do solicitante entram sozinhas. Depois, "Vincular itens" abre a seleção item a item (como o TOTVS).
+ */
+export function QuotesAttachDialog({ row, onClose, onDone }: { row: ScRow | null; onClose: () => void; onDone: (requestId: string) => void }) {
+  const qc = useQueryClient();
+  const data = useRecData(row?.id ?? null);
+  const [reading, setReading] = useState<Set<string>>(new Set());
+  const [uploading, setUploading] = useState(false);
+  const [matching, setMatching] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const prepared = useRef<string | null>(null);
+  const refresh = () => qc.invalidateQueries({ queryKey: ["sc-rec", row?.id] }).then(() => qc.invalidateQueries({ queryKey: ["sc-rec-all"] }));
+
+  const read = async (ids: string[]) => {
+    if (!ids.length) return;
+    setReading((s) => new Set([...s, ...ids]));
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const r = await readPurchaseQuote({ data: { quoteId: id } });
+        if (!r.ok) toast.error(`Cotação não lida: ${r.error}`);
+      } catch (e) { toast.error((e as Error).message); }
+      setReading((s) => { const n = new Set(s); n.delete(id); return n; });
+      await refresh();
+    }));
+  };
+
+  // Ao abrir: traz as cotações do solicitante e lê as que ainda não foram lidas.
+  useEffect(() => {
+    const d = data.data;
+    if (!row || !d || prepared.current === row.id) return;
+    prepared.current = row.id;
+    void (async () => {
+      try {
+        const fresh = await ensureRequesterQuotes(d);
+        const pending = d.quotes.filter((q) => q.read_status === "pendente").map((q) => q.id);
+        if (fresh.length) await refresh();
+        await read([...new Set([...fresh, ...pending])]);
+      } catch (e) { toast.error((e as Error).message); }
+    })();
+  }, [row, data.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!row) prepared.current = null; }, [row]);
+
+  const upload = async (files: FileList | null) => {
+    if (!row || !files?.length) return;
+    setUploading(true);
+    const ids: string[] = [];
+    try {
+      for (const f of Array.from(files)) {
+        const path = `quotes/${row.id}/${crypto.randomUUID()}-${f.name.replace(/[^\w.-]/g, "_")}`;
+        const up = await supabase.storage.from("purchase-photos").upload(path, f);
+        if (up.error) throw up.error;
+        const ins = await supabase.from("purchase_quotes").insert({ request_id: row.id, file_path: path, file_name: f.name, source: "comprador" }).select("id").single();
+        if (ins.error) throw ins.error;
+        ids.push(ins.data.id);
+      }
+    } catch (e) { toast.error((e as Error).message); }
+    setUploading(false);
+    await refresh();
+    await read(ids);
+  };
+
+  const remove = async (q: QuoteLite) => {
+    const { error } = await supabase.from("purchase_quotes").delete().eq("id", q.id);
+    if (error) { toast.error(error.message); return; }
+    if (q.source === "comprador") await supabase.storage.from("purchase-photos").remove([q.file_path]);
+    await refresh();
+  };
+
+  const quotes = data.data?.quotes ?? [];
+  const qItems = data.data?.qItems ?? [];
+  const locked = data.data?.req.fa_state === "em_aprovacao";
+  const anyRead = quotes.some((q) => q.read_status === "lido");
+  const busy = uploading || reading.size > 0;
+  return (
+    <>
+      <Dialog open={!!row && !matching} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Paperclip className="h-4 w-4" /> Cotações · {row?.number}</DialogTitle>
+            <DialogDescription>PDF, foto ou Excel. Cada cotação é lida pela IA (fornecedor, prazo, pagamento e itens). As cotações anexadas pelo solicitante já entram aqui.</DialogDescription>
+          </DialogHeader>
+          {locked && <p className="rounded-md bg-amber-500/10 p-2 text-xs">Esta SC está em aprovação: as cotações não mudam até a decisão (ou puxe de volta na Recomendação).</p>}
+          <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+            {data.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+            {!data.isLoading && !quotes.length && <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">Nenhuma cotação anexada.</p>}
+            {quotes.map((q) => {
+              const n = qItems.filter((x) => x.quote_id === q.id).length;
+              const isReading = reading.has(q.id);
+              return (
+                <div key={q.id} className="flex items-center gap-3 rounded-md border border-border p-2 text-sm">
+                  <button type="button" className="shrink-0" title="Abrir arquivo" onClick={() => void openQuoteFile(q.file_path)}><FileText className="h-5 w-5 text-primary" /></button>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{q.supplier ?? q.file_name ?? baseName(q.file_path)}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {q.source === "solicitante" ? "Do solicitante · " : ""}{q.file_name ?? baseName(q.file_path)}
+                      {q.read_status === "lido" && ` · ${n} ${n === 1 ? "item" : "itens"}${q.total != null ? ` · ${brl(q.total)}` : ""}${q.payment_terms ? ` · ${q.payment_terms}` : ""}${q.delivery_days != null ? ` · entrega ${q.delivery_days} d` : ""}`}
+                    </div>
+                    {q.read_status === "erro" && !isReading && <div className="text-xs text-destructive"><AlertTriangle className="mr-1 inline h-3 w-3" />{q.read_error}</div>}
+                  </div>
+                  {isReading ? <span className="flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Lendo…</span>
+                    : q.read_status === "lido" ? <span className="flex items-center gap-1 text-xs text-emerald-600"><Check className="h-3.5 w-3.5" /> Lida</span> : null}
+                  {!locked && <Button variant="ghost" size="icon" className="h-7 w-7" title="Ler de novo" disabled={isReading} onClick={() => void read([q.id])}><RefreshCw className="h-3.5 w-3.5" /></Button>}
+                  {!locked && <Button variant="ghost" size="icon" className="h-7 w-7" title="Tirar a cotação" disabled={isReading} onClick={() => void remove(q)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>}
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            {!locked ? (
+              <Button variant="outline" disabled={uploading} onClick={() => input.current?.click()}>
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Anexar cotações
+              </Button>
+            ) : <span />}
+            <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} />
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onClose}>Fechar</Button>
+              {!locked && <Button disabled={!anyRead || busy} onClick={() => setMatching(true)}>Vincular itens</Button>}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {row && matching && data.data && (
+        <QuoteMatchingDialog data={data.data} onClose={() => setMatching(false)}
+          onFinish={() => { setMatching(false); onClose(); onDone(row.id); }} />
+      )}
+    </>
+  );
+}
+
+type Edit = { request_item_id: string | null; conv_factor: string; conv_type: string; discarded: boolean };
+const DISCARD = "__descartar__";
+const NONE = "__nenhum__";
+
+/**
+ * Seleção item a item, como a "Seleção de Pedidos de Compra" do TOTVS: para cada item da SC, os itens das cotações
+ * que serão ligados a ele, com Fator Conv. e Tipo de Conv (Multiplicador/Divisor); cada um pode ir para outro item
+ * ou ser descartado. OK em sequência; no fim, os itens das cotações que ficaram sem vínculo.
+ */
+export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData; onClose: () => void; onFinish: () => void }) {
+  const qc = useQueryClient();
+  const items = useMemo(() => [...data.items].sort((a, b) => a.item_no - b.item_no), [data.items]);
+  const readQuotes = data.quotes.filter((q) => q.read_status === "lido");
+  const qById = new Map(readQuotes.map((q) => [q.id, q]));
+  const lines = data.qItems.filter((x) => qById.has(x.quote_id));
+  const [edits, setEdits] = useState<Record<string, Edit>>(() =>
+    Object.fromEntries(lines.map((l) => [l.id, { request_item_id: l.request_item_id, conv_factor: String(l.conv_factor), conv_type: l.conv_type, discarded: l.discarded }])));
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const last = items.length; // passo final = sem vínculo
+  const cur = step < last ? items[step]! : null;
+  const ed = (id: string) => edits[id]!;
+  const set = (id: string, p: Partial<Edit>) => setEdits((e) => ({ ...e, [id]: { ...e[id]!, ...p } }));
+  const shown = cur ? lines.filter((l) => !ed(l.id).discarded && ed(l.id).request_item_id === cur.id) : lines.filter((l) => !ed(l.id).discarded && !ed(l.id).request_item_id);
+
+  const save = async (ids: string[]) => {
+    const changed = ids.filter((id) => {
+      const l = lines.find((x) => x.id === id)!, e = ed(id);
+      return l.request_item_id !== e.request_item_id || String(l.conv_factor) !== e.conv_factor || l.conv_type !== e.conv_type || l.discarded !== e.discarded;
+    });
+    for (const id of changed) {
+      const e = ed(id);
+      const f = Number(e.conv_factor.replace(",", "."));
+      const { error } = await supabase.from("purchase_quote_items").update({
+        request_item_id: e.discarded ? null : e.request_item_id, conv_factor: f > 0 ? f : 1, conv_type: e.conv_type, discarded: e.discarded,
+      }).eq("id", id);
+      if (error) throw error;
+    }
+  };
+  const ok = async () => {
+    setSaving(true);
+    try {
+      // Grava as linhas mexidas neste passo (as que estavam aqui no começo e as que estão agora).
+      const ids = cur ? lines.filter((l) => l.request_item_id === cur.id || ed(l.id).request_item_id === cur.id).map((l) => l.id) : lines.map((l) => l.id);
+      await save(ids);
+      if (step >= last) {
+        await save(lines.map((l) => l.id));
+        await supabase.from("purchase_quotes").update({ matched: true }).in("id", readQuotes.map((q) => q.id));
+        await qc.invalidateQueries({ queryKey: ["sc-rec", data.req.id] });
+        await qc.invalidateQueries({ queryKey: ["sc-rec-all"] });
+        toast.success("Itens vinculados");
+        onFinish();
+      } else setStep(step + 1);
+    } catch (e) { toast.error((e as Error).message); }
+    setSaving(false);
+  };
+
+  const target = (l: QuoteItemLite) => (ed(l.id).discarded ? DISCARD : ed(l.id).request_item_id ?? NONE);
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>Seleção de itens das cotações · {data.req.number}</DialogTitle>
+          <DialogDescription>
+            {cur ? `Item ${step + 1} de ${items.length}: confira os itens das cotações ligados a ele, o fator de conversão e clique OK.` : "Itens das cotações sem vínculo: ligue a um item da SC ou descarte."}
+          </DialogDescription>
+        </DialogHeader>
+        {cur && (
+          <div className="grid gap-2 rounded-md border border-border bg-muted/40 p-3 text-sm sm:grid-cols-[auto_auto_1fr_auto]">
+            <div><div className="text-[11px] uppercase text-muted-foreground">Item</div><div className="font-medium">{cur.item_no}</div></div>
+            <div><div className="text-[11px] uppercase text-muted-foreground">Quantidade</div><div className="font-medium">{cur.quantity} {cur.unit}</div></div>
+            <div><div className="text-[11px] uppercase text-muted-foreground">Produto</div><div className="font-medium">{cur.description}</div></div>
+            <div><div className="text-[11px] uppercase text-muted-foreground">Verba</div><div className="font-medium">{brl(cur.budget)}</div></div>
+          </div>
+        )}
+        <div className="max-h-[50vh] overflow-auto rounded-md border border-border">
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fornecedor</TableHead>
+                <TableHead className="min-w-56">Descrição na cotação</TableHead>
+                <TableHead className="text-right">Qtd</TableHead>
+                <TableHead>Un.</TableHead>
+                <TableHead className="text-right">Vlr. unit.</TableHead>
+                <TableHead className="w-24">Fator Conv.</TableHead>
+                <TableHead className="w-36">Tipo de Conv</TableHead>
+                {cur && <TableHead className="text-right">Preço na un. da SC</TableHead>}
+                {cur && <TableHead className="text-right">Total da SC</TableHead>}
+                <TableHead className="min-w-52">Vincular a</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!shown.length && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">{cur ? "Nenhum item das cotações ligado a este item." : "Todos os itens das cotações estão vinculados ou descartados."}</TableCell></TableRow>}
+              {shown.map((l) => {
+                const e = ed(l.id);
+                const up = quoteUnitPrice(l);
+                const f = Number(e.conv_factor.replace(",", "."));
+                const scPrice = up != null ? priceInScUnit(up, f > 0 ? f : 1, e.conv_type) : null;
+                return (
+                  <TableRow key={l.id}>
+                    <TableCell className="whitespace-nowrap">{qById.get(l.quote_id)?.supplier ?? "—"}</TableCell>
+                    <TableCell>{l.description}</TableCell>
+                    <TableCell className="text-right tabular-nums">{l.quantity ?? "—"}</TableCell>
+                    <TableCell>{l.unit ?? "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{brl(up)}</TableCell>
+                    <TableCell><Input className="h-7 w-20 text-xs" inputMode="decimal" value={e.conv_factor} onChange={(ev) => set(l.id, { conv_factor: ev.target.value })} aria-label="Fator de conversão" /></TableCell>
+                    <TableCell>
+                      <Select value={e.conv_type} onValueChange={(v) => set(l.id, { conv_type: v })}>
+                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="M">Multiplicador</SelectItem><SelectItem value="D">Divisor</SelectItem></SelectContent>
+                      </Select>
+                    </TableCell>
+                    {cur && <TableCell className="text-right tabular-nums">{brl(scPrice)}</TableCell>}
+                    {cur && <TableCell className="text-right tabular-nums font-medium">{brl(scPrice != null ? scPrice * Number(cur.quantity) : null)}</TableCell>}
+                    <TableCell>
+                      <Select value={target(l)} onValueChange={(v) => set(l.id, v === DISCARD ? { discarded: true, request_item_id: null } : { discarded: false, request_item_id: v === NONE ? null : v })}>
+                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {items.map((i) => <SelectItem key={i.id} value={i.id}>{i.item_no}. {i.description.slice(0, 50)}</SelectItem>)}
+                          {!cur && <SelectItem value={NONE}>Sem vínculo</SelectItem>}
+                          <SelectItem value={DISCARD}>Descartar</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Fator Conv.: mesma quantidade e unidade = 1, Multiplicador. Unidades diferentes, ex.: SC 5 KG e cotação 1 RL (rolo de 5 kg) = fator 5, Divisor.
+        </p>
+        <DialogFooter className="gap-2 sm:justify-between">
+          <span className="text-xs text-muted-foreground">Passo {Math.min(step + 1, last + 1)} de {last + 1}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            {step > 0 && <Button variant="outline" disabled={saving} onClick={() => setStep(step - 1)}>Voltar</Button>}
+            <Button disabled={saving} onClick={() => void ok()}>{saving && <Loader2 className="h-4 w-4 animate-spin" />}{step >= last ? "Concluir" : "OK"}</Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

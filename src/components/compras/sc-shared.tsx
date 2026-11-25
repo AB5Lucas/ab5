@@ -69,8 +69,13 @@ export function StatusFilter({ value, onChange, counts, exclude = [] }: { value:
 }
 
 /** Tabela de controle (mesmas colunas da aba CONTROLE DE SC que o sistema usa); cada título filtra/ordena como no Excel. */
-export function ScTable({ rows, clientName, actions, showRequester = true }: {
+export type ScExtraCol = ColumnDef<ScRow> & { cell: (r: ScRow) => ReactNode; className?: string };
+export function ScTable({ rows, clientName, actions, showRequester = true, extraCols = [], endActions }: {
   rows: ScRow[]; clientName: Map<string, string>; actions?: (r: ScRow) => ReactNode; showRequester?: boolean;
+  /** Colunas a mais depois do Status (ex.: melhor escolha × verba na Recomendação). */
+  extraCols?: ScExtraCol[];
+  /** Botões no fim da linha (ex.: clipe das cotações no Comprador). */
+  endActions?: (r: ScRow) => ReactNode;
 }) {
   const today = todayISO();
   const [filters, setFilters] = useState<ColumnFilters>({});
@@ -86,6 +91,7 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
     { key: "date", label: "Data", values: (r) => [brDate(r.request_date)], sort: (r) => r.request_date, cell: (r) => brDate(r.request_date) },
     { key: "status", label: "Status", values: (r) => [r.status], className: "whitespace-nowrap",
       cell: (r) => <Pill className={statusClass(r.status)}>{r.status}</Pill> },
+    ...extraCols.map((c) => ({ ...c, cell: (r: ScRow) => c.cell(r) }) as Col),
     ...(showRequester ? [{ key: "requester", label: "Solicitante", values: (r: ScRow) => [r.requester_name], className: "whitespace-nowrap", cell: (r: ScRow) => r.requester_name } as Col] : []),
     { key: "system", label: "Tipo", values: (r) => [r.system], cell: (r) => r.system },
     { key: "category", label: "Categoria", values: (r) => [r.category ?? ""], cell: (r) => r.category ?? "—" },
@@ -126,11 +132,12 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
                   {actions && c.key === "status" && <TableHead>Ações</TableHead>}
                 </Fragment>
               ))}
+              {endActions && <TableHead className="w-10" />}
             </TableRow>
           </TableHeader>
           <TableBody>
             {!shown.length ? (
-              <TableRow><TableCell colSpan={cols.length + 1} className="text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={cols.length + 2} className="text-center text-muted-foreground">Nenhuma solicitação.</TableCell></TableRow>
             ) : shown.map((r) => {
               const dl = deadlineControl(r, today);
               return (
@@ -141,6 +148,7 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
                       {actions && c.key === "status" && <TableCell className="whitespace-nowrap">{actions(r)}</TableCell>}
                     </Fragment>
                   ))}
+                  {endActions && <TableCell className="whitespace-nowrap">{endActions(r)}</TableCell>}
                 </TableRow>
               );
             })}

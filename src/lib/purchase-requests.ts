@@ -29,6 +29,7 @@ export const SC_STATUSES = [
   { value: "COTAR", cls: "bg-violet-100 text-violet-950 dark:bg-violet-900/50 dark:text-violet-100" },
   { value: "EM ANDAMENTO", cls: "bg-blue-900 text-white" },
   { value: "APROVAÇÃO PENDENTE", cls: "bg-orange-200 text-orange-950 dark:bg-orange-900/60 dark:text-orange-100" },
+  { value: "EM APROVAÇÃO", cls: "bg-amber-300 text-amber-950 dark:bg-amber-800/70 dark:text-amber-50" },
   { value: "RECUSADA", cls: "bg-zinc-900 text-white dark:bg-zinc-200 dark:text-zinc-900" },
   { value: "APROVADA", cls: "bg-emerald-100 text-emerald-950 dark:bg-emerald-900/50 dark:text-emerald-100" },
   { value: "COMPRA PARCIAL", cls: "bg-lime-200 text-lime-950 dark:bg-lime-900/60 dark:text-lime-100" },
@@ -62,7 +63,7 @@ export const statusClass = (s: string | null | undefined) => SC_STATUSES.find((x
 /** Bolinha de status antes do número (cor forte da mesma família da etiqueta). */
 const STATUS_DOT: Record<string, string> = {
   "EM PREPARAÇÃO": "bg-zinc-400", "SOLICITAÇÃO ENVIADA": "bg-cyan-500", "SOLICITAÇÃO RECEBIDA": "bg-sky-500", "EM ANÁLISE": "bg-yellow-400",
-  "SOLICITAÇÃO COM PENDÊNCIAS": "bg-red-500", COTAR: "bg-violet-500", "EM ANDAMENTO": "bg-blue-900", "APROVAÇÃO PENDENTE": "bg-orange-500",
+  "SOLICITAÇÃO COM PENDÊNCIAS": "bg-red-500", COTAR: "bg-violet-500", "EM ANDAMENTO": "bg-blue-900", "APROVAÇÃO PENDENTE": "bg-orange-500", "EM APROVAÇÃO": "bg-amber-500",
   RECUSADA: "bg-zinc-900 dark:bg-zinc-200", APROVADA: "bg-emerald-500", "COMPRA PARCIAL": "bg-lime-500", "COMPRA EFETIVADA": "bg-green-600",
   ALMOXARIFADO: "bg-teal-600", CANCELADA: "bg-zinc-900 dark:bg-zinc-200",
 };

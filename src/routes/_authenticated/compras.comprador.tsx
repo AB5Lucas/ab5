@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Ban, Pencil, Undo2 } from "lucide-react";
+import { Ban, Eye, Paperclip, Pencil, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,9 @@ import { ApproversPanel } from "@/components/compras/approvers";
 import { ScReportButton } from "@/components/compras/sc-report-dialog";
 import { Pill, ScTable, todayISO, StatusFilter, statusCounts, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 import { SC_DONE_STATUSES, SC_STATUSES, statusClass } from "@/lib/purchase-requests";
+import { QuotesAttachDialog } from "@/components/compras/quotes";
+import { RecommendationView } from "@/components/compras/recommendation-view";
+import { recCols, useRecTotals } from "@/components/compras/rec-list";
 
 export const Route = createFileRoute("/_authenticated/compras/comprador")({
   head: () => ({ meta: [{ title: "Comprador | AB5 Hub" }, { name: "description", content: "Solicitações de compra aprovadas, para o comprador tratar." }] }),
@@ -57,6 +60,14 @@ function Page() {
     onSuccess: () => { toast.success("SC cancelada"); setCancelling(null); setCancelReason(""); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
+  // Recomendação: clipe das cotações em cada SC; a subaba lista as SCs com cotação (ou já enviadas à aprovação).
+  const [tab, setTab] = useState(() => (typeof location !== "undefined" && ["recomendacao", "aprovadores"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "solicitacoes"));
+  const changeTab = (v: string) => { setTab(v); try { history.replaceState(history.state, "", `${location.pathname}${location.search}#${v}`); } catch { /* ignora */ } };
+  const [attachRow, setAttachRow] = useState<ScRow | null>(null);
+  const [openRec, setOpenRec] = useState<string | null>(null);
+  const openRows = useMemo(() => (list.data ?? []).filter((r) => !done(r) || r.fa_state), [list.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const totals = useRecTotals(openRows);
+  const recRows = openRows.filter((r) => r.fa_state || (totals.get(r.id)?.quotes ?? 0) > 0);
   const save = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc("purchase_request_set_status", { _id: edit!.id, _status: form.status, _notes: form.notes, ...(form.date ? { _date: form.date } : {}) });
@@ -68,9 +79,10 @@ function Page() {
   return (
     <div className="space-y-4">
       <PageHeader title="Comprador" description="Solicitações validadas (e as do TOTVS). Em aberto ficam até a compra efetivada, almoxarifado, cancelada ou recusada. Clique no número para tratar os itens e anexar o pedido de compras." />
-      <Tabs pageTabs defaultValue="solicitacoes">
+      <Tabs pageTabs value={tab} onValueChange={changeTab}>
         <TabsList>
           <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
+          <TabsTrigger value="recomendacao">Recomendação</TabsTrigger>
           <TabsTrigger value="aprovadores">Validadores</TabsTrigger>
         </TabsList>
         <TabsContent value="solicitacoes" className="mt-4 space-y-4">
@@ -96,11 +108,32 @@ function Page() {
                 <Button size="sm" variant="ghost" title="Devolver ao validador ou ao solicitante" onClick={() => { setReturning(r); setReason(""); setTarget("validador"); }}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
                 {r.stage === "compras" && <Button size="sm" variant="ghost" className="text-destructive" title="Cancelar a SC inteira" onClick={() => { setCancelling(r); setCancelReason(""); }}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}
               </div>
-            )} />
+            )} endActions={(r) => {
+              const n = totals.get(r.id)?.quotes ?? 0;
+              return (
+                <Button size="icon" variant="ghost" className="relative h-7 w-7" title={n ? `${n} cotação(ões) · anexar mais` : "Anexar cotações"} onClick={() => setAttachRow(r)}>
+                  <Paperclip className={`h-4 w-4 ${n ? "text-primary" : "text-muted-foreground"}`} />
+                  {n > 0 && <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] leading-tight text-primary-foreground">{n}</span>}
+                </Button>
+              );
+            }} />
+          )}
+        </TabsContent>
+        <TabsContent value="recomendacao" className="mt-4 space-y-4">
+          {openRec ? <RecommendationView requestId={openRec} mode="comprador" onBack={() => setOpenRec(null)} /> : (
+            <>
+              <p className="text-sm text-muted-foreground">SCs com cotações anexadas (clipe na aba Solicitações). Abra para ver a melhor escolha de cada item e enviar ao aprovador.</p>
+              <ScTable rows={recRows} clientName={clientName} extraCols={recCols(totals)} actions={(r) => (
+                <Button size="sm" variant="outline" onClick={() => setOpenRec(r.id)}><Eye className="h-3.5 w-3.5" /> Abrir</Button>
+              )} endActions={(r) => (
+                <Button size="icon" variant="ghost" className="h-7 w-7" title="Cotações" onClick={() => setAttachRow(r)}><Paperclip className="h-4 w-4 text-primary" /></Button>
+              )} />
+            </>
           )}
         </TabsContent>
         <TabsContent value="aprovadores" className="mt-4"><ApproversPanel /></TabsContent>
       </Tabs>
+      <QuotesAttachDialog row={attachRow} onClose={() => setAttachRow(null)} onDone={(id) => { changeTab("recomendacao"); setOpenRec(id); }} />
       <Dialog open={!!returning} onOpenChange={(o) => !o && setReturning(null)}>
         <DialogContent>
           <DialogHeader>

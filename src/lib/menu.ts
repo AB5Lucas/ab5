@@ -38,6 +38,7 @@ import {
   ShieldCheck,
   FilePlus,
   PackageCheck,
+  Stamp,
   BadgeCheck,
 } from "lucide-react";
 
@@ -117,6 +118,7 @@ const RAW_GROUPS: MenuGroup[] = [
       { title: "Solicitações", url: "/compras/solicitacoes", icon: FilePlus },
       { title: "Validação", url: "/compras/aprovacao", icon: BadgeCheck },
       { title: "Comprador", url: "/compras/comprador", icon: PackageCheck },
+      { title: "Aprovação", url: "/compras/aprovacao-compra", icon: Stamp },
       { title: "Relatório", url: "/obras/compras", icon: ChartPie },
     ],
   },

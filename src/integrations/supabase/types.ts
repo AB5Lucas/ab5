@@ -4342,6 +4342,120 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_quote_items: {
+        Row: {
+          conv_factor: number
+          conv_type: string
+          created_at: string
+          description: string
+          discarded: boolean
+          id: string
+          line_no: number
+          quantity: number | null
+          quote_id: string
+          request_item_id: string | null
+          total: number | null
+          unit: string | null
+          unit_price: number | null
+        }
+        Insert: {
+          conv_factor?: number
+          conv_type?: string
+          created_at?: string
+          description: string
+          discarded?: boolean
+          id?: string
+          line_no?: number
+          quantity?: number | null
+          quote_id: string
+          request_item_id?: string | null
+          total?: number | null
+          unit?: string | null
+          unit_price?: number | null
+        }
+        Update: {
+          conv_factor?: number
+          conv_type?: string
+          created_at?: string
+          description?: string
+          discarded?: boolean
+          id?: string
+          line_no?: number
+          quantity?: number | null
+          quote_id?: string
+          request_item_id?: string | null
+          total?: number | null
+          unit?: string | null
+          unit_price?: number | null
+        }
+        Relationships: []
+      }
+      purchase_quotes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delivery_days: number | null
+          file_name: string | null
+          file_path: string
+          freight: number | null
+          id: string
+          matched: boolean
+          payment_days: number | null
+          payment_terms: string | null
+          quote_date: string | null
+          quote_number: string | null
+          read_error: string | null
+          read_status: string
+          request_id: string
+          source: string
+          supplier: string | null
+          supplier_doc: string | null
+          total: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delivery_days?: number | null
+          file_name?: string | null
+          file_path: string
+          freight?: number | null
+          id?: string
+          matched?: boolean
+          payment_days?: number | null
+          payment_terms?: string | null
+          quote_date?: string | null
+          quote_number?: string | null
+          read_error?: string | null
+          read_status?: string
+          request_id: string
+          source?: string
+          supplier?: string | null
+          supplier_doc?: string | null
+          total?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delivery_days?: number | null
+          file_name?: string | null
+          file_path?: string
+          freight?: number | null
+          id?: string
+          matched?: boolean
+          payment_days?: number | null
+          payment_terms?: string | null
+          quote_date?: string | null
+          quote_number?: string | null
+          read_error?: string | null
+          read_status?: string
+          request_id?: string
+          source?: string
+          supplier?: string | null
+          supplier_doc?: string | null
+          total?: number | null
+        }
+        Relationships: []
+      }
       purchase_request_items: {
         Row: {
           budget: number | null
@@ -4351,6 +4465,7 @@ export type Database = {
           id: string
           item_no: number
           link_url: string | null
+          rec_quote_item_id: string | null
           notes: string | null
           order_file_path: string | null
           order_number: string | null
@@ -4371,6 +4486,7 @@ export type Database = {
           id?: string
           item_no: number
           link_url?: string | null
+          rec_quote_item_id?: string | null
           notes?: string | null
           order_file_path?: string | null
           order_number?: string | null
@@ -4391,6 +4507,7 @@ export type Database = {
           id?: string
           item_no?: number
           link_url?: string | null
+          rec_quote_item_id?: string | null
           notes?: string | null
           order_file_path?: string | null
           order_number?: string | null
@@ -4430,6 +4547,20 @@ export type Database = {
           cancelled_at: string | null
           category: string | null
           cc_code: string | null
+          fa_ack_at: string | null
+          fa_ack_needed: boolean
+          fa_budget: number | null
+          fa_decided_at: string | null
+          fa_decided_by: string | null
+          fa_decision_notes: string | null
+          fa_notes: string | null
+          fa_rule: string | null
+          fa_sent_at: string | null
+          fa_sent_by: string | null
+          fa_snapshot: Json | null
+          fa_state: string | null
+          fa_total: number | null
+          rec_criteria: string[]
           client_id: string | null
           created_at: string
           decided_by: string | null
@@ -4471,6 +4602,20 @@ export type Database = {
           cancelled_at?: string | null
           category?: string | null
           cc_code?: string | null
+          fa_ack_at?: string | null
+          fa_ack_needed?: boolean
+          fa_budget?: number | null
+          fa_decided_at?: string | null
+          fa_decided_by?: string | null
+          fa_decision_notes?: string | null
+          fa_notes?: string | null
+          fa_rule?: string | null
+          fa_sent_at?: string | null
+          fa_sent_by?: string | null
+          fa_snapshot?: Json | null
+          fa_state?: string | null
+          fa_total?: number | null
+          rec_criteria?: string[]
           client_id?: string | null
           created_at?: string
           decided_by?: string | null
@@ -4512,6 +4657,20 @@ export type Database = {
           cancelled_at?: string | null
           category?: string | null
           cc_code?: string | null
+          fa_ack_at?: string | null
+          fa_ack_needed?: boolean
+          fa_budget?: number | null
+          fa_decided_at?: string | null
+          fa_decided_by?: string | null
+          fa_decision_notes?: string | null
+          fa_notes?: string | null
+          fa_rule?: string | null
+          fa_sent_at?: string | null
+          fa_sent_by?: string | null
+          fa_snapshot?: Json | null
+          fa_state?: string | null
+          fa_total?: number | null
+          rec_criteria?: string[]
           client_id?: string | null
           created_at?: string
           decided_by?: string | null
