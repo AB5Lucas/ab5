@@ -29,14 +29,20 @@ export function whatsappProvider(): WhatsAppProvider {
 }
 
 export function channelsConfigured() {
-  return { push: !!vapidKeys(), email: !!(env("RESEND_API_KEY") && env("NOTIFY_EMAIL_FROM")), whatsapp: !!whatsappProvider() };
+  return { push: !!vapidKeys(), email: !!outlookKeys() || !!(env("RESEND_API_KEY") && env("NOTIFY_EMAIL_FROM")), whatsapp: !!whatsappProvider() };
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
+/** Outlook (Microsoft 365 da AB5) pelo conector Microsoft Outlook da Lovable: envia pela conta conectada, sem DNS nem serviço extra. */
+function outlookKeys() {
+  const lovable = env("LOVABLE_API_KEY"), outlook = env("MICROSOFT_OUTLOOK_API_KEY");
+  return lovable && outlook ? { lovable, outlook } : null;
+}
+
 export async function sendEmail(to: string | null, n: { title: string; body: string | null; ref: string | null }, url: string | null): Promise<SendResult> {
-  const key = env("RESEND_API_KEY"), from = env("NOTIFY_EMAIL_FROM");
-  if (!key || !from) return { status: "skipped_no_config", error: "RESEND_API_KEY/NOTIFY_EMAIL_FROM não configurados" };
+  const key = env("RESEND_API_KEY"), from = env("NOTIFY_EMAIL_FROM"), ms = outlookKeys();
+  if (!ms && (!key || !from)) return { status: "skipped_no_config", error: "E-mail não configurado (conector Microsoft Outlook ou RESEND_API_KEY/NOTIFY_EMAIL_FROM)" };
   if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return { status: "skipped_no_target", error: "Usuário sem e-mail" };
   const subject = n.ref ? `${n.title} · ${n.ref}` : n.title;
   const html = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111">
@@ -46,6 +52,22 @@ ${n.body ? `<p style="margin:0 0 12px">${esc(n.body)}</p>` : ""}
 ${url ? `<p><a href="${esc(url)}" style="background:#111;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none">Abrir no AB5 Hub</a></p>` : ""}
 <p style="color:#888;font-size:12px;margin-top:16px">Para mudar os canais, abra Notificações › Preferências no AB5 Hub.</p></div>`;
   const text = [n.title, n.ref, n.body, url].filter(Boolean).join("\n");
+  // 1º Outlook da empresa (conector Microsoft Outlook); a Resend só é usada se o conector não estiver ligado.
+  if (ms) {
+    try {
+      const res = await fetch("https://connector-gateway.lovable.dev/microsoft_outlook/me/sendMail", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${ms.lovable}`, "X-Connection-Api-Key": ms.outlook, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: { subject, body: { contentType: "HTML", content: html }, toRecipients: [{ emailAddress: { address: to } }] }, saveToSentItems: false }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (res.ok) return { status: "sent" };
+      return { status: "failed", error: `Outlook ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}` };
+    } catch (e) {
+      return { status: "failed", error: `Outlook: ${(e as Error).message}` };
+    }
+  }
+  if (!key || !from) return { status: "skipped_no_config", error: "RESEND_API_KEY/NOTIFY_EMAIL_FROM não configurados" };
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
