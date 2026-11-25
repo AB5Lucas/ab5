@@ -9,9 +9,11 @@ import { PatioCalendar } from "@/components/overview/patio-calendar";
 import { Pie3D } from "@/components/overview/pie-3d";
 import { CountUp } from "@/components/count-up";
 import { cn } from "@/lib/utils";
+import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
 export const Route = createFileRoute("/_authenticated/planejamento")({
-  head: () => ({ meta: [{ title: "Planejamento | AB5 Hub" }, { name: "description", content: "Visão geral da programação: escalações, ausências, transporte e Pátio." }] }),
+  pendingComponent: DashboardSkeleton,
+  head: () => ({ meta: [{ title: "Planejamento | AB5 Hub" }, { name: "description", content: "Visão geral da programação: escalações, ausências, transporte e Pátio." }, { property: "og:title", content: "Planejamento | AB5 Hub" }, { property: "og:description", content: "Visão geral da programação: escalações, ausências, transporte e Pátio." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: PlanejamentoOverview,
 });
 
@@ -49,7 +51,8 @@ function PlanejamentoOverview() {
   const nav = useNavigate();
   const allowed = canAccess("/programacao/diaria");
   useEffect(() => { if (!loading && !allowed) nav({ to: "/dashboard", replace: true }); }, [loading, allowed]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (loading || !allowed) return null;
+  if (loading) return <DashboardSkeleton />;
+  if (!allowed) return null;
   return <Overview />;
 }
 
@@ -213,7 +216,7 @@ function Overview() {
         </div>
       </div>
       {!d ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />)}</div>
+        <DashboardSkeleton />
       ) : (
         <>
           <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">

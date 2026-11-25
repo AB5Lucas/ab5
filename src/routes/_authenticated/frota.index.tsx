@@ -12,9 +12,11 @@ import { dayKm, dayToll, normalizePlate } from "@/lib/fleet-costs";
 import { closestPlate, isoDay, maintenanceState, type MaintenanceState } from "@/lib/fleet-notes";
 import { KIND_LABEL, timeSpan, type LogDemand } from "@/lib/logistics";
 import { cn } from "@/lib/utils";
+import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
 export const Route = createFileRoute("/_authenticated/frota/")({
-  head: () => ({ meta: [{ title: "Veículos | AB5 Hub" }, { name: "description", content: "Visão geral da frota: manutenções, km, custos, ranking dos motoristas e logística." }] }),
+  pendingComponent: DashboardSkeleton,
+  head: () => ({ meta: [{ title: "Veículos | AB5 Hub" }, { name: "description", content: "Visão geral da frota: manutenções, km, custos, ranking dos motoristas e logística." }, { property: "og:title", content: "Veículos | AB5 Hub" }, { property: "og:description", content: "Visão geral da frota: manutenções, km, custos, ranking dos motoristas e logística." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: FleetOverview,
 });
 
@@ -50,7 +52,8 @@ function FleetOverview() {
   const items = MENU_GROUPS.find((g) => g.overview === "/frota")?.items ?? [];
   const allowed = items.some((i) => canAccess(i.url));
   useEffect(() => { if (!loading && !allowed) nav({ to: "/dashboard", replace: true }); }, [loading, allowed]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (loading || !allowed) return null;
+  if (loading) return <DashboardSkeleton />;
+  if (!allowed) return null;
   return <Overview canCost={canAccess("/frota/custos")} />;
 }
 
@@ -202,7 +205,7 @@ function Overview({ canCost }: { canCost: boolean }) {
         </div>
       </div>
       {!d ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />)}</div>
+        <DashboardSkeleton />
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
           <OverviewCard dark title={`Km rodados — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Km da escala da Transporte (ida e volta × viagens + obras adicionais)" className="min-h-0" bodyClassName="flex min-h-0 flex-col">

@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
 import { menuUrlFor, MENU_GROUPS } from "@/lib/menu";
+import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
 let cachedUser: import("@supabase/supabase-js").User | null = null;
 if (typeof window !== "undefined") {
@@ -47,6 +48,7 @@ function AuthenticatedLayout() {
   const { profile, role, isForeman } = useCurrentUser();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const dashboardPending = useRouterState({ select: (r) => r.status === "pending" && r.location.pathname !== r.resolvedLocation?.pathname && ["/planejamento", "/atividades", "/frota", "/frota/", "/obras/resultado"].includes(r.location.pathname) });
   const queryClient = useQueryClient();
   const { canAccess, loading: accessLoading } = useAccess();
   const pageUrl = menuUrlFor(pathname);
@@ -123,12 +125,15 @@ function AuthenticatedLayout() {
             </div>
           </header>
           <main className={`flex-1 p-4 md:p-6 ${rail ? "md:pl-[6.5rem]" : ""}`}>
-            {accessLoading ? null : blocked ? (
+            {accessLoading ? <DashboardSkeleton /> : blocked ? (
               <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
                 Você não tem acesso a esta página. Fale com um administrador.
               </div>
             ) : (
-              <PageEnter><Outlet /></PageEnter>
+              <>
+                {dashboardPending && <DashboardSkeleton />}
+                <div className={dashboardPending ? "hidden" : "contents"}><PageEnter><Outlet /></PageEnter></div>
+              </>
             )}
           </main>
         </div>

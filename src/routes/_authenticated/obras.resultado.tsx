@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ResultadoPage } from "@/components/resultado-page";
+import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
 export const Route = createFileRoute("/_authenticated/obras/resultado")({
+  pendingComponent: DashboardSkeleton,
   head: () => ({
     meta: [
       { title: "Resultados | AB5 Hub" },

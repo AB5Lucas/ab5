@@ -13,6 +13,7 @@ import { Big, Donut, HoverBars, LineArea, MultiLine, OverviewCard, type LineSeri
 import { RdoTiles, type TileCol } from "@/components/overview/rdo-tiles";
 import { cn } from "@/lib/utils";
 import { CountUp } from "@/components/count-up";
+import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 import { isInternalClient } from "@/lib/fleet-budget";
 import { KM_RATE } from "@/lib/results-engine";
 
@@ -43,6 +44,7 @@ const EXP_SERIES: LineSeries[] = [
 ];
 
 export const Route = createFileRoute("/_authenticated/atividades")({
+  pendingComponent: DashboardSkeleton,
   head: () => ({
     meta: [
       { title: "Atividades | AB5 Hub" },
@@ -99,7 +101,8 @@ function AtividadesOverview() {
     const first = MENU_GROUPS.find((g) => g.overview === "/atividades")?.items.find((i) => canOpen(i.url));
     nav({ to: (first ? first.to ?? first.url : "/dashboard") as never, replace: true });
   }, [roleLoading, accessLoading, allowed]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (roleLoading || !allowed) return null;
+  if (roleLoading || accessLoading) return <DashboardSkeleton />;
+  if (!allowed) return null;
   return <HubOverview />;
 }
 
@@ -305,7 +308,7 @@ function HubOverview() {
       </div>
 
       {!d ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />)}</div>
+        <DashboardSkeleton />
       ) : (
         <>
           <div className="grid shrink-0 gap-3 md:grid-cols-2 xl:grid-cols-4">

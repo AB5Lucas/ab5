@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
 export function ResultCard({ title, dark, className, onEdit, children }: {
   title: string; dark?: boolean; className?: string; onEdit?: () => void; children: ReactNode;
@@ -22,10 +23,5 @@ export function ResultChartSkeleton() {
 }
 
 export function ResultDashboardSkeleton() {
-  return <div role="status" aria-label="Carregando resultados" className="result-dashboard grid gap-3 xl:grid-cols-4">
-    {Array.from({ length: 4 }, (_, i) => <div key={i} className="result-skeleton h-48 rounded-2xl border bg-card p-4"><div className="h-3 w-28 rounded bg-muted" /><div className="mt-6 h-9 w-40 rounded bg-muted" /><div className="mt-5 h-2 w-full rounded bg-muted" /></div>)}
-    <div className="h-72 xl:col-span-2"><ResultChartSkeleton /></div>
-    <div className="h-72 xl:col-span-2"><ResultChartSkeleton /></div>
-    <span className="sr-only">Carregando resultados…</span>
-  </div>;
+  return <DashboardSkeleton label="Carregando resultados" />;
 }
