@@ -30,12 +30,12 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
   return (
     <div className={cn("flex flex-col md:flex-row", compact ? "gap-4" : "gap-5")}>
       <div className="min-w-0 flex-1">
-        <div className={cn("grid", compact ? "gap-0.5" : big ? "gap-1.5" : "gap-1", unit === "day" ? (big ? "mx-auto w-max grid-cols-[repeat(7,2.6rem)]" : "grid-cols-7") : "grid-cols-6")}>
+        <div className={cn("grid", compact ? "gap-0.5" : big ? "gap-1.5" : "gap-1", unit === "day" ? (big ? "w-full grid-cols-7 gap-y-2" : "grid-cols-7") : "grid-cols-6")}>
           {unit === "day" && WD.map((w, i) => <span key={i} className={cn("pb-0.5 text-center text-[10px] font-medium", mut)}>{w}</span>)}
           {Array.from({ length: lead }, (_, i) => <span key={`l${i}`} />)}
           {days.map((d, i) => (
             <div key={d.key} title={`${d.title}: ${d.value} ${d.value === 1 ? "pessoa" : "pessoas"}`}
-              className={cn("ov-grow mx-auto flex aspect-square w-full flex-col items-center justify-center rounded-full", compact ? "max-w-[1.2rem] text-[9px]" : big ? "max-w-none text-sm" : "max-w-7 text-[11px]", " font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max, dark))}
+              className={cn("ov-grow mx-auto flex aspect-square w-full flex-col items-center justify-center rounded-full", compact ? "max-w-[1.2rem] text-[9px]" : big ? "max-w-[2.9rem] text-sm" : "max-w-7 text-[11px]", " font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max, dark))}
               style={{ animationDelay: `${i * 18}ms` }}>
               {d.value || d.label}
             </div>
@@ -49,19 +49,19 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
         </div>
       </div>
       {dark ? (
-        <div className={cn("flex w-full flex-col border-t border-background/20 pt-3 md:w-48 md:border-l md:border-t-0 md:pl-5 md:pt-0", compact ? "gap-2" : "gap-3")}>
+        <div className={cn("flex w-full flex-col border-t border-background/20 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0", compact ? "gap-2 md:w-48" : big ? "justify-center gap-4 md:w-64" : "gap-3 md:w-48")}>
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider text-background/60">{unit === "day" ? "No mês" : "No período"}</p>
-            <p className={cn("font-display font-semibold leading-tight tabular-nums", compact ? "text-2xl" : "text-3xl")}>{total}</p>
-            <p className="text-[11px] text-background/60">pessoas diferentes no Pátio</p>
+            <p className={cn("font-display font-semibold leading-tight tabular-nums", compact ? "text-2xl" : big ? "text-5xl" : "text-3xl")}>{total}</p>
+            <p className={cn("text-background/60", big ? "text-sm" : "text-[11px]")}>pessoas diferentes no Pátio</p>
           </div>
           <div>
-            <div className="flex items-baseline justify-between text-xs"><span className="text-background/60">Do efetivo</span><span className="font-semibold tabular-nums">{(share * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</span></div>
+            <div className={cn("flex items-baseline justify-between", big ? "text-sm" : "text-xs")}><span className="text-background/60">Do efetivo</span><span className="font-semibold tabular-nums">{(share * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</span></div>
             <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-background/15"><div className="h-full rounded-full bg-background transition-[width] duration-700" style={{ width: `${Math.min(100, share * 100)}%` }} /></div>
             <p className="mt-1 text-[10px] text-background/60">{total} de {workforce} colaboradores ativos</p>
           </div>
-          <div className="flex justify-between text-xs"><span className="text-background/60">Média por dia</span><b className="tabular-nums">{avg}</b></div>
-          <div className="flex justify-between text-xs"><span className="text-background/60">Pico</span><b className="tabular-nums">{peak ? `${peak.value} · ${peak.title}` : "—"}</b></div>
+          <div className={cn("flex justify-between", big ? "text-sm" : "text-xs")}><span className="text-background/60">Média por dia</span><b className="tabular-nums">{avg}</b></div>
+          <div className={cn("flex justify-between", big ? "text-sm" : "text-xs")}><span className="text-background/60">Pico</span><b className="tabular-nums">{peak ? `${peak.value} · ${peak.title}` : "—"}</b></div>
         </div>
       ) : (
       <SummaryPanel>

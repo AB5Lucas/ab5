@@ -87,6 +87,14 @@ function Overview() {
       return { boxes, off: off.data ?? [], vac: (vac.data ?? []).filter((v) => !/cancel/i.test(v.status ?? "")), veh };
     },
   });
+  // Mesma ordem dos veículos da aba Transporte (preferência salva por usuário).
+  const vehOrderQ = useQuery({
+    queryKey: ["vehicle-view-prefs"], staleTime: STATIC,
+    queryFn: async () => {
+      const { data } = await supabase.from("vehicle_view_prefs").select("hidden_vehicle_ids, vehicle_order").maybeSingle();
+      return { hidden: (data?.hidden_vehicle_ids ?? []) as string[], order: (data?.vehicle_order ?? []) as string[] };
+    },
+  });
   const cadQ = useQuery({
     queryKey: ["overview", "plan-cad"], staleTime: STATIC,
     queryFn: async () => {
@@ -163,11 +171,12 @@ function Overview() {
       byVeh.set(v.vehicle_id, g);
     }
     const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
-    const vehicles = [...byVeh.values()].map((g) => {
+    const rank = new Map((vehOrderQ.data?.order ?? []).map((id, i) => [id, i]));
+    const vehicles = [...byVeh.entries()].map(([vid, g]) => {
       const cl = top(g.clients);
       const maint = g.maintDays === g.days.size;
-      return { plate: g.plate, model: g.model, client: cl[0] ?? "—", more: cl.length - 1, maint, driver: top(g.drivers)[0] ?? "—", km: maint ? null : g.km, days: g.days.size };
-    }).sort((a, b) => Number(a.maint) - Number(b.maint) || a.client.localeCompare(b.client));
+      return { rank: rank.get(vid) ?? Number.MAX_SAFE_INTEGER, plate: g.plate, model: g.model, client: cl[0] ?? "—", more: cl.length - 1, maint, driver: top(g.drivers)[0] ?? "—", km: maint ? null : g.km, days: g.days.size };
+    }).sort((a, b) => a.rank - b.rank || a.plate.localeCompare(b.plate, "pt-BR"));
     const worksSet = new Set(inRange.filter((a: any) => a.service_assigned).map((a: any) => a.work_id));
     const worksByClient = clients.filter((c) => c.works.length).map((c) => ({ name: c.name, n: c.works.length }));
     return {
@@ -175,7 +184,7 @@ function Overview() {
       kmTotal: vehicles.reduce((a, v) => a + (v.km ?? 0), 0), maint: vehicles.filter((v) => v.maint).length,
       worksCount: worksSet.size, worksByClient, pendTotal: clients.reduce((a, c) => a + c.pend, 0),
     };
-  }, [worksQ.data, allocQ.data, rangeQ.data, cadQ.data, R.from, R.to, single, today, mFrom, mTo, qFrom, qTo]);
+  }, [worksQ.data, allocQ.data, rangeQ.data, cadQ.data, vehOrderQ.data, R.from, R.to, single, today, mFrom, mTo, qFrom, qTo]);
 
   const pLabel = period === "hoje" ? "hoje" : period === "amanha" ? "amanhã" : period === "semana" ? "esta semana" : "mês atual";
   const when = single ? brDay(R.from) : `${brDay(R.from)} a ${brDay(R.to)}`;
@@ -260,7 +269,7 @@ function Overview() {
               <AbsencePie total={d.absTotal} parts={d.absParts} />
             </OverviewCard>
           </div>
-          <OverviewCard title={`Escalações — ${pLabel} · ${d.clients.length} clientes · ${d.worksCount} serviços · ${d.people} pessoas`} to="/programacao/diaria" linkLabel="Abrir Programação"
+          <OverviewCard title={`Escalações — ${pLabel} · ${d.clients.length} clientes · ${d.worksCount} serviços · ${d.people} pessoas`} to="/programacao/servicos" linkLabel="Abrir Serviços"
             hint="Pessoas escaladas por cliente no período" className="shrink-0 xl:h-[13.25rem]" bodyClassName="min-h-0 overflow-hidden">
             {!d.clients.length ? <p className="py-10 text-center text-xs text-muted-foreground">Sem escalações no período.</p> : (
               <div className="grid h-full grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:auto-cols-fr xl:grid-flow-col xl:grid-cols-none xl:grid-rows-1 xl:overflow-hidden">
@@ -315,11 +324,17 @@ function ClientBars({ rows, empty, limit, tight }: { rows: { name: string; n: nu
 type AbsPart = { key: string; label: string; n: number; names: string[] };
 const PIE_TONES = [1, 0.65, 0.4, 0.2];
 /** Fatia da pizza (ângulos em voltas, 0 = topo). */
-function slicePath(a0: number, a1: number, r = 48) {
-  const p = (t: number) => [50 + r * Math.sin(2 * Math.PI * t), 50 - r * Math.cos(2 * Math.PI * t)];
-  const [x0, y0] = p(a0), [x1, y1] = p(a1);
-  return `M50 50 L${x0} ${y0} A${r} ${r} 0 ${a1 - a0 > 0.5 ? 1 : 0} 1 ${x1} ${y1} Z`;
+/** Pizza 3D: elipse inclinada (RX × RY) com espessura DEPTH desenhada em camadas mais escuras por baixo. */
+const RX = 48, RY = 30, CY = 34, DEPTH = 12;
+function slicePath(a0: number, a1: number, dy = 0) {
+  const p = (t: number) => `${(50 + RX * Math.sin(2 * Math.PI * t)).toFixed(2)} ${(CY + dy - RY * Math.cos(2 * Math.PI * t)).toFixed(2)}`;
+  const mid = (a0 + a1) / 2; // dois arcos: cobre também a pizza inteira (uma só situação)
+  return `M50 ${CY + dy} L${p(a0)} A${RX} ${RY} 0 0 1 ${p(mid)} A${RX} ${RY} 0 0 1 ${p(a1)} Z`;
 }
+/** Cor da fatia (tom do texto sobre o fundo do quadro) e da lateral (mais escura). */
+const toneFill = (tone: number, side = false) =>
+  side ? `color-mix(in oklab, color-mix(in oklab, var(--foreground) ${Math.round(tone * 100)}%, var(--card)) 72%, black)`
+    : `color-mix(in oklab, var(--foreground) ${Math.round(tone * 100)}%, var(--card))`;
 
 /**
  * Ausências em pizza (folgas, férias, atestados, faltas). Clicar numa fatia: a pizza encolhe para o canto, as outras
@@ -342,26 +357,30 @@ function AbsencePie({ total, parts }: { total: number; parts: AbsPart[] }) {
       {/* Pizza: no centro com a legenda; com fatia escolhida, encolhe para o canto de cima. */}
       <div className={cn("absolute flex items-center gap-4 transition-all duration-700 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
         "left-0 top-0", cur ? "h-16 w-16" : "h-full w-full")}>
-        <div className={cn("relative aspect-square shrink-0 transition-all duration-700", cur ? "h-16 max-w-16" : "h-full max-w-[58%]")}>
+        <div className={cn("relative aspect-[100/82] shrink-0 transition-all duration-700", cur ? "h-14 max-w-16" : "h-full max-w-[60%]")}>
           {!sum ? (
             <div className="flex h-full items-center justify-center rounded-full border border-dashed text-xs text-muted-foreground">Ninguém fora</div>
           ) : (
-            <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible">
-              {slices.map((sl) => {
-                const out = (hover === sl.key && !cur) ? 3 : 0;
-                const dx = out * Math.sin(2 * Math.PI * sl.mid), dy = -out * Math.cos(2 * Math.PI * sl.mid);
+            <svg viewBox="0 0 100 82" className="h-full w-full overflow-visible">
+              {/* 1º as laterais de todas as fatias (de trás para a frente), depois os topos: assim nenhuma lateral cobre o topo de outra. */}
+              {(["side", "top"] as const).map((layer) => slices.map((sl) => {
+                const out = (hover === sl.key && !cur) ? 4 : 0;
+                const dx = out * Math.sin(2 * Math.PI * sl.mid), dy = -out * 0.62 * Math.cos(2 * Math.PI * sl.mid);
                 const hidden = cur && cur.key !== sl.key;
+                const tone = PIE_TONES[sl.i]!;
                 return (
-                  <g key={sl.key} style={{ transform: `translate(${dx}px, ${dy}px)`, opacity: hidden ? 0 : 1, transition: "transform 300ms, opacity 500ms" }}>
-                    {sl.a1 - sl.a0 >= 0.9999
-                      ? <circle cx="50" cy="50" r="48" className="fill-foreground" fillOpacity={PIE_TONES[sl.i]} />
-                      : <path d={slicePath(sl.a0, sl.a1)} className="fill-foreground stroke-card" strokeWidth="1" fillOpacity={PIE_TONES[sl.i]} />}
-                    <title>{`${sl.label}: ${sl.n}`}</title>
-                    {!cur && <path d={slicePath(sl.a0, sl.a1)} fill="transparent" className="cursor-pointer"
-                      onMouseEnter={() => setHover(sl.key)} onMouseLeave={() => setHover(null)} onClick={(e) => { stop(e); setHover(null); setSel(sl.key); }} />}
+                  <g key={`${layer}-${sl.key}`} style={{ transform: `translate(${dx}px, ${dy}px)`, opacity: hidden ? 0 : 1, transition: "transform 300ms, opacity 500ms" }}>
+                    {layer === "side"
+                      ? Array.from({ length: DEPTH }, (_, k) => DEPTH - k).map((k) => <path key={k} d={slicePath(sl.a0, sl.a1, k)} style={{ fill: toneFill(tone, true) }} />)
+                      : <>
+                        <path d={slicePath(sl.a0, sl.a1)} style={{ fill: toneFill(tone) }} className="stroke-card" strokeWidth="0.6" />
+                        <title>{`${sl.label}: ${sl.n}`}</title>
+                        {!cur && <path d={slicePath(sl.a0, sl.a1)} fill="transparent" className="cursor-pointer"
+                          onMouseEnter={() => setHover(sl.key)} onMouseLeave={() => setHover(null)} onClick={(e) => { stop(e); setHover(null); setSel(sl.key); }} />}
+                      </>}
                   </g>
                 );
-              })}
+              }))}
             </svg>
           )}
         </div>
