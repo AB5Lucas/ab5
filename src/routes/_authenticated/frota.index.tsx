@@ -10,12 +10,13 @@ import { CountUp } from "@/components/count-up";
 import { useDriverRanking } from "@/components/frota/ranking";
 import { dayKm, dayToll, normalizePlate } from "@/lib/fleet-costs";
 import { closestPlate, isoDay, maintenanceState, type MaintenanceState } from "@/lib/fleet-notes";
-import { KIND_LABEL, timeSpan, type LogDemand } from "@/lib/logistics";
+import { AgendaTab } from "@/components/logistica/agenda";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ResultCard, ResultChartSkeleton } from "@/components/result-dashboard-shell";
 import { useDashboardBudget } from "@/components/frota/use-dashboard-budget";
 import { fleetDashboardCosts } from "@/lib/fleet-dashboard-costs";
+import { fleetRankingPeriod } from "@/lib/fleet-ranking-period";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
 export const Route = createFileRoute("/_authenticated/frota/")({
@@ -107,17 +108,14 @@ function Overview({ canCost }: { canCost: boolean }) {
       return { plans, recs, readings };
     },
   });
-  const logQ = useQuery({
-    queryKey: ["overview", "fleet-log", calFrom, calTo], staleTime: 60_000, placeholderData: keepPreviousData,
-    queryFn: async () => {
-      const data = await fetchAll<LogDemand>((a, b) => supabase.from("log_demands").select("*").gte("scheduled_date", calFrom).lte("scheduled_date", calTo).order("id").range(a, b));
-      const list = ((data ?? []) as LogDemand[]).filter((d) => !/cancel/i.test(String((d as any).status ?? "")));
-      const addrIds = [...new Set(list.flatMap((d) => [(d as any).origin_id, (d as any).dest_id]).filter(Boolean))] as string[];
-      const addrs = addrIds.length ? (await supabase.from("log_addresses").select("id, name, city").in("id", addrIds)).data ?? [] : [];
-      return { list, addr: new Map(addrs.map((a) => [a.id, a.name])) };
-    },
+  const year = ym.slice(0, 4);
+  const annualQ = useQuery({
+    queryKey: ["overview", "fleet-maintenance-year", year], staleTime: STATIC,
+    queryFn: () => fetchAll<{ schedule_date: string; maintenance_kind: string | null }>((a, b) => supabase.from("vehicle_schedules")
+      .select("schedule_date, maintenance_kind").eq("is_maintenance", true)
+      .gte("schedule_date", `${year}-01-01`).lte("schedule_date", `${year}-12-31`).order("id").range(a, b)),
   });
-  const rank = useDriverRanking({ from: R.from, to: R.to });
+  const rank = useDriverRanking(fleetRankingPeriod(today));
 
   const d = useMemo(() => {
     if (!vehiclesQ.data || !schedQ.data || !maintQ.data) return null;
@@ -196,7 +194,7 @@ function Overview({ canCost }: { canCost: boolean }) {
   useEffect(() => { setSelectedDay(R.from); }, [R.from]);
   const pLabel = period === "hoje" ? "hoje" : period === "amanha" ? "amanhã" : period === "semana" ? "esta semana" : "este mês";
   const when = single ? brDay(R.from) : `${brDay(R.from)} a ${brDay(R.to)}`;
-  const loadingNew = schedQ.isPlaceholderData || logQ.isPlaceholderData;
+  const loadingNew = schedQ.isPlaceholderData;
   return (
     <div className={cn("flex flex-col gap-3 transition-opacity duration-300 xl:h-[calc(100dvh-6.5rem)] xl:min-h-[640px]", loadingNew && "opacity-70")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -264,7 +262,11 @@ function Overview({ canCost }: { canCost: boolean }) {
             })()}
           </OverviewCard>
 
-          <OverviewCard title={`Ranking dos motoristas — ${pLabel}`} to="/frota/notas" linkLabel="Abrir Abastecimento" hint="% das notas de abastecimento entregues (foto do cupom); os últimos 2 dias ainda estão no prazo" className="min-h-0 xl:col-start-4 xl:row-start-1 xl:row-span-3" bodyClassName="flex min-h-0 flex-col">
+          <ResultCard title={`Manutenções e revisões — ${year}`} className="min-h-48 xl:min-h-0 xl:col-start-4 xl:row-start-1">
+            {annualQ.isPending ? <ResultChartSkeleton /> : <MaintenanceYear rows={annualQ.data ?? []} year={year} />}
+          </ResultCard>
+
+          <OverviewCard title="Ranking dos motoristas — últimos 30 dias" to="/frota/notas" linkLabel="Abrir Abastecimento" hint="% das notas de abastecimento entregues (foto do cupom); os últimos 2 dias ainda estão no prazo" className="min-h-0 xl:col-start-4 xl:row-start-2 xl:row-span-2" bodyClassName="flex min-h-0 flex-col">
             <div className="flex items-baseline gap-2">
               <Big value={rank.overall == null ? "—" : `${rank.overall}%`} />
               <span className="text-xs text-muted-foreground">das notas entregues</span>
@@ -298,7 +300,7 @@ function Overview({ canCost }: { canCost: boolean }) {
                   ) : <p className="text-sm text-background/60">Custos disponíveis para quem tem acesso à Visão Geral.</p>}
                 </ResultCard>
                 <ResultCard title={`Logística — ${brDay(selectedDay)}`} className="min-h-64 xl:min-h-0 xl:col-start-3 xl:row-start-2 xl:row-span-2">
-                  {logQ.isPending ? <ResultChartSkeleton /> : <LogTimeline key={selectedDay} list={(logQ.data?.list ?? []).filter((x) => x.scheduled_date === selectedDay)} addr={logQ.data?.addr ?? new Map()} vehicles={new Map((vehiclesQ.data ?? []).map((v) => [v.id, v.plate]))} single />}
+                  <AgendaTab dashboardDate={selectedDay} />
                 </ResultCard>
         </div>
       )}
@@ -374,54 +376,17 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
   );
 }
 
-const H0 = 5 * 60, H1 = 22 * 60;
-/** Linha do tempo das demandas da Logística (5h–22h): um dia = por veículo/transportadora; vários dias = por dia. */
-function LogTimeline({ list, addr, vehicles, single }: { list: LogDemand[]; addr: Map<string, string>; vehicles: Map<string, string>; single: boolean }) {
-  const groups = new Map<string, LogDemand[]>();
-  for (const dm of list) {
-    const x = dm as any;
-    const key = single ? (x.vehicle_id ? vehicles.get(x.vehicle_id) ?? "Veículo" : x.carrier_name || (x.carrier === "cliente" ? "Cliente" : "Terceiro")) : String(x.scheduled_date);
-    groups.set(key, [...(groups.get(key) ?? []), dm]);
-  }
-  const rows = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  const hours = Array.from({ length: (H1 - H0) / 60 + 1 }, (_, i) => H0 + i * 60);
-  if (!rows.length) rows.push(["Sem demandas", []], ["", []], [" ", []]);
-
-  return (
-    <div className="flex h-full min-h-0 flex-1 flex-col" onClick={(e) => e.preventDefault()}>
-      <div className="flex items-baseline gap-2">
-        <span className="font-display text-3xl font-semibold tabular-nums"><CountUp value={list.length} /></span>
-        <span className="text-xs text-muted-foreground">{list.length === 1 ? "demanda programada" : "demandas programadas"}</span>
-      </div>
-      <div className="relative mt-2 grid grid-cols-[5.5rem_minmax(0,1fr)] text-[10px] text-muted-foreground">
-        <span />
-        <div className="relative h-4">
-          {hours.map((h) => <span key={h} className="absolute -translate-x-1/2 text-[9px]" style={{ left: `${((h - H0) / (H1 - H0)) * 100}%` }}>{h / 60}h</span>)}
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
-        {rows.map(([key, items], ri) => (
-          <div key={key} className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-0">
-            <span className="truncate pr-2 text-[11px] font-medium">{single ? key : brDay(key)}</span>
-            <div className="relative h-12 border-y border-border bg-muted/30">
-              {hours.map((h) => <span key={h} className="absolute inset-y-0 w-px bg-border/70" style={{ left: `${((h - H0) / (H1 - H0)) * 100}%` }} />)}
-              {items.map((dm, i) => {
-                const x = dm as any;
-                const span = timeSpan(dm);
-                const a = span ? Math.max(H0, span.start) : H0, b = span ? Math.min(H1, span.end) : H0 + 60;
-                const where = [addr.get(x.origin_id), addr.get(x.dest_id)].filter(Boolean).join(" → ");
-                return (
-                  <span key={x.id} className="tile-snap absolute inset-y-0.5 flex items-center overflow-hidden rounded bg-foreground px-1.5 text-[10px] font-medium text-background"
-                    style={{ left: `${((a - H0) / (H1 - H0)) * 100}%`, width: `${Math.max(3, ((b - a) / (H1 - H0)) * 100)}%`, animationDelay: `${100 + (ri * 3 + i) * 60}ms` }}
-                    title={`${x.title} · ${KIND_LABEL[x.kind] ?? x.kind}${where ? ` · ${where}` : ""}${x.departure_time ? ` · ${String(x.departure_time).slice(0, 5)}` : " · sem horário"}${!single && x.vehicle_id ? ` · ${vehicles.get(x.vehicle_id) ?? ""}` : ""}`}>
-                    <span className="truncate">{x.title}</span>
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function MaintenanceYear({ rows, year }: { rows: { schedule_date: string; maintenance_kind: string | null }[]; year: string }) {
+  const months = MONTHS.map((label, i) => {
+    const entries = rows.filter((r) => r.schedule_date.startsWith(`${year}-${pad(i + 1)}`));
+    return { label, total: entries.length, revision: entries.filter((r) => r.maintenance_kind === "revisao").length };
+  });
+  const max = Math.max(1, ...months.map((m) => m.total));
+  return <div className="flex h-full min-h-0 flex-col gap-2">
+    <div className="flex gap-3 text-[10px] text-muted-foreground"><span>Manutenção / revisão</span><span className="ml-auto">Dias por veículo</span></div>
+    <div className="grid min-h-20 flex-1 grid-cols-12 gap-1">{months.map((m) => <div key={m.label} className="flex min-h-0 min-w-0 flex-col gap-1" title={`${m.label}: ${m.total - m.revision} manutenções · ${m.revision} revisões`}>
+      <div className="grid min-h-0 flex-1 grid-rows-7 gap-0.5">{Array.from({ length: 7 }, (_, i) => { const level = 6 - i, filled = Math.ceil(m.total / max * 6); return <span key={i} className={cn("mx-auto aspect-square h-full max-w-full rounded-[2px]", level > filled ? "invisible" : level === 0 ? "border border-border bg-muted/40" : "bg-foreground")} />; })}</div>
+      <span className="text-center text-[9px] capitalize text-muted-foreground">{m.label.slice(0, 3)}</span>
+    </div>)}</div>
+  </div>;
 }

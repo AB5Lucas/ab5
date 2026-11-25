@@ -73,14 +73,14 @@ type Drag = { id: string; mode: "move" | "resize"; y0: number; start: number; en
 type Sel = { col: string; a: number; b: number };
 
 /** Logística › Programação: agenda do dia/semana por horário, como o calendário do Outlook. */
-export function AgendaTab() {
+export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
   const qc = useQueryClient();
   const { base, demands } = useLogData();
   const b = base.data;
   const [view, setView] = useState<"dia" | "semana">("semana");
   const [anchor, setAnchor] = useState(todayISO);
   const [show, setShow] = useState("todos");
-  const days = view === "dia" ? [anchor] : Array.from({ length: 6 }, (_, i) => addDays(mondayOf(anchor), i));
+  const days = dashboardDate ? [dashboardDate] : view === "dia" ? [anchor] : Array.from({ length: 6 }, (_, i) => addDays(mondayOf(anchor), i));
   const from = days[0]!, to = days[days.length - 1]!;
   const all = useMemo(() => (demands.data ?? []).filter((d) => d.status !== "cancelada"), [demands.data]);
   const alerts = useAlerts(all, from, to);
@@ -236,9 +236,9 @@ export function AgendaTab() {
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
-      <div className="min-w-0 space-y-3">
-        <div className="flex flex-wrap items-end gap-2">
+    <div className={cn(dashboardDate ? "flex h-full min-h-0 flex-col" : "grid gap-4 xl:grid-cols-[1fr_300px]")}>
+      <div className={cn("min-w-0", dashboardDate ? "flex min-h-0 flex-1 flex-col" : "space-y-3")}>
+        {!dashboardDate && <div className="flex flex-wrap items-end gap-2">
           <Button variant="outline" onClick={() => setAnchor(todayISO())}>Hoje</Button>
           <Button variant="ghost" size="icon" aria-label="Anterior" onClick={() => setAnchor(addDays(anchor, view === "dia" ? (wd(anchor) === 1 ? -2 : -1) : -7))}><ChevronLeft className="h-4 w-4" /></Button>
           <Button variant="ghost" size="icon" aria-label="Próximo" onClick={() => setAnchor(addDays(anchor, view === "dia" ? (wd(anchor) === 6 ? 2 : 1) : 7))}><ChevronRight className="h-4 w-4" /></Button>
@@ -253,10 +253,10 @@ export function AgendaTab() {
             ))}
           </div>
           <Button onClick={() => setEdit({ preset: { date: view === "dia" ? anchor : undefined } })}><Plus className="h-4 w-4" /> Novo evento</Button>
-        </div>
+        </div>}
 
-        <div className="overflow-x-auto rounded-md border border-border bg-card">
-          <div style={{ minWidth: 64 + cols.length * 130 }}>
+        <div className={cn("overflow-x-auto rounded-md border border-border bg-card", dashboardDate && "min-h-0 flex-1")}>
+          <div className={dashboardDate ? "h-full" : undefined} style={{ minWidth: 64 + cols.length * 130 }}>
             {/* Cabeçalho das colunas + linha "dia inteiro" (sem horário). */}
             <div className="flex border-b border-border">
               <div className="w-16 shrink-0" />
@@ -280,7 +280,7 @@ export function AgendaTab() {
                 ))}
               </div>
             )}
-            <div ref={scroller} className="relative max-h-[66vh] overflow-y-auto" onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { setDrag(null); setSel(null); }}>
+            <div ref={scroller} className={cn("relative overflow-y-auto", dashboardDate ? "h-[calc(100%-2rem)]" : "max-h-[66vh]")} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { setDrag(null); setSel(null); }}>
               <div className="flex select-none" style={{ height: (END - START) * PX }}>
                 <div className="relative w-16 shrink-0">
                   {hours.map((h) => <div key={h} className="absolute right-2 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h - START) * PX }}>{h > START ? `${h / 60}h` : ""}</div>)}
@@ -332,13 +332,13 @@ export function AgendaTab() {
             </div>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
+        {!dashboardDate && <p className="text-xs text-muted-foreground">
           Clique ou arraste num horário vazio para criar. Arraste o evento para mudar dia, horário{view === "dia" ? " ou veículo" : ""}; puxe a borda de baixo para mudar o fim.
           Cores: cada veículo AB5 tem uma; <span className="font-medium text-sky-700 dark:text-sky-300">azul = cliente</span>, <span className="font-medium text-violet-700 dark:text-violet-300">roxo = terceiro</span>. Clique no dia (semana) para abrir o dia por veículo.
-        </p>
+        </p>}
       </div>
 
-      <div className="space-y-4">
+      {!dashboardDate && <div className="space-y-4">
         <section className="rounded-md border border-border bg-card p-3">
           <h2 className="mb-1 font-display text-sm font-semibold uppercase tracking-wide">Fila para programar ({queue.length})</h2>
           <p className="mb-2 text-[11px] text-muted-foreground">Arraste para a agenda.</p>
@@ -374,7 +374,7 @@ export function AgendaTab() {
             ))}
           </ul>
         </section>
-      </div>
+      </div>}
       <DemandDialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)} demand={edit?.demand} preset={edit?.preset} overlap={edit?.demand ? overlaps.get(edit.demand.id) : undefined} />
       <MessageDialog demand={msg} onClose={() => setMsg(null)} />
     </div>

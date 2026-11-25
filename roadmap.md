@@ -66,3 +66,5 @@
 - [x] Veículos: indicadores no topo, calendário menor, horários permanentes, gráfico anual e remoção das empilhadeiras.
 
 - [x] Veículos: ranking em altura total, gráfico escuro à esquerda, calendário claro abaixo, Logística central e remoção do anual.
+
+- [x] Veículos: agenda da Logística no quadro, ranking de 30 dias abaixo e quadradinhos anuais no topo.
