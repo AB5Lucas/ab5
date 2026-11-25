@@ -80,7 +80,7 @@ function HubOverview() {
   const P = useMemo(() => periodOf(period, today), [period, isoOf(today)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const q = useQuery({
-    queryKey: ["overview", "atividades", P.from, P.to], placeholderData: keepPreviousData,
+    queryKey: ["overview", "hub", P.from, P.to], placeholderData: keepPreviousData,
     staleTime: 2 * 60_000,
     refetchInterval: 5 * 60_000,
     queryFn: async () => {
@@ -214,10 +214,10 @@ function HubOverview() {
     });
 
     // Despesas por dia (MO das escalações + lançamentos de custo) e MO normal × HE por cliente.
-    const hol = new Set<string>(q.data.hol.map((h: any) => String(h.date)));
-    const person = new Map<string, any>(q.data.people.map((p: any) => [p.id, p]));
+    const hol = new Set<string>((q.data.hol ?? []).map((h: any) => String(h.date)));
+    const person = new Map<string, any>((q.data.people ?? []).map((p: any) => [p.id, p]));
     const wfH = new Map<string, number>(), wfDay = new Map<string, number>();
-    for (const r of q.data.wf) { if (r.worked_hours == null) continue; const h = Number(r.worked_hours) || 0; wfH.set(`${r.collaborator_id}|${r.work_id}|${r.report_date}`, h); wfDay.set(`${r.collaborator_id}|${r.report_date}`, (wfDay.get(`${r.collaborator_id}|${r.report_date}`) ?? 0) + h); }
+    for (const r of q.data.wf ?? []) { if (r.worked_hours == null) continue; const h = Number(r.worked_hours) || 0; wfH.set(`${r.collaborator_id}|${r.work_id}|${r.report_date}`, h); wfDay.set(`${r.collaborator_id}|${r.report_date}`, (wfDay.get(`${r.collaborator_id}|${r.report_date}`) ?? 0) + h); }
     const costBy = new Map<string, number>(P.buckets.map((b) => [b, 0]));
     const moBy = new Map<string, { normal: number; extra: number }>();
     for (const a of q.data.allocs) {
@@ -229,7 +229,7 @@ function HubOverview() {
       const k = keyOf(dt); if (costBy.has(k)) costBy.set(k, costBy.get(k)! + sp.normal + sp.extra);
       const cn = w.clients?.name ?? "—"; const m = moBy.get(cn) ?? { normal: 0, extra: 0 }; m.normal += sp.normal; m.extra += sp.extra; moBy.set(cn, m);
     }
-    for (const e of q.data.costs) { if (!workBy.has(e.work_id)) continue; const k = keyOf(String(e.entry_date).slice(0, 10)); if (costBy.has(k)) costBy.set(k, costBy.get(k)! + (Number(e.amount) || 0)); }
+    for (const e of q.data.costs ?? []) { if (!workBy.has(e.work_id)) continue; const k = keyOf(String(e.entry_date).slice(0, 10)); if (costBy.has(k)) costBy.set(k, costBy.get(k)! + (Number(e.amount) || 0)); }
     const moRows = [...moBy.entries()].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.normal + b.extra - a.normal - a.extra).slice(0, 7);
     let ind = 0;
     for (const [n, v] of byClient) if (/^industria$/i.test(n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim())) ind += v;
