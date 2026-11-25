@@ -8,6 +8,8 @@ import { Big, Donut, HoverBars, OverviewCard } from "@/components/overview/chart
 import { PatioCalendar } from "@/components/overview/patio-calendar";
 import { CountUp } from "@/components/count-up";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/planejamento")({
   head: () => ({ meta: [{ title: "Planejamento | AB5 Hub" }, { name: "description", content: "Visão geral da programação: escalações, ausências, transporte e Pátio." }] }),
@@ -142,7 +144,10 @@ function Overview() {
     for (const b of rangeQ.data.boxes) { const k = ABSENCE[b.box_key]; if (k) abs[k].add(b.collaborator_id); }
     for (const o of rangeQ.data.off) abs.folga.add(o.collaborator_id);
     for (const v of rangeQ.data.vac) abs.ferias.add(v.collaborator_id);
-    const absParts = (Object.keys(abs) as (keyof typeof abs)[]).map((k) => ({ key: k, label: ABS_LABEL[k], n: abs[k].size }));
+    const absParts = (Object.keys(abs) as (keyof typeof abs)[]).map((k) => ({
+      key: k, label: ABS_LABEL[k], n: abs[k].size,
+      names: [...abs[k]].map((id) => person.get(id) ?? "—").sort((a, b) => a.localeCompare(b, "pt-BR")),
+    }));
     const absTotal = new Set(Object.values(abs).flatMap((s) => [...s])).size;
     // Transporte: um por veículo (no período: dias, km somado, cliente e motorista mais frequentes).
     const byVeh = new Map<string, { plate: string; model: string; days: Set<string>; maintDays: number; km: number; clients: Map<string, number>; drivers: Map<string, number> }>();
@@ -202,19 +207,9 @@ function Overview() {
               <p className="text-xs text-background/60">{single ? `${pLabel} · média do mês ${Math.round(d.series.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.series.filter((s) => s.value).length))}` : `média por dia · ${d.people} pessoas diferentes`}</p>
               <div className="mt-auto pt-2"><HoverBars dark data={d.series} format={(v) => `${v} pessoas`} height="h-16" /></div>
             </OverviewCard>
-            <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Ver Ausências" hint="Folgas, férias, atestados e faltas (quadros da Programação e lançamentos); no período, pessoas diferentes" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
-              <Big value={d.absTotal} />
-              <p className="text-xs text-muted-foreground">fora da escala</p>
-              <div className="mt-auto">
-                <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
-                  {d.absParts.map((p, i) => <span key={p.key} className={cn("ov-grow h-full", ["bg-foreground", "bg-foreground/65", "bg-foreground/40", "bg-foreground/20"][i])} style={{ width: `${(p.n / Math.max(1, d.absParts.reduce((a, x) => a + x.n, 0))) * 100}%` }} />)}
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                  {d.absParts.map((p, i) => (
-                    <span key={p.key} className="flex items-center gap-1.5"><span className={cn("h-2 w-2 rounded-sm", ["bg-foreground", "bg-foreground/65", "bg-foreground/40", "bg-foreground/20"][i])} />{p.label} <b className="tabular-nums">{p.n}</b></span>
-                  ))}
-                </div>
-              </div>
+            <OverviewCard title={`Serviços com equipe — ${pLabel}`} to="/programacao/servicos" linkLabel="Abrir Serviços" hint="Serviços com gente distribuída no período, por cliente" className="min-h-0" bodyClassName="min-h-0 overflow-hidden">
+              <div className="flex items-baseline gap-2"><Big value={d.worksCount} /><span className="text-xs text-muted-foreground">de {d.activeWorks} serviços ativos</span></div>
+              <ClientBars rows={d.worksByClient} empty="Nenhum serviço com equipe." limit={4} />
             </OverviewCard>
             <OverviewCard title={`Transporte — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Veículos na escala da Transporte no período" className="min-h-0 xl:row-span-2" bodyClassName="flex min-h-0 flex-col">
               <div className="grid grid-cols-3 gap-2">
@@ -259,11 +254,10 @@ function Overview() {
               })()}
             </OverviewCard>
             <OverviewCard dark title={`Pessoas no Pátio — ${month}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no mês" className="min-h-0 md:col-span-2" bodyClassName="min-h-0 overflow-hidden">
-              <div onClick={(e) => e.preventDefault()}><PatioCalendar dark days={d.patioDays} unit="day" total={d.patioCount} workforce={d.workforce} /></div>
+              <div onClick={(e) => e.preventDefault()}><PatioCalendar dark big days={d.patioDays} unit="day" total={d.patioCount} workforce={d.workforce} /></div>
             </OverviewCard>
-            <OverviewCard title={`Serviços com equipe — ${pLabel}`} to="/programacao/servicos" linkLabel="Abrir Serviços" hint="Serviços com gente distribuída no período, por cliente" className="min-h-0 xl:col-start-4" bodyClassName="min-h-0 overflow-hidden">
-              <div className="flex items-baseline gap-2"><Big value={d.worksCount} /><span className="text-xs text-muted-foreground">de {d.activeWorks} serviços ativos</span></div>
-              <ClientBars rows={d.worksByClient} empty="Nenhum serviço com equipe." limit={10} />
+            <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Ver Ausências" hint="Folgas, férias, atestados e faltas (quadros da Programação e lançamentos); no período, pessoas diferentes. Clique numa fatia para ver as pessoas." className="min-h-0 xl:col-start-4" bodyClassName="flex min-h-0 flex-col">
+              <AbsencePie total={d.absTotal} parts={d.absParts} />
             </OverviewCard>
           </div>
           <OverviewCard title={`Escalações — ${pLabel} · ${d.clients.length} clientes · ${d.worksCount} serviços · ${d.people} pessoas`} to="/programacao/diaria" linkLabel="Abrir Programação"
@@ -314,6 +308,96 @@ function ClientBars({ rows, empty, limit, tight }: { rows: { name: string; n: nu
           <span className="text-right tabular-nums text-muted-foreground">{r.n}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+type AbsPart = { key: string; label: string; n: number; names: string[] };
+const PIE_TONES = [1, 0.65, 0.4, 0.2];
+/** Fatia da pizza (ângulos em voltas, 0 = topo). */
+function slicePath(a0: number, a1: number, r = 48) {
+  const p = (t: number) => [50 + r * Math.sin(2 * Math.PI * t), 50 - r * Math.cos(2 * Math.PI * t)];
+  const [x0, y0] = p(a0), [x1, y1] = p(a1);
+  return `M50 50 L${x0} ${y0} A${r} ${r} 0 ${a1 - a0 > 0.5 ? 1 : 0} 1 ${x1} ${y1} Z`;
+}
+
+/**
+ * Ausências em pizza (folgas, férias, atestados, faltas). Clicar numa fatia: a pizza encolhe para o canto, as outras
+ * fatias somem e a lista das pessoas entra; "Voltar" faz o caminho inverso.
+ */
+function AbsencePie({ total, parts }: { total: number; parts: AbsPart[] }) {
+  const [sel, setSel] = useState<string | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
+  const sum = parts.reduce((a, p) => a + p.n, 0);
+  const cur = parts.find((p) => p.key === sel) ?? null;
+  let acc = 0;
+  const slices = parts.filter((p) => p.n > 0).map((p) => {
+    const i = parts.indexOf(p);
+    const a0 = acc / sum; acc += p.n; const a1 = acc / sum;
+    return { ...p, i, a0, a1, mid: (a0 + a1) / 2 };
+  });
+  const stop = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); };
+  return (
+    <div className="relative min-h-[14rem] flex-1 overflow-hidden" onClick={stop}>
+      {/* Pizza: no centro com a legenda; com fatia escolhida, encolhe para o canto de cima. */}
+      <div className={cn("absolute flex items-center gap-4 transition-all duration-700 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
+        "left-0 top-0", cur ? "h-16 w-16" : "h-full w-full")}>
+        <div className={cn("relative aspect-square shrink-0 transition-all duration-700", cur ? "h-16 max-w-16" : "h-full max-w-[58%]")}>
+          {!sum ? (
+            <div className="flex h-full items-center justify-center rounded-full border border-dashed text-xs text-muted-foreground">Ninguém fora</div>
+          ) : (
+            <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible">
+              {slices.map((sl) => {
+                const out = (hover === sl.key && !cur) ? 3 : 0;
+                const dx = out * Math.sin(2 * Math.PI * sl.mid), dy = -out * Math.cos(2 * Math.PI * sl.mid);
+                const hidden = cur && cur.key !== sl.key;
+                return (
+                  <g key={sl.key} style={{ transform: `translate(${dx}px, ${dy}px)`, opacity: hidden ? 0 : 1, transition: "transform 300ms, opacity 500ms" }}>
+                    {sl.a1 - sl.a0 >= 0.9999
+                      ? <circle cx="50" cy="50" r="48" className="fill-foreground" fillOpacity={PIE_TONES[sl.i]} />
+                      : <path d={slicePath(sl.a0, sl.a1)} className="fill-foreground stroke-card" strokeWidth="1" fillOpacity={PIE_TONES[sl.i]} />}
+                    <title>{`${sl.label}: ${sl.n}`}</title>
+                    {!cur && <path d={slicePath(sl.a0, sl.a1)} fill="transparent" className="cursor-pointer"
+                      onMouseEnter={() => setHover(sl.key)} onMouseLeave={() => setHover(null)} onClick={(e) => { stop(e); setHover(null); setSel(sl.key); }} />}
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+        </div>
+        <div className={cn("min-w-0 space-y-2 transition-opacity duration-300", cur ? "pointer-events-none opacity-0" : "opacity-100 delay-300")}>
+          <div><span className="font-display text-3xl font-semibold tabular-nums"><CountUp value={total} /></span><p className="text-xs text-muted-foreground">fora da escala</p></div>
+          {parts.map((p, i) => (
+            <button key={p.key} type="button" disabled={!p.n} onMouseEnter={() => setHover(p.key)} onMouseLeave={() => setHover(null)}
+              onClick={(e) => { stop(e); setHover(null); setSel(p.key); }}
+              className="flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-left text-xs hover:bg-muted disabled:opacity-50">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-foreground" style={{ opacity: PIE_TONES[i] }} />
+              <span className="flex-1">{p.label}</span><b className="tabular-nums">{p.n}</b>
+            </button>
+          ))}
+          <p className="text-[10px] text-muted-foreground">Clique numa fatia para ver as pessoas.</p>
+        </div>
+      </div>
+      {/* Pessoas da fatia escolhida. */}
+      <div className={cn("absolute inset-0 flex flex-col transition-all duration-700 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
+        cur ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-8 opacity-0")}>
+        <div className="flex h-16 items-center gap-3 pl-20">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{cur?.label}</p>
+            <p className="text-xs text-muted-foreground">{cur?.n} {cur?.n === 1 ? "pessoa" : "pessoas"}{sum ? ` · ${Math.round(((cur?.n ?? 0) / sum) * 100)}%` : ""}</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={(e) => { stop(e); setSel(null); }}><ArrowLeft className="h-3.5 w-3.5" /> Voltar</Button>
+        </div>
+        <ul className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 text-xs">
+          {(cur?.names ?? []).map((n, i) => (
+            <li key={`${n}-${i}`} className="flex items-center gap-2 rounded-md border border-border/60 px-2 py-1"
+              style={{ transition: "opacity 400ms, transform 400ms", transitionDelay: cur ? `${200 + Math.min(i, 20) * 25}ms` : "0ms", opacity: cur ? 1 : 0, transform: cur ? "none" : "translateY(6px)" }}>
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-semibold">{n.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("")}</span>
+              <span className="truncate">{n}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

@@ -19,7 +19,7 @@ function tone(v: number, max: number, dark?: boolean) {
   return r > 0.75 ? "bg-foreground text-background" : r > 0.5 ? "bg-foreground/70 text-background" : r > 0.25 ? "bg-foreground/40 text-foreground" : "bg-foreground/15 text-foreground";
 }
 
-export function PatioCalendar({ days, unit, total, workforce, dark, compact }: { days: PatioDay[]; unit: "day" | "month"; total: number; workforce: number; dark?: boolean; compact?: boolean }) {
+export function PatioCalendar({ days, unit, total, workforce, dark, compact, big }: { days: PatioDay[]; unit: "day" | "month"; total: number; workforce: number; dark?: boolean; compact?: boolean; big?: boolean }) {
   const mut = dark ? "text-background/60" : "text-muted-foreground";
   const max = Math.max(1, ...days.map((d) => d.value));
   const lead = unit === "day" && days[0] ? (new Date(`${days[0].key}T12:00:00`).getDay() + 6) % 7 : 0;
@@ -30,12 +30,12 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact }: {
   return (
     <div className={cn("flex flex-col md:flex-row", compact ? "gap-4" : "gap-5")}>
       <div className="min-w-0 flex-1">
-        <div className={cn("grid", compact ? "gap-0.5" : "gap-1", unit === "day" ? "grid-cols-7" : "grid-cols-6")}>
+        <div className={cn("grid", compact ? "gap-0.5" : big ? "gap-1.5" : "gap-1", unit === "day" ? (big ? "mx-auto w-max grid-cols-[repeat(7,2.6rem)]" : "grid-cols-7") : "grid-cols-6")}>
           {unit === "day" && WD.map((w, i) => <span key={i} className={cn("pb-0.5 text-center text-[10px] font-medium", mut)}>{w}</span>)}
           {Array.from({ length: lead }, (_, i) => <span key={`l${i}`} />)}
           {days.map((d, i) => (
             <div key={d.key} title={`${d.title}: ${d.value} ${d.value === 1 ? "pessoa" : "pessoas"}`}
-              className={cn("ov-grow mx-auto flex aspect-square w-full flex-col items-center justify-center rounded-full", compact ? "max-w-[1.2rem] text-[9px]" : "max-w-7 text-[11px]", " font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max, dark))}
+              className={cn("ov-grow mx-auto flex aspect-square w-full flex-col items-center justify-center rounded-full", compact ? "max-w-[1.2rem] text-[9px]" : big ? "max-w-none text-sm" : "max-w-7 text-[11px]", " font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max, dark))}
               style={{ animationDelay: `${i * 18}ms` }}>
               {d.value || d.label}
             </div>
