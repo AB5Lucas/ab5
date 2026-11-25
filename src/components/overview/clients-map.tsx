@@ -34,9 +34,11 @@ export function ClientsMap({ clients, className }: { clients: MapClient[]; class
     const sp = inState("SP", c.lon, c.lat);
     void sp; const uf = ufOf(c.lon, c.lat);
     // SP: mapa de SP; outro estado: Brasil inteiro com as cidades só do estado do cliente.
-    const target = uf === "SP" ? "SP" : "BR";
-    if (target !== region) setRegion(target);
-    setSelected(c.id); setFocus((f) => ({ lon: c.lon, lat: c.lat, n: (f?.n ?? 0) + 1, uf: ufOf(c.lon, c.lat) }));
+    const target = uf || "SP";
+    const go = () => { setRegion(target); setSelected(c.id); setFocus((f) => ({ lon: c.lon, lat: c.lat, n: (f?.n ?? 0) + 1, uf })); };
+    // Troca de estado: abre o Brasil inteiro e depois entra só no estado do cliente.
+    if (target !== region && region !== "BR") { setRegion("BR"); setSelected(c.id); window.setTimeout(go, 900); }
+    else go();
   };
   const listed = [...base].sort((a, b) => (b.billed ?? 0) - (a.billed ?? 0) || a.name.localeCompare(b.name));
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
