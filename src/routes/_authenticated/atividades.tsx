@@ -7,6 +7,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
+import { MENU_GROUPS } from "@/lib/menu";
 import { useWorkScope } from "@/hooks/use-work-scope";
 import { Big, Donut, HoverBars, LineArea, MultiLine, OverviewCard, type LineSeries } from "@/components/overview/charts";
 import { RdoTiles, type TileCol } from "@/components/overview/rdo-tiles";
@@ -89,9 +90,15 @@ function periodOf(p: Period, today: Date) {
 /** Visão geral do módulo Atividades: cada cartão resume uma página e leva até ela. */
 function AtividadesOverview() {
   const { role, loading: roleLoading } = useCurrentUser();
+  const { canAccess: canOpen, loading: accessLoading } = useAccess();
   const nav = useNavigate();
   const allowed = role === "admin" || role === "coordenador";
-  useEffect(() => { if (!roleLoading && !allowed) nav({ to: "/clientes", replace: true }); }, [roleLoading, allowed]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Sem a visão geral: vai para a 1ª página do módulo Atividades que a pessoa acessa (ex.: só o Relatório Diário).
+  useEffect(() => {
+    if (roleLoading || accessLoading || allowed) return;
+    const first = MENU_GROUPS.find((g) => g.overview === "/atividades")?.items.find((i) => canOpen(i.url));
+    nav({ to: (first ? first.to ?? first.url : "/dashboard") as never, replace: true });
+  }, [roleLoading, accessLoading, allowed]); // eslint-disable-line react-hooks/exhaustive-deps
   if (roleLoading || !allowed) return null;
   return <HubOverview />;
 }
