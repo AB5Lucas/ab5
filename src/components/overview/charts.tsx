@@ -17,11 +17,11 @@ export function OverviewCard({ title, to, linkLabel, dark, className, bodyClassN
         dark ? "border-transparent bg-foreground text-background" : "border-border bg-card", className)}>
       <div className="flex items-start justify-between gap-2">
         <p className={cn("text-xs font-medium", dark ? "text-background/70" : "text-muted-foreground")}>{title}</p>
-        <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border transition-transform duration-300 group-hover:rotate-45",
+        <span title={linkLabel} aria-label={linkLabel} className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-transform duration-300 group-hover:rotate-45",
           dark ? "border-background/25" : "border-border")}><ArrowUpRight className="h-3.5 w-3.5" /></span>
       </div>
+      {/* Sem o texto do link embaixo: o conteúdo vai até o fim do quadro; a seta de cima mostra o destino no mouse. */}
       <div className={cn("mt-2 flex-1", bodyClassName)}>{children}</div>
-      <p className={cn("mt-3 text-[11px] underline-offset-4 group-hover:underline", dark ? "text-background/70" : "text-muted-foreground")}>{linkLabel}</p>
     </Link>
   );
 }

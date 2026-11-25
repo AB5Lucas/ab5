@@ -282,13 +282,13 @@ function HubOverview() {
         <>
           <div className="grid shrink-0 gap-3 md:grid-cols-2 xl:grid-cols-4">
             {can("/obras/resultado") && (
-              <OverviewCard dark title={`Faturado — ${pLabel}`} to="/obras/resultado" linkLabel="Ver resultados" hint="Notas lançadas nos serviços no período, comparadas ao período anterior equivalente">
+              <OverviewCard dark title={`Faturado — ${pLabel}`} to="/obras/resultado" linkLabel="Ver Resultados" hint="Notas lançadas nos serviços no período, comparadas ao período anterior equivalente">
                 <Big dark value={brl(d.cur)} delta={delta(d.cur, d.prev)} />
                 <div className="mt-3"><HoverBars dark data={d.series.map((s) => ({ label: s.label, value: s.a }))} format={brl} /></div>
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
-              <OverviewCard title="Margem média dos serviços por mês" to="/fechamentos/financeiro" linkLabel="Ver financeiro" hint="Média da margem de contribuição de cada mês do período (mesma conta do Financeiro)">
+              <OverviewCard title="Margem média dos serviços por mês" to="/fechamentos/financeiro" linkLabel="Ver Financeiro" hint="Média da margem de contribuição de cada mês do período (mesma conta do Financeiro)">
                 {margin ? (
                   <>
                     <Big value={fmtPct(margin.avg)} />
@@ -301,12 +301,12 @@ function HubOverview() {
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
-              <OverviewCard title={`Clientes que mais faturaram — ${pLabel}`} to="/clientes" linkLabel="Ver clientes" hint="Notas lançadas nos serviços do cliente no período">
+              <OverviewCard title={`Clientes que mais faturaram — ${pLabel}`} to="/clientes" linkLabel="Ver Clientes" hint="Notas lançadas nos serviços do cliente no período">
                 <ClientBars rows={d.top} limit={4} />
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
-              <OverviewCard title="Saldo a faturar" to="/obras/resultado" linkLabel="Ver resultados" hint="Pedidos dos serviços ativos com data até o fim do período menos o faturado neles até essa data">
+              <OverviewCard title="Saldo a faturar" to="/obras/resultado" linkLabel="Ver Resultados" hint="Pedidos dos serviços ativos com data até o fim do período menos o faturado neles até essa data">
                 <div className="grid grid-cols-2 items-center gap-3">
                   <div className="min-w-0">
                     <Big value={brl(d.openBalance)} />
@@ -321,7 +321,7 @@ function HubOverview() {
 
           <div className="grid gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-2">
             {can("/obras") && (
-              <OverviewCard dark className="lg:min-h-0" bodyClassName="flex min-h-0 flex-col" title="Clientes no mapa" to="/clientes" linkLabel="Ver clientes" hint="Marcador do tamanho do faturado no período; clique num cliente da lista para aproximar">
+              <OverviewCard dark className="lg:min-h-0" bodyClassName="flex min-h-0 flex-col" title="Clientes no mapa" to="/clientes" linkLabel="Ver Clientes" hint="Marcador do tamanho do faturado no período; clique num cliente da lista para aproximar">
                 {mapClients.length > 0 ? (
                   <div className="min-h-0 flex-1" onClick={(e) => e.preventDefault()}>
                     <ClientsMap fill clients={mapClients} className="h-[340px] w-full rounded-xl lg:h-full" />
