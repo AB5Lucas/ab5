@@ -377,16 +377,26 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
 }
 
 function MaintenanceYear({ rows, year }: { rows: { schedule_date: string; maintenance_kind: string | null }[]; year: string }) {
+  const [selected, setSelected] = useState<number | null>(null);
   const months = MONTHS.map((label, i) => {
     const entries = rows.filter((r) => r.schedule_date.startsWith(`${year}-${pad(i + 1)}`));
     return { label, total: entries.length, revision: entries.filter((r) => r.maintenance_kind === "revisao").length };
   });
   const max = Math.max(1, ...months.map((m) => m.total));
-  return <div className="flex h-full min-h-0 flex-col gap-2">
-    <div className="flex gap-3 text-[10px] text-muted-foreground"><span>Manutenção / revisão</span><span className="ml-auto">Dias por veículo</span></div>
-    <div className="grid min-h-20 flex-1 grid-cols-12 gap-1">{months.map((m) => <div key={m.label} className="flex min-h-0 min-w-0 flex-col gap-1" title={`${m.label}: ${m.total - m.revision} manutenções · ${m.revision} revisões`}>
-      <div className="grid min-h-0 flex-1 grid-rows-7 gap-0.5">{Array.from({ length: 7 }, (_, i) => { const level = 6 - i, filled = Math.ceil(m.total / max * 6); return <span key={i} className={cn("mx-auto aspect-square h-full max-w-full rounded-[2px]", level > filled ? "invisible" : level === 0 ? "border border-border bg-muted/40" : "bg-foreground")} />; })}</div>
+  const current = selected === null ? null : months[selected];
+  const total = current?.total ?? rows.length;
+  const revision = current?.revision ?? rows.filter((r) => r.maintenance_kind === "revisao").length;
+  return <div className="flex h-full min-h-0 gap-3">
+    <div className="grid min-h-0 min-w-0 flex-1 grid-cols-12 gap-px">{months.map((m, ci) => <Button variant="ghost" key={m.label} onClick={() => setSelected(selected === ci ? null : ci)} title={`${m.label}: ${m.total - m.revision} manutenções · ${m.revision} revisões`} className={cn("flex h-full min-h-0 min-w-0 flex-col gap-1 rounded-sm p-0", selected === ci && "bg-muted")}>
+      <div className="grid min-h-0 w-full flex-1 grid-rows-6 gap-px">{Array.from({ length: 6 }, (_, i) => { const level = 5 - i, filled = Math.ceil(m.total / max * 6); return <span key={i} className={cn("ov-grow h-full w-full rounded-[2px]", level < filled ? "bg-foreground" : "border border-dashed border-border bg-muted/40")} />; })}</div>
       <span className="text-center text-[9px] capitalize text-muted-foreground">{m.label.slice(0, 3)}</span>
-    </div>)}</div>
+    </Button>)}</div>
+    <div className="flex w-28 shrink-0 flex-col gap-2 border-l border-border pl-3">
+      <p className="text-[10px] capitalize text-muted-foreground">{current?.label ?? `Resumo ${year}`}</p>
+      <p className="text-2xl font-semibold tabular-nums"><CountUp value={total} /></p>
+      <p className="text-[10px] text-muted-foreground">dias por veículo</p>
+      <div className="flex justify-between gap-1 text-[10px]"><span className="text-muted-foreground">Manutenção</span><CountUp value={total - revision} /></div>
+      <div className="flex justify-between gap-1 text-[10px]"><span className="text-muted-foreground">Revisão</span><CountUp value={revision} /></div>
+    </div>
   </div>;
 }

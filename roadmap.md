@@ -68,3 +68,5 @@
 - [x] Veículos: ranking em altura total, gráfico escuro à esquerda, calendário claro abaixo, Logística central e remoção do anual.
 
 - [x] Veículos: agenda da Logística no quadro, ranking de 30 dias abaixo e quadradinhos anuais no topo.
+
+- [x] Veículos: quadradinhos maiores com silhueta e resumo lateral; agenda sem rolagem e destaque cinza.

@@ -75,6 +75,14 @@ type Sel = { col: string; a: number; b: number };
 /** Logística › Programação: agenda do dia/semana por horário, como o calendário do Outlook. */
 export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
   const qc = useQueryClient();
+  const [px, setPx] = useState(PX);
+  useEffect(() => {
+    if (!dashboardDate || !scroller.current) return;
+    const node = scroller.current;
+    const observer = new ResizeObserver(() => setPx(node.clientHeight / (END - START)));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [dashboardDate]);
   const { base, demands } = useLogData();
   const b = base.data;
   const [view, setView] = useState<"dia" | "semana">("semana");
@@ -90,10 +98,11 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [sel, setSel] = useState<Sel | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const dashboardYToMin = (y: number) => START + y / px;
   const today = todayISO();
   const [nowMin, setNowMin] = useState(() => { const d = new Date(Date.now() - 3 * 3600_000); return d.getUTCHours() * 60 + d.getUTCMinutes(); });
   useEffect(() => { const t = setInterval(() => { const d = new Date(Date.now() - 3 * 3600_000); setNowMin(d.getUTCHours() * 60 + d.getUTCMinutes()); }, 60_000); return () => clearInterval(t); }, []);
-  useEffect(() => { if (scroller.current) scroller.current.scrollTop = (6 * 60 - START) * PX; }, []);
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = (6 * 60 - START) * px; }, []);
 
   const visible = (d: DemandRow) => show === "todos" || (show === "ab5" ? isOwn(d) : !isOwn(d));
   const colorOf = (d: DemandRow) => {
@@ -157,7 +166,7 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
         setDrag({ ...drag, start, end: start + len, col: ok ? target.key : drag.col, moved });
       }
     } else if (sel) {
-      setSel({ ...sel, b: snap(yToMin(e.clientY - colTop(sel.col))) });
+      setSel({ ...sel, b: snap(dashboardYToMin(e.clientY - colTop(sel.col))) });
     }
   };
   const onUp = () => {
@@ -178,7 +187,7 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
   };
   const onColDown = (e: RPointerEvent, col: Col) => {
     if (e.button !== 0) return;
-    const m = snap(yToMin(e.clientY - colTop(col.key)) - SNAP / 2);
+    const m = snap(dashboardYToMin(e.clientY - colTop(col.key)) - SNAP / 2);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setSel({ col: col.key, a: m, b: m });
   };
@@ -188,7 +197,7 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
     const id = e.dataTransfer.getData("text/x-log-demand");
     const d = all.find((x) => x.id === id);
     if (!d) return;
-    const start = snap(yToMin(e.clientY - colTop(col.key)) - 30);
+    const start = snap(dashboardYToMin(e.clientY - colTop(col.key)) - 30);
     const len = (timeSpan(d) ? timeSpan(d)!.end - timeSpan(d)!.start : 60);
     const patch: Partial<DemandRow> = { scheduled_date: col.date, departure_time: hhmm(start), end_time: hhmm(Math.min(END, start + len)) };
     if (col.vehicleId && isOwn(d)) patch.vehicle_id = col.vehicleId;
@@ -262,7 +271,7 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
               <div className="w-16 shrink-0" />
               {cols.map((c) => (
                 <div key={c.key} className="min-w-0 flex-1 border-l border-border px-2 py-1.5">
-                  <button type="button" className={cn("block w-full truncate text-left text-sm font-semibold", view === "semana" && "hover:underline", c.date === today && view === "semana" && "text-primary")}
+                  <button type="button" className={cn("block w-full truncate text-left text-sm font-semibold", view === "semana" && "hover:underline", c.date === today && view === "semana" && (dashboardDate ? "text-muted-foreground" : "text-primary"))}
                     onClick={() => { if (view === "semana") { setAnchor(c.date); setView("dia"); } }}>{c.title}</button>
                   {c.sub && <div className="truncate text-[11px] text-muted-foreground">{c.sub}</div>}
                 </div>
@@ -280,33 +289,33 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
                 ))}
               </div>
             )}
-            <div ref={scroller} className={cn("relative overflow-y-auto", dashboardDate ? "h-[calc(100%-2rem)]" : "max-h-[66vh]")} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { setDrag(null); setSel(null); }}>
-              <div className="flex select-none" style={{ height: (END - START) * PX }}>
+            <div ref={scroller} className={cn("relative", dashboardDate ? "h-[calc(100%-2rem)] overflow-hidden" : "max-h-[66vh] overflow-y-auto")} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { setDrag(null); setSel(null); }}>
+              <div className="flex select-none" style={{ height: (END - START) * px }}>
                 <div className="relative w-16 shrink-0">
-                  {hours.map((h) => <div key={h} className="absolute right-2 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h - START) * PX }}>{h > START ? `${h / 60}h` : ""}</div>)}
+                  {hours.map((h) => <div key={h} className="absolute right-2 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h - START) * px }}>{h > START ? `${h / 60}h` : ""}</div>)}
                 </div>
                 {cols.map((c) => (
-                  <div key={c.key} data-col={c.key} className={cn("relative min-w-0 flex-1 cursor-cell border-l border-border", c.date === today && view === "semana" && "bg-primary/[0.03]")}
+                  <div key={c.key} data-col={c.key} className={cn("relative min-w-0 flex-1 cursor-cell border-l border-border", c.date === today && view === "semana" && (dashboardDate ? "bg-muted/20" : "bg-primary/[0.03]"))}
                     onPointerDown={(e) => onColDown(e, c)} onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(e, c)}>
                     {hours.map((h) => (
-                      <div key={h} className="pointer-events-none absolute inset-x-0 border-t border-border/70" style={{ top: (h - START) * PX }}>
-                        <div className="border-t border-dashed border-border/40" style={{ marginTop: 30 * PX }} />
+                      <div key={h} className="pointer-events-none absolute inset-x-0 border-t border-border/70" style={{ top: (h - START) * px }}>
+                        <div className="border-t border-dashed border-border/40" style={{ marginTop: 30 * px }} />
                       </div>
                     ))}
                     {sel?.col === c.key && (
                       <div className="pointer-events-none absolute inset-x-1 rounded bg-primary/15 ring-1 ring-primary"
-                        style={{ top: (Math.min(sel.a, sel.b) - START) * PX, height: Math.max(SNAP, Math.abs(sel.b - sel.a)) * PX }}>
+                        style={{ top: (Math.min(sel.a, sel.b) - START) * px, height: Math.max(SNAP, Math.abs(sel.b - sel.a)) * px }}>
                         <span className="px-1 text-[11px] font-medium text-primary">{hhmm(Math.min(sel.a, sel.b))}–{hhmm(Math.max(sel.a, sel.b) > Math.min(sel.a, sel.b) ? Math.max(sel.a, sel.b) : Math.min(sel.a, sel.b) + 60)}</span>
                       </div>
                     )}
                     {c.date === today && nowMin >= START && nowMin <= END && (
-                      <div className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-destructive" style={{ top: (nowMin - START) * PX }}>
-                        <span className="absolute -left-1 -top-[5px] h-2 w-2 rounded-full bg-destructive" />
+                      <div className={cn("pointer-events-none absolute inset-x-0 z-20 border-t-2", dashboardDate ? "border-muted-foreground" : "border-destructive")} style={{ top: (nowMin - START) * px }}>
+                        <span className={cn("absolute -left-1 -top-[5px] h-2 w-2 rounded-full", dashboardDate ? "bg-muted-foreground" : "bg-destructive")} />
                       </div>
                     )}
                     {laid(c).map(({ d, start, end, lane, lanes }) => {
                       const t = toneOf(alerts.get(d.id));
-                      const h = (end - start) * PX;
+                      const h = (end - start) * px;
                       const dragging = drag?.id === d.id;
                       return (
                         <div key={d.id} role="button" tabIndex={0} aria-label={`${d.title}, ${hhmm(start)} às ${hhmm(end)}`}
@@ -314,7 +323,7 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
                           onPointerDown={(e) => onEventDown(e, d, c, "move")}
                           className={cn("absolute z-10 cursor-grab overflow-hidden rounded border-l-4 px-1.5 py-0.5 text-[11px] leading-tight shadow-sm", colorOf(d),
                             d.status === "concluida" && "opacity-55", dragging && "z-30 cursor-grabbing opacity-90 shadow-lg ring-2 ring-primary", t === "red" && "ring-1 ring-destructive")}
-                          style={{ top: (start - START) * PX + 1, height: Math.max(h - 2, 14), left: `calc(${(lane / lanes) * 100}% + 2px)`, width: `calc(${100 / lanes}% - 4px)` }}>
+                          style={{ top: (start - START) * px + 1, height: Math.max(h - 2, 14), left: `calc(${(lane / lanes) * 100}% + 2px)`, width: `calc(${100 / lanes}% - 4px)` }}>
                           <div className="flex items-start gap-1">
                             <span className="min-w-0 flex-1 truncate font-semibold">{d.title}</span>
                             {t && <TriangleAlert aria-label="Com alerta" className={cn("h-3 w-3 shrink-0", t === "red" ? "text-destructive" : "text-orange-500")} />}
