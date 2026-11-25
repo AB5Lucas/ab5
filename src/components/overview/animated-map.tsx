@@ -89,8 +89,15 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     for (const uf of showUfs) if (!citiesBy[uf]) void loadCities(uf).then((rings) => setCitiesBy((m) => ({ ...m, [uf]: rings })));
   }, [showUfs]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Entrando num estado vindo do Brasil: os outros estados continuam desenhados durante o zoom (ghost "on"),
+  // somem devagar quando o zoom termina ("fading") e só então saem da tela ("off").
+  const [ghost, setGhost] = useState<"on" | "fading" | "off">("off");
+  // No 1º desenho com o estado novo o efeito ainda não rodou: prevRegion ainda é "BR", então os vizinhos já ficam
+  // (sem isso eles saíam e voltavam, recomeçando a animação de desenho).
+  const keepAll = region !== "BR" && (ghost !== "off" || prevRegion.current === "BR");
   const { paths, project } = useMemo(() => {
     const keys = region !== "BR" ? [region] : Object.keys(STATES);
+    const drawKeys = keepAll ? Object.keys(STATES) : keys;
     const rings = keys.flatMap((k) => STATES[k] ?? []);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const r of rings) for (const p of r) { const x = p[0]!, y = p[1]!; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -99,9 +106,9 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     const ox = (W - (x1 - x0) * k * s) / 2, oy = (H - (y1 - y0) * s) / 2;
     const project = (lon: number, lat: number): [number, number] => [ox + (lon - x0) * k * s, oy + (y1 - lat) * s];
     const ring = (r: number[][]) => "M" + r.map((p) => project(p[0]!, p[1]!).map((v) => v.toFixed(1)).join(",")).join("L") + "Z";
-    const paths = keys.map((key) => ({ key, d: (STATES[key] ?? []).map(ring).join("") }));
+    const paths = drawKeys.map((key) => ({ key, d: (STATES[key] ?? []).map(ring).join("") }));
     return { paths, project, ring };
-  }, [region, H]);
+  }, [region, H, keepAll]); // eslint-disable-line react-hooks/exhaustive-deps
   const fitBox = (uf: string[]) => {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const key of uf) for (const rg of STATES[key] ?? []) for (const pt of rg) { const [x, y] = project(pt[0]!, pt[1]!); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -119,7 +126,11 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     // entrando num estado, aproxima com suavidade. REGION_WAIT + REGION_MS também atrasa os pontos e o foco no cliente.
     const wait = region === "BR" ? REGION_WAIT : 0;
     const t = window.setTimeout(() => animateTo({ x: 0, y: 0, k: 1 }, REGION_MS, true), wait);
-    return () => window.clearTimeout(t);
+    const fromBR = prev === "BR" && region !== "BR";
+    setGhost(fromBR ? "on" : "off");
+    const t2 = fromBR ? window.setTimeout(() => setGhost("fading"), REGION_MS) : 0;
+    const t3 = fromBR ? window.setTimeout(() => setGhost("off"), REGION_MS + 700) : 0;
+    return () => { window.clearTimeout(t); window.clearTimeout(t2); window.clearTimeout(t3); };
   }, [region]); // eslint-disable-line react-hooks/exhaustive-deps
   const cityPath = useMemo(() => {
     const cities = showUfs.flatMap((uf) => (region !== "BR" && uf !== region ? [] : citiesBy[uf] ?? []));
@@ -178,7 +189,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
           }}
           onPointerUp={() => { drag.current = null; }}>
           {paths.map((p, i) => (
-            <path key={p.key} d={p.d} pathLength={1} className="amap-line" style={{ animationDelay: `${region === "BR" ? i * 40 : 0}ms` }} />
+            <path key={p.key} d={p.d} pathLength={1} className={`amap-line ${region !== "BR" && p.key !== region ? `amap-ghost ${ghost === "fading" ? "amap-gone" : ""}` : ""}`} style={{ animationDelay: `${region === "BR" ? i * 40 : 0}ms` }} />
           ))}
           {cityPath && <path d={cityPath} className="amap-cities" strokeWidth={view.k > 2 ? 1 : 0.7} style={{ vectorEffect: "non-scaling-stroke", strokeOpacity: view.k > 2 ? 0.55 : undefined }} />}
           {pts.map((p, i) => (
