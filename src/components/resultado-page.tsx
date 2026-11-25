@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { workedHours, positionLabel } from "@/lib/rdo";
 import { ResultCard, ResultChartSkeleton, ResultDashboardSkeleton } from "@/components/result-dashboard-shell";
-import { Gauge as OverviewGauge } from "@/components/overview/charts";
+import { ResultProgressGauge } from "@/components/result-progress-gauge";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Trash2, Plus, Pencil, Check, X, CalendarDays, Download, Repeat2 } from "lucide-react";
@@ -862,8 +862,8 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
             <span>{calc?.first ? fmtDate(calc.first) : "—"} — {calc?.lastDay ? fmtDate(calc.lastDay) : "—"} · <CountUp value={calc?.days ?? 0} /> dias</span>
             <span>{data.isFetching || activeIds.isPlaceholderData ? "Atualizando…" : `Atualização ${fmtDate(new Date().toISOString().slice(0, 10))}`}</span>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <ResultCard dark title="Valor do pedido" {...(canEdit ? { onEdit: () => open("orcamento") } : {})}>
+          <div className="grid gap-3 lg:grid-cols-3">
+            <ResultCard title="Valor do pedido" {...(canEdit ? { onEdit: () => open("orcamento") } : {})}>
               <p className="font-display text-3xl font-semibold tabular-nums"><CountUp value={brl(shownOrder)} /></p>
               <p className="mt-2 text-xs text-background/70">{w.clients?.name ?? w.client ?? "—"}</p>
               <p className="mt-1 line-clamp-2 text-sm">{w.name}</p>
@@ -874,33 +874,17 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
               <progress aria-label="Faturado do pedido" className="result-progress mt-2 h-2 w-full" max={100} value={shownOrder ? Math.max(0, Math.min(100, billed / shownOrder * 100)) : 0} />
               <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs"><span className="text-muted-foreground">Saldo a faturar</span><CountUp value={brl(shownOrder - billed)} /></div>
             </ResultCard>
-            <ResultCard title="Conclusão da obra" {...(canEdit ? { onEdit: () => open("andamento") } : {})}>
-              <OverviewGauge pct={monthlyInfo || (isAll && (() => { const g = (works.data ?? []).filter((x: any) => workIds.includes(x.id)); return g.length > 0 && g.every((x: any) => x.monthly_enabled); })()) ? 100 : last?.progress ?? 0} label="" />
-            </ResultCard>
-            <ResultCard title="Margem de contribuição">
-              <div className="grid grid-cols-[1fr_auto_1fr] text-center">
-                <p className="border-b pb-1 text-sm text-muted-foreground">Orçado</p>
-                <p className="border-b pb-1" />
-                <p className="border-b pb-1 text-sm text-muted-foreground">Realizado</p>
-                <p className="pt-2 text-sm">{brl(fixedBudget.margin)}</p>
-                <div className="row-span-2 mx-4 w-px bg-border" />
-                <p className={`pt-2 text-sm ${fixedReal.margin < 0 ? "text-foreground" : ""}`}>{brl(fixedReal.margin)}</p>
-                <p className="pt-2 text-lg"><CountUp value={pct(fixedBudget.pct)} /></p>
-                <p className="pt-2 text-lg"><MarginPercent value={fixedReal.pct} margin={fixedReal.margin} /></p>
-              </div>
-              {monthlyInfo && hasPeriod && (
-                <div className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-center">
-                  <SectionTitle>Margem Mensal</SectionTitle>
-                  <div className={`flex items-baseline justify-center gap-4 pt-2 ${realMargin < 0 ? "text-foreground" : ""}`}>
-                    <span className="text-sm">{brl(realMargin)}</span>
-                    <span className="text-lg"><MarginPercent value={last?.marginPct ?? null} margin={realMargin} /></span>
-                  </div>
-                </div>
-              )}
-            </ResultCard>
+            <ResultCard title="Horas normais × HE">
+  {(() => { const normal = calc?.laborHours?.normal ?? 0, extra = calc?.laborHours?.extra ?? 0, total = normal + extra;
+    return <div className="flex h-full flex-col justify-center gap-4">
+      <p className="font-display text-3xl font-semibold tabular-nums"><CountUp value={total} /> <span className="text-sm text-muted-foreground">horas</span></p>
+      <div className="flex h-5 overflow-hidden rounded bg-muted" role="img" aria-label={`${normal.toLocaleString("pt-BR")} horas normais e ${extra.toLocaleString("pt-BR")} horas extras`}><span className="ov-widen h-full bg-foreground" style={{ width: `${total ? normal / total * 100 : 0}%` }} /><span className="ov-widen h-full bg-foreground/35" style={{ width: `${total ? extra / total * 100 : 0}%` }} /></div>
+      <div className="grid grid-cols-2 gap-4 text-xs"><div><p className="text-muted-foreground">Horas normais</p><p className="mt-1 font-display text-2xl font-semibold"><CountUp value={normal} /> h</p></div><div><p className="text-muted-foreground">Horas extras</p><p className="mt-1 font-display text-2xl font-semibold"><CountUp value={extra} /> h</p></div></div>
+    </div>; })()}
+</ResultCard>
           </div>
-          <div className="grid gap-3 xl:grid-cols-4">
-            <ResultCard title="Dados do cliente" {...(canEdit ? { onEdit: () => open("cliente") } : {})}>
+          <div className="grid gap-3 lg:grid-cols-3">
+            <ResultCard dark className="result-client-dark" title="Dados do cliente" {...(canEdit ? { onEdit: () => open("cliente") } : {})}>
               <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-xs">
                 <Lbl>Cliente</Lbl>
                 <span className="text-base font-semibold">{w.clients?.name ?? w.client ?? "—"}</span>
@@ -936,55 +920,46 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
               </div>
 
             </ResultCard>
-            <ResultCard title="Andamento mensal" className="xl:col-span-2">
+            <ResultCard title="Andamento mensal">
               <div className="h-64 min-w-0">{calc && calc.monthBars.length > 0 ? <Suspense fallback={<ResultChartSkeleton />}><MonthBarsChart data={calc.monthBars} /></Suspense> : <p className="pt-10 text-center text-sm text-muted-foreground">Sem custos lançados.</p>}</div>
             </ResultCard>
-            <ResultCard title="Custos realizados × orçados">
-              <div className="h-64 min-w-0">{barItems.length ? <Suspense fallback={<ResultChartSkeleton />}><ItemBarsChart data={barItems} /></Suspense> : <p className="pt-10 text-center text-sm text-muted-foreground">Sem orçamento por item.</p>}</div>
+            <ResultCard title="Conclusão da obra" {...(canEdit ? { onEdit: () => open("andamento") } : {})}>
+              <ResultProgressGauge value={monthlyInfo || (isAll && (() => { const g = (works.data ?? []).filter((x: any) => workIds.includes(x.id)); return g.length > 0 && g.every((x: any) => x.monthly_enabled); })()) ? 100 : last?.progress ?? 0} />
             </ResultCard>
           </div>
-          <ResultCard title="Custos orçados × realizados" {...(canEdit ? { onEdit: () => open("orcamento") } : {})}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="py-1 text-left font-normal">Tipo de Custo</th>
-                    <th className="text-right font-normal">Custo Orçado</th>
-                    <th className="text-right font-normal">Custo Realizado</th>
-                    <th className="text-right font-normal">% Utilizado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scaledItems.map((i) => (
-                    <tr key={i.key}>
-                      <td className="py-2">{relabel(i.key, i.label)}</td>
-                      <td className="text-right">{brl(i.budget)}</td>
-                      <td className="text-right">
-                        <Button
-                          type="button"
-                          className="h-auto p-0 text-foreground underline-offset-2 hover:underline" variant="ghost"
-                          title="Ver detalhes"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDetail(i.key);
-                          }}
-                        >
-                          {brl(i.real)}
-                        </Button>
-                      </td>
-                      <td className={`text-right ${i.used > 100 ? "text-destructive" : ""}`}>{Math.round(i.used)}%</td>
-                    </tr>
-                  ))}
-                  <tr className="font-semibold">
-                    <td className="py-1">Total</td>
-                    <td className="text-right">{brl(totBudget)}</td>
-                    <td className="text-right">{brl(totReal)}</td>
-                    <td className="text-right">{totBudget ? Math.round((totReal / totBudget) * 100) : 0}%</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </ResultCard>
+          <div className="grid gap-3 lg:grid-cols-3">
+            <ResultCard title="Custos realizados" {...(canEdit ? { onEdit: () => openEntries("lancamentos") } : {})}>
+  <p className="mb-3 font-display text-3xl font-semibold tabular-nums"><CountUp value={brl(totReal)} /></p>
+  <div className="h-44 min-w-0">{barItems.length ? <Suspense fallback={<ResultChartSkeleton />}><ItemBarsChart data={barItems} /></Suspense> : <p className="pt-10 text-center text-sm text-muted-foreground">Sem orçamento por item.</p>}</div>
+  <div className="mt-3 space-y-1">{scaledItems.map((i) => <div key={i.key} className="flex items-center justify-between gap-3 text-xs"><span className="text-muted-foreground">{relabel(i.key, i.label)}</span><Button variant="ghost" className="h-auto p-0 text-xs" onClick={() => setDetail(i.key)} title="Ver detalhes">{brl(i.real)}</Button></div>)}</div>
+</ResultCard>
+            <ResultCard title="Custos orçados" {...(canEdit ? { onEdit: () => open("orcamento") } : {})}>
+  <p className="mb-4 font-display text-3xl font-semibold tabular-nums"><CountUp value={brl(totBudget)} /></p>
+  <div className="overflow-x-auto"><table className="w-full text-xs sm:text-sm"><thead><tr className="border-b text-xs text-muted-foreground"><th className="pb-2 text-left font-normal">Tipo de custo</th><th className="pb-2 text-right font-normal">Orçado</th><th className="pb-2 text-right font-normal">Utilizado</th></tr></thead>
+  <tbody>{scaledItems.map((i) => <tr key={i.key}><td className="py-2">{relabel(i.key, i.label)}</td><td className="text-right">{brl(i.budget)}</td><td className="text-right">{Math.round(i.used)}%</td></tr>)}<tr className="border-t font-semibold"><td className="pt-3">Total</td><td className="pt-3 text-right">{brl(totBudget)}</td><td className="pt-3 text-right">{totBudget ? Math.round(totReal / totBudget * 100) : 0}%</td></tr></tbody></table></div>
+</ResultCard>
+            <ResultCard title="Margem de contribuição">
+              <div className="grid grid-cols-[1fr_auto_1fr] text-center">
+                <p className="border-b pb-1 text-sm text-muted-foreground">Orçado</p>
+                <p className="border-b pb-1" />
+                <p className="border-b pb-1 text-sm text-muted-foreground">Realizado</p>
+                <p className="pt-2 text-sm">{brl(fixedBudget.margin)}</p>
+                <div className="row-span-2 mx-4 w-px bg-border" />
+                <p className={`pt-2 text-sm ${fixedReal.margin < 0 ? "text-foreground" : ""}`}>{brl(fixedReal.margin)}</p>
+                <p className="pt-2 text-lg"><CountUp value={pct(fixedBudget.pct)} /></p>
+                <p className="pt-2 text-lg"><MarginPercent value={fixedReal.pct} margin={fixedReal.margin} /></p>
+              </div>
+              {monthlyInfo && hasPeriod && (
+                <div className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-center">
+                  <SectionTitle>Margem Mensal</SectionTitle>
+                  <div className={`flex items-baseline justify-center gap-4 pt-2 ${realMargin < 0 ? "text-foreground" : ""}`}>
+                    <span className="text-sm">{brl(realMargin)}</span>
+                    <span className="text-lg"><MarginPercent value={last?.marginPct ?? null} margin={realMargin} /></span>
+                  </div>
+                </div>
+              )}
+            </ResultCard>
+          </div>
         </div>
       )}
 

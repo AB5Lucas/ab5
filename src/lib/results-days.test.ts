@@ -14,6 +14,18 @@ describe("fração do mês no período por dias", () => {
 });
 
 describe("Resultados com período por dias", () => {
+  it("separa horas normais e HE sem alterar horas ou custo da mão de obra", () => {
+    const w = { id: "a", client_id: "c", order_value: 10000 };
+    const allocs = ["2026-11-23", "2026-11-28"].map((date) => ({ work_id: "a", collaborator_id: "p", daily_schedules: { schedule_date: date } }));
+    const raw = { ...empty, allocs, sibAllocs: allocs, people: [{ id: "p", salary: 10, full_name: "Pessoa", contract_type: "efetivo" }], rdoWf: [
+      { collaborator_id: "p", work_id: "a", report_date: "2026-11-23", present: true, worked_hours: 10 },
+      { collaborator_id: "p", work_id: "a", report_date: "2026-11-28", present: true, worked_hours: 8 },
+    ] };
+    const b = buildBase(w, raw, "2026-11", "2026-11", { isAll: false, workIds: ["a"], holidays: [], allWorks: [w] });
+    expect(b?.laborHours).toEqual({ normal: 8, extra: 10 });
+    expect(b?.laborRows[0]?.hours).toBe(18);
+    expect(b?.laborRows[0]?.cost).toBeCloseTo((8 + 2 * 1.6 + 8 * 1.6) * 10 * 2.6);
+  });
   it("mensal: custo só dos dias escolhidos e pedido do mês proporcional", () => {
     const w = { id: "m", monthly_enabled: true, orders: [{ date: "2026-10-31", value: 2000 }, { date: "2026-11-30", value: 3000 }] };
     const opts: BaseOpts = { isAll: false, workIds: ["m"], holidays: [], allWorks: [w], fromDate: "2026-11-01", toDate: "2026-11-10" };

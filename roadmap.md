@@ -59,3 +59,6 @@
 - [x] Margem por cliente na ordem do faturamento
 - [x] Resultados: preservar modelo anterior e aplicar layout monocromático de Atividades.
 - [x] Resultados: skeleton, transições suaves e verificação com dados reais em computador e celular; edição, troca de período e 21 testes conferidos.
+- [x] Veículos: calendário acima dos quatro indicadores; gráfico orçado × gasto e timeline ao lado, usando o orçamento da frota proporcional por dia.
+- [x] Veículos: seleção de dia com empilhadeiras, troca dos quadros e validação em computador/celular; timeline mostra o dia selecionado (dias testados sem demandas).
+- [x] Resultados: três linhas na ordem solicitada, MO normal × HE e conclusão com marcações; 41 testes, horas reais, edição e celular conferidos.

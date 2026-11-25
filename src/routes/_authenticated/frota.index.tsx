@@ -1,17 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
 import { MENU_GROUPS } from "@/lib/menu";
-import { Big, Donut, HoverBars, OverviewCard } from "@/components/overview/charts";
+import { Big, Donut, HoverBars, LineArea, OverviewCard } from "@/components/overview/charts";
 import { CountUp } from "@/components/count-up";
 import { useDriverRanking } from "@/components/frota/ranking";
 import { dayKm, dayToll, normalizePlate } from "@/lib/fleet-costs";
 import { closestPlate, isoDay, maintenanceState, type MaintenanceState } from "@/lib/fleet-notes";
 import { KIND_LABEL, timeSpan, type LogDemand } from "@/lib/logistics";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ResultCard, ResultChartSkeleton } from "@/components/result-dashboard-shell";
+import { ForkliftTransfer, type TransferHandle } from "@/components/frota/forklift-transfer";
+import { useDashboardBudget } from "@/components/frota/use-dashboard-budget";
+import { fleetDashboardCosts } from "@/lib/fleet-dashboard-costs";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
 export const Route = createFileRoute("/_authenticated/frota/")({
@@ -62,6 +67,12 @@ type Suggestion = { vehicleId: string; plate: string; due: string; week: string;
 
 function Overview({ canCost }: { canCost: boolean }) {
   const today = todayIso();
+  const [selectedDay, setSelectedDay] = useState(today);
+  const [deliveredDay, setDeliveredDay] = useState(today);
+  const [timelineAbove, setTimelineAbove] = useState(false);
+  const transfer = useRef<TransferHandle>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
   const [period, setPeriod] = useState<Period>("hoje");
   const R = rangeOf(period, today);
   const single = R.from === R.to;
@@ -71,7 +82,9 @@ function Overview({ canCost }: { canCost: boolean }) {
   const calFrom = monday(`${ym}-01`), calTo = addDays(monday(`${ym}-${pad(lastDay)}`), 6);
   // Barras de km: dias do período (um dia só → o mês, para ter contexto).
   const barFrom = single ? `${ym}-01` : R.from, barTo = single ? `${ym}-${pad(lastDay)}` : R.to;
-  const qFrom = [R.from, calFrom, barFrom].sort()[0]!, qTo = [R.to, calTo, barTo].sort().at(-1)!;
+  const budgetFrom = `${ym}-01`, budgetTo = `${R.to.slice(0, 7)}-${pad(new Date(Date.UTC(Number(R.to.slice(0, 4)), Number(R.to.slice(5, 7)), 0)).getUTCDate())}`;
+  const budget = useDashboardBudget(budgetFrom, budgetTo, canCost);
+  const qFrom = [R.from, calFrom, barFrom, budgetFrom].sort()[0]!, qTo = [R.to, calTo, barTo, budgetTo].sort().at(-1)!;
 
   const vehiclesQ = useQuery({
     queryKey: ["overview", "fleet-vehicles"], staleTime: STATIC,
@@ -101,9 +114,9 @@ function Overview({ canCost }: { canCost: boolean }) {
     },
   });
   const logQ = useQuery({
-    queryKey: ["overview", "fleet-log", R.from, R.to], staleTime: 60_000, placeholderData: keepPreviousData,
+    queryKey: ["overview", "fleet-log", calFrom, calTo], staleTime: 60_000, placeholderData: keepPreviousData,
     queryFn: async () => {
-      const { data } = await supabase.from("log_demands").select("*").gte("scheduled_date", R.from).lte("scheduled_date", R.to).order("scheduled_date");
+      const data = await fetchAll<LogDemand>((a, b) => supabase.from("log_demands").select("*").gte("scheduled_date", calFrom).lte("scheduled_date", calTo).order("id").range(a, b));
       const list = ((data ?? []) as LogDemand[]).filter((d) => !/cancel/i.test(String((d as any).status ?? "")));
       const addrIds = [...new Set(list.flatMap((d) => [(d as any).origin_id, (d as any).dest_id]).filter(Boolean))] as string[];
       const addrs = addrIds.length ? (await supabase.from("log_addresses").select("id, name, city").in("id", addrIds)).data ?? [] : [];
@@ -185,6 +198,17 @@ function Overview({ canCost }: { canCost: boolean }) {
     return { series, km, ran: ranIn.size, fleet: vehicles.length, cost, counts, suggestions, maintDays, maintInRange };
   }, [vehiclesQ.data, schedQ.data, expQ.data, maintQ.data, R.from, R.to, barFrom, barTo, today, lastDay]);
 
+  const comparison = useMemo(() => fleetDashboardCosts((vehiclesQ.data ?? []).filter((v) => v.status !== "inactive"), schedQ.data ?? [], expQ.data ?? [], budget.data ?? new Map(), daysBetween(R.from, R.to), single), [vehiclesQ.data, schedQ.data, expQ.data, budget.data, R.from, R.to, single]);
+  useEffect(() => { setSelectedDay(R.from); setDeliveredDay(R.from); }, [R.from]);
+  const selectCalendarDay = (dt: string, element: HTMLElement, upper: boolean) => {
+    if (dt === selectedDay) return;
+    setSelectedDay(dt);
+    const timeline = timelineRef.current, chart = chartRef.current;
+    const swap = () => setTimelineAbove(upper);
+    const delivered = () => setDeliveredDay(dt);
+    if (timeline && chart && transfer.current) transfer.current.move(element, timeline, chart, swap, delivered, Number(dt.slice(8, 10)));
+    else { swap(); delivered(); }
+  };
   const pLabel = period === "hoje" ? "hoje" : period === "amanha" ? "amanhã" : period === "semana" ? "esta semana" : "este mês";
   const when = single ? brDay(R.from) : `${brDay(R.from)} a ${brDay(R.to)}`;
   const loadingNew = schedQ.isPlaceholderData || logQ.isPlaceholderData;
@@ -207,7 +231,37 @@ function Overview({ canCost }: { canCost: boolean }) {
       {!d ? (
         <DashboardSkeleton />
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
+        <div className="fleet-dashboard-layout flex min-h-0 flex-1 flex-col gap-3">
+          <div className="grid gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-2">
+            <div className="min-h-0">
+          <ResultCard dark title={`Manutenções e revisões — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`}
+            className="h-full min-h-[28rem] xl:min-h-0">
+            <MaintCalendar ym={ym} calFrom={calFrom} calTo={calTo} range={R} today={today} maintDays={d.maintDays} suggestions={d.suggestions} selected={selectedDay} onSelect={selectCalendarDay} />
+          </ResultCard>
+
+
+            </div>
+            <div className="fleet-dashboard-stack flex min-h-0 flex-col gap-3 xl:grid xl:grid-rows-2">
+              <div ref={chartRef} className={cn("min-h-0 min-w-0", timelineAbove ? "order-2" : "order-1")}>
+                <ResultCard title={single ? `Orçado × gasto por veículo — ${when}` : `Orçado × gasto por dia — ${when}`} className="h-full min-h-64">
+                  {canCost ? budget.error || expQ.error ? <p className="text-sm text-muted-foreground">Não foi possível carregar os custos.</p> : !budget.data || expQ.isPending ? <ResultChartSkeleton /> : (
+                    <div className="flex h-full min-h-0 flex-col">
+                      <div className="mb-2 flex flex-wrap gap-4 text-xs text-muted-foreground"><span>Orçado <CountUp value={brl(comparison.reduce((sum, x) => sum + x.a, 0))} /></span><span>Gasto <CountUp value={brl(comparison.reduce((sum, x) => sum + x.b, 0))} /></span></div>
+                      <div className="mb-2 flex gap-4 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Orçado</span><span className="flex items-center gap-1"><span className="w-3 border-t border-dashed border-muted-foreground" />Gasto</span></div>
+                      <LineArea className="min-h-0 flex-1" height="h-36 xl:h-auto xl:min-h-0 xl:flex-1" data={comparison} format={(x) => `Orçado ${brl(x.a)} · Gasto ${brl(x.b ?? 0)}`} />
+                    </div>
+                  ) : <p className="text-sm text-muted-foreground">Custos disponíveis para quem tem acesso à Visão Geral.</p>}
+                </ResultCard>
+              </div>
+              <div ref={timelineRef} className={cn("min-h-0 min-w-0", timelineAbove ? "order-1" : "order-2")}>
+                <ResultCard title={`Logística — ${brDay(deliveredDay)}`} className="h-full min-h-64">
+                  {logQ.isPending ? <ResultChartSkeleton /> : <LogTimeline key={deliveredDay} list={(logQ.data?.list ?? []).filter((x) => x.scheduled_date === deliveredDay)} addr={logQ.data?.addr ?? new Map()} vehicles={new Map((vehiclesQ.data ?? []).map((v) => [v.id, v.plate]))} single />}
+                </ResultCard>
+              </div>
+            </div>
+          </div>
+          <div className="grid shrink-0 gap-3 md:grid-cols-2 xl:h-[13.25rem] xl:grid-cols-4">
+
           <OverviewCard dark title={`Km rodados — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Km da escala da Transporte (ida e volta × viagens + obras adicionais)" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
             <Big dark value={Math.round(d.km).toLocaleString("pt-BR")} />
             <p className="text-xs text-background/60">{d.ran} de {d.fleet} veículos rodaram{single ? ` · barras do mês` : ""}</p>
@@ -275,15 +329,9 @@ function Overview({ canCost }: { canCost: boolean }) {
             </div>
           </OverviewCard>
 
-          <OverviewCard dark title={`Manutenções e revisões — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} to="/frota/manutencao" linkLabel="Abrir Manutenção"
-            hint="Manutenções e revisões programadas na Transporte; a semana destacada é a sugestão para marcar a revisão (pelo km médio por dia e a regra de cada veículo)"
-            className="min-h-[22rem] md:col-span-2 xl:min-h-0" bodyClassName="flex min-h-0 flex-col">
-            <MaintCalendar ym={ym} calFrom={calFrom} calTo={calTo} range={R} today={today} maintDays={d.maintDays} suggestions={d.suggestions} />
-          </OverviewCard>
 
-          <OverviewCard title={`Logística — ${pLabel}`} to="/logistica" linkLabel="Abrir Logística" hint="Demandas programadas de carga, descarga e busca (sistema em validação)" className="min-h-[22rem] md:col-span-2 xl:min-h-0" bodyClassName="flex min-h-0 flex-col">
-            <LogTimeline list={logQ.data?.list ?? []} addr={logQ.data?.addr ?? new Map()} vehicles={new Map((vehiclesQ.data ?? []).map((v) => [v.id, v.plate]))} single={single} />
-          </OverviewCard>
+          </div>
+          <ForkliftTransfer ref={transfer} />
         </div>
       )}
     </div>
@@ -296,9 +344,10 @@ const COST_PARTS = [
 const TONES = ["bg-foreground", "bg-foreground/65", "bg-foreground/40", "bg-foreground/20"];
 
 /** Calendário do mês: manutenções/revisões programadas por dia e a semana sugerida para marcar a revisão em destaque. */
-function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestions }: {
+function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestions, selected, onSelect }: {
   ym: string; calFrom: string; calTo: string; range: { from: string; to: string }; today: string;
   maintDays: Map<string, { plate: string; kind: "man" | "rev" }[]>; suggestions: Suggestion[];
+  selected: string; onSelect: (dt: string, element: HTMLElement, upper: boolean) => void;
 }) {
   const days = daysBetween(calFrom, calTo);
   const weeks: string[][] = [];
@@ -308,13 +357,13 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
   // Sugestões de semanas fora do mês (ex.: próximo mês) aparecem embaixo.
   const outside = suggestions.filter((s) => s.week < calFrom || s.week > calTo).sort((a, b) => a.due.localeCompare(b.due));
   return (
-    <div className="flex min-h-0 flex-1 flex-col" onClick={(e) => e.preventDefault()}>
+    <div className="flex h-full min-h-0 flex-1 flex-col" onClick={(e) => e.preventDefault()}>
       <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(0,1.6fr)] gap-1 text-[10px] text-background/60">
         {WD.map((w, i) => <span key={i} className="text-center font-medium">{w}</span>)}
         <span className="pl-1 font-medium">Sugestão de revisão</span>
       </div>
       <div className="mt-1 grid min-h-0 flex-1 auto-rows-fr gap-1">
-        {weeks.map((wk) => {
+        {weeks.map((wk, wi) => {
           const sug = byWeek.get(wk[0]!) ?? [];
           return (
             <div key={wk[0]} className={cn("grid min-h-0 grid-cols-[repeat(7,minmax(0,1fr))_minmax(0,1.6fr)] gap-1 rounded-lg p-0.5 transition-colors",
@@ -324,15 +373,15 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
                 const inMonth = dt.startsWith(ym);
                 const inRange = dt >= range.from && dt <= range.to;
                 return (
-                  <div key={dt} title={ev.length ? ev.map((e) => `${e.plate} · ${e.kind === "rev" ? "Revisão" : "Manutenção"}`).join("\n") : brDay(dt)}
-                    className={cn("flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5", inMonth ? "bg-background/5" : "opacity-35",
+                  <Button variant="ghost" key={dt} aria-label={`Selecionar dia ${brDay(dt)}`} aria-pressed={selected === dt} onClick={(e) => onSelect(dt, e.currentTarget, wi < weeks.length / 2)} title={ev.length ? ev.map((e) => `${e.plate} · ${e.kind === "rev" ? "Revisão" : "Manutenção"}`).join("\n") : brDay(dt)}
+                    className={cn("h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-background hover:bg-background/20", selected === dt && "ring-2 ring-background bg-background/20", inMonth ? "bg-background/5" : "opacity-35",
                       inRange && "outline outline-1 outline-background/60", dt === today && "bg-background/20")}>
                     <span className={cn("text-[10px] tabular-nums", dt === today ? "font-bold" : "text-background/70")}>{Number(dt.slice(8, 10))}</span>
                     {ev.slice(0, 2).map((e, i) => (
                       <span key={i} className={cn("truncate rounded px-1 text-[9px] font-semibold leading-tight", e.kind === "rev" ? "bg-background text-foreground" : "bg-background/30 text-background")}>{e.plate}</span>
                     ))}
                     {ev.length > 2 && <span className="text-[9px] text-background/60">+{ev.length - 2}</span>}
-                  </div>
+                  </Button>
                 );
               })}
               <div className="flex min-h-0 flex-col justify-center overflow-hidden pl-1 text-[10px]">
@@ -371,13 +420,13 @@ function LogTimeline({ list, addr, vehicles, single }: { list: LogDemand[]; addr
   if (!rows.length) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
-        <p className="text-sm font-medium">Nenhuma demanda programada no período.</p>
-        <p className="text-xs text-muted-foreground">A Logística está em validação: as cargas, descargas e buscas programadas aparecem aqui.</p>
+        <p className="text-sm font-medium">Nenhuma demanda programada neste dia.</p>
+        <p className="text-xs text-muted-foreground"></p>
       </div>
     );
   }
   return (
-    <div className="flex min-h-0 flex-1 flex-col" onClick={(e) => e.preventDefault()}>
+    <div className="flex h-full min-h-0 flex-1 flex-col" onClick={(e) => e.preventDefault()}>
       <div className="flex items-baseline gap-2">
         <span className="font-display text-3xl font-semibold tabular-nums"><CountUp value={list.length} /></span>
         <span className="text-xs text-muted-foreground">{list.length === 1 ? "demanda programada" : "demandas programadas"}</span>
