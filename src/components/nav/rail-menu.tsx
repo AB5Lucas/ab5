@@ -5,11 +5,7 @@
  * e a troca para o menu lateral). No celular vira uma barra embaixo.
  */
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, Building2, ChevronDown, LayoutList, Search, Settings } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { fetchAll } from "@/lib/fetch-all";
-import { CountUp } from "@/components/count-up";
+import { Bell, ChevronDown, LayoutList, Search, Settings } from "lucide-react";
 import { useCompanyRole } from "@/hooks/use-company-role";
 import { useEffect, useRef, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 const dotClass = (tone: string) => (tone === "red" ? "bg-destructive" : "bg-warning");
 /** Vidro (como o iOS): fundo translúcido com desfoque e saturação, borda clara e sombra suave. */
-const GLASS = "liquid-glass text-foreground";
+const GLASS = "liquid-glass liquid-glass-menu text-foreground";
 const GLASS_POP = "liquid-glass liquid-glass-strong";
 const ACTIVE = "bg-white/95 text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)] dark:bg-white/15";
 const IDLE = "text-foreground/70 hover:bg-white/50 hover:text-foreground dark:hover:bg-white/10";
@@ -138,64 +134,10 @@ function moduleInfo(g: Group, badges: Badges) {
   return n ? `${n} aviso${n > 1 ? "s" : ""}` : "";
 }
 
-/** Prévia de Atividades ao passar o mouse: faturado no mês + barras dos últimos 6 meses (mesma leitura da visão geral). */
-function useActivitiesPreview(enabled: boolean) {
-  return useQuery({
-    queryKey: ["rail-preview", "atividades"],
-    enabled,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const now = new Date();
-      const from = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().slice(0, 10);
-      const rows = await fetchAll<{ entry_date: string; amount: number }>((a, b) => supabase.from("work_entries").select("entry_date, amount")
-        .eq("category", "faturamento").eq("sync_cancelled", false).gte("entry_date", from).order("id").range(a, b));
-      const months: string[] = [];
-      for (let k = 5; k >= 0; k--) { const d = new Date(now.getFullYear(), now.getMonth() - k, 1); months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }
-      const by = new Map(months.map((m) => [m, 0]));
-      for (const r of rows) { const m = String(r.entry_date).slice(0, 7); if (by.has(m)) by.set(m, by.get(m)! + Number(r.amount ?? 0)); }
-      return months.map((m) => ({ m, v: by.get(m)! }));
-    },
-  });
-}
-
-const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-function ActivitiesPreview() {
-  const q = useActivitiesPreview(true);
-  const [hov, setHov] = useState<number | null>(null);
-  const data = q.data ?? [];
-  const cur = data[data.length - 1]?.v ?? 0, prev = data[data.length - 2]?.v ?? 0;
-  const delta = prev ? ((cur - prev) / prev) * 100 : null;
-  const max = Math.max(1, ...data.map((d) => d.v));
-  const sel = hov ?? data.length - 1;
-  const short = (v: number) => v >= 1e6 ? `${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi` : v >= 1e3 ? `${(v / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil` : v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-  return (
-    <div className="rail-preview w-64 rounded-3xl bg-neutral-950 p-4 text-white shadow-2xl">
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10"><Building2 className="h-3.5 w-3.5" /></span>
-        <div>
-          <p className="text-sm font-medium leading-tight">Faturado no mês</p>
-          {delta != null && <p className="text-[10px] text-white/60">{delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}% vs. mês anterior</p>}
-        </div>
-      </div>
-      <p className="mt-3 font-display text-4xl font-light tracking-tight">{q.isLoading ? "…" : <CountUp value={`R$ ${short(cur)}`} />}</p>
-      <div className="relative mt-3 flex h-16 items-end gap-1.5" onMouseLeave={() => setHov(null)}>
-        {data.map((d, k) => (
-          <div key={d.m} className="relative flex h-full flex-1 items-end" onMouseEnter={() => setHov(k)}>
-            <div className={cn("ov-grow w-full rounded-md", k === sel ? "bg-primary" : "bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.28)_0_2px,transparent_2px_5px)]")}
-              style={{ height: `${Math.max(6, (d.v / max) * 100)}%`, animationDelay: `${k * 50}ms` }} />
-            {k === sel && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-neutral-900">{MONTHS[Number(d.m.slice(5, 7)) - 1]} · {short(d.v)}</span>}
-          </div>
-        ))}
-      </div>
-      <div className="mt-1 flex justify-between text-[9px] text-white/45">{data.map((d) => <span key={d.m}>{MONTHS[Number(d.m.slice(5, 7)) - 1]}</span>)}</div>
-    </div>
-  );
-}
-
 /**
  * Computador (modelo do vídeo "Nido"): painel de vidro arredondado, compacto só com ícones; ao passar o mouse abre com
  * busca, módulos (ativo em pílula escura com o ícone num círculo da cor da marca, avisos à direita), páginas do módulo
- * aberto com bolinha, prévia escura ao lado (Atividades) e Configurações fixa embaixo.
+ * aberto com bolinha e Configurações fixa embaixo.
  */
 function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
   modules: Group[]; adminItems: { item: Group["items"][number]; group: Group }[]; current: string; currentMod: string | null; badges: Badges;
@@ -207,12 +149,11 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
   const [openMod, setOpenMod] = useState<string | null | undefined>(undefined);
   const [hover, setHover] = useState(false);
   const [settings, setSettings] = useState(false);
-  const [preview, setPreview] = useState<{ label: string; top: number } | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const enter = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHover(true), 90); };
-  const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => { setHover(false); setPreview(null); }, 240); };
+  const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => { setHover(false); }, 240); };
   useEffect(() => () => window.clearTimeout(timer.current), []);
-  useEffect(() => { setOpenMod(undefined); setSettings(false); setPreview(null); }, [current]);
+  useEffect(() => { setOpenMod(undefined); setSettings(false); }, [current]);
   const openLabel = openMod === undefined ? currentMod : openMod;
   const expanded = hover || settings;
   const highlighted = expanded && openLabel ? openLabel : currentMod;
@@ -256,7 +197,6 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
               return (
                 <div key={g.label}>
                   <button type="button" aria-expanded={isOpen}
-                    onMouseEnter={(e) => { if (g.overview && expanded) setPreview({ label: g.label, top: (e.currentTarget as HTMLElement).getBoundingClientRect().top }); else setPreview(null); }}
                     onClick={() => { const opening = openLabel !== g.label; setOpenMod(opening ? g.label : null); if (opening && g.overview) void navigate({ to: g.overview as never }); }}
                     className={cn(rowBase, active ? "bg-foreground/[0.09] font-semibold text-foreground dark:bg-white/15" : "text-foreground/80 hover:bg-white/70 hover:shadow-sm dark:hover:bg-white/10")}>
                     <span className={iconWrap(active)}><g.icon className="h-4 w-4" /></span>
@@ -328,13 +268,6 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
         </Popover>
       </nav>
 
-      {/* Prévia escura do módulo (Atividades), ao lado da linha em que o mouse está */}
-      {expanded && preview && (
-        <div className="absolute left-[calc(100%+0.75rem)]" style={{ top: Math.max(8, preview.top - (document.querySelector(".rail-menu")?.getBoundingClientRect().top ?? 0) - 8) }}
-          onMouseEnter={enter}>
-          {preview.label === "Atividades" && <ActivitiesPreview />}
-        </div>
-      )}
     </div>
   );
 }

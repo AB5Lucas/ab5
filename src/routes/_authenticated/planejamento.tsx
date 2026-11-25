@@ -279,8 +279,8 @@ function Overview() {
             hint="Pessoas escaladas por cliente no período" className="shrink-0 xl:h-[13.25rem]" bodyClassName="min-h-0 overflow-hidden">
             {!d.clients.length ? <p className="py-10 text-center text-xs text-muted-foreground">Sem escalações no período.</p> : (
               <div className="grid h-full grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:auto-cols-fr xl:grid-flow-col xl:grid-cols-none xl:grid-rows-1 xl:overflow-hidden">
-                {d.clients.slice(0, 8).map((c) => (
-                  <ClientTile key={c.name} c={c} single={single}
+                {d.clients.slice(0, 8).map((c, i) => (
+                  <ClientTile key={c.name} c={c} single={single} index={i}
                     onOpen={c.clientId ? () => void nav({ to: "/programacao/servicos", search: { client: c.clientId!, date: single ? R.from : today } }) : undefined} />
                 ))}
               </div>
@@ -294,12 +294,13 @@ function Overview() {
 
 type ClientRow = { name: string; clientId: string | null; people: number; personDays: number; days: number; pend: number; works: { name: string; n: number }[] };
 /** Quadro de um cliente na faixa de Escalações: pessoas, distribuição, serviços com quantas pessoas cada. */
-function ClientTile({ c, single, onOpen }: { c: ClientRow; single: boolean; onOpen?: (() => void) | undefined }) {
+function ClientTile({ c, single, onOpen, index = 0 }: { c: ClientRow; single: boolean; onOpen?: (() => void) | undefined; index?: number }) {
   return (
     <div role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} title={onOpen ? `Abrir ${c.name} na aba Serviços` : undefined}
       onClick={onOpen ? (e) => { e.preventDefault(); e.stopPropagation(); onOpen(); } : undefined}
       onKeyDown={onOpen ? (e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onOpen(); } } : undefined}
-      className={cn("flex min-h-0 min-w-0 flex-col justify-between gap-1.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5 transition-colors", onOpen && "cursor-pointer hover:border-foreground/40 hover:bg-muted")}>
+      style={{ animationDelay: `${150 + index * 90}ms` }}
+      className={cn("tile-snap flex min-h-0 min-w-0 flex-col justify-between gap-1.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5 transition-colors", onOpen && "cursor-pointer hover:border-foreground/40 hover:bg-muted")}>
       <span className="truncate text-[11px] font-semibold tracking-wide" title={c.name}>{c.name}</span>
       <span className="flex items-baseline gap-1">
         <span className="font-display text-3xl font-semibold leading-none tabular-nums"><CountUp value={c.people} /></span>

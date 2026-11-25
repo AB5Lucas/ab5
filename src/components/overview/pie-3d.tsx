@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CountUp } from "@/components/count-up";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +31,19 @@ export function Pie3D({ total, totalLabel, parts, unit = ["pessoa", "pessoas"], 
 }) {
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
+  // Entrada: as fatias chegam de fora, uma a uma, e se encaixam no lugar.
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setEntered(true), 80);
+    return () => window.clearTimeout(t);
+  }, []);
+  // Depois da entrada, o realce do mouse fica sem atraso.
+  const [hoverReady, setHoverReady] = useState(false);
+  useEffect(() => {
+    if (!entered) return;
+    const t = window.setTimeout(() => setHoverReady(true), 1400);
+    return () => window.clearTimeout(t);
+  }, [entered]);
   const sum = parts.reduce((a, p) => a + p.n, 0);
   const cur = parts.find((p) => p.key === sel) ?? null;
   // Mantém o conteúdo da última fatia enquanto a lista sai (animação de volta).
@@ -57,12 +70,16 @@ export function Pie3D({ total, totalLabel, parts, unit = ["pessoa", "pessoas"], 
             <svg viewBox="0 0 100 82" className="h-full w-full overflow-visible">
               {/* 1º as laterais de todas as fatias (de trás para a frente), depois os topos: assim nenhuma lateral cobre o topo de outra. */}
               {(["side", "top"] as const).map((layer) => slices.map((sl) => {
-                const out = (hover === sl.key && !cur) ? 4 : 0;
+                const out = !entered ? 34 : (hover === sl.key && !cur) ? 4 : 0;
                 const dx = out * Math.sin(2 * Math.PI * sl.mid), dy = -out * 0.62 * Math.cos(2 * Math.PI * sl.mid);
                 const hidden = cur && cur.key !== sl.key;
                 const tone = PIE_TONES[sl.i]!;
                 return (
-                  <g key={`${layer}-${sl.key}`} style={{ transform: `translate(${dx}px, ${dy}px)`, opacity: hidden ? 0 : 1, transition: "transform 300ms, opacity 500ms" }}>
+                  <g key={`${layer}-${sl.key}`} style={{
+                    transform: `translate(${dx}px, ${dy}px)`, opacity: hidden || !entered ? 0 : 1,
+                    transition: !entered ? "none" : hoverReady ? "transform 300ms, opacity 500ms"
+                      : `transform 750ms cubic-bezier(0.34, 1.4, 0.64, 1) ${120 + slices.indexOf(sl) * 140}ms, opacity 450ms ${120 + slices.indexOf(sl) * 140}ms`,
+                  }}>
                     {layer === "side"
                       ? Array.from({ length: DEPTH }, (_, k) => DEPTH - k).map((k) => <path key={k} d={slicePath(sl.a0, sl.a1, k)} style={{ fill: toneFill(tone, true) }} />)
                       : <>
