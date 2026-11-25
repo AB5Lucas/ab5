@@ -23,12 +23,9 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: "bad
   );
 }
 
-/** Frota › Abastecimento › Ranking: motoristas pela entrega da foto da nota (motorista pela Transporte). */
-export function DriverRanking() {
-  const [range, setRange] = useState<DayRange>(() => currentMonthRange());
-  const [open, setOpen] = useState<string | null>(null);
+/** Ranking dos motoristas no período (mesma conta da aba Ranking; também usado no dashboard de Veículos). */
+export function useDriverRanking(range: DayRange) {
   const today = new Date().toISOString().slice(0, 10);
-
   const notes = useQuery({
     queryKey: ["fleet-ranking-notes", range.from, range.to],
     queryFn: () => fetchAll<RankingNote & { access_key: string; item_no: number; issued_on_fix: string | null }>((a, b) => supabase.from("fleet_fuel_notes")
@@ -68,6 +65,17 @@ export function DriverRanking() {
   const loading = notes.isLoading || schedules.isLoading || vehicles.isLoading || names.isLoading;
   const totals = ranking.reduce((s, r) => ({ delivered: s.delivered + r.delivered, pending: s.pending + r.pending, waiting: s.waiting + r.waiting }), { delivered: 0, pending: 0, waiting: 0 });
   const overall = totals.delivered + totals.pending ? Math.round((totals.delivered / (totals.delivered + totals.pending)) * 100) : null;
+  const plates = [...(vehicles.data ?? []).map((v) => v.plate), ...release.vehicles.map((e) => e.plate)];
+  return { ranking, totals, overall, loading, plates };
+}
+
+/** Frota › Abastecimento › Ranking: motoristas pela entrega da foto da nota (motorista pela Transporte). */
+export function DriverRanking() {
+  const [range, setRange] = useState<DayRange>(() => currentMonthRange());
+  const [open, setOpen] = useState<string | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { ranking, totals, overall, loading, plates } = useDriverRanking(range);
 
   return (
     <div className="space-y-4">
@@ -132,7 +140,7 @@ export function DriverRanking() {
                       <TableCell colSpan={6} className="text-sm">
                         <div className="mb-1 font-medium">XML sem nota</div>
                         {r.pendingNotes.map((p) => (
-                          <div key={p.id} className="tabular-nums">{brDate(p.day)} · NF {p.nf ?? "—"} · {registeredPlate(p.plate, [...(vehicles.data ?? []).map((v) => v.plate), ...release.vehicles.map((e) => e.plate)]) ?? "sem placa"} · {brl(p.total)}</div>
+                          <div key={p.id} className="tabular-nums">{brDate(p.day)} · NF {p.nf ?? "—"} · {registeredPlate(p.plate, plates) ?? "sem placa"} · {brl(p.total)}</div>
                         ))}
                       </TableCell>
                     </TableRow>

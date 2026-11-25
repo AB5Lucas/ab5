@@ -54,6 +54,7 @@ import { Route as AuthenticatedDocumentosAgendamentosRouteImport } from './route
 import { Route as AuthenticatedExternoRelatorioDiarioRouteImport } from './routes/_authenticated/externo.relatorio-diario'
 import { Route as AuthenticatedFechamentosFinanceiroRouteImport } from './routes/_authenticated/fechamentos.financeiro'
 import { Route as AuthenticatedFechamentosSuzanoRouteImport } from './routes/_authenticated/fechamentos.suzano'
+import { Route as AuthenticatedFrotaIndexRouteImport } from './routes/_authenticated/frota.index'
 import { Route as AuthenticatedFrotaCustosRouteImport } from './routes/_authenticated/frota.custos'
 import { Route as AuthenticatedFrotaManutencaoRouteImport } from './routes/_authenticated/frota.manutencao'
 import { Route as AuthenticatedFrotaNotasRouteImport } from './routes/_authenticated/frota.notas'
@@ -336,6 +337,11 @@ const AuthenticatedFechamentosSuzanoRoute =
     path: '/fechamentos/suzano',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFrotaIndexRoute = AuthenticatedFrotaIndexRouteImport.update({
+  id: '/frota/',
+  path: '/frota/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedFrotaCustosRoute =
   AuthenticatedFrotaCustosRouteImport.update({
     id: '/frota/custos',
@@ -533,6 +539,7 @@ export interface FileRoutesByFullPath {
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/ausencias/': typeof AuthenticatedAusenciasIndexRoute
   '/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
+  '/frota/': typeof AuthenticatedFrotaIndexRoute
   '/obras/': typeof AuthenticatedObrasIndexRoute
   '/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos/': typeof AuthenticatedVeiculosIndexRoute
@@ -602,6 +609,7 @@ export interface FileRoutesByTo {
   '/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/ausencias': typeof AuthenticatedAusenciasIndexRoute
   '/colaboradores': typeof AuthenticatedColaboradoresIndexRoute
+  '/frota': typeof AuthenticatedFrotaIndexRoute
   '/obras': typeof AuthenticatedObrasIndexRoute
   '/relatorios': typeof AuthenticatedRelatoriosIndexRoute
   '/veiculos': typeof AuthenticatedVeiculosIndexRoute
@@ -673,6 +681,7 @@ export interface FileRoutesById {
   '/_authenticated/veiculos/transporte': typeof AuthenticatedVeiculosTransporteRoute
   '/_authenticated/ausencias/': typeof AuthenticatedAusenciasIndexRoute
   '/_authenticated/colaboradores/': typeof AuthenticatedColaboradoresIndexRoute
+  '/_authenticated/frota/': typeof AuthenticatedFrotaIndexRoute
   '/_authenticated/obras/': typeof AuthenticatedObrasIndexRoute
   '/_authenticated/relatorios/': typeof AuthenticatedRelatoriosIndexRoute
   '/_authenticated/veiculos/': typeof AuthenticatedVeiculosIndexRoute
@@ -744,6 +753,7 @@ export interface FileRouteTypes {
     | '/veiculos/transporte'
     | '/ausencias/'
     | '/colaboradores/'
+    | '/frota/'
     | '/obras/'
     | '/relatorios/'
     | '/veiculos/'
@@ -813,6 +823,7 @@ export interface FileRouteTypes {
     | '/veiculos/transporte'
     | '/ausencias'
     | '/colaboradores'
+    | '/frota'
     | '/obras'
     | '/relatorios'
     | '/veiculos'
@@ -883,6 +894,7 @@ export interface FileRouteTypes {
     | '/_authenticated/veiculos/transporte'
     | '/_authenticated/ausencias/'
     | '/_authenticated/colaboradores/'
+    | '/_authenticated/frota/'
     | '/_authenticated/obras/'
     | '/_authenticated/relatorios/'
     | '/_authenticated/veiculos/'
@@ -1220,6 +1232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFechamentosSuzanoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/frota/': {
+      id: '/_authenticated/frota/'
+      path: '/frota'
+      fullPath: '/frota/'
+      preLoaderRoute: typeof AuthenticatedFrotaIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/frota/custos': {
       id: '/_authenticated/frota/custos'
       path: '/frota/custos'
@@ -1441,6 +1460,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVeiculosTransporteRoute: typeof AuthenticatedVeiculosTransporteRoute
   AuthenticatedAusenciasIndexRoute: typeof AuthenticatedAusenciasIndexRoute
   AuthenticatedColaboradoresIndexRoute: typeof AuthenticatedColaboradoresIndexRoute
+  AuthenticatedFrotaIndexRoute: typeof AuthenticatedFrotaIndexRoute
   AuthenticatedObrasIndexRoute: typeof AuthenticatedObrasIndexRoute
   AuthenticatedRelatoriosIndexRoute: typeof AuthenticatedRelatoriosIndexRoute
   AuthenticatedVeiculosIndexRoute: typeof AuthenticatedVeiculosIndexRoute
@@ -1520,6 +1540,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVeiculosTransporteRoute: AuthenticatedVeiculosTransporteRoute,
   AuthenticatedAusenciasIndexRoute: AuthenticatedAusenciasIndexRoute,
   AuthenticatedColaboradoresIndexRoute: AuthenticatedColaboradoresIndexRoute,
+  AuthenticatedFrotaIndexRoute: AuthenticatedFrotaIndexRoute,
   AuthenticatedObrasIndexRoute: AuthenticatedObrasIndexRoute,
   AuthenticatedRelatoriosIndexRoute: AuthenticatedRelatoriosIndexRoute,
   AuthenticatedVeiculosIndexRoute: AuthenticatedVeiculosIndexRoute,

@@ -126,11 +126,11 @@ const RAW_GROUPS: MenuGroup[] = [
   {
     label: "Veículos",
     icon: Truck,
+    overview: "/frota",
     items: [
       { title: "Abastecimento", url: "/frota/notas", icon: Fuel },
       { title: "Logística", url: "/logistica", icon: Route },
       { title: "Manutenção", url: "/frota/manutencao", icon: Wrench },
-      { title: "Visão Geral", url: "/frota/custos", icon: Gauge },
     ],
   },
   {
