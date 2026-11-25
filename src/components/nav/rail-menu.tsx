@@ -231,7 +231,7 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
         className={cn("rail-menu relative flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[28px] p-[7px] transition-[width,box-shadow] duration-500", ease, GLASS, expanded ? "w-[15.75rem]" : "w-[3.5rem]")}>
         {/* Logo e a pessoa (nome e função na empresa) */}
         <div className={cn("mb-1.5 flex h-11 items-center transition-[padding,gap] duration-300", expanded ? "gap-2.5 pl-0.5 pr-2" : "justify-center gap-0")}>
-          <Link to="/atividades" title="HUB" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-white to-neutral-200 text-[11px] font-semibold text-neutral-700 shadow-sm dark:from-neutral-700 dark:to-neutral-800 dark:text-white">HUB</span></Link>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-white to-neutral-200 text-[11px] font-semibold text-neutral-700 shadow-sm dark:from-neutral-700 dark:to-neutral-800 dark:text-white">HUB</span></span>
           <span className={cn(fade, "min-w-0 leading-tight", !expanded && "hidden")}>
             <span className="block truncate font-display text-sm font-semibold uppercase tracking-wide">AB5 HUB</span>
             <span className="block truncate text-[10.5px] text-muted-foreground">Sistema de Gestão Corporativo</span>

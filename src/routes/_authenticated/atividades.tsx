@@ -329,11 +329,11 @@ function HubOverview() {
                 ) : <p className="py-8 text-center text-xs text-background/70">Nenhum cliente com endereço localizado.</p>}
               </OverviewCard>
             )}
-            <div className="flex flex-col gap-3 lg:min-h-0">
+            <div className="flex flex-col gap-3 lg:grid lg:min-h-0 lg:grid-rows-2">
               {can("/externo/relatorio-diario") && (
-                <OverviewCard title={P.unit === "day" ? "RDOs por dia" : "RDOs por mês (média por dia)"} to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
+                <OverviewCard className="lg:min-h-0" bodyClassName="min-h-0" title={P.unit === "day" ? "RDOs por dia" : "RDOs por mês (média por dia)"} to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
                   hint="Altura = clientes com equipe escalada no mês; cada quadradinho é um cliente com RDO">
-                  <div onClick={(e) => e.preventDefault()}><RdoTiles cols={d.cols} unit={P.unit} /></div>
+                  <div className="h-full min-h-0" onClick={(e) => e.preventDefault()}><RdoTiles fill cols={d.cols} unit={P.unit} /></div>
                 </OverviewCard>
               )}
               {can("/obras/resultado") && (
