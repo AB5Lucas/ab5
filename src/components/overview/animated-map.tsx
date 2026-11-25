@@ -132,13 +132,13 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   const zoomAnim = (f: number) => animateTo(zoomTarget(viewRef.current, f), 450);
   // Aproxima no cliente escolhido na lista (depois do reset de região).
   useEffect(() => {
-    if (!focus) return;
+    if (!focus) { if (viewRef.current.k > 1) animateTo({ x: 0, y: 0, k: 1 }, 700); return; }
     const [fx, fy] = project(focus.lon, focus.lat);
     const k = region !== "BR" ? 5 : 8, vw = W / k, vh = H / k;
     const wait = Math.max(30, 1150 - (performance.now() - regionChangedAt.current));
     const t = setTimeout(() => animateTo({ k, x: Math.min(W - vw, Math.max(0, fx - vw / 2)), y: Math.min(H - vh, Math.max(0, fy - vh / 2)) }, 900), wait);
     return () => clearTimeout(t);
-  }, [focus?.n, project]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focus?.n ?? 0, project]); // eslint-disable-line react-hooks/exhaustive-deps
   const toSvg = (e: { clientX: number; clientY: number }) => {
     const r = svgRef.current!.getBoundingClientRect();
     return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H] as const;

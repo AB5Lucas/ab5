@@ -31,6 +31,7 @@ export function ClientsMap({ clients, className }: { clients: MapClient[]; class
   const [focus, setFocus] = useState<{ lon: number; lat: number; n: number; uf?: string | null } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const pick = (c: MapClient) => {
+    if (selected === c.id) { setSelected(null); setFocus(null); return; }
     const sp = inState("SP", c.lon, c.lat);
     void sp; const uf = ufOf(c.lon, c.lat);
     // SP: mapa de SP; outro estado: Brasil inteiro com as cidades só do estado do cliente.
