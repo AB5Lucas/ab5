@@ -37,7 +37,7 @@ const periodKey = (from: string, to: string) => ["overview", "atividades-period"
 const EXP_SERIES: LineSeries[] = [
   { key: "mo", label: "Mão de obra", stroke: "stroke-foreground", width: 2, area: true },
   { key: "tr", label: "Transporte", stroke: "stroke-muted-foreground", dash: "3 2" },
-  { key: "mat", label: "Materiais + ferramentas", stroke: "stroke-foreground/60", dash: "1 2" },
+  { key: "mat", label: "Materiais + ferramentas", stroke: "stroke-foreground/45", width: 1.5 },
 ];
 
 export const Route = createFileRoute("/_authenticated/atividades")({
@@ -229,8 +229,8 @@ function HubOverview() {
       const k = keyOf(dt); if (costBy.has(k)) { costBy.set(k, costBy.get(k)! + sp.normal + sp.extra); laborBy.set(k, (laborBy.get(k) ?? 0) + sp.normal + sp.extra); }
       const cn = w.clients?.name ?? "—"; const m = moBy.get(cn) ?? { normal: 0, extra: 0 }; m.normal += sp.normal; m.extra += sp.extra; moBy.set(cn, m);
     }
-    // Lançamentos de custo (compras, MO lançada, ferramentas…) vêm quase todos no último dia do mês (competência):
-    // na visão por dia são espalhados igualmente pelos dias do mês no período, senão o gráfico vira um pico no dia 31.
+    // Lançamentos de custo (compras/materiais, MO lançada, ferramentas…) não têm dia real (vêm no último dia do mês, competência):
+    // na visão por dia são rateados igualmente pelos dias do período filtrado daquele mês — viram uma linha contínua.
     const spread = (dt: string): [string, number][] => {
       if (P.unit !== "day") { const k = keyOf(dt); return costBy.has(k) ? [[k, 1]] : []; }
       const days = P.buckets.filter((b) => b.startsWith(dt.slice(0, 7)));
@@ -312,7 +312,7 @@ function HubOverview() {
                       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
                         <span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />MO {brl(t.mo)}</span>
                         <span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-muted-foreground" />Transporte {brl(t.tr)}</span>
-                        <span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dotted border-foreground/60" />Mat. + ferr. {brl(t.mat)}</span>
+                        <span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground/45" />Mat. + ferr. {brl(t.mat)}</span>
                       </div>
                       <MultiLine className="mt-1" height="h-16" data={d.expenses} series={EXP_SERIES} format={brl} />
                     </>
