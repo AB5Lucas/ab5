@@ -288,11 +288,10 @@ function HubOverview() {
                 <div className="mt-3"><HoverBars dark data={d.series.map((s) => ({ label: s.label, value: s.a }))} format={brl} /></div>
               </OverviewCard>
             )}
-            {can("/obras") && (
-              <OverviewCard title="Serviços com equipe" to="/obras" linkLabel="Ver serviços" hint="Serviços com pessoas escaladas no período (por dia no mês; por mês no ano)">
-                <Big value={d.svcCount} />
-                <p className="text-xs text-muted-foreground">serviços com alocação {P.unit === "day" ? "no mês" : "no período"}</p>
-                <div className="mt-3"><LineArea height="h-16" data={d.svcSeries.map((x) => ({ label: x.label, a: x.value }))} format={(x) => `${x.a} serviços`} /></div>
+            {can("/obras/resultado") && (
+              <OverviewCard title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = imposto de 18,5% do faturado + MO das escalações (com encargos e HE) + transporte (km × R$ 1,35) + materiais, ferramentas, terceiros e andaimes lançados no dia">
+                <div className="mb-1 flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Faturado</span><span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-muted-foreground" />Despesas</span></div>
+                <LineArea height="h-24" data={d.billedCost} format={(p) => `Faturado ${brl(p.a)} · Despesas ${brl(p.b ?? 0)}`} />
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
@@ -340,12 +339,9 @@ function HubOverview() {
                 </OverviewCard>
               )}
               {can("/obras/resultado") && (
-                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = imposto de 18,5% do faturado + MO das escalações (com encargos e HE) + transporte (km × R$ 1,35) + materiais, ferramentas, terceiros e andaimes lançados no dia; círculo = faturado de Serviços × Indústria">
+                <OverviewCard className="flex-1" title="MO: horas normais × HE" to="/fechamentos/financeiro" linkLabel="Ver financeiro" hint="Custo de MO das escalações por cliente (HE = acima de 8 h, sábado ×1,6, domingo/feriado ×2); círculo = faturado de Serviços × Indústria">
                   <div className="grid gap-5 md:grid-cols-[1fr_200px]">
-                    <div className="min-w-0">
-                      <div className="mb-1 flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Faturado</span><span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-muted-foreground" />Despesas</span></div>
-                      <LineArea height="h-36" data={d.billedCost} format={(p) => `Faturado ${brl(p.a)} · Despesas ${brl(p.b ?? 0)}`} />
-                    </div>
+                    <div className="min-w-0"><MoBars rows={d.moRows} /></div>
                     <div className="flex flex-col items-center justify-center gap-2 border-t pt-3 md:border-l md:border-t-0 md:pl-4 md:pt-0">
                       <Donut frac={d.cur ? (d.cur - d.ind) / d.cur : 0} center={d.cur ? `${Math.round(((d.cur - d.ind) / d.cur) * 100)}%` : "—"} sub="serviços" size="h-28 w-28" />
                       <div className="w-full space-y-0.5 text-[11px]">
@@ -359,7 +355,7 @@ function HubOverview() {
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 lg:grid-cols-3">
             {can("/obras") && (
               <OverviewCard title={`Clientes que mais faturaram — ${pLabel}`} to="/clientes" linkLabel="Ver clientes">
                 {d.top.length ? <RankBars rows={d.top} format={brl} /> : <p className="py-8 text-center text-xs text-muted-foreground">Nenhuma nota lançada no período.</p>}
@@ -375,11 +371,6 @@ function HubOverview() {
             {can("/obras") && (
               <OverviewCard title="Pessoas no Pátio" to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no período">
                 <div onClick={(e) => e.preventDefault()}><PatioCalendar days={d.patioDays} unit={P.unit} total={d.patioCount} workforce={workforceQ.data ?? 0} /></div>
-              </OverviewCard>
-            )}
-            {can("/obras/resultado") && (
-              <OverviewCard title="MO: horas normais × HE" to="/fechamentos/financeiro" linkLabel="Ver financeiro" hint="Custo de mão de obra das escalações por cliente; HE = acima de 8 h, sábado ×1,6, domingo/feriado ×2">
-                <MoBars rows={d.moRows} />
               </OverviewCard>
             )}
           </div>
