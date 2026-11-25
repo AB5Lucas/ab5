@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useCurrentUser } from "@/hooks/use-auth";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
@@ -15,12 +16,12 @@ import { loadResultShared } from "@/lib/results-engine";
 import { financeBatches, financeList, loadFinanceActive, loadFinanceRaws } from "@/lib/finance-data";
 import { directorSummary } from "@/lib/director-overview";
 
-export const Route = createFileRoute("/_authenticated/atividades")({
+export const Route = createFileRoute("/_authenticated/hub")({
   head: () => ({
     meta: [
-      { title: "Atividades | AB5 Hub" },
+      { title: "HUB | AB5 Hub" },
       { name: "description", content: "Visão geral de faturamento, margem, RDOs e clientes no mapa." },
-      { property: "og:title", content: "Atividades | AB5 Hub" },
+      { property: "og:title", content: "HUB | AB5 Hub" },
       { property: "og:description", content: "Visão geral de faturamento, margem, RDOs e clientes no mapa." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -62,6 +63,15 @@ function periodOf(p: Period, today: Date) {
 
 /** Visão geral do módulo Atividades: cada cartão resume uma página e leva até ela. */
 function AtividadesOverview() {
+  const { role, loading: roleLoading } = useCurrentUser();
+  const nav = useNavigate();
+  const allowed = role === "admin" || role === "coordenador";
+  useEffect(() => { if (!roleLoading && !allowed) nav({ to: "/programacao/diaria", replace: true }); }, [roleLoading, allowed]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (roleLoading || !allowed) return null;
+  return <HubOverview />;
+}
+
+function HubOverview() {
   const { canAccess } = useAccess();
   const scope = useWorkScope();
   const [period, setPeriod] = useState<Period>("mes");
@@ -222,7 +232,7 @@ function AtividadesOverview() {
     <div className={cn("space-y-5 transition-opacity duration-300", (q.isPlaceholderData || raws.isPlaceholderData) && "opacity-70")}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Atividades</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">HUB</h1>
           <p className="text-sm text-muted-foreground">Visão geral de clientes, resultados e relatórios diários. Clique em um quadro para abrir a página.</p>
         </div>
         <div className="flex rounded-full border bg-muted/40 p-0.5 text-xs">

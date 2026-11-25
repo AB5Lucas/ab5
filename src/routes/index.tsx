@@ -27,7 +27,7 @@ function Home() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && session) navigate({ to: "/programacao/diaria", replace: true });
+    if (!loading && session) navigate({ to: "/hub", replace: true });
   }, [loading, session, navigate]);
 
   return (
