@@ -62,3 +62,5 @@
 - [x] Veículos: calendário acima dos quatro indicadores; gráfico orçado × gasto e timeline ao lado, usando o orçamento da frota proporcional por dia.
 - [x] Veículos: seleção de dia com empilhadeiras, troca dos quadros e validação em computador/celular; timeline mostra o dia selecionado (dias testados sem demandas).
 - [x] Resultados: três linhas na ordem solicitada, MO normal × HE e conclusão com marcações; 41 testes, horas reais, edição e celular conferidos.
+
+- [x] Veículos: indicadores no topo, calendário menor, horários permanentes, gráfico anual e remoção das empilhadeiras.
