@@ -5,7 +5,7 @@ import type React from "react";
  */
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, Maximize2, Minimize2 } from "lucide-react";
-import { AnimatedMap, inState } from "./animated-map";
+import { AnimatedMap, inState, ufOf } from "./animated-map";
 
 export type MapClient = { id: string; name: string; lat: number; lon: number; city?: string | null; billed?: number; marginPct?: number | null; active?: boolean };
 
@@ -28,13 +28,13 @@ export function ClientsMap({ clients, className }: { clients: MapClient[]; class
   const themeCls = useInvertedTheme();
   const base = all ? clients : clients.filter((c) => c.active);
   const list = region === "SP" ? base.filter((c) => inState("SP", c.lon, c.lat)) : base;
-  const [focus, setFocus] = useState<{ lon: number; lat: number; n: number } | null>(null);
+  const [focus, setFocus] = useState<{ lon: number; lat: number; n: number; uf?: string | null } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const pick = (c: MapClient) => {
     const sp = inState("SP", c.lon, c.lat);
     if (!sp && region === "SP") setRegion("BR");
     if (sp && region === "BR") setRegion("SP");
-    setSelected(c.id); setFocus((f) => ({ lon: c.lon, lat: c.lat, n: (f?.n ?? 0) + 1 }));
+    setSelected(c.id); setFocus((f) => ({ lon: c.lon, lat: c.lat, n: (f?.n ?? 0) + 1, uf: ufOf(c.lon, c.lat) }));
   };
   const listed = [...base].sort((a, b) => (b.billed ?? 0) - (a.billed ?? 0) || a.name.localeCompare(b.name));
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });

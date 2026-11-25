@@ -142,7 +142,7 @@ function AtividadesOverview() {
     const top = [...byClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value }));
 
     // RDOs: clientes com atividade (MO escalada) no mês = índice máximo; preenchido = clientes com RDO no dia (ou média por dia útil no mês).
-    const clientOf = (wid: string) => { const w = workBy.get(wid); return w && w.client_id && !isInternalClient(w.clients?.name ?? "") ? w.client_id as string : null; };
+    const clientOf = (wid: string) => { const w = workBy.get(wid); return w && w.client_id && !/^(adm|comercial)$/i.test(String(w.clients?.name ?? "").trim()) ? w.client_id as string : null; };
     const activeIds = new Set<string>(byClientId.keys());
     const activeByMonth = new Map<string, Set<string>>(), activeByDay = new Map<string, Set<string>>();
     for (const a of q.data.allocs) {

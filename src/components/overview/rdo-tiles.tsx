@@ -41,7 +41,7 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
                     : fromBottom < f ? "bg-foreground"
                     : fromBottom < f + dr ? "bg-foreground/45"
                     : "border border-dashed border-border bg-muted/40";
-                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", unit === "month" ? "h-6" : "h-5", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
+                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", "h-5", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
                 })}
                 <span className="mt-1 text-center text-[10px] tabular-nums text-muted-foreground">{ci % step === 0 || ci === i ? col.label : "\u00a0"}</span>
               </button>

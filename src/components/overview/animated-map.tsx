@@ -1,7 +1,7 @@
 import type React from "react";
 /**
  * Mapa animado (Atividades): o contorno é desenhado, o mapa se inclina em 3D e os clientes surgem em sequência.
- * SP mostra também o contorno das cidades (IBGE, public/geo/sp-cities.json). Roda do mouse / botões = zoom; arrastar = mover.
+ * Contorno das cidades por UF (IBGE via geodata-br, public/geo/<uf>-cities.json): SP sempre; outra UF ao escolher um cliente dela. Roda do mouse / botões = zoom; arrastar = mover.
  * Desenho próprio, sem API de mapas.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -22,13 +22,20 @@ export function inState(uf: string, lon: number, lat: number) {
 }
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-let citiesCache: Promise<number[][][]> | null = null;
-const loadCities = () => (citiesCache ??= fetch("/geo/sp-cities.json").then((r) => r.json()).catch(() => []));
+const citiesCache = new Map<string, Promise<number[][][]>>();
+/** Contorno das cidades de uma UF (public/geo/<uf>-cities.json), carregado sob demanda. */
+const loadCities = (uf: string) => {
+  const k = uf.toLowerCase();
+  if (!citiesCache.has(k)) citiesCache.set(k, fetch(`/geo/${k}-cities.json`).then((r) => (r.ok ? r.json() : [])).catch(() => []));
+  return citiesCache.get(k)!;
+};
+/** UF do ponto pelo contorno dos estados. */
+export function ufOf(lon: number, lat: number) { return Object.keys(STATES).find((uf) => inState(uf, lon, lat)) ?? null; }
 
-export function AnimatedMap({ clients, region, className, extra, focus, selected }: { clients: MapClient[]; region: "SP" | "BR"; className?: string; extra?: React.ReactNode; focus?: { lon: number; lat: number; n: number } | null; selected?: string | null }) {
+export function AnimatedMap({ clients, region, className, extra, focus, selected }: { clients: MapClient[]; region: "SP" | "BR"; className?: string; extra?: React.ReactNode; focus?: { lon: number; lat: number; n: number; uf?: string | null } | null; selected?: string | null }) {
   const [run, setRun] = useState(0);
   const [hover, setHover] = useState<MapClient | null>(null);
-  const [cities, setCities] = useState<number[][][]>([]);
+  const [citiesBy, setCitiesBy] = useState<Record<string, number[][][]>>({});
   const boxRef = useRef<HTMLDivElement>(null);
   const [ratio, setRatio] = useState(region === "SP" ? 0.62 : 0.9);
   useEffect(() => {
@@ -62,7 +69,15 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   const prevRegion = useRef(region);
   const regionChangedAt = useRef(0);
   useEffect(() => { setView({ x: 0, y: 0, k: 1 }); }, [run]);
-  useEffect(() => { if (region === "SP" || view.k >= 2) void loadCities().then(setCities); }, [region, view.k >= 2]); // eslint-disable-line react-hooks/exhaustive-deps
+  const showUfs = useMemo(() => {
+    const set = new Set<string>();
+    if (region === "SP" || view.k >= 2) set.add("SP");
+    if (focus?.uf) set.add(focus.uf);
+    return [...set];
+  }, [region, view.k >= 2, focus?.uf]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    for (const uf of showUfs) if (!citiesBy[uf]) void loadCities(uf).then((rings) => setCitiesBy((m) => ({ ...m, [uf]: rings })));
+  }, [showUfs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { paths, project } = useMemo(() => {
     const keys = region === "SP" ? ["SP"] : Object.keys(STATES);
@@ -93,9 +108,10 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     animateTo({ x: 0, y: 0, k: 1 }, 1100);
   }, [region]); // eslint-disable-line react-hooks/exhaustive-deps
   const cityPath = useMemo(() => {
-    if (!cities.length || (region !== "SP" && view.k < 2)) return "";
+    const cities = showUfs.flatMap((uf) => (region === "SP" && uf !== "SP" ? [] : citiesBy[uf] ?? []));
+    if (!cities.length) return "";
     return cities.map((r) => "M" + r.map((p) => project(p[0]!, p[1]!).map((v) => v.toFixed(1)).join(",")).join("L") + "Z").join("");
-  }, [cities, project, region, view.k >= 2]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [citiesBy, showUfs, project, region]);
 
   const max = Math.max(1, ...clients.map((c) => c.billed ?? 0));
   const pts = clients.map((c) => ({ c, xy: project(c.lon, c.lat), r: (region === "SP" ? 4 : 3) + Math.sqrt((c.billed ?? 0) / max) * (region === "SP" ? 8 : 6) }))
