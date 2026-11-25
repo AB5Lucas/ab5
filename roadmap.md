@@ -56,3 +56,4 @@
 - [x] Atividades: troca de filtro sem tela branca
 - [x] RDOs: legendas só na lateral
 - [x] Mapa acompanha modo claro/escuro
+- [x] Margem por cliente na ordem do faturamento

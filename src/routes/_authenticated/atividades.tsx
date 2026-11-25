@@ -103,7 +103,7 @@ function AtividadesOverview() {
     const s = directorSummary(fList, raws.data, P.yms, holidays.data ?? [], fWorks.data ?? []);
     const months = s.months.filter((m) => m.pct != null);
     const avg = months.length ? months.reduce((a, m) => a + m.pct!, 0) / months.length : null;
-    return { avg, months: s.months, clients: (s.clients ?? []).filter((c: any) => c.comp > 0 && c.pct != null).sort((a: any, b: any) => b.pct - a.pct) };
+    return { avg, months: s.months, clients: (s.clients ?? []).filter((c: any) => c.comp > 0 && c.pct != null).sort((a: any, b: any) => b.comp - a.comp) };
   }, [raws.data, fList, P.yms, holidays.data, fWorks.data]);
 
   const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
