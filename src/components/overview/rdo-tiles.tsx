@@ -49,12 +49,6 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
             );
           })}
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">1 quadradinho = {per} {per === 1 ? "cliente" : "clientes"}{unit === "month" ? " (média por dia)" : ""}</p>
-        <div className="mt-2 flex flex-wrap gap-4 text-[11px] text-muted-foreground">
-          <Legend cls="bg-foreground" label="Finalizado" />
-          <Legend cls="bg-foreground/45" label="Rascunho" />
-          <Legend cls="border border-dashed border-border bg-muted/40" label="Sem RDO (clientes ativos no mês)" />
-        </div>
       </div>
       {c && (
         <div className="flex w-full flex-col rounded-xl border bg-muted/30 p-3 md:w-48 md:p-2.5">
@@ -66,7 +60,7 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
             <Row cls="bg-foreground/45" label="Rascunho" v={draft} pct={pct(draft)} />
             <Row cls="border border-dashed border-border bg-muted/40" label="Sem RDO" v={Math.max(0, exp - fin - draft)} pct={pct(Math.max(0, exp - fin - draft))} />
           </div>
-          <p className="mt-auto pt-3 text-[11px] text-muted-foreground">{c0 ? `${c.max} clientes com equipe no mês` : "Clique num dia para ver só ele"}</p>
+          <p className="mt-auto pt-3 text-[11px] text-muted-foreground">{c0 ? `${c.max} clientes com equipe no mês` : "Clique num dia para ver só ele"}<br />1 quadradinho = {per} {per === 1 ? "cliente" : "clientes"}{unit === "month" ? " (média por dia)" : ""}</p>
         </div>
       )}
     </div>
