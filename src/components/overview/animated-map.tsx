@@ -32,6 +32,12 @@ const loadCities = (uf: string) => {
 /** UF do ponto pelo contorno dos estados. */
 export function ufOf(lon: number, lat: number) { return Object.keys(STATES).find((uf) => inState(uf, lon, lat)) ?? null; }
 
+/** Tempo da troca de região (Brasil ↔ estado), em ms; o Brasil espera REGION_WAIT antes de afastar. */
+export const REGION_MS = 1900;
+export const REGION_WAIT = 350;
+/** Tempo para o Brasil desenhar a silhueta de todos os estados antes de entrar em outro estado (clients-map). */
+export const BR_DRAW_MS = 2900;
+
 export function AnimatedMap({ clients, region, className, extra, focus, selected, onPick }: { onPick?: (c: MapClient) => void; clients: MapClient[]; region: string; /** "BR" ou a UF */ className?: string; extra?: React.ReactNode; focus?: { lon: number; lat: number; n: number; uf?: string | null } | null; selected?: string | null }) {
   const [run, setRun] = useState(0);
   // Inclinação 3D só no mapa inteiro: com zoom o mapa fica plano (o navegador desenha a camada inclinada em baixa resolução).
@@ -53,10 +59,11 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   // Animação da câmera (viewBox): zoom, foco e troca SP ↔ Brasil.
   const anim = useRef<number | null>(null);
   const viewRef = useRef(view); viewRef.current = view;
-  const animateTo = (t: { x: number; y: number; k: number }, ms = 800) => {
+  const animateTo = (t: { x: number; y: number; k: number }, ms = 800, smooth = false) => {
     if (anim.current) cancelAnimationFrame(anim.current);
     const f = viewRef.current, t0 = performance.now();
-    const ease = (u: number) => 1 - Math.pow(1 - u, 3);
+    // smooth: começa e termina devagar (troca de região); padrão: só desacelera no fim.
+    const ease = smooth ? (u: number) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2) : (u: number) => 1 - Math.pow(1 - u, 3);
     const step = (now: number) => {
       const u = Math.min(1, (now - t0) / ms), e = ease(u);
       const k = Math.exp(Math.log(f.k) + (Math.log(t.k) - Math.log(f.k)) * e);
@@ -108,7 +115,11 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     // começa enquadrando a região anterior na projeção nova e anima até a região toda
     const from = fitBox(region === "BR" ? [prev] : Object.keys(STATES));
     viewRef.current = from; setView(from);
-    animateTo({ x: 0, y: 0, k: 1 }, 1100);
+    // Devagar, a pedido: indo para o Brasil, espera as silhuetas dos estados começarem a aparecer e afasta com suavidade;
+    // entrando num estado, aproxima com suavidade. REGION_WAIT + REGION_MS também atrasa os pontos e o foco no cliente.
+    const wait = region === "BR" ? REGION_WAIT : 0;
+    const t = window.setTimeout(() => animateTo({ x: 0, y: 0, k: 1 }, REGION_MS, true), wait);
+    return () => window.clearTimeout(t);
   }, [region]); // eslint-disable-line react-hooks/exhaustive-deps
   const cityPath = useMemo(() => {
     const cities = showUfs.flatMap((uf) => (region !== "BR" && uf !== region ? [] : citiesBy[uf] ?? []));
@@ -132,11 +143,11 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   const zoomAnim = (f: number) => animateTo(zoomTarget(viewRef.current, f), 450);
   // Aproxima no cliente escolhido na lista (depois do reset de região).
   useEffect(() => {
-    if (!focus) { if (viewRef.current.k > 1) animateTo({ x: 0, y: 0, k: 1 }, 700); return; }
+    if (!focus) { if (viewRef.current.k > 1) animateTo({ x: 0, y: 0, k: 1 }, 1400, true); return; }
     const [fx, fy] = project(focus.lon, focus.lat);
     const k = region !== "BR" ? 5 : 8, vw = W / k, vh = H / k;
-    const wait = Math.max(30, 1150 - (performance.now() - regionChangedAt.current));
-    const t = setTimeout(() => animateTo({ k, x: Math.min(W - vw, Math.max(0, fx - vw / 2)), y: Math.min(H - vh, Math.max(0, fy - vh / 2)) }, 900), wait);
+    const wait = Math.max(30, REGION_WAIT + REGION_MS + 50 - (performance.now() - regionChangedAt.current));
+    const t = setTimeout(() => animateTo({ k, x: Math.min(W - vw, Math.max(0, fx - vw / 2)), y: Math.min(H - vh, Math.max(0, fy - vh / 2)) }, 1400, true), wait);
     return () => clearTimeout(t);
   }, [focus?.n ?? 0, project]); // eslint-disable-line react-hooks/exhaustive-deps
   const toSvg = (e: { clientX: number; clientY: number }) => {
@@ -173,7 +184,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
           {pts.map((p, i) => (
             <g key={p.c.id} className="amap-pin"
               onMouseEnter={() => setHover(p.c)} onMouseLeave={() => setHover(null)}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPick?.(p.c); }} style={{ animationDelay: `${(regionChangedAt.current ? 1100 : 2600) + i * 40}ms`, cursor: onPick ? "pointer" : undefined }}>
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPick?.(p.c); }} style={{ animationDelay: `${(regionChangedAt.current ? REGION_WAIT + REGION_MS : 2600) + i * 40}ms`, cursor: onPick ? "pointer" : undefined }}>
               <circle cx={p.xy[0]} cy={p.xy[1]} r={(p.r + 10) * inv} fill="transparent" />
               <circle cx={p.xy[0]} cy={p.xy[1]} r={p.r * inv} className={hover?.id === p.c.id || selected === p.c.id ? "fill-primary stroke-background" : "fill-foreground stroke-background"} strokeWidth={1 * inv} fillOpacity={0.88} />
             </g>

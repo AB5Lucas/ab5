@@ -158,6 +158,51 @@ export function LineArea({ data, format, height = "h-44", className }: { data: {
   );
 }
 
+/** Linhas do mesmo desenho do LineArea, com várias séries (ex.: despesas por tipo). O quadro só aparece no mouse. */
+export type LineSeries = { key: string; label: string; stroke: string; dash?: string; width?: number; area?: boolean };
+export function MultiLine({ data, series, format, height = "h-20", className }: {
+  data: { label: string; tip?: string; values: Record<string, number> }[]; series: LineSeries[]; format: (v: number) => string; height?: string; className?: string;
+}) {
+  const id = useId().replace(/:/g, "");
+  const [hover, setHover] = useState<number | null>(null);
+  const max = Math.max(1, ...data.flatMap((d) => series.map((s) => d.values[s.key] ?? 0)));
+  const n = Math.max(1, data.length - 1);
+  const pt = (i: number, v: number) => [(i / n) * 100, 46 - (v / max) * 42] as const;
+  const path = (key: string) => data.map((d, i) => {
+    const [x, y] = pt(i, d.values[key] ?? 0);
+    if (!i) return `M ${x} ${y}`;
+    const [px, py] = pt(i - 1, data[i - 1]!.values[key] ?? 0);
+    const cx = (px + x) / 2;
+    return `C ${cx} ${py}, ${cx} ${y}, ${x} ${y}`;
+  }).join(" ");
+  const sx = hover != null ? pt(hover, 0)[0] : 0;
+  return (
+    <div className={cn("relative", className)}>
+      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className={cn(height, "w-full overflow-visible")}
+        onMouseMove={(e) => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); setHover(Math.max(0, Math.min(n, Math.round(((e.clientX - r.left) / r.width) * n)))); }}
+        onMouseLeave={() => setHover(null)}>
+        <defs>
+          <linearGradient id={`m${id}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="var(--color-foreground)" stopOpacity="0.16" />
+            <stop offset="1" stopColor="var(--color-foreground)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {series.filter((s) => s.area).map((s) => <path key={`a${s.key}`} d={`${path(s.key)} L 100 50 L 0 50 Z`} fill={`url(#m${id})`} className="ov-fade" />)}
+        {series.map((s) => <path key={s.key} d={path(s.key)} fill="none" className={cn("ov-fade", s.stroke)} strokeWidth={s.width ?? 1.5} strokeDasharray={s.dash} vectorEffect="non-scaling-stroke" />)}
+        {hover != null && <line x1={sx} x2={sx} y1={0} y2={50} className="stroke-border" strokeWidth="1" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />}
+      </svg>
+      {hover != null && data[hover] && (
+        <div className="pointer-events-none absolute top-0 z-10 rounded-lg border bg-popover px-2 py-1 text-[11px] text-popover-foreground shadow-md"
+          style={{ left: `clamp(0px, calc(${sx}% - 80px), calc(100% - 160px))`, width: 160 }}>
+          <p className="font-medium">{data[hover]!.tip ?? data[hover]!.label}</p>
+          {series.map((s) => <p key={s.key} className="flex justify-between gap-2 tabular-nums text-muted-foreground"><span>{s.label}</span><span>{format(data[hover]!.values[s.key] ?? 0)}</span></p>)}
+        </div>
+      )}
+      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground"><span>{data[0]?.label}</span><span>{data[data.length - 1]?.label}</span></div>
+    </div>
+  );
+}
+
 /** Barras horizontais (ranking), com valor à direita. */
 export function RankBars({ rows, format }: { rows: { label: string; value: number }[]; format: (v: number) => string }) {
   const max = Math.max(1, ...rows.map((r) => r.value));

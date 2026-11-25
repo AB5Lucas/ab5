@@ -1226,6 +1226,13 @@
       "when": 1795463096217,
       "tag": "0187_client_location",
       "breakpoints": true
+    },
+    {
+      "idx": 175,
+      "version": "7",
+      "when": 1795603471536,
+      "tag": "0188_overview_period_data",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,7 @@ import type React from "react";
  */
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, Maximize2, Minimize2 } from "lucide-react";
-import { AnimatedMap, inState, ufOf } from "./animated-map";
+import { AnimatedMap, BR_DRAW_MS, inState, ufOf } from "./animated-map";
 
 export type MapClient = { id: string; name: string; lat: number; lon: number; city?: string | null; billed?: number; marginPct?: number | null; active?: boolean };
 
@@ -38,7 +38,7 @@ export function ClientsMap({ clients, className, fill }: { clients: MapClient[];
     const target = uf || "SP";
     const go = () => { setRegion(target); setSelected(c.id); setFocus((f) => ({ lon: c.lon, lat: c.lat, n: (f?.n ?? 0) + 1, uf })); };
     // Troca de estado: abre o Brasil inteiro e depois entra só no estado do cliente.
-    if (target !== region && region !== "BR") { setRegion("BR"); setSelected(c.id); window.setTimeout(go, 900); }
+    if (target !== region && region !== "BR") { setRegion("BR"); setSelected(c.id); window.setTimeout(go, BR_DRAW_MS); }
     else go();
   };
   const listed = [...base].sort((a, b) => (b.billed ?? 0) - (a.billed ?? 0) || a.name.localeCompare(b.name));
