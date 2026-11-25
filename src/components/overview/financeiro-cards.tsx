@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkScope } from "@/hooks/use-work-scope";
-import { Big, MarginLine, OverviewCard } from "@/components/overview/charts";
+import { Big, Donut, MarginLine, OverviewCard } from "@/components/overview/charts";
 import { loadResultShared } from "@/lib/results-engine";
 import { financeBatches, financeList, loadFinanceActive, loadFinanceRaws } from "@/lib/finance-data";
 import { directorSummary } from "@/lib/director-overview";
@@ -54,6 +54,27 @@ export function MarginCard({ period }: { period: { from: string; unit: "day" | "
             : margin.months.filter((m) => m.pct != null).map((m) => ({ label: `${MONTHS[Number(m.ym.slice(5, 7)) - 1]}/${m.ym.slice(2, 4)}`, pct: m.pct! }))} /></div>
         </>
       ) : <div className="h-16 animate-pulse rounded-lg bg-muted" />}
+    </OverviewCard>
+  );
+}
+
+/**
+ * Saldo a faturar (saiu da visão geral de Atividades em 25/11, guardado para o dashboard do Financeiro).
+ * ordered = pedidos dos serviços ativos com data até `to` (sem data = sempre); openBalance = ordered − faturado até `to`
+ * (conta em atividades.tsx, bloco "Saldo a faturar no fim do período").
+ */
+export function OpenBalanceCard({ ordered, openBalance, to }: { ordered: number; openBalance: number; to: string }) {
+  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  return (
+    <OverviewCard title="Saldo a faturar" to="/obras/resultado" linkLabel="Ver Resultados" hint="Pedidos dos serviços ativos com data até o fim do período menos o faturado neles até essa data">
+      <div className="grid grid-cols-2 items-center gap-3">
+        <div className="min-w-0">
+          <Big value={brl(openBalance)} />
+          <p className="text-xs text-muted-foreground">de {brl(ordered)} em pedidos até {to.slice(8, 10)}/{to.slice(5, 7)}/{to.slice(0, 4)}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Faturado: {brl(ordered - openBalance)}</p>
+        </div>
+        <Donut frac={ordered ? (ordered - openBalance) / ordered : 0} center={ordered ? `${Math.round(((ordered - openBalance) / ordered) * 100)}%` : "—"} sub="faturado" size="h-28 w-28" />
+      </div>
     </OverviewCard>
   );
 }

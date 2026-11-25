@@ -122,6 +122,7 @@ function HubOverview() {
   const q = { data: worksQ.data && billingQ.data && peopleQ.data && holQ.data && periodQ.data
     ? { works: worksQ.data, billing: billingQ.data, people: peopleQ.data, hol: holQ.data, ...periodQ.data } : undefined };
 
+  const clientsQ = useQuery({ queryKey: ["overview", "clients"], staleTime: STATIC, queryFn: async () => (await supabase.from("clients").select("id, name").eq("active", true)).data ?? [] });
   const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
 
   const d = useMemo(() => {
@@ -326,15 +327,22 @@ function HubOverview() {
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
-              <OverviewCard title="Saldo a faturar" to="/obras/resultado" linkLabel="Ver Resultados" hint="Pedidos dos serviços ativos com data até o fim do período menos o faturado neles até essa data">
-                <div className="grid grid-cols-2 items-center gap-3">
-                  <div className="min-w-0">
-                    <Big value={brl(d.openBalance)} />
-                    <p className="text-xs text-muted-foreground">de {brl(d.ordered)} em pedidos até {P.to.slice(8, 10)}/{P.to.slice(5, 7)}/{P.to.slice(0, 4)}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">Faturado: {brl(d.ordered - d.openBalance)}</p>
-                  </div>
-                  <Donut frac={d.ordered ? (d.ordered - d.openBalance) / d.ordered : 0} center={d.ordered ? `${Math.round(((d.ordered - d.openBalance) / d.ordered) * 100)}%` : "—"} sub="faturado" size="h-28 w-28" />
-                </div>
+              <OverviewCard title={`Clientes atendidos — ${pLabel}`} to="/clientes" linkLabel="Ver Clientes" hint="Clientes com equipe escalada, RDO ou faturamento no período, em relação a todos os clientes ativos do cadastro (sem ADM, Comercial, Pátio e Indústria)">
+                {(() => {
+                  const all = (clientsQ.data ?? []).filter((c: any) => scope.allowClient(c.id) && !isInternalClient(c.name ?? ""));
+                  const served = all.filter((c: any) => d.activeIds.has(c.id)).length;
+                  const total = all.length;
+                  return (
+                    <div className="grid grid-cols-2 items-center gap-3">
+                      <div className="min-w-0">
+                        <Big value={served} />
+                        <p className="text-xs text-muted-foreground">de {total} clientes no cadastro</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">Sem atividade: {Math.max(0, total - served)}</p>
+                      </div>
+                      <Donut frac={total ? served / total : 0} center={total ? `${Math.round((served / total) * 100)}%` : "—"} sub="atendidos" size="h-28 w-28" />
+                    </div>
+                  );
+                })()}
               </OverviewCard>
             )}
           </div>
