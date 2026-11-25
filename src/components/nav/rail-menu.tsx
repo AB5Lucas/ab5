@@ -267,12 +267,12 @@ function DesktopRail({ modules, adminItems, current, currentMod, badges }: {
                   </button>
                   <div className={cn("grid transition-[grid-template-rows,opacity] duration-500", ease, isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
                     <div className="min-h-0 overflow-hidden">
-                      <div className="ml-6 mt-0.5 space-y-px py-0.5 pl-2">
+                      <div className="ml-2 mt-0.5 space-y-px py-0.5 pl-1">
                         {g.items.map((i) => {
                           const b = badges[i.url];
                           return (
                             <Link key={i.url} to={i.to ?? i.url}
-                              className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] transition-colors duration-300", current === i.url ? "bg-white/90 font-semibold text-foreground shadow-sm dark:bg-white/15" : "text-foreground/70 hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10")}>
+                              className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-sm transition-colors duration-300", current === i.url ? "bg-white/90 font-semibold text-foreground shadow-sm dark:bg-white/15" : "text-foreground/70 hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10")}>
                               <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", b ? dotClass(b.tone) : "bg-foreground/25")} />
                               <span className="truncate">{i.title}</span>
                               {b && <span className="ml-auto text-[10.5px] text-muted-foreground">{b.label ?? b.count}</span>}
