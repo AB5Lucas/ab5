@@ -57,3 +57,5 @@
 - [x] RDOs: legendas só na lateral
 - [x] Mapa acompanha modo claro/escuro
 - [x] Margem por cliente na ordem do faturamento
+- [x] Resultados: preservar modelo anterior e aplicar layout monocromático de Atividades.
+- [x] Resultados: skeleton, transições suaves e verificação com dados reais em computador e celular; edição, troca de período e 21 testes conferidos.

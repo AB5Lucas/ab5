@@ -8,10 +8,10 @@ const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toLocaleString("pt-BR
 export function MonthBarsChart({ data }: { data: any[] }) {
   return (
     <ResponsiveContainer>
-      <BarChart data={data} margin={{ left: 20 }}>
+      <BarChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
         <CartesianGrid vertical={false} className="stroke-border" />
         <XAxis dataKey="label" fontSize={11} />
-        <YAxis fontSize={11} tickFormatter={(v: number) => brl(v)} width={100} />
+        <YAxis fontSize={11} tickFormatter={(v: number) => brl(v)} width={88} />
         <Tooltip
           content={({ active, payload, label }: any) => {
             if (!active || !payload?.length) return null;
@@ -25,7 +25,7 @@ export function MonthBarsChart({ data }: { data: any[] }) {
                   <p>Faturamento: {brl(p.faturamento)}</p>
                 ) : (
                   payload.map((it: any) => (
-                    <p key={it.dataKey} style={{ color: it.color }}>
+                    <p key={it.dataKey} className="text-popover-foreground">
                       {it.name}: {brl(Number(it.value ?? 0))}
                     </p>
                   ))
@@ -34,10 +34,10 @@ export function MonthBarsChart({ data }: { data: any[] }) {
             );
           }}
         />
-        <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
-        <Bar dataKey="mo" name="R$ Total MO" fill="var(--chart-blue)" />
-        <Bar dataKey="materiais" name="R$ Total Materiais" fill="var(--muted-foreground)" />
-        <Bar dataKey="transporte" name="R$ Total Transporte" fill="var(--foreground)" />
+        <Legend layout="horizontal" align="center" verticalAlign="bottom" wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
+        <Bar animationDuration={650} radius={[2, 2, 0, 0]} dataKey="mo" name="R$ Total MO" fill="var(--foreground)" />
+        <Bar animationDuration={650} radius={[2, 2, 0, 0]} dataKey="materiais" name="R$ Total Materiais" fill="var(--muted-foreground)" fillOpacity={0.5} />
+        <Bar animationDuration={650} radius={[2, 2, 0, 0]} dataKey="transporte" name="R$ Total Transporte" fill="var(--foreground)" fillOpacity={0.3} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -50,12 +50,12 @@ export function ItemBarsChart({ data }: { data: any[] }) {
       <BarChart data={data} layout="vertical" margin={{ right: 48 }} barGap={2}>
         <XAxis type="number" hide />
         <YAxis type="category" dataKey="label" width={80} fontSize={11} axisLine={false} tickLine={false} />
-        <Tooltip formatter={(v: number) => brl(v)} />
+        <Tooltip content={({ active, payload, label }: any) => active && payload?.length ? <div className="rounded-lg border bg-popover p-3 text-xs text-popover-foreground shadow-sm"><p className="mb-2 font-semibold">{label}</p>{payload.map((it: any) => <p key={it.dataKey}>{it.name}: {brl(Number(it.value ?? 0))}</p>)}</div> : null} />
         <Legend wrapperStyle={{ fontSize: 13 }} formatter={(v) => <span className="text-foreground">{v}</span>} />
-        <Bar dataKey="real" name="Custo Realizado" fill="var(--chart-blue)">
+        <Bar animationDuration={650} radius={[2, 2, 0, 0]} dataKey="real" name="Custo Realizado" fill="var(--foreground)">
           <LabelList dataKey="used" position="right" fontSize={11} className="fill-foreground" formatter={(v: number) => pct(Math.round(v))} />
         </Bar>
-        <Bar dataKey="budget" name="Custo Orçado" fill="var(--chart-2)" />
+        <Bar animationDuration={650} radius={[2, 2, 0, 0]} dataKey="budget" name="Custo Orçado" fill="var(--muted-foreground)" />
       </BarChart>
     </ResponsiveContainer>
   );
