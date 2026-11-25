@@ -46,7 +46,7 @@ export function ClientsMap({ clients, className }: { clients: MapClient[]; class
   return (
     <div className={`${themeCls} grid gap-3 text-foreground md:grid-cols-[1fr_240px]`}><div className="relative">
       <AnimatedMap clients={list} region={region} className={className ?? "h-[340px] w-full rounded-xl border"} extra={<>
-        <button type="button" className={btn} title={region !== "BR" ? "Expandir (Brasil)" : "Voltar para SP"} onClick={(e) => { stop(e); setRegion((r) => (r !== "BR" ? "BR" : "SP")); }}>
+        <button type="button" className={btn} title={region !== "BR" ? "Expandir (Brasil)" : "Voltar para SP"} onClick={(e) => { stop(e); setSelected(null); setFocus(null); setRegion((r) => (r !== "BR" ? "BR" : "SP")); }}>
           {region !== "BR" ? <Maximize2 className="h-3.5 w-3.5" /> : <Minimize2 className="h-3.5 w-3.5" />}
         </button>
         <button type="button" className={btn} title={all ? "Mostrar só clientes com atividade no período" : "Mostrar todos os clientes"} aria-pressed={all} onClick={(e) => { stop(e); setAll((v) => !v); }}>

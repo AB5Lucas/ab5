@@ -75,7 +75,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   const showUfs = useMemo(() => {
     const set = new Set<string>();
     if (region !== "BR") set.add(region);
-    else if (focus?.uf) set.add(focus.uf);
+    
     return [...set];
   }, [region, view.k >= 2, focus?.uf]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
