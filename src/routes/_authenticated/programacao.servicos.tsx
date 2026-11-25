@@ -46,6 +46,11 @@ async function fetchDayAbsences(date: string) {
 }
 
 export const Route = createFileRoute("/_authenticated/programacao/servicos")({
+  // ?client=<id>&date=AAAA-MM-DD abre direto no cliente e no dia (ex.: clique nas Escalações do Planejamento).
+  validateSearch: (s: Record<string, unknown>) => ({
+    client: typeof s["client"] === "string" ? (s["client"] as string) : undefined,
+    date: typeof s["date"] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s["date"] as string) ? (s["date"] as string) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Serviços do dia | AB5 Hub" },
@@ -67,7 +72,8 @@ function ServicesPage() {
   // Admin/programador veem todos os clientes; demais só os atribuídos em Usuários
   const canWrite = role === "admin" || role === "programmer";
   const qc = useQueryClient();
-  const [date, setDate] = useState(todayISO());
+  const urlSearch = Route.useSearch();
+  const [date, setDate] = useState(urlSearch.date ?? todayISO());
   const distribution = useServiceDistribution(date);
   useEffect(() => {
     qc.setQueryData(SERVICE_BADGE_DATE, date);
@@ -78,8 +84,8 @@ function ServicesPage() {
   useEffect(() => {
     if (dateInit || userLoading) return;
     setDateInit(true);
-    if (isForeman) setDate(addDays(todayISO(), 1));
-  }, [dateInit, userLoading, isForeman]);
+    if (isForeman && !urlSearch.date) setDate(addDays(todayISO(), 1));
+  }, [dateInit, userLoading, isForeman]); // eslint-disable-line react-hooks/exhaustive-deps
   const [clientId, setClientId] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -132,7 +138,7 @@ function ServicesPage() {
     if (!clients.data) return;
     if (clientId && clients.data.some((c) => c.id === clientId)) return;
     if (!clients.data.length) { if (clientId) setClientId(""); return; }
-    const saved = typeof window !== "undefined" ? window.localStorage.getItem(SAVED_CLIENT) : null;
+    const saved = urlSearch.client ?? (typeof window !== "undefined" ? window.localStorage.getItem(SAVED_CLIENT) : null);
     setClientId(clients.data.some((c) => c.id === saved) ? saved! : clients.data[0]!.id);
   }, [clients.data, clientId]);
 

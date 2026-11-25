@@ -2,9 +2,10 @@
  * Pessoas no Pátio em calendário (Atividades): cada dia (ou mês) mostra quantas pessoas estavam no Pátio,
  * com o tom mais forte quanto mais gente; resumo ao lado com o total do período e a parte do efetivo.
  */
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export type PatioDay = { key: string; label: string; title: string; value: number };
+export type PatioDay = { key: string; label: string; title: string; value: number; names?: string[] };
 
 const WD = ["S", "T", "Q", "Q", "S", "S", "D"];
 
@@ -27,6 +28,12 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
   const withPeople = days.filter((d) => d.value > 0);
   const avg = withPeople.length ? Math.round(withPeople.reduce((a, d) => a + d.value, 0) / withPeople.length) : 0;
   const peak = withPeople.reduce<PatioDay | null>((a, d) => (!a || d.value > a.value ? d : a), null);
+  // Clicar num dia (com nomes) abre a lista das pessoas no lugar do resumo; clicar de novo no mesmo dia fecha.
+  const [pickKey, setPickKey] = useState<string | null>(null);
+  const pick = days.find((d) => d.key === pickKey && d.names) ?? null;
+  const lastPick = useRef<PatioDay | null>(null);
+  if (pick) lastPick.current = pick;
+  const view = pick ?? lastPick.current; // conteúdo fica durante a animação de saída
   return (
     <div className={cn("flex flex-col md:flex-row", compact ? "gap-4" : "gap-5")}>
       <div className="min-w-0 flex-1">
@@ -34,8 +41,11 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
           {unit === "day" && WD.map((w, i) => <span key={i} className={cn("pb-0.5 text-center text-[10px] font-medium", mut)}>{w}</span>)}
           {Array.from({ length: lead }, (_, i) => <span key={`l${i}`} />)}
           {days.map((d, i) => (
-            <div key={d.key} title={`${d.title}: ${d.value} ${d.value === 1 ? "pessoa" : "pessoas"}`}
-              className={cn("ov-grow mx-auto flex aspect-square w-full flex-col items-center justify-center rounded-full", compact ? "max-w-[1.2rem] text-[9px]" : big ? "max-w-[2.9rem] text-sm" : "max-w-7 text-[11px]", " font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max, dark))}
+            <div key={d.key} title={`${d.title}: ${d.value} ${d.value === 1 ? "pessoa" : "pessoas"}${d.names?.length ? " · clique para ver" : ""}`}
+              role={d.names?.length ? "button" : undefined} tabIndex={d.names?.length ? 0 : undefined}
+              onClick={d.names?.length ? (e) => { e.preventDefault(); e.stopPropagation(); setPickKey((k) => (k === d.key ? null : d.key)); } : undefined}
+              className={cn("ov-grow mx-auto flex aspect-square w-full flex-col items-center justify-center rounded-full", compact ? "max-w-[1.2rem] text-[9px]" : big ? "max-w-[2.9rem] text-sm" : "max-w-7 text-[11px]", " font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max, dark),
+                d.names?.length && "cursor-pointer", pickKey === d.key && (dark ? "scale-110 ring-2 ring-background ring-offset-2 ring-offset-foreground" : "scale-110 ring-2 ring-foreground ring-offset-2"))}
               style={{ animationDelay: `${i * 18}ms` }}>
               {d.value || d.label}
             </div>
@@ -49,7 +59,8 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
         </div>
       </div>
       {dark ? (
-        <div className={cn("flex w-full flex-col border-t border-background/20 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0", compact ? "gap-2 md:w-48" : big ? "justify-center gap-4 md:w-64" : "gap-3 md:w-48")}>
+        <div className={cn("relative w-full border-t border-background/20 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0", compact ? "md:w-48" : big ? "md:w-64" : "md:w-48")}>
+        <div className={cn("flex h-full w-full flex-col transition-all duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]", compact ? "gap-2" : big ? "justify-center gap-4" : "gap-3", pick ? "pointer-events-none -translate-x-4 opacity-0" : "translate-x-0 opacity-100")}>
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider text-background/60">{unit === "day" ? "No mês" : "No período"}</p>
             <p className={cn("font-display font-semibold leading-tight tabular-nums", compact ? "text-2xl" : big ? "text-5xl" : "text-3xl")}>{total}</p>
@@ -62,6 +73,22 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
           </div>
           <div className={cn("flex justify-between", big ? "text-sm" : "text-xs")}><span className="text-background/60">Média por dia</span><b className="tabular-nums">{avg}</b></div>
           <div className={cn("flex justify-between", big ? "text-sm" : "text-xs")}><span className="text-background/60">Pico</span><b className="tabular-nums">{peak ? `${peak.value} · ${peak.title}` : "—"}</b></div>
+        </div>
+          {/* Pessoas do dia escolhido: entram no lugar do resumo. */}
+          <div className={cn("absolute inset-0 flex flex-col pt-3 transition-all duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] md:left-5 md:pt-0", pick ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0")}>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-background/60">{view?.title}</p>
+            <p className="font-display text-2xl font-semibold leading-tight tabular-nums">{view?.value ?? 0} <span className="text-sm font-normal text-background/60">{view?.value === 1 ? "pessoa no Pátio" : "pessoas no Pátio"}</span></p>
+            <ul className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 text-xs">
+              {(view?.names ?? []).map((n, i) => (
+                <li key={`${view?.key}-${n}-${i}`} className="flex items-center gap-2 rounded-md bg-background/10 px-2 py-1"
+                  style={{ transition: "opacity 400ms, transform 400ms", transitionDelay: `${150 + Math.min(i, 20) * 25}ms`, opacity: pick ? 1 : 0, transform: pick ? "none" : "translateX(8px)" }}>
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-background/20 text-[9px] font-semibold">{n.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("")}</span>
+                  <span className="truncate">{n}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-[10px] text-background/50">Clique no dia de novo para voltar ao resumo.</p>
+          </div>
         </div>
       ) : (
       <SummaryPanel>

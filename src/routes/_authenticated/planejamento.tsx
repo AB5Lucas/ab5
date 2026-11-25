@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,8 +8,6 @@ import { Big, Donut, HoverBars, OverviewCard } from "@/components/overview/chart
 import { PatioCalendar } from "@/components/overview/patio-calendar";
 import { CountUp } from "@/components/count-up";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/planejamento")({
   head: () => ({ meta: [{ title: "Planejamento | AB5 Hub" }, { name: "description", content: "Visão geral da programação: escalações, ausências, transporte e Pátio." }] }),
@@ -61,6 +59,7 @@ function PlanejamentoOverview() {
 function Overview() {
   const today = todayIso();
   const [period, setPeriod] = useState<Period>("hoje");
+  const nav = useNavigate();
   const R = rangeOf(period, today);
   const single = R.from === R.to;
   // Mês do calendário do Pátio e das barras: o mês do início do período.
@@ -128,21 +127,22 @@ function Overview() {
     const rangeDays = daysBetween(R.from, R.to);
     const withPpl = rangeDays.map((x) => ppl.get(x)?.size ?? 0).filter((v) => v > 0);
     const avg = withPpl.length ? Math.round(withPpl.reduce((a, v) => a + v, 0) / withPpl.length) : 0;
-    const patioDays = daysBetween(mFrom, mTo).map((x) => ({ key: x, label: String(Number(x.slice(8, 10))), title: brDay(x), value: patio.get(x)!.size }));
+    const patioDays = daysBetween(mFrom, mTo).map((x) => ({ key: x, label: String(Number(x.slice(8, 10))), title: brDay(x), value: patio.get(x)!.size,
+      names: [...patio.get(x)!].map((id) => person.get(id) ?? "—").sort((a, b) => a.localeCompare(b, "pt-BR")) }));
     // Escalações do período por cliente e serviço.
-    type G = { people: Set<string>; pd: number; works: Map<string, Set<string>>; pend: Set<string>; days: Set<string> };
+    type G = { clientId: string | null; people: Set<string>; pd: number; works: Map<string, Set<string>>; pend: Set<string>; days: Set<string> };
     const byClient = new Map<string, G>();
     const inRange = allocQ.data.filter((a: any) => dateOf(a) >= R.from && dateOf(a) <= R.to);
     for (const a of inRange) {
       const c = clientOf(a.work_id);
-      const g = byClient.get(c) ?? { people: new Set(), pd: 0, works: new Map(), pend: new Set(), days: new Set() };
+      const g = byClient.get(c) ?? { clientId: a.work_id ? work.get(a.work_id)?.client_id ?? null : null, people: new Set(), pd: 0, works: new Map(), pend: new Set(), days: new Set() };
       g.people.add(a.collaborator_id); g.pd++; g.days.add(dateOf(a));
       if (a.service_assigned) { const s = g.works.get(a.work_id) ?? new Set<string>(); s.add(a.collaborator_id); g.works.set(a.work_id, s); }
       else g.pend.add(a.collaborator_id);
       byClient.set(c, g);
     }
     const clients = [...byClient.entries()].map(([name, g]) => ({
-      name, people: g.people.size, personDays: g.pd, days: g.days.size, pend: g.pend.size,
+      name, clientId: g.clientId, people: g.people.size, personDays: g.pd, days: g.days.size, pend: g.pend.size,
       works: [...g.works.entries()].map(([wid, s]) => ({ name: work.get(wid)?.name ?? "—", n: s.size })).sort((a, b) => b.n - a.n),
     })).sort((a, b) => b.people - a.people);
     const people = new Set(inRange.map((a: any) => a.collaborator_id)).size;
@@ -273,7 +273,10 @@ function Overview() {
             hint="Pessoas escaladas por cliente no período" className="shrink-0 xl:h-[13.25rem]" bodyClassName="min-h-0 overflow-hidden">
             {!d.clients.length ? <p className="py-10 text-center text-xs text-muted-foreground">Sem escalações no período.</p> : (
               <div className="grid h-full grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:auto-cols-fr xl:grid-flow-col xl:grid-cols-none xl:grid-rows-1 xl:overflow-hidden">
-                {d.clients.slice(0, 8).map((c) => <ClientTile key={c.name} c={c} single={single} />)}
+                {d.clients.slice(0, 8).map((c) => (
+                  <ClientTile key={c.name} c={c} single={single}
+                    onOpen={c.clientId ? () => void nav({ to: "/programacao/servicos", search: { client: c.clientId!, date: single ? R.from : today } }) : undefined} />
+                ))}
               </div>
             )}
           </OverviewCard>
@@ -283,11 +286,14 @@ function Overview() {
   );
 }
 
-type ClientRow = { name: string; people: number; personDays: number; days: number; pend: number; works: { name: string; n: number }[] };
+type ClientRow = { name: string; clientId: string | null; people: number; personDays: number; days: number; pend: number; works: { name: string; n: number }[] };
 /** Quadro de um cliente na faixa de Escalações: pessoas, distribuição, serviços com quantas pessoas cada. */
-function ClientTile({ c, single }: { c: ClientRow; single: boolean }) {
+function ClientTile({ c, single, onOpen }: { c: ClientRow; single: boolean; onOpen?: (() => void) | undefined }) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-col justify-between gap-1.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5">
+    <div role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} title={onOpen ? `Abrir ${c.name} na aba Serviços` : undefined}
+      onClick={onOpen ? (e) => { e.preventDefault(); e.stopPropagation(); onOpen(); } : undefined}
+      onKeyDown={onOpen ? (e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onOpen(); } } : undefined}
+      className={cn("flex min-h-0 min-w-0 flex-col justify-between gap-1.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5 transition-colors", onOpen && "cursor-pointer hover:border-foreground/40 hover:bg-muted")}>
       <span className="truncate text-[11px] font-semibold tracking-wide" title={c.name}>{c.name}</span>
       <span className="flex items-baseline gap-1">
         <span className="font-display text-3xl font-semibold leading-none tabular-nums"><CountUp value={c.people} /></span>
@@ -338,13 +344,17 @@ const toneFill = (tone: number, side = false) =>
 
 /**
  * Ausências em pizza (folgas, férias, atestados, faltas). Clicar numa fatia: a pizza encolhe para o canto, as outras
- * fatias somem e a lista das pessoas entra; "Voltar" faz o caminho inverso.
+ * fatias somem e a lista das pessoas entra; clicar de novo na fatia (pizza pequena) faz o caminho inverso.
  */
 function AbsencePie({ total, parts }: { total: number; parts: AbsPart[] }) {
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const sum = parts.reduce((a, p) => a + p.n, 0);
   const cur = parts.find((p) => p.key === sel) ?? null;
+  // Mantém o conteúdo da última fatia enquanto a lista sai (animação de volta).
+  const lastRef = useRef<AbsPart | null>(null);
+  if (cur) lastRef.current = cur;
+  const view = cur ?? lastRef.current;
   let acc = 0;
   const slices = parts.filter((p) => p.n > 0).map((p) => {
     const i = parts.indexOf(p);
@@ -357,7 +367,8 @@ function AbsencePie({ total, parts }: { total: number; parts: AbsPart[] }) {
       {/* Pizza: no centro com a legenda; com fatia escolhida, encolhe para o canto de cima. */}
       <div className={cn("absolute flex items-center gap-4 transition-all duration-700 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
         "left-0 top-0", cur ? "h-16 w-16" : "h-full w-full")}>
-        <div className={cn("relative aspect-[100/82] shrink-0 transition-all duration-700", cur ? "h-14 max-w-16" : "h-full max-w-[60%]")}>
+        <div className={cn("relative aspect-[100/82] shrink-0 transition-all duration-700", cur ? "h-14 max-w-16 cursor-pointer" : "h-full max-w-[60%]")}
+          title={cur ? "Clique para voltar à pizza" : undefined} onClick={cur ? (e) => { stop(e); setSel(null); } : undefined}>
           {!sum ? (
             <div className="flex h-full items-center justify-center rounded-full border border-dashed text-xs text-muted-foreground">Ninguém fora</div>
           ) : (
@@ -402,13 +413,12 @@ function AbsencePie({ total, parts }: { total: number; parts: AbsPart[] }) {
         cur ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-8 opacity-0")}>
         <div className="flex h-16 items-center gap-3 pl-20">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{cur?.label}</p>
-            <p className="text-xs text-muted-foreground">{cur?.n} {cur?.n === 1 ? "pessoa" : "pessoas"}{sum ? ` · ${Math.round(((cur?.n ?? 0) / sum) * 100)}%` : ""}</p>
+            <p className="text-sm font-semibold">{view?.label}</p>
+            <p className="text-xs text-muted-foreground">{view?.n} {view?.n === 1 ? "pessoa" : "pessoas"}{sum ? ` · ${Math.round(((view?.n ?? 0) / sum) * 100)}%` : ""} · clique na fatia para voltar</p>
           </div>
-          <Button size="sm" variant="outline" onClick={(e) => { stop(e); setSel(null); }}><ArrowLeft className="h-3.5 w-3.5" /> Voltar</Button>
         </div>
         <ul className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 text-xs">
-          {(cur?.names ?? []).map((n, i) => (
+          {(view?.names ?? []).map((n, i) => (
             <li key={`${n}-${i}`} className="flex items-center gap-2 rounded-md border border-border/60 px-2 py-1"
               style={{ transition: "opacity 400ms, transform 400ms", transitionDelay: cur ? `${200 + Math.min(i, 20) * 25}ms` : "0ms", opacity: cur ? 1 : 0, transform: cur ? "none" : "translateY(6px)" }}>
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-semibold">{n.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("")}</span>
