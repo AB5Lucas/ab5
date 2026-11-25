@@ -117,7 +117,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   }, [citiesBy, showUfs, project, region]);
 
   const max = Math.max(1, ...clients.map((c) => c.billed ?? 0));
-  const pts = clients.map((c) => ({ c, xy: project(c.lon, c.lat), r: (region !== "BR" ? 4 : 3) + Math.sqrt((c.billed ?? 0) / max) * (region !== "BR" ? 8 : 6) }))
+  const pts = clients.map((c) => ({ c, xy: project(c.lon, c.lat), r: (region !== "BR" ? 3 : 2.2) + Math.sqrt((c.billed ?? 0) / max) * (region !== "BR" ? 5.5 : 4) }))
     .filter((p) => p.xy[0] > -50 && p.xy[0] < W + 50 && p.xy[1] > -50 && p.xy[1] < H + 50)
     .sort((a, b) => b.r - a.r); // menores por cima, mais fáceis de pegar
 
@@ -175,7 +175,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
               onMouseEnter={() => setHover(p.c)} onMouseLeave={() => setHover(null)}
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPick?.(p.c); }} style={{ animationDelay: `${(regionChangedAt.current ? 1100 : 2600) + i * 40}ms`, cursor: onPick ? "pointer" : undefined }}>
               <circle cx={p.xy[0]} cy={p.xy[1]} r={(p.r + 10) * inv} fill="transparent" />
-              <circle cx={p.xy[0]} cy={p.xy[1]} r={p.r * inv} className={hover?.id === p.c.id || selected === p.c.id ? "fill-primary stroke-background" : "fill-foreground stroke-background"} strokeWidth={2.5 * inv} fillOpacity={0.88} />
+              <circle cx={p.xy[0]} cy={p.xy[1]} r={p.r * inv} className={hover?.id === p.c.id || selected === p.c.id ? "fill-primary stroke-background" : "fill-foreground stroke-background"} strokeWidth={1 * inv} fillOpacity={0.88} />
             </g>
           ))}
         </svg>
