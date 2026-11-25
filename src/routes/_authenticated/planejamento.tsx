@@ -196,7 +196,7 @@ function Overview() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />)}</div>
       ) : (
         <>
-          <div className="grid shrink-0 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-[13.25rem_13.25rem]">
+          <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
             <OverviewCard dark title={single ? `Pessoas escaladas — ${pLabel}` : `Pessoas escaladas por dia — ${pLabel}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas alocadas nos clientes na Programação" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
               <Big dark value={single ? d.people : d.avg} />
               <p className="text-xs text-background/60">{single ? `${pLabel} · média do mês ${Math.round(d.series.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.series.filter((s) => s.value).length))}` : `média por dia · ${d.people} pessoas diferentes`}</p>
@@ -259,15 +259,15 @@ function Overview() {
               })()}
             </OverviewCard>
             <OverviewCard dark title={`Pessoas no Pátio — ${month}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no mês" className="min-h-0 md:col-span-2" bodyClassName="min-h-0 overflow-hidden">
-              <div onClick={(e) => e.preventDefault()}><PatioCalendar dark compact days={d.patioDays} unit="day" total={d.patioCount} workforce={d.workforce} /></div>
+              <div onClick={(e) => e.preventDefault()}><PatioCalendar dark days={d.patioDays} unit="day" total={d.patioCount} workforce={d.workforce} /></div>
             </OverviewCard>
             <OverviewCard title={`Serviços com equipe — ${pLabel}`} to="/programacao/servicos" linkLabel="Abrir Serviços" hint="Serviços com gente distribuída no período, por cliente" className="min-h-0 xl:col-start-4" bodyClassName="min-h-0 overflow-hidden">
               <div className="flex items-baseline gap-2"><Big value={d.worksCount} /><span className="text-xs text-muted-foreground">de {d.activeWorks} serviços ativos</span></div>
-              <ClientBars rows={d.worksByClient} empty="Nenhum serviço com equipe." limit={5} />
+              <ClientBars rows={d.worksByClient} empty="Nenhum serviço com equipe." limit={10} />
             </OverviewCard>
           </div>
           <OverviewCard title={`Escalações — ${pLabel} · ${d.clients.length} clientes · ${d.worksCount} serviços · ${d.people} pessoas`} to="/programacao/diaria" linkLabel="Abrir Programação"
-            hint="Pessoas escaladas por cliente e serviço no período" className="min-h-[20rem] xl:min-h-0 xl:flex-1" bodyClassName="min-h-0 overflow-hidden">
+            hint="Pessoas escaladas por cliente no período" className="shrink-0 xl:h-[13.25rem]" bodyClassName="min-h-0 overflow-hidden">
             {!d.clients.length ? <p className="py-10 text-center text-xs text-muted-foreground">Sem escalações no período.</p> : (
               <div className="grid h-full grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:auto-cols-fr xl:grid-flow-col xl:grid-cols-none xl:grid-rows-1 xl:overflow-hidden">
                 {d.clients.slice(0, 8).map((c) => <ClientTile key={c.name} c={c} single={single} />)}
@@ -283,10 +283,8 @@ function Overview() {
 type ClientRow = { name: string; people: number; personDays: number; days: number; pend: number; works: { name: string; n: number }[] };
 /** Quadro de um cliente na faixa de Escalações: pessoas, distribuição, serviços com quantas pessoas cada. */
 function ClientTile({ c, single }: { c: ClientRow; single: boolean }) {
-  const max = Math.max(1, ...c.works.map((w) => w.n));
-  const shown = c.works.slice(0, 6);
   return (
-    <div className="flex min-h-0 min-w-0 flex-col gap-1.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5">
+    <div className="flex min-h-0 min-w-0 flex-col justify-between gap-1.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5">
       <span className="truncate text-[11px] font-semibold tracking-wide" title={c.name}>{c.name}</span>
       <span className="flex items-baseline gap-1">
         <span className="font-display text-3xl font-semibold leading-none tabular-nums"><CountUp value={c.people} /></span>
@@ -299,16 +297,6 @@ function ClientTile({ c, single }: { c: ClientRow; single: boolean }) {
         <span>{c.works.length} {c.works.length === 1 ? "serviço" : "serviços"}</span>
         <span className={cn("truncate", c.pend > 0 && "font-medium text-foreground")}>{c.pend ? `${c.pend} sem serviço` : "distribuído"}</span>
       </span>
-      <div className="mt-0.5 min-h-0 flex-1 space-y-1 overflow-hidden border-t border-border/70 pt-1.5">
-        {!shown.length && <p className="text-[10.5px] text-muted-foreground">Ainda sem serviço distribuído.</p>}
-        {shown.map((w) => (
-          <div key={w.name} title={`${w.name}: ${w.n} ${w.n === 1 ? "pessoa" : "pessoas"}`}>
-            <div className="flex justify-between gap-2 text-[10.5px]"><span className="truncate">{w.name}</span><span className="tabular-nums text-muted-foreground">{w.n}</span></div>
-            <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-background"><div className="ov-grow h-full rounded-full bg-foreground/70" style={{ width: `${(w.n / max) * 100}%` }} /></div>
-          </div>
-        ))}
-        {c.works.length > shown.length && <p className="text-[10px] text-muted-foreground">+{c.works.length - shown.length} serviços</p>}
-      </div>
     </div>
   );
 }

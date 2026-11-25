@@ -1247,6 +1247,13 @@
       "when": 1795603850083,
       "tag": "0190_purchase_recommendation",
       "breakpoints": true
+    },
+    {
+      "idx": 178,
+      "version": "7",
+      "when": 1795603851083,
+      "tag": "0191_purchase_notify_item_bought",
+      "breakpoints": true
     }
   ]
 }
