@@ -227,6 +227,8 @@ const nn = (v: string) => (v.trim() === "" ? null : v.trim());
 const ref = (v: string) => (v === NONE ? null : v);
 
 const SALARY_GROUPS = ["diretoria / administrador", "rh / pessoal"];
+/** Pessoas que editam colaboradores sem ver o salário (o salário continua borrado e não é gravado por elas): Yasmin Corrêa. */
+const EDIT_WITHOUT_SALARY = ["e0dd725d-5e41-405a-95e7-e38c891bedec"];
 
 function CollaboratorsPage() {
   const { canWrite: canWriteRole, role, user } = useCurrentUser();
@@ -244,7 +246,7 @@ function CollaboratorsPage() {
   });
   const canSeeSalary = role === "admin" || SALARY_GROUPS.includes((myGroup.data ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
   // Editar/incluir/importar/excluir só quem pode ver o salário; os demais só consultam (sem o salário).
-  const canWrite = canWriteRole && canSeeSalary;
+  const canWrite = canWriteRole && (canSeeSalary || EDIT_WITHOUT_SALARY.includes(user?.id ?? ""));
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string[]>(["active"]);
