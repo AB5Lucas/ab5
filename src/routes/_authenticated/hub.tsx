@@ -236,7 +236,7 @@ function HubOverview() {
     for (const v of q.data.vs ?? []) { if (v.is_maintenance) continue; const k = keyOf(String(v.schedule_date).slice(0, 10)); if (costBy.has(k)) costBy.set(k, costBy.get(k)! + ((Number(v.km) || 0) * 2 * (Number(v.trips) || 1) + (Number(v.extra_km) || 0)) * KM_RATE); }
     // Imposto de 18,5% sobre todo o faturado do dia.
     for (const b of P.buckets) costBy.set(b, costBy.get(b)! + (byBucket.get(b) ?? 0) * FIN_TAX);
-    const moRows = [...moBy.entries()].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.normal + b.extra - a.normal - a.extra).slice(0, 7);
+    const moRows = [...moBy.entries()].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.normal + b.extra - a.normal - a.extra);
     let ind = 0;
     for (const [n, v] of byClient) if (/^industria$/i.test(n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim())) ind += v;
     return {
@@ -289,12 +289,6 @@ function HubOverview() {
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
-              <OverviewCard title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = imposto de 18,5% do faturado + MO das escalações (com encargos e HE) + transporte (km × R$ 1,35) + materiais, ferramentas, terceiros e andaimes lançados no dia">
-                <div className="mb-1 flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Faturado</span><span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-muted-foreground" />Despesas</span></div>
-                <LineArea height="h-24" data={d.billedCost} format={(p) => `Faturado ${brl(p.a)} · Despesas ${brl(p.b ?? 0)}`} />
-              </OverviewCard>
-            )}
-            {can("/obras/resultado") && (
               <OverviewCard title="Margem média dos serviços por mês" to="/fechamentos/financeiro" linkLabel="Ver financeiro" hint="Média da margem de contribuição de cada mês do período (mesma conta do Financeiro)">
                 {margin ? (
                   <>
@@ -305,6 +299,11 @@ function HubOverview() {
                       : margin.months.filter((m) => m.pct != null).map((m) => ({ label: `${monthLabel(m.ym)}/${m.ym.slice(2, 4)}`, pct: m.pct! }))} /></div>
                   </>
                 ) : <div className="h-16 animate-pulse rounded-lg bg-muted" />}
+              </OverviewCard>
+            )}
+            {can("/obras/resultado") && (
+              <OverviewCard title="MO: horas normais × HE" to="/fechamentos/financeiro" linkLabel="Ver financeiro" hint="Custo de MO das escalações por cliente (HE = acima de 8 h, sábado ×1,6, domingo/feriado ×2)">
+                <MoBars rows={d.moRows} limit={4} />
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
@@ -339,14 +338,17 @@ function HubOverview() {
                 </OverviewCard>
               )}
               {can("/obras/resultado") && (
-                <OverviewCard className="flex-1" title="MO: horas normais × HE" to="/fechamentos/financeiro" linkLabel="Ver financeiro" hint="Custo de MO das escalações por cliente (HE = acima de 8 h, sábado ×1,6, domingo/feriado ×2); círculo = faturado de Serviços × Indústria">
+                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = imposto de 18,5% do faturado + MO das escalações (com encargos e HE) + transporte (km × R$ 1,35) + materiais, ferramentas, terceiros e andaimes lançados no dia; pizza = faturado de Serviços × Indústria">
                   <div className="grid gap-5 md:grid-cols-[1fr_200px]">
-                    <div className="min-w-0"><MoBars rows={d.moRows} /></div>
-                    <div className="flex flex-col items-center justify-center gap-2 border-t pt-3 md:border-l md:border-t-0 md:pl-4 md:pt-0">
-                      <Donut frac={d.cur ? (d.cur - d.ind) / d.cur : 0} center={d.cur ? `${Math.round(((d.cur - d.ind) / d.cur) * 100)}%` : "—"} sub="serviços" size="h-28 w-28" />
+                    <div className="min-w-0">
+                      <div className="mb-1 flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Faturado</span><span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-muted-foreground" />Despesas</span></div>
+                      <LineArea height="h-52" data={d.billedCost} format={(p) => `Faturado ${brl(p.a)} · Despesas ${brl(p.b ?? 0)}`} />
+                    </div>
+                    <div className="flex flex-col items-center justify-center gap-3 border-t pt-3 md:border-l md:border-t-0 md:pl-4 md:pt-0">
+                      <Pie frac={d.cur ? (d.cur - d.ind) / d.cur : 0} />
                       <div className="w-full space-y-0.5 text-[11px]">
                         <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-foreground" />Serviços</span><span className="tabular-nums font-medium">{brl(d.cur - d.ind)}</span></div>
-                        <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-muted" />Indústria</span><span className="tabular-nums font-medium">{brl(d.ind)}</span></div>
+                        <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-foreground/25" />Indústria</span><span className="tabular-nums font-medium">{brl(d.ind)}</span></div>
                       </div>
                     </div>
                   </div>
@@ -381,7 +383,7 @@ function HubOverview() {
 }
 
 
-function MoBars({ rows }: { rows: { label: string; normal: number; extra: number }[] }) {
+function MoBars({ rows, limit = 99 }: { rows: { label: string; normal: number; extra: number }[]; limit?: number }) {
   const max = Math.max(1, ...rows.map((r) => r.normal + r.extra));
   const tot = rows.reduce((a, r) => ({ n: a.n + r.normal, x: a.x + r.extra }), { n: 0, x: 0 });
   if (!rows.length) return <p className="py-8 text-center text-xs text-muted-foreground">Sem escalações no período.</p>;
@@ -391,7 +393,7 @@ function MoBars({ rows }: { rows: { label: string; normal: number; extra: number
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-foreground" />Normais {brl(tot.n)}</span>
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-foreground/35" />HE {brl(tot.x)}</span>
       </div>
-      {rows.map((r) => (
+      {rows.slice(0, limit).map((r) => (
         <div key={r.label} title={`${r.label}: normais ${brl(r.normal)} · HE ${brl(r.extra)}`}>
           <div className="flex justify-between text-[11px]"><span className="truncate">{r.label}</span><span className="tabular-nums text-muted-foreground">{brl(r.normal + r.extra)}</span></div>
           <div className="mt-0.5 flex h-2 overflow-hidden rounded-full bg-muted" style={{ width: `${((r.normal + r.extra) / max) * 100}%` }}>
@@ -401,5 +403,21 @@ function MoBars({ rows }: { rows: { label: string; normal: number; extra: number
         </div>
       ))}
     </div>
+  );
+}
+
+function Pie({ frac }: { frac: number }) {
+  const f = Math.max(0, Math.min(1, frac)), a = f * 2 * Math.PI;
+  const x = 50 + 46 * Math.sin(a), y = 50 - 46 * Math.cos(a);
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  const mid = (t: number) => [50 + 26 * Math.sin(t), 50 - 26 * Math.cos(t)] as const;
+  const [sx, sy] = mid(a / 2), [ix, iy] = mid(a + (2 * Math.PI - a) / 2);
+  return (
+    <svg viewBox="0 0 100 100" className="ov-fade h-32 w-32">
+      <circle cx="50" cy="50" r="46" className="fill-foreground/25" />
+      {f >= 1 ? <circle cx="50" cy="50" r="46" className="fill-foreground" /> : f > 0 && <path d={`M50 50 L50 4 A46 46 0 ${f > 0.5 ? 1 : 0} 1 ${x} ${y} Z`} className="fill-foreground stroke-background" strokeWidth="1.5" />}
+      {f > 0.08 && <text x={sx} y={sy} textAnchor="middle" dominantBaseline="middle" className="fill-background text-[9px] font-semibold">{pct(f)}</text>}
+      {f < 0.92 && <text x={ix} y={iy} textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-[9px] font-semibold">{pct(1 - f)}</text>}
+    </svg>
   );
 }
