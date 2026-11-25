@@ -12,7 +12,7 @@ export type TileCol = { key: string; label: string; title: string; max: number; 
 export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month" }) {
   const [sel, setSel] = useState<number | null>(null);
   const top = Math.max(1, ...cols.map((c) => c.max));
-  const per = 2; // clientes por quadradinho (fixo)
+  const per: number = 2; // clientes por quadradinho (fixo)
   const rows = Math.ceil(top / per);
   const i = sel ?? -1;
   const c0 = cols[i];
