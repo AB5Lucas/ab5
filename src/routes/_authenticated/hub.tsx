@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { laborSplit } from "@/lib/hub-labor";
+import { FIN_TAX } from "@/lib/finance-data";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
@@ -13,7 +14,7 @@ import { RdoTiles, type TileCol } from "@/components/overview/rdo-tiles";
 import { cn } from "@/lib/utils";
 import { ClientsMap } from "@/components/overview/clients-map";
 import { isInternalClient } from "@/lib/fleet-budget";
-import { loadResultShared } from "@/lib/results-engine";
+import { KM_RATE, loadResultShared } from "@/lib/results-engine";
 import { financeBatches, financeList, loadFinanceActive, loadFinanceRaws } from "@/lib/finance-data";
 import { directorSummary } from "@/lib/director-overview";
 
@@ -80,11 +81,11 @@ function HubOverview() {
   const P = useMemo(() => periodOf(period, today), [period, isoOf(today)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const q = useQuery({
-    queryKey: ["overview", "hub", P.from, P.to], placeholderData: keepPreviousData,
+    queryKey: ["overview", "hub2", P.from, P.to], placeholderData: keepPreviousData,
     staleTime: 2 * 60_000,
     refetchInterval: 5 * 60_000,
     queryFn: async () => {
-      const [works, billing, rdos, allocs, wf, costs, people, hol] = await Promise.all([
+      const [works, billing, rdos, allocs, wf, costs, people, vs, hol] = await Promise.all([
         fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, status, active, order_value, orders, clients(name)").order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id, entry_date, amount").eq("category", "faturamento").eq("sync_cancelled", false).order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("rdos").select("id, work_id, client_id, report_date, status").gte("report_date", P.from).lte("report_date", P.to).order("id").range(a, b)),
@@ -93,9 +94,10 @@ function HubOverview() {
         fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("id, collaborator_id, work_id, report_date, worked_hours").gte("report_date", P.from).lte("report_date", P.to).order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("work_entries").select("id, work_id, entry_date, amount, category").in("category", ["mao_obra", "terceiros", "materiais", "ferramentas", "andaimes"]).gte("entry_date", P.from).lte("entry_date", P.to).order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, contract_type").order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("id, schedule_date, km, trips, extra_km, is_maintenance").gte("schedule_date", P.from).lte("schedule_date", P.to).order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("holidays").select("id, date").order("id").range(a, b)),
       ]);
-      return { works, billing, rdos, allocs, wf, costs, people, hol };
+      return { works, billing, rdos, allocs, wf, costs, people, vs, hol };
     },
   });
 
@@ -230,6 +232,10 @@ function HubOverview() {
       const cn = w.clients?.name ?? "—"; const m = moBy.get(cn) ?? { normal: 0, extra: 0 }; m.normal += sp.normal; m.extra += sp.extra; moBy.set(cn, m);
     }
     for (const e of q.data.costs ?? []) { if (!workBy.has(e.work_id)) continue; const k = keyOf(String(e.entry_date).slice(0, 10)); if (costBy.has(k)) costBy.set(k, costBy.get(k)! + (Number(e.amount) || 0)); }
+    // Transporte próprio: km rodado × R$ 1,35 (principal = km × 2 × viagens; extras = extra_km); manutenção não conta.
+    for (const v of q.data.vs ?? []) { if (v.is_maintenance) continue; const k = keyOf(String(v.schedule_date).slice(0, 10)); if (costBy.has(k)) costBy.set(k, costBy.get(k)! + ((Number(v.km) || 0) * 2 * (Number(v.trips) || 1) + (Number(v.extra_km) || 0)) * KM_RATE); }
+    // Imposto de 18,5% sobre todo o faturado do dia.
+    for (const b of P.buckets) costBy.set(b, costBy.get(b)! + (byBucket.get(b) ?? 0) * FIN_TAX);
     const moRows = [...moBy.entries()].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.normal + b.extra - a.normal - a.extra).slice(0, 7);
     let ind = 0;
     for (const [n, v] of byClient) if (/^industria$/i.test(n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim())) ind += v;
@@ -334,7 +340,7 @@ function HubOverview() {
                 </OverviewCard>
               )}
               {can("/obras/resultado") && (
-                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = MO das escalações (valor hora × encargos, com HE) + lançamentos de custo do dia; círculo = faturado de Serviços × Indústria">
+                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = imposto de 18,5% do faturado + MO das escalações (com encargos e HE) + transporte (km × R$ 1,35) + materiais, ferramentas, terceiros e andaimes lançados no dia; círculo = faturado de Serviços × Indústria">
                   <div className="grid gap-5 md:grid-cols-[1fr_200px]">
                     <div className="min-w-0">
                       <div className="mb-1 flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Faturado</span><span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-muted-foreground" />Despesas</span></div>
