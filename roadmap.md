@@ -64,3 +64,5 @@
 - [x] Resultados: três linhas na ordem solicitada, MO normal × HE e conclusão com marcações; 41 testes, horas reais, edição e celular conferidos.
 
 - [x] Veículos: indicadores no topo, calendário menor, horários permanentes, gráfico anual e remoção das empilhadeiras.
+
+- [x] Veículos: ranking em altura total, gráfico escuro à esquerda, calendário claro abaixo, Logística central e remoção do anual.

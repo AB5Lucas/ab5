@@ -117,13 +117,6 @@ function Overview({ canCost }: { canCost: boolean }) {
       return { list, addr: new Map(addrs.map((a) => [a.id, a.name])) };
     },
   });
-  const year = ym.slice(0, 4);
-  const annualQ = useQuery({
-    queryKey: ["overview", "fleet-maintenance-year", year], staleTime: STATIC,
-    queryFn: () => fetchAll<{ schedule_date: string; maintenance_kind: string | null }>((a, b) => supabase.from("vehicle_schedules")
-      .select("schedule_date, maintenance_kind").eq("is_maintenance", true)
-      .gte("schedule_date", `${year}-01-01`).lte("schedule_date", `${year}-12-31`).order("id").range(a, b)),
-  });
   const rank = useDriverRanking({ from: R.from, to: R.to });
 
   const d = useMemo(() => {
@@ -223,8 +216,7 @@ function Overview({ canCost }: { canCost: boolean }) {
       {!d ? (
         <DashboardSkeleton />
       ) : (
-        <div className="fleet-dashboard-layout flex min-h-0 flex-1 flex-col gap-3">
-          <div className="grid shrink-0 gap-3 md:grid-cols-2 xl:h-[13.25rem] xl:grid-cols-4">
+        <div className="fleet-dashboard-layout grid min-h-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)_minmax(0,1fr)]">
 
           <OverviewCard dark title={`Km rodados — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Km da escala da Transporte (ida e volta × viagens + obras adicionais)" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
             <Big dark value={Math.round(d.km).toLocaleString("pt-BR")} />
@@ -272,15 +264,15 @@ function Overview({ canCost }: { canCost: boolean }) {
             })()}
           </OverviewCard>
 
-          <OverviewCard title={`Ranking dos motoristas — ${pLabel}`} to="/frota/notas" linkLabel="Abrir Abastecimento" hint="% das notas de abastecimento entregues (foto do cupom); os últimos 2 dias ainda estão no prazo" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
+          <OverviewCard title={`Ranking dos motoristas — ${pLabel}`} to="/frota/notas" linkLabel="Abrir Abastecimento" hint="% das notas de abastecimento entregues (foto do cupom); os últimos 2 dias ainda estão no prazo" className="min-h-0 xl:col-start-4 xl:row-start-1 xl:row-span-3" bodyClassName="flex min-h-0 flex-col">
             <div className="flex items-baseline gap-2">
               <Big value={rank.overall == null ? "—" : `${rank.overall}%`} />
               <span className="text-xs text-muted-foreground">das notas entregues</span>
             </div>
-            <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-hidden">
+            <div className="mt-2 min-h-0 flex-1 space-y-4 overflow-y-auto">
               {rank.loading && <p className="text-xs text-muted-foreground">Carregando…</p>}
               {!rank.loading && !rank.ranking.length && <p className="text-xs text-muted-foreground">Sem abastecimentos no período.</p>}
-              {rank.ranking.slice(0, 5).map((r, i) => (
+              {rank.ranking.map((r, i) => (
                 <div key={r.key} className="grid grid-cols-[1rem_minmax(0,1fr)_2.2rem] items-center gap-2 text-[11px]" title={`${r.name}: ${r.delivered} entregues, ${r.pending} pendentes`}>
                   <span className="tabular-nums text-muted-foreground">{i + 1}º</span>
                   <span className="min-w-0">
@@ -293,37 +285,21 @@ function Overview({ canCost }: { canCost: boolean }) {
             </div>
           </OverviewCard>
 
-
-          </div>
-          <div className="grid gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-            <div className="flex min-h-0 flex-col gap-3">
-          <ResultCard dark title={`Manutenções e revisões — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`}
-            className="min-h-[22rem] flex-[2] xl:min-h-0">
+          <ResultCard title={`Manutenções e revisões — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} className="min-h-[22rem] xl:min-h-0 xl:col-start-1 xl:col-span-2 xl:row-start-3">
             <MaintCalendar ym={ym} calFrom={calFrom} calTo={calTo} range={R} today={today} maintDays={d.maintDays} suggestions={d.suggestions} selected={selectedDay} onSelect={setSelectedDay} />
           </ResultCard>
-              <ResultCard title={`Manutenções e revisões — ${year}`} className="min-h-48 flex-1 xl:min-h-0">
-                {annualQ.isPending ? <ResultChartSkeleton /> : <MaintenanceYear rows={annualQ.data ?? []} year={year} />}
-              </ResultCard>
-            </div>
-            <div className="fleet-dashboard-stack flex min-h-0 flex-col gap-3 xl:grid xl:grid-rows-2">
-              <div className="min-h-0 min-w-0">
-                <ResultCard title={single ? `Orçado × gasto por veículo — ${when}` : `Orçado × gasto por dia — ${when}`} className="h-full min-h-64">
-                  {canCost ? budget.error || expQ.error ? <p className="text-sm text-muted-foreground">Não foi possível carregar os custos.</p> : !budget.data || expQ.isPending ? <ResultChartSkeleton /> : (
+                <ResultCard dark title={single ? `Orçado × gasto por veículo — ${when}` : `Orçado × gasto por dia — ${when}`} className="min-h-64 xl:min-h-0 xl:col-start-1 xl:col-span-2 xl:row-start-2">
+                  {canCost ? budget.error || expQ.error ? <p className="text-sm text-background/60">Não foi possível carregar os custos.</p> : !budget.data || expQ.isPending ? <ResultChartSkeleton /> : (
                     <div className="flex h-full min-h-0 flex-col">
-                      <div className="mb-2 flex flex-wrap gap-4 text-xs text-muted-foreground"><span>Orçado <CountUp value={brl(comparison.reduce((sum, x) => sum + x.a, 0))} /></span><span>Gasto <CountUp value={brl(comparison.reduce((sum, x) => sum + x.b, 0))} /></span></div>
-                      <div className="mb-2 flex gap-4 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Orçado</span><span className="flex items-center gap-1"><span className="w-3 border-t border-dashed border-muted-foreground" />Gasto</span></div>
-                      <LineArea className="min-h-0 flex-1" height="h-36 xl:h-auto xl:min-h-0 xl:flex-1" data={comparison} format={(x) => `Orçado ${brl(x.a)} · Gasto ${brl(x.b ?? 0)}`} />
+                      <div className="mb-2 flex flex-wrap gap-4 text-xs text-background/60"><span>Orçado <CountUp value={brl(comparison.reduce((sum, x) => sum + x.a, 0))} /></span><span>Gasto <CountUp value={brl(comparison.reduce((sum, x) => sum + x.b, 0))} /></span></div>
+                      <div className="mb-2 flex gap-4 text-[10px] text-background/60"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-background" />Orçado</span><span className="flex items-center gap-1"><span className="w-3 border-t border-dashed border-background/60" />Gasto</span></div>
+                      <LineArea className="min-h-0 flex-1 [--color-foreground:var(--background)] [&_.stroke-foreground]:stroke-background [&_.stroke-muted-foreground\/60]:stroke-background/60 [&_.text-muted-foreground]:text-background/60 [&_.bg-popover]:text-foreground [&_.bg-popover_.text-muted-foreground]:text-muted-foreground" height="h-36 xl:h-auto xl:min-h-0 xl:flex-1" data={comparison} format={(x) => `Orçado ${brl(x.a)} · Gasto ${brl(x.b ?? 0)}`} />
                     </div>
-                  ) : <p className="text-sm text-muted-foreground">Custos disponíveis para quem tem acesso à Visão Geral.</p>}
+                  ) : <p className="text-sm text-background/60">Custos disponíveis para quem tem acesso à Visão Geral.</p>}
                 </ResultCard>
-              </div>
-              <div className="min-h-0 min-w-0">
-                <ResultCard title={`Logística — ${brDay(selectedDay)}`} className="h-full min-h-64">
+                <ResultCard title={`Logística — ${brDay(selectedDay)}`} className="min-h-64 xl:min-h-0 xl:col-start-3 xl:row-start-2 xl:row-span-2">
                   {logQ.isPending ? <ResultChartSkeleton /> : <LogTimeline key={selectedDay} list={(logQ.data?.list ?? []).filter((x) => x.scheduled_date === selectedDay)} addr={logQ.data?.addr ?? new Map()} vehicles={new Map((vehiclesQ.data ?? []).map((v) => [v.id, v.plate]))} single />}
                 </ResultCard>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>
@@ -350,7 +326,7 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
   const outside = suggestions.filter((s) => s.week < calFrom || s.week > calTo).sort((a, b) => a.due.localeCompare(b.due));
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col" onClick={(e) => e.preventDefault()}>
-      <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(0,1.6fr)] gap-1 text-[10px] text-background/60">
+      <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(0,1.6fr)] gap-1 text-[10px] text-muted-foreground">
         {WD.map((w, i) => <span key={i} className="text-center font-medium">{w}</span>)}
         <span className="pl-1 font-medium">Sugestão de revisão</span>
       </div>
@@ -359,39 +335,39 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
           const sug = byWeek.get(wk[0]!) ?? [];
           return (
             <div key={wk[0]} className={cn("grid min-h-0 grid-cols-[repeat(7,minmax(0,1fr))_minmax(0,1.6fr)] gap-1 rounded-lg p-0.5 transition-colors",
-              sug.length && "bg-background/15 ring-1 ring-background/50")}>
+              sug.length && "bg-muted ring-1 ring-border")}>
               {wk.map((dt) => {
                 const ev = maintDays.get(dt) ?? [];
                 const inMonth = dt.startsWith(ym);
                 const inRange = dt >= range.from && dt <= range.to;
                 return (
                   <Button variant="ghost" key={dt} aria-label={`Selecionar dia ${brDay(dt)}`} aria-pressed={selected === dt} onClick={() => onSelect(dt)} title={ev.length ? ev.map((e) => `${e.plate} · ${e.kind === "rev" ? "Revisão" : "Manutenção"}`).join("\n") : brDay(dt)}
-                    className={cn("h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-background hover:bg-background/20", selected === dt && "ring-2 ring-background bg-background/20", inMonth ? "bg-background/5" : "opacity-35",
-                      inRange && "outline outline-1 outline-background/60", dt === today && "bg-background/20")}>
-                    <span className={cn("text-[10px] tabular-nums", dt === today ? "font-bold" : "text-background/70")}>{Number(dt.slice(8, 10))}</span>
+                    className={cn("h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-foreground hover:bg-foreground/10", selected === dt && "ring-2 ring-foreground bg-foreground/10", inMonth ? "bg-muted/50" : "opacity-35",
+                      inRange && "outline outline-1 outline-border", dt === today && "bg-foreground/10")}>
+                    <span className={cn("text-[10px] tabular-nums", dt === today ? "font-bold" : "text-muted-foreground")}>{Number(dt.slice(8, 10))}</span>
                     {ev.slice(0, 2).map((e, i) => (
-                      <span key={i} className={cn("truncate rounded px-1 text-[9px] font-semibold leading-tight", e.kind === "rev" ? "bg-background text-foreground" : "bg-background/30 text-background")}>{e.plate}</span>
+                      <span key={i} className={cn("truncate rounded px-1 text-[9px] font-semibold leading-tight", e.kind === "rev" ? "bg-foreground text-background" : "bg-foreground/20 text-foreground")}>{e.plate}</span>
                     ))}
-                    {ev.length > 2 && <span className="text-[9px] text-background/60">+{ev.length - 2}</span>}
+                    {ev.length > 2 && <span className="text-[9px] text-muted-foreground">+{ev.length - 2}</span>}
                   </Button>
                 );
               })}
               <div className="flex min-h-0 flex-col justify-center overflow-hidden pl-1 text-[10px]">
                 {sug.slice(0, 2).map((s) => (
                   <span key={s.vehicleId} className="truncate" title={`${s.plate}: ${s.reason} (vencimento previsto ${brDay(s.due)})`}>
-                    <b>{s.plate}</b> <span className="text-background/60">· {s.reason}</span>
+                    <b>{s.plate}</b> <span className="text-muted-foreground">· {s.reason}</span>
                   </span>
                 ))}
-                {sug.length > 2 && <span className="text-background/60">+{sug.length - 2} veículos</span>}
+                {sug.length > 2 && <span className="text-muted-foreground">+{sug.length - 2} veículos</span>}
               </div>
             </div>
           );
         })}
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-background/60">
-        <span className="flex items-center gap-1"><span className="rounded bg-background/30 px-1 font-semibold text-background">ABC</span> manutenção</span>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1"><span className="rounded bg-foreground/20 px-1 font-semibold text-foreground">ABC</span> manutenção</span>
         <span className="flex items-center gap-1"><span className="rounded bg-background px-1 font-semibold text-foreground">ABC</span> revisão</span>
-        <span className="flex items-center gap-1"><span className="h-2.5 w-4 rounded-sm bg-background/15 ring-1 ring-background/50" /> semana sugerida para marcar a revisão</span>
+        <span className="flex items-center gap-1"><span className="h-2.5 w-4 rounded-sm bg-muted ring-1 ring-border" /> semana sugerida para marcar a revisão</span>
         {outside.length > 0 && <span className="ml-auto truncate">Depois: {outside.slice(0, 3).map((s) => `${s.plate} (sem. ${brDay(s.week)})`).join(", ")}</span>}
       </div>
     </div>
@@ -448,22 +424,4 @@ function LogTimeline({ list, addr, vehicles, single }: { list: LogDemand[]; addr
       </div>
     </div>
   );
-}
-
-function MaintenanceYear({ rows, year }: { rows: { schedule_date: string; maintenance_kind: string | null }[]; year: string }) {
-  const months = MONTHS.map((label, i) => {
-    const entries = rows.filter((r) => r.schedule_date.startsWith(`${year}-${pad(i + 1)}`));
-    return { label, maintenance: entries.filter((r) => r.maintenance_kind !== "revisao").length, revision: entries.filter((r) => r.maintenance_kind === "revisao").length };
-  });
-  const max = Math.max(1, ...months.map((m) => m.maintenance + m.revision));
-  return <div className="flex h-full min-h-0 flex-col gap-2">
-    <div className="flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><i className="h-2 w-2 bg-foreground" />Manutenção</span><span className="flex items-center gap-1"><i className="h-2 w-2 bg-foreground/40" />Revisão</span><span className="ml-auto">Dias por veículo</span></div>
-    <div className="grid min-h-20 flex-1 grid-cols-12 items-end gap-1">
-      {months.map((m) => <div key={m.label} className="flex h-full min-w-0 flex-col justify-end gap-1" title={`${m.label}: ${m.maintenance} manutenções · ${m.revision} revisões`}>
-        <span className="text-center text-[9px] tabular-nums text-muted-foreground">{m.maintenance + m.revision || ""}</span>
-        <div className="grid min-h-0 flex-1 grid-rows-7 gap-0.5">{Array.from({ length: 7 }, (_, i) => { const level = 6 - i, filled = Math.ceil((m.maintenance + m.revision) / max * 6); return <span key={i} className={cn("mx-auto aspect-square h-full max-w-full rounded-[2px]", level > filled ? "invisible" : level === 0 ? "border border-border bg-muted/40" : level <= Math.round(m.maintenance / max * 6) ? "bg-foreground" : "bg-foreground/40")} />; })}</div>
-        <span className="text-center text-[9px] capitalize text-muted-foreground">{m.label.slice(0, 3)}</span>
-      </div>)}
-    </div>
-  </div>;
 }
