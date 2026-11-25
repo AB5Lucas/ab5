@@ -11,6 +11,7 @@ import { useWorkScope } from "@/hooks/use-work-scope";
 import { Big, Donut, HoverBars, LineArea, MultiLine, OverviewCard, type LineSeries } from "@/components/overview/charts";
 import { RdoTiles, type TileCol } from "@/components/overview/rdo-tiles";
 import { cn } from "@/lib/utils";
+import { CountUp } from "@/components/count-up";
 import { isInternalClient } from "@/lib/fleet-budget";
 import { KM_RATE } from "@/lib/results-engine";
 
@@ -132,13 +133,15 @@ function HubOverview() {
     const billing = q.data.billing.filter((e) => workBy.has(e.work_id));
     const keyOf = (iso: string) => (P.unit === "day" ? iso.slice(0, 10) : iso.slice(0, 7));
     // Faturado no período e no período anterior equivalente
+    // Serviços atendidos no período: com faturamento, escalação ou RDO (internos fora no quadro).
+    const servedWorks = new Set<string>();
     let cur = 0, prev = 0;
     const byBucket = new Map(P.buckets.map((b) => [b, 0]));
     const byClient = new Map<string, number>(), byClientId = new Map<string, number>();
     for (const e of billing) {
       const dt = String(e.entry_date).slice(0, 10), v = Number(e.amount ?? 0);
       if (dt >= P.from && dt <= P.to) {
-        cur += v;
+        cur += v; servedWorks.add(e.work_id);
         const k = keyOf(dt); if (byBucket.has(k)) byBucket.set(k, byBucket.get(k)! + v);
         const w = workBy.get(e.work_id);
         const n = w?.clients?.name ?? "—"; byClient.set(n, (byClient.get(n) ?? 0) + v);
@@ -184,13 +187,14 @@ function HubOverview() {
       if (!workBy.has(a.work_id)) continue;
       const dt = String(a.daily_schedules?.schedule_date ?? "").slice(0, 10); if (!dt) continue;
       const k = keyOf(dt); if (!svcBy.has(k)) continue;
-      svcBy.get(k)!.add(a.work_id); svcAll.add(a.work_id); pplBy.set(k, pplBy.get(k)! + 1);
+      svcBy.get(k)!.add(a.work_id); svcAll.add(a.work_id); servedWorks.add(a.work_id); pplBy.set(k, pplBy.get(k)! + 1);
       (daysBy.get(k) ?? daysBy.set(k, new Set()).get(k)!).add(dt);
     }
     const bLabel = (b: string) => (P.unit === "day" ? `${b.slice(8, 10)}/${b.slice(5, 7)}` : `${monthLabel(b)}/${b.slice(2, 4)}`);
     const svcSeries = P.buckets.map((b) => ({ label: bLabel(b), value: svcBy.get(b)!.size }));
     const pplSeries = P.buckets.map((b) => ({ label: bLabel(b), tip: P.unit === "day" ? bLabel(b) : `${bLabel(b)} (média por dia)`, value: Math.round(pplBy.get(b)! / Math.max(1, daysBy.get(b)?.size ?? 1)) }));
     const rdoDay = new Map<string, Map<string, boolean>>(); // dia → cliente → finalizado?
+    for (const r of q.data.rdos) { const dt0 = String(r.report_date).slice(0, 10); if (r.work_id && workBy.has(r.work_id) && dt0 >= P.from && dt0 <= P.to) servedWorks.add(r.work_id); }
     for (const r of q.data.rdos) {
       const c = clientOf(r.work_id) ?? (r.client_id && scope.allowClient(r.client_id) ? (r.client_id as string) : null);
       if (!c) continue;
@@ -257,6 +261,7 @@ function HubOverview() {
       expenses: P.buckets.map((b) => { const x = expBy.get(b)!; return { label: bLabel(b), values: { mo: x.mo + (laborBy.get(b) ?? 0), tr: x.tr, mat: x.mat } }; }),
       billedCost: P.buckets.map((b) => ({ label: bLabel(b), a: byBucket.get(b) ?? 0, b: costBy.get(b) ?? 0 })), moRows, ind,
       patioDays: P.buckets.map((b) => ({ key: b, label: P.unit === "day" ? String(Number(b.slice(8, 10))) : monthLabel(b), title: bLabel(b), value: patioBy.get(b)!.size })), patioCount: patioAll.size,
+      servedWorks: [...servedWorks].map((id) => workBy.get(id)).filter((w: any) => w && !isInternalClient(w.clients?.name ?? "")),
       byClientId, activeIds, svcSeries, pplSeries, svcCount: svcAll.size, cur, prev, ordered, openBalance, top, cols,
       series: P.buckets.map((b) => ({ label: P.unit === "day" ? `${b.slice(8, 10)}/${b.slice(5, 7)}` : `${monthLabel(b)}/${b.slice(2, 4)}`, a: byBucket.get(b) ?? 0 })),
       activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
@@ -338,8 +343,22 @@ function HubOverview() {
                         <Big value={served} />
                         <p className="text-xs text-muted-foreground">de {total} clientes no cadastro</p>
                         <p className="mt-1 text-[11px] text-muted-foreground">Sem atividade: {Math.max(0, total - served)}</p>
+                        {(() => {
+                          const sw = d.servedWorks.length, done = d.servedWorks.filter((w: any) => w.status === "completed").length;
+                          return (
+                            <div className="mt-3" title={`${sw} serviços com escalação, RDO ou faturamento no período; ${done} já concluídos`}>
+                              <div className="flex items-baseline justify-between gap-2 text-[11px]">
+                                <span><span className="font-display text-base font-semibold tabular-nums"><CountUp value={sw} /></span> serviços atendidos</span>
+                              </div>
+                              <div className="mt-1 flex h-2 overflow-hidden rounded-full bg-muted">
+                                <span className="ov-grow h-full bg-foreground" style={{ width: `${sw ? (done / sw) * 100 : 0}%` }} />
+                              </div>
+                              <p className="mt-1 text-[11px] text-muted-foreground">{done} concluídos · {sw - done} em andamento</p>
+                            </div>
+                          );
+                        })()}
                       </div>
-                      <Donut frac={total ? served / total : 0} center={total ? `${Math.round((served / total) * 100)}%` : "—"} sub="atendidos" size="h-28 w-28" />
+                      <Donut frac={total ? served / total : 0} center={total ? `${Math.round((served / total) * 100)}%` : "—"} sub="atendidos" size="h-36 w-36" />
                     </div>
                   );
                 })()}
