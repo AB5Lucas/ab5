@@ -5,6 +5,7 @@
  */
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { SummaryPanel, SummaryHead, SummaryRow } from "./patio-calendar";
 
 export type TileCol = { key: string; label: string; title: string; max: number; fin: number; draft: number; expected: number; totalFin?: number; totalDraft?: number; totalExpected?: number };
 
@@ -50,17 +51,19 @@ export function RdoTiles({ cols, unit }: { cols: TileCol[]; unit: "day" | "month
         </div>
       </div>
       {c && (
-        <div className="flex w-full flex-col rounded-xl border bg-muted/30 p-3 md:w-48 md:p-2.5">
-          <p className="text-[11px] text-muted-foreground">{c.title}</p>
-          <p className="font-display text-2xl font-semibold tabular-nums">{fin + draft}</p>
-          <p className="text-[11px] text-muted-foreground">RDOs de {exp} esperados</p>
-          <div className="mt-2 grid grid-cols-3 gap-1 text-xs md:grid-cols-1 md:space-y-0">
-            <Row cls="bg-foreground" label="Finalizados" v={fin} pct={pct(fin)} />
-            <Row cls="bg-foreground/45" label="Rascunho" v={draft} pct={pct(draft)} />
-            <Row cls="border border-dashed border-border bg-muted/40" label="Sem RDO" v={Math.max(0, exp - fin - draft)} pct={pct(Math.max(0, exp - fin - draft))} />
+        <SummaryPanel>
+          <SummaryHead label={c.title} value={fin + draft} sub={`RDOs de ${exp} esperados`} />
+          <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-full bg-foreground transition-[width] duration-700" style={{ width: exp ? `${(fin / exp) * 100}%` : 0 }} />
+            <div className="h-full bg-foreground/45 transition-[width] duration-700" style={{ width: exp ? `${(draft / exp) * 100}%` : 0 }} />
           </div>
-          <p className="mt-auto pt-3 text-[11px] text-muted-foreground">{c0 ? `${c.max} clientes com equipe no mês` : "Clique num dia para ver só ele"}<br />1 quadradinho = {per} {per === 1 ? "cliente" : "clientes"}{unit === "month" ? " (média por dia)" : ""}</p>
-        </div>
+          <div className="space-y-0.5">
+            <SummaryRow dot="bg-foreground" label="Finalizados" value={fin} sub={pct(fin)} />
+            <SummaryRow dot="bg-foreground/45" label="Rascunho" value={draft} sub={pct(draft)} />
+            <SummaryRow dot="border border-dashed border-border bg-muted/40" label="Sem RDO" value={Math.max(0, exp - fin - draft)} sub={pct(Math.max(0, exp - fin - draft))} />
+          </div>
+          <p className="mt-auto text-[10px] leading-relaxed text-muted-foreground">{c0 ? `${c.max} clientes com equipe no mês` : "Clique num dia para ver só ele"}<br />1 quadradinho = {per} {per === 1 ? "cliente" : "clientes"}{unit === "month" ? " (média por dia)" : ""}</p>
+        </SummaryPanel>
       )}
     </div>
   );

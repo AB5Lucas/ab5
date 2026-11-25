@@ -6,6 +6,7 @@ import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
 import { useWorkScope } from "@/hooks/use-work-scope";
 import { Big, Donut, HoverBars, LineArea, MarginLine, OverviewCard, RankBars } from "@/components/overview/charts";
+import { PatioCalendar } from "@/components/overview/patio-calendar";
 import { RdoTiles, type TileCol } from "@/components/overview/rdo-tiles";
 import { cn } from "@/lib/utils";
 import { ClientsMap } from "@/components/overview/clients-map";
@@ -106,6 +107,7 @@ function AtividadesOverview() {
     return { avg, months: s.months, clients: (s.clients ?? []).filter((c: any) => c.comp > 0 && c.pct != null).sort((a: any, b: any) => b.comp - a.comp) };
   }, [raws.data, fList, P.yms, holidays.data, fWorks.data]);
 
+  const workforceQ = useQuery({ queryKey: ["active-collaborators-count"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("collaborators").select("id", { count: "exact", head: true }).eq("status", "active")).count ?? 0 });
   const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
 
   const d = useMemo(() => {
@@ -197,7 +199,7 @@ function AtividadesOverview() {
     });
 
     return {
-      patioSeries: P.buckets.map((b) => ({ label: bLabel(b), value: patioBy.get(b)!.size })), patioCount: patioAll.size,
+      patioDays: P.buckets.map((b) => ({ key: b, label: P.unit === "day" ? String(Number(b.slice(8, 10))) : monthLabel(b), title: bLabel(b), value: patioBy.get(b)!.size })), patioCount: patioAll.size,
       byClientId, activeIds, svcSeries, pplSeries, svcCount: svcAll.size, cur, prev, ordered, openBalance, top, cols,
       series: P.buckets.map((b) => ({ label: P.unit === "day" ? `${b.slice(8, 10)}/${b.slice(5, 7)}` : `${monthLabel(b)}/${b.slice(2, 4)}`, a: byBucket.get(b) ?? 0 })),
       activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
@@ -244,11 +246,9 @@ function AtividadesOverview() {
                 <div className="mt-3"><HoverBars dark data={d.series.map((s) => ({ label: s.label, value: s.a }))} format={brl} /></div>
               </OverviewCard>
             )}
-            {can("/obras") && (
-              <OverviewCard title="Serviços com equipe" to="/obras" linkLabel="Ver serviços" hint="Serviços com pessoas escaladas no período (por dia no mês; por mês no ano)">
-                <Big value={d.svcCount} />
-                <p className="text-xs text-muted-foreground">serviços com alocação {P.unit === "day" ? "no mês" : "no período"}</p>
-                <div className="mt-3"><LineArea height="h-16" data={d.svcSeries.map((x) => ({ label: x.label, a: x.value }))} format={(x) => `${x.a} serviços`} /></div>
+            {can("/obras/resultado") && (
+              <OverviewCard title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
+                <LineArea height="h-28" data={d.series} format={(p) => brl(p.a)} />
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
@@ -295,9 +295,9 @@ function AtividadesOverview() {
                   <div onClick={(e) => e.preventDefault()}><RdoTiles cols={d.cols} unit={P.unit} /></div>
                 </OverviewCard>
               )}
-              {can("/obras/resultado") && (
-                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
-                  <LineArea height="h-44" data={d.series} format={(p) => brl(p.a)} />
+              {can("/obras") && (
+                <OverviewCard className="flex-1" title="Pessoas no Pátio" to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio; cor mais forte = mais pessoas no dia">
+                  <div onClick={(e) => e.preventDefault()}><PatioCalendar days={d.patioDays} unit={P.unit} total={d.patioCount} workforce={workforceQ.data ?? 0} /></div>
                 </OverviewCard>
               )}
             </div>
@@ -317,10 +317,10 @@ function AtividadesOverview() {
               </OverviewCard>
             )}
             {can("/obras") && (
-              <OverviewCard title="Pessoas no Pátio" to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no período">
-                <Big value={d.patioCount} />
-                <p className="text-xs text-muted-foreground">pessoas diferentes no Pátio {P.unit === "day" ? "no mês" : "no período"}</p>
-                <div className="mt-3"><HoverBars data={d.patioSeries} format={(v) => `${v} pessoas`} height="h-20" /></div>
+              <OverviewCard title="Serviços com equipe" to="/obras" linkLabel="Ver serviços" hint="Serviços com pessoas escaladas no período (por dia no mês; por mês no ano)">
+                <Big value={d.svcCount} />
+                <p className="text-xs text-muted-foreground">serviços com alocação {P.unit === "day" ? "no mês" : "no período"}</p>
+                <div className="mt-3"><LineArea height="h-16" data={d.svcSeries.map((x) => ({ label: x.label, a: x.value }))} format={(x) => `${x.a} serviços`} /></div>
               </OverviewCard>
             )}
           </div>
