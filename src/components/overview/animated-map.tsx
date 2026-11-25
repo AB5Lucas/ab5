@@ -72,7 +72,10 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
       const k = Math.exp(Math.log(f.k) + (Math.log(t.k) - Math.log(f.k)) * e);
       // interpola o centro para o movimento ficar natural
       const fc = [f.x + W / f.k / 2, f.y + H / f.k / 2], tc = [t.x + W / t.k / 2, t.y + H / t.k / 2];
-      const cx = fc[0]! + (tc[0]! - fc[0]!) * e, cy = fc[1]! + (tc[1]! - fc[1]!) * e;
+      // O centro anda junto com a escala (proporcional a 1/k): o ponto de destino (ex.: o cliente) vem chegando
+      // e nunca sai da tela no meio do zoom; sem mudança de escala, anda linear.
+      const dk = 1 / t.k - 1 / f.k, w = Math.abs(dk) > 1e-9 ? (1 / k - 1 / f.k) / dk : e;
+      const cx = fc[0]! + (tc[0]! - fc[0]!) * w, cy = fc[1]! + (tc[1]! - fc[1]!) * w;
       setView({ k, x: cx - W / k / 2, y: cy - H / k / 2 });
       anim.current = u < 1 ? requestAnimationFrame(step) : null;
       if (u >= 1) setMoving(false);
@@ -105,7 +108,9 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     const rings = keys.flatMap((k) => STATES[k] ?? []);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const r of rings) for (const p of r) { const x = p[0]!, y = p[1]!; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-    const k = Math.cos((((y0 + y1) / 2) * Math.PI) / 180);
+    // Mesmo fator de latitude para Brasil e estados: o desenho muda só de escala/posição entre regiões,
+    // então a troca de projeção no meio da animação não dá "tranco" (com o fator de cada região a forma esticava ~5%).
+    const k = Math.cos((15 * Math.PI) / 180);
     const s = Math.min((W * 0.99) / ((x1 - x0) * k), (H * 0.92) / (y1 - y0));
     const ox = (W - (x1 - x0) * k * s) / 2, oy = (H - (y1 - y0) * s) / 2;
     const project = (lon: number, lat: number): [number, number] => [ox + (lon - x0) * k * s, oy + (y1 - lat) * s];
@@ -139,10 +144,10 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     if (old) {
       const [lonA, latA] = old.unproject(v.x, v.y), [lonB, latB] = old.unproject(v.x + W / v.k, v.y + H / v.k);
       const [ax, ay] = project(lonA, latA), [bx, by] = project(lonB, latB);
-      const k = Math.max(0.2, Math.min(W / Math.max(1e-6, bx - ax), H / Math.max(1e-6, by - ay)));
+      const k = Math.max(0.02, Math.min(W / Math.max(1e-6, bx - ax), H / Math.max(1e-6, by - ay)));
       from = { k, x: (ax + bx) / 2 - W / k / 2, y: (ay + by) / 2 - H / k / 2 };
     }
-    viewRef.current = from; setView(from);
+    viewRef.current = from; setView(from); setMoving(true);
     // Destino: o cliente escolhido (entrada direta, um movimento só) ou a região inteira.
     const toFocus = focus && region !== "BR" ? focusView(focus) : null;
     if (toFocus && focus) focusDone.current = focus.n;
@@ -157,11 +162,13 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     return () => { window.clearTimeout(t); window.clearTimeout(t2); window.clearTimeout(t3); };
   }, [region]); // eslint-disable-line react-hooks/exhaustive-deps
   useLayoutEffect(() => { projRef.current = { unproject }; }, [unproject]);
+  // Cidades (milhares de contornos) só são montadas com a câmera parada: montar no início do zoom travava a animação.
   const cityPath = useMemo(() => {
+    if (moving) return "";
     const cities = showUfs.flatMap((uf) => (region !== "BR" && uf !== region ? [] : citiesBy[uf] ?? []));
     if (!cities.length) return "";
     return cities.map((r) => "M" + r.map((p) => project(p[0]!, p[1]!).map((v) => v.toFixed(1)).join(",")).join("L") + "Z").join("");
-  }, [citiesBy, showUfs, project, region]);
+  }, [citiesBy, showUfs, project, region, moving]);
 
   const max = Math.max(1, ...clients.map((c) => c.billed ?? 0));
   const pts = clients.map((c) => ({ c, xy: project(c.lon, c.lat), r: (region !== "BR" ? 3 : 2.2) + Math.sqrt((c.billed ?? 0) / max) * (region !== "BR" ? 5.5 : 4) }))
