@@ -4388,7 +4388,22 @@ export type Database = {
           unit?: string | null
           unit_price?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "purchase_quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_quote_items_request_item_id_fkey"
+            columns: ["request_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_quotes: {
         Row: {
@@ -4457,7 +4472,53 @@ export type Database = {
           supplier_doc?: string | null
           total?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "purchase_quotes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_request_edits: {
+        Row: {
+          edited_at: string
+          edited_by: string | null
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          request_id: string
+        }
+        Insert: {
+          edited_at?: string
+          edited_by?: string | null
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          request_id: string
+        }
+        Update: {
+          edited_at?: string
+          edited_by?: string | null
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_request_edits_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_request_items: {
         Row: {
@@ -4468,13 +4529,13 @@ export type Database = {
           id: string
           item_no: number
           link_url: string | null
-          rec_quote_item_id: string | null
           notes: string | null
           order_file_path: string | null
           order_number: string | null
           photo_path: string | null
           quantity: number
           quote_path: string | null
+          rec_quote_item_id: string | null
           request_id: string
           status: string
           status_at: string | null
@@ -4489,13 +4550,13 @@ export type Database = {
           id?: string
           item_no: number
           link_url?: string | null
-          rec_quote_item_id?: string | null
           notes?: string | null
           order_file_path?: string | null
           order_number?: string | null
           photo_path?: string | null
           quantity: number
           quote_path?: string | null
+          rec_quote_item_id?: string | null
           request_id: string
           status?: string
           status_at?: string | null
@@ -4510,13 +4571,13 @@ export type Database = {
           id?: string
           item_no?: number
           link_url?: string | null
-          rec_quote_item_id?: string | null
           notes?: string | null
           order_file_path?: string | null
           order_number?: string | null
           photo_path?: string | null
           quantity?: number
           quote_path?: string | null
+          rec_quote_item_id?: string | null
           request_id?: string
           status?: string
           status_at?: string | null
@@ -4524,6 +4585,13 @@ export type Database = {
           work_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "purchase_request_items_rec_quote_item_id_fkey"
+            columns: ["rec_quote_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_quote_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchase_request_items_request_id_fkey"
             columns: ["request_id"]
@@ -4550,6 +4618,12 @@ export type Database = {
           cancelled_at: string | null
           category: string | null
           cc_code: string | null
+          client_id: string | null
+          created_at: string
+          decided_by: string | null
+          delivery_kind: string
+          delivery_place: string | null
+          due_date: string | null
           fa_ack_at: string | null
           fa_ack_needed: boolean
           fa_budget: number | null
@@ -4566,13 +4640,6 @@ export type Database = {
           fa_snapshot: Json | null
           fa_state: string | null
           fa_total: number | null
-          rec_criteria: string[]
-          client_id: string | null
-          created_at: string
-          decided_by: string | null
-          delivery_kind: string
-          delivery_place: string | null
-          due_date: string | null
           id: string
           justification: string | null
           nature: string | null
@@ -4582,6 +4649,7 @@ export type Database = {
           photo_path: string | null
           priority: string | null
           quote_path: string | null
+          rec_criteria: string[]
           request_date: string
           requester_id: string
           requester_name: string
@@ -4608,6 +4676,12 @@ export type Database = {
           cancelled_at?: string | null
           category?: string | null
           cc_code?: string | null
+          client_id?: string | null
+          created_at?: string
+          decided_by?: string | null
+          delivery_kind?: string
+          delivery_place?: string | null
+          due_date?: string | null
           fa_ack_at?: string | null
           fa_ack_needed?: boolean
           fa_budget?: number | null
@@ -4624,13 +4698,6 @@ export type Database = {
           fa_snapshot?: Json | null
           fa_state?: string | null
           fa_total?: number | null
-          rec_criteria?: string[]
-          client_id?: string | null
-          created_at?: string
-          decided_by?: string | null
-          delivery_kind?: string
-          delivery_place?: string | null
-          due_date?: string | null
           id?: string
           justification?: string | null
           nature?: string | null
@@ -4640,6 +4707,7 @@ export type Database = {
           photo_path?: string | null
           priority?: string | null
           quote_path?: string | null
+          rec_criteria?: string[]
           request_date?: string
           requester_id?: string
           requester_name: string
@@ -4666,6 +4734,12 @@ export type Database = {
           cancelled_at?: string | null
           category?: string | null
           cc_code?: string | null
+          client_id?: string | null
+          created_at?: string
+          decided_by?: string | null
+          delivery_kind?: string
+          delivery_place?: string | null
+          due_date?: string | null
           fa_ack_at?: string | null
           fa_ack_needed?: boolean
           fa_budget?: number | null
@@ -4682,13 +4756,6 @@ export type Database = {
           fa_snapshot?: Json | null
           fa_state?: string | null
           fa_total?: number | null
-          rec_criteria?: string[]
-          client_id?: string | null
-          created_at?: string
-          decided_by?: string | null
-          delivery_kind?: string
-          delivery_place?: string | null
-          due_date?: string | null
           id?: string
           justification?: string | null
           nature?: string | null
@@ -4698,6 +4765,7 @@ export type Database = {
           photo_path?: string | null
           priority?: string | null
           quote_path?: string | null
+          rec_criteria?: string[]
           request_date?: string
           requester_id?: string
           requester_name?: string
@@ -7297,6 +7365,10 @@ export type Database = {
         Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
         Returns: boolean
       }
+      purchase_client_gestor_users: {
+        Args: { _client: string }
+        Returns: string[]
+      }
       purchase_client_manager: { Args: { _client: string }; Returns: string }
       purchase_client_substitute: {
         Args: { _client: string; _manager: string }
@@ -7315,6 +7387,36 @@ export type Database = {
         Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
         Returns: string
       }
+      purchase_fa_ack: { Args: { _id: string }; Returns: undefined }
+      purchase_fa_budget: { Args: { _id: string }; Returns: number }
+      purchase_fa_can_decide: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: boolean
+      }
+      purchase_fa_decide: {
+        Args: { _approve: boolean; _id: string; _notes: string }
+        Returns: undefined
+      }
+      purchase_fa_director: { Args: never; Returns: string }
+      purchase_fa_is_gestor: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: boolean
+      }
+      purchase_fa_my_gestor_ids: { Args: never; Returns: string[] }
+      purchase_fa_recall: { Args: { _id: string }; Returns: undefined }
+      purchase_fa_rule_of: {
+        Args: { _budget: number; _due: string; _total: number }
+        Returns: string
+      }
+      purchase_fa_send: {
+        Args: { _id: string; _notes: string; _snapshot: Json; _total: number }
+        Returns: string
+      }
+      purchase_fa_side: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
+        Returns: string
+      }
+      purchase_fa_vitoria: { Args: never; Returns: string }
       purchase_fixed_observers: { Args: never; Returns: string[] }
       purchase_is_approver_of: {
         Args: { _requester: string }
@@ -7340,6 +7442,15 @@ export type Database = {
         Returns: string
       }
       purchase_notify_deadlines: { Args: never; Returns: number }
+      purchase_quote_can_write: { Args: { _request: string }; Returns: boolean }
+      purchase_rec_choose: {
+        Args: { _item: string; _quote_item: string }
+        Returns: undefined
+      }
+      purchase_rec_set_criteria: {
+        Args: { _criteria: string[]; _id: string }
+        Returns: undefined
+      }
       purchase_replace_entries: {
         Args: {
           _entries: Json
@@ -7351,6 +7462,10 @@ export type Database = {
       }
       purchase_request_buyer_cancel: {
         Args: { _id: string; _notes: string }
+        Returns: undefined
+      }
+      purchase_request_buyer_edit: {
+        Args: { _field: string; _id: string; _value: string }
         Returns: undefined
       }
       purchase_request_cancel: { Args: { _id: string }; Returns: undefined }
