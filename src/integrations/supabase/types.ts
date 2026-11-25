@@ -4399,6 +4399,7 @@ export type Database = {
           file_path: string
           freight: number | null
           id: string
+          kind: string
           matched: boolean
           payment_days: number | null
           payment_terms: string | null
@@ -4420,6 +4421,7 @@ export type Database = {
           file_path: string
           freight?: number | null
           id?: string
+          kind?: string
           matched?: boolean
           payment_days?: number | null
           payment_terms?: string | null
@@ -4441,6 +4443,7 @@ export type Database = {
           file_path?: string
           freight?: number | null
           id?: string
+          kind?: string
           matched?: boolean
           payment_days?: number | null
           payment_terms?: string | null
@@ -4554,6 +4557,9 @@ export type Database = {
           fa_decided_by: string | null
           fa_decision_notes: string | null
           fa_notes: string | null
+          fa_partial_at: string | null
+          fa_partial_by: string | null
+          fa_partial_side: string | null
           fa_rule: string | null
           fa_sent_at: string | null
           fa_sent_by: string | null
@@ -4609,6 +4615,9 @@ export type Database = {
           fa_decided_by?: string | null
           fa_decision_notes?: string | null
           fa_notes?: string | null
+          fa_partial_at?: string | null
+          fa_partial_by?: string | null
+          fa_partial_side?: string | null
           fa_rule?: string | null
           fa_sent_at?: string | null
           fa_sent_by?: string | null
@@ -4664,6 +4673,9 @@ export type Database = {
           fa_decided_by?: string | null
           fa_decision_notes?: string | null
           fa_notes?: string | null
+          fa_partial_at?: string | null
+          fa_partial_by?: string | null
+          fa_partial_side?: string | null
           fa_rule?: string | null
           fa_sent_at?: string | null
           fa_sent_by?: string | null

@@ -37,7 +37,7 @@ export const readPurchaseQuote = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
     const key = process.env["LOVABLE_API_KEY"];
-    const { data: q, error } = await sb.from("purchase_quotes").select("id, request_id, file_path, file_name").eq("id", data.quoteId).maybeSingle();
+    const { data: q, error } = await sb.from("purchase_quotes").select("id, request_id, file_path, file_name, kind").eq("id", data.quoteId).maybeSingle();
     if (error) throw error;
     if (!q) throw new Error("Cotação não encontrada");
     const fail = async (msg: string) => {
@@ -48,12 +48,33 @@ export const readPurchaseQuote = createServerFn({ method: "POST" })
     const { data: items } = await sb.from("purchase_request_items").select("id, item_no, quantity, unit, description").eq("request_id", q.request_id).order("item_no");
     const scItems = items ?? [];
     const list = scItems.map((i) => `${i.item_no}. ${i.quantity} ${i.unit} - ${i.description}`).join("\n") || "(sem itens)";
+    const prompt = QUOTE_PROMPT(list);
+    let text: string;
+    // Cotação por link (página do produto/loja): lê o texto da página e manda para a IA.
+    if (q.kind === "link" || /^https?:\/\//i.test(q.file_path)) {
+      try {
+        const page = await fetch(q.file_path, { headers: { "User-Agent": "Mozilla/5.0 (AB5Hub cotacao)", Accept: "text/html,application/pdf,*/*" }, signal: AbortSignal.timeout(20000), redirect: "follow" });
+        if (!page.ok) return fail(`Link não abriu (${page.status})`);
+        const type = page.headers.get("content-type") ?? "";
+        if (/pdf/i.test(type)) {
+          const b = new Uint8Array(await page.arrayBuffer());
+          text = await askAi(key, [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: `data:application/pdf;base64,${toBase64(b)}` } }]);
+        } else {
+          const html = await page.text();
+          const body = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
+            .replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, 60000);
+          // Dados estruturados (preço do anúncio) costumam vir em JSON-LD/meta.
+          const meta = [...html.matchAll(/<meta[^>]+(?:property|name)="(?:og:title|og:description|product:price:amount|product:price:currency|twitter:data1)"[^>]*>/gi)].map((m) => m[0]).join("\n").slice(0, 4000);
+          const ld = [...html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join("\n").slice(0, 12000);
+          text = await askAi(key, [{ type: "text", text: `${prompt}\n\nEsta cotação é uma página de produto/loja na internet (${q.file_path}). Fornecedor = a loja; prazo de pagamento = 0 se não houver; um item com o preço anunciado.\n\nMetadados:\n${meta}\n\nJSON-LD:\n${ld}\n\nTexto da página:\n${body}` }]);
+        }
+      } catch (e) { return fail((e as Error).message); }
+      return await save(text);
+    }
     const file = await sb.storage.from("purchase-photos").download(q.file_path);
     if (file.error || !file.data) return fail(`Arquivo indisponível: ${file.error?.message ?? ""}`);
     const bytes = new Uint8Array(await file.data.arrayBuffer());
     const name = (q.file_name ?? q.file_path).toLowerCase();
-    const prompt = QUOTE_PROMPT(list);
-    let text: string;
     try {
       if (/\.(xlsx|xlsm|xls|csv|ods)$/.test(name)) {
         const XLSX = await import("xlsx");
@@ -78,8 +99,12 @@ export const readPurchaseQuote = createServerFn({ method: "POST" })
     } catch (e) {
       return fail((e as Error).message);
     }
+    return await save(text);
+
+    async function save(text: string) {
     let r;
     try { r = parseQuoteReading(text); } catch (e) { return fail((e as Error).message); }
+    if (!q) throw new Error("Cotação não encontrada");
     const byNo = new Map(scItems.map((i) => [i.item_no, i]));
     const rows = r.items.map((it, k) => {
       const sc = (it.sc_item != null ? byNo.get(it.sc_item) : undefined) ?? scItems.find((x) => x.id === bestScItem(it.description, scItems));
@@ -102,4 +127,5 @@ export const readPurchaseQuote = createServerFn({ method: "POST" })
     }).eq("id", q.id);
     if (up.error) throw up.error;
     return { ok: rows.length > 0, error: rows.length ? null : "Nenhum item encontrado na cotação", items: rows.length, supplier: r.supplier };
+    }
   });

@@ -6,7 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { fetchPurchaseOrderPdf, linkPurchaseOrderFile } from "@/lib/purchase-orders.functions";
 import { orderFilePaths, splitOrders } from "@/lib/purchase-orders";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Link2, Camera, Check, Download, Eye, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Link2, Camera, Check, Download, Eye, History, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
@@ -21,18 +21,25 @@ import { SearchSelect } from "@/components/search-select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PRINT_REQUIRED, Pill, ScHeaderDialog, ScRemoveDialog, todayISO, useClientsList, useScRemove, useScUsers, type ScRow } from "@/components/compras/sc-shared";
 import {
-  SC_ITEM_STATUSES, SC_UNITS, itemStatusClass, STAGE_LABEL, brDate, brl, budgetMissing, deadlineControl, deliveryLabel, priorityClass, statusClass, statusDot, type ScStage,
+  SC_CATEGORIES, SC_ITEM_STATUSES, SC_NATURES, SC_PRIORITIES, SC_UNITS, itemStatusClass, STAGE_LABEL, brDate, brl, budgetMissing, deadlineControl, deliveryLabel, priorityClass, statusClass, statusDot, type ScStage,
 } from "@/lib/purchase-requests";
 import type { Tables } from "@/integrations/supabase/types";
 import { useEditHistory } from "@/hooks/use-edit-history";
 import { UndoRedoButtons } from "@/components/compras/undo-redo";
 import { ScImportButtons, type ScImportItem } from "@/components/compras/sc-import-dialog";
 import { PastePrint } from "@/components/compras/paste-print";
+import { useActionHistory } from "@/hooks/use-action-history";
+import { QuotesAttachDialog } from "@/components/compras/quotes";
+import { RecommendationView } from "@/components/compras/recommendation-view";
 
 export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")({
   head: () => ({ meta: [{ title: "Solicitação de Compra | AB5 Hub" }, { name: "description", content: "Itens da solicitação de compra (modelo FR-CPS-SC)." }] }),
   // Aberta pelo número = só visualizar; ?edit=1 (lápis em Ações) abre já em edição.
-  validateSearch: (s: Record<string, unknown>): { edit?: boolean } => (s["edit"] === true || s["edit"] === 1 || s["edit"] === "1" || s["edit"] === "true" ? { edit: true } : {}),
+  // ?tab=recomendacao abre direto na Recomendação de compras (comprador).
+  validateSearch: (s: Record<string, unknown>): { edit?: boolean; tab?: "recomendacao" } => ({
+    ...(s["edit"] === true || s["edit"] === 1 || s["edit"] === "1" || s["edit"] === "true" ? { edit: true } : {}),
+    ...(s["tab"] === "recomendacao" ? { tab: "recomendacao" as const } : {}),
+  }),
   component: Page,
 });
 
@@ -109,7 +116,7 @@ function Page() {
   const canSendDraft = !!r && r.stage === "rascunho" && (r.requester_id === user?.id || isAdmin);
   // O validador (gestor ou substituto) também pode editar a SC enquanto ela está com ele, antes de validar.
   const isValidator = !!r && !!user?.id && r.stage === "aprovacao" && (isAdmin || r.approver_id === user.id || r.substitute_id === user.id);
-  const { edit: editParam } = Route.useSearch();
+  const { edit: editParam, tab: tabParam } = Route.useSearch();
   const [editMode, setEditMode] = useState(!!editParam);
   const canEdit = canSendDraft || isValidator;
   const editable = canEdit && editMode;
@@ -141,6 +148,29 @@ function Page() {
     onError: (e: Error) => { toast.error(e.message); qc.invalidateQueries({ queryKey: ["sc-request", id] }); },
   });
   const isBuyer = !!r && r.stage === "compras" && (isAdmin || canAccess("/compras/comprador"));
+  // Comprador: aba Recomendação de compras, cotações, edição do cabeçalho (com histórico) e desfazer/refazer.
+  const [scTab, setScTab] = useState<"itens" | "recomendacao">(tabParam === "recomendacao" ? "recomendacao" : "itens");
+  const [attachOpen, setAttachOpen] = useState(false);
+  const buyerHistory = useActionHistory();
+  const buyerCanEdit = isBuyer && r?.fa_state !== "em_aprovacao";
+  const headerEdits = useQuery({
+    queryKey: ["sc-header-edits", id],
+    enabled: !!r && r.stage === "compras",
+    queryFn: async () => (await supabase.from("purchase_request_edits" as never).select("*").eq("request_id", id).order("edited_at", { ascending: false })).data as unknown as
+      { id: string; field: string; old_value: string | null; new_value: string | null; edited_by: string | null; edited_at: string }[] ?? [],
+  });
+  const rpcBuyerEdit = async (field: string, value: string | null) => {
+    const { error } = await supabase.rpc("purchase_request_buyer_edit" as never, { _id: id, _field: field, _value: value ?? "" } as never);
+    if (error) { toast.error(error.message); throw error; }
+    await Promise.all([qc.invalidateQueries({ queryKey: ["sc-request", id] }), qc.invalidateQueries({ queryKey: ["sc-header-edits", id] }), qc.invalidateQueries({ queryKey: ["sc-rec", id] })]);
+  };
+  const buyerEdit = async (field: string, label: string, before: string | null, after: string | null) => {
+    if ((before ?? "") === (after ?? "")) return;
+    try {
+      await rpcBuyerEdit(field, after);
+      buyerHistory.push({ label: `${label}: ${after ?? "—"}`, undo: () => rpcBuyerEdit(field, before), redo: () => rpcBuyerEdit(field, after) });
+    } catch { /* aviso já mostrado */ }
+  };
 
   const [rows, setRows] = useState<Draft[]>([]);
   const [total, setTotal] = useState("");
@@ -364,8 +394,16 @@ function Page() {
   const created = new Date(r.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
   const headCols: [string, React.ReactNode][][] = [
     [["Data da SC", brDate(r.request_date)], ["Horário", created], ["Requisitante", r.requester_name]],
-    [["Categoria", r.category ?? "—"], ["Natureza da compra", r.nature ?? "—"], ["Prioridade", r.priority ? <Pill key="p" className={priorityClass(r.priority)}>{r.priority}</Pill> : "—"]],
-    [["Cliente", cName], ["Prazo de entrega", brDate(r.due_date)], ["Local de entrega", deliveryLabel(r, cName)]],
+    [
+      ["Categoria", buyerCanEdit ? <InlineSelect key="c" value={r.category} options={SC_CATEGORIES} onChange={(v) => void buyerEdit("category", "Categoria", r.category, v)} /> : r.category ?? "—"],
+      ["Natureza da compra", buyerCanEdit ? <InlineSelect key="n" value={r.nature} options={SC_NATURES} onChange={(v) => void buyerEdit("nature", "Natureza", r.nature, v)} /> : r.nature ?? "—"],
+      ["Prioridade", buyerCanEdit
+        ? <InlineSelect key="p" value={r.priority} options={SC_PRIORITIES.map((p) => p.value)} render={(v) => <Pill className={priorityClass(v)}>{v}</Pill>} onChange={(v) => void buyerEdit("priority", "Prioridade", r.priority, v)} />
+        : r.priority ? <Pill key="p" className={priorityClass(r.priority)}>{r.priority}</Pill> : "—"],
+    ],
+    [["Cliente", cName], ["Prazo de entrega", buyerCanEdit
+      ? <Input key={`d-${r.due_date}`} type="date" className="h-7 w-40 text-xs" defaultValue={r.due_date ?? ""} onBlur={(e) => void buyerEdit("due_date", "Prazo de entrega", r.due_date, e.target.value || null)} />
+      : brDate(r.due_date)], ["Local de entrega", deliveryLabel(r, cName)]],
     [
       ["Envio", r.sent_at ? new Date(r.sent_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "não enviado"],
       ["Controle de prazo", <Pill key="d" className={dl.cls}>{dl.label}</Pill>],
@@ -383,6 +421,8 @@ function Page() {
         <span className={`inline-block h-3 w-3 rounded-full ${statusDot(r.status)}`} title={r.status} aria-label={`Status: ${r.status}`} />
         <h1 className="font-display text-xl font-semibold uppercase tracking-wide">{r.number}</h1>
         <div className="ml-auto flex gap-2">
+          {isBuyer && <UndoRedoButtons undoLabels={buyerHistory.undoLabels} redoLabels={buyerHistory.redoLabels} onUndo={(n) => void buyerHistory.undo(n)} onRedo={(n) => void buyerHistory.redo(n)} />}
+          {buyerCanEdit && <Button variant="outline" size="sm" onClick={() => setAttachOpen(true)}><Paperclip className="h-4 w-4" /> Cotações</Button>}
           {canEdit && !editMode && <Button variant="outline" size="sm" onClick={() => setEditMode(true)}><Pencil className="h-4 w-4" /> Editar</Button>}
           {editable && <UndoRedoButtons undoLabels={history.undoLabels} redoLabels={history.redoLabels} onUndo={undo} onRedo={redo} />}
           {editable && <Button variant="outline" size="sm" onClick={() => setEditingHeader(true)}><Pencil className="h-4 w-4" /> Editar cabeçalho</Button>}
@@ -414,7 +454,10 @@ function Page() {
       <div className="panel p-4">
         <div className="mb-3 flex items-baseline justify-between gap-2 border-b border-border pb-2">
           <span className="text-sm font-semibold">Ab5 Indústria e Comércio LTDA</span>
-          <span className="font-display text-sm uppercase tracking-wide">Solicitação de compras</span>
+          <span className="flex items-center gap-2">
+            <span className="font-display text-sm uppercase tracking-wide">Solicitação de compras</span>
+            {r.stage === "compras" && <EditHistory edits={headerEdits.data ?? []} userName={userName} />}
+          </span>
         </div>
         <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-border">
           {headCols.map((col, i) => (
@@ -443,6 +486,18 @@ function Page() {
         {r.buyer_notes && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Comprador:</b> {r.buyer_notes}</p>}
       </div>
 
+      {isBuyer && (
+        <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-sm text-muted-foreground" role="tablist">
+          {([["itens", "Solicitação"], ["recomendacao", "Recomendação de compras"]] as const).map(([v, l]) => (
+            <button key={v} type="button" role="tab" aria-selected={scTab === v} onClick={() => setScTab(v)}
+              className={`rounded-md px-3 py-1 transition-colors ${scTab === v ? "bg-background font-medium text-foreground shadow-sm" : "hover:text-foreground"}`}>{l}</button>
+          ))}
+        </div>
+      )}
+      {isBuyer && scTab === "recomendacao" ? (
+        <RecommendationView requestId={id} mode="comprador" embedded history={buyerHistory} />
+      ) : (
+      <>
       <div className="panel overflow-x-auto">
         <Table className="text-sm">
           <TableHeader>
@@ -612,6 +667,10 @@ function Page() {
         )}
       </div>
 
+      </>
+      )}
+      {attachOpen && <QuotesAttachDialog row={r} onClose={() => setAttachOpen(false)} onDone={() => { setScTab("recomendacao"); void qc.invalidateQueries({ queryKey: ["sc-rec", id] }); }} />}
+
       <Dialog open={deciding !== null} onOpenChange={(o) => { if (!o) { setDeciding(null); setDecNotes(""); } }}>
         <DialogContent>
           <DialogHeader>
@@ -706,6 +765,47 @@ function ItemLink({ value, editable, onChange }: { value: string; editable: bool
             {value && <Button size="sm" variant="ghost" onClick={() => { onChange(""); setOpen(false); }}>Remover</Button>}
             <Button size="sm" onClick={() => { onChange(draft.trim()); setOpen(false); }}>OK</Button>
           </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Campo do cabeçalho que o comprador edita na hora (grava pela função com histórico). */
+function InlineSelect({ value, options, onChange, render }: { value: string | null; options: readonly string[]; onChange: (v: string) => void; render?: (v: string) => React.ReactNode }) {
+  return (
+    <Select value={value ?? ""} onValueChange={(v) => { if (v !== value) onChange(v); }}>
+      <SelectTrigger className="h-7 w-full max-w-60 text-xs"><SelectValue placeholder="—">{value ? (render ? render(value) : value) : "—"}</SelectValue></SelectTrigger>
+      <SelectContent className="max-h-72">{options.map((o) => <SelectItem key={o} value={o}>{render ? render(o) : o}</SelectItem>)}</SelectContent>
+    </Select>
+  );
+}
+
+const EDIT_FIELD: Record<string, string> = { category: "Categoria", nature: "Natureza da compra", priority: "Prioridade", due_date: "Prazo de entrega" };
+/** Reloginho do cabeçalho: histórico das edições feitas pelo comprador. */
+function EditHistory({ edits, userName }: { edits: { id: string; field: string; old_value: string | null; new_value: string | null; edited_by: string | null; edited_at: string }[]; userName: Map<string, string> }) {
+  const fmt = (f: string, v: string | null) => (v == null ? "—" : f === "due_date" ? brDate(v) : v);
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" className="relative inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted" title="Histórico de edições do cabeçalho" aria-label="Histórico de edições">
+          <History className="h-4 w-4 text-muted-foreground" />
+          {edits.length > 0 && <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] leading-tight text-primary-foreground">{edits.length}</span>}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-96 p-0">
+        <div className="border-b border-border px-3 py-2 text-sm font-medium">Histórico de edições</div>
+        <div className="max-h-80 overflow-y-auto p-2 text-xs">
+          {!edits.length && <p className="p-2 text-muted-foreground">Nenhuma edição no cabeçalho.</p>}
+          {edits.map((e) => (
+            <div key={e.id} className="border-b border-border/60 px-1 py-1.5 last:border-0">
+              <div className="flex justify-between gap-2 text-muted-foreground">
+                <span>{new Date(e.edited_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>
+                <span className="truncate">{userName.get(e.edited_by ?? "") ?? "—"}</span>
+              </div>
+              <div><b>{EDIT_FIELD[e.field] ?? e.field}:</b> <span className="line-through opacity-60">{fmt(e.field, e.old_value)}</span> → <span className="font-medium">{fmt(e.field, e.new_value)}</span></div>
+            </div>
+          ))}
         </div>
       </PopoverContent>
     </Popover>

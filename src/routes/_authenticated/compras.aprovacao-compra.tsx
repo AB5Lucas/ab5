@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Eye } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -7,10 +9,9 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScTable, todayISO, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
+import { ScTable, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 import { FA_DIRECTOR, FA_VITORIA, RecommendationView } from "@/components/compras/recommendation-view";
 import { recCols, useRecTotals } from "@/components/compras/rec-list";
-import { approvalRule } from "@/lib/purchase-quotes";
 
 export const Route = createFileRoute("/_authenticated/compras/aprovacao-compra")({
   validateSearch: (s: Record<string, unknown>) => ({ sc: typeof s["sc"] === "string" ? s["sc"] : undefined }),
@@ -35,12 +36,16 @@ function Page() {
   const clients = useClientsList();
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
   const seesAll = uid === FA_DIRECTOR || role === "admin" || canAccess("/compras/comprador");
-  const today = todayISO();
+  // Gestor (cadastro do cliente: gestor/substituto, ou o validador da SC): só as SCs dos clientes dele.
+  const gestorIds = useQuery({
+    queryKey: ["fa-gestor-ids", uid],
+    enabled: !!uid,
+    queryFn: async () => new Set(((await supabase.rpc("purchase_fa_my_gestor_ids" as never)).data as unknown as string[] | null) ?? []),
+  });
   const mine = (list.data ?? []).filter((r) => {
     if (seesAll) return true;
-    const rule = approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, today);
-    if (uid === FA_VITORIA) return rule !== "diretor" || r.fa_decided_by === uid;
-    return (rule === "dupla" && (r.approver_id === uid || r.substitute_id === uid)) || r.fa_decided_by === uid;
+    if (uid === FA_VITORIA) return true;
+    return gestorIds.data?.has(r.id) || r.fa_decided_by === uid || r.fa_partial_by === uid;
   });
   const by: Record<View, (r: ScRow) => boolean> = {
     pendentes: (r) => r.fa_state === "em_aprovacao",
@@ -52,7 +57,7 @@ function Page() {
   const totals = useRecTotals(rows);
   const open = (id: string | undefined) => navigate({ search: { sc: id }, replace: !id });
 
-  if (sc) return <RecommendationView requestId={sc} mode="aprovacao" onBack={() => open(undefined)} />;
+  if (sc) return <RecommendationView requestId={sc} mode="aprovacao" isGestor={!!gestorIds.data?.has(sc)} onBack={() => open(undefined)} />;
   const count = (v: View) => mine.filter(by[v]).length;
   return (
     <div className="space-y-4">
@@ -71,7 +76,7 @@ function Page() {
           </Select>
         </div>
         <p className="text-xs text-muted-foreground">
-          Dentro da verba: Vitória ou Marcelo. Acima da verba com prazo em até 2 dias: aprovação dupla (Vitória ou gestor; depois a ciência do Marcelo). Acima da verba com mais prazo: só o Marcelo.
+          Compras acima da verba com prazo em até 2 dias: aprovação dupla (Comprador + Gestor; depois a ciência do Marcelo)
         </p>
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (

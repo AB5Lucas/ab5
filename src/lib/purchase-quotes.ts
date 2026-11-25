@@ -155,7 +155,7 @@ export function approvalRule(total: number, budget: number | null, due: string |
 }
 export const RULE_LABEL: Record<FaRule, string> = {
   verba: "Dentro da verba: aprova a Vitória Brasilino ou o Marcelo Barrella",
-  dupla: "Acima da verba e prazo em até 2 dias: aprovação dupla (Vitória ou o gestor aprovam; fica pendente a ciência do Marcelo)",
+  dupla: "Compras acima da verba com prazo em até 2 dias: aprovação dupla (Comprador + Gestor; depois a ciência do Marcelo)",
   diretor: "Acima da verba e prazo maior que 2 dias: só o Marcelo Barrella aprova",
 };
 

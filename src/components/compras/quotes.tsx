@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Check, FileText, Loader2, Paperclip, RefreshCw, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, Check, FileText, Link2, Loader2, Paperclip, RefreshCw, Trash2, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import type { ScRow } from "@/components/compras/sc-shared";
 
 export type RecItem = {
   id: string; item_no: number; quantity: number; unit: string; description: string; budget: number | null; notes: string | null;
-  work_id: string | null; cc_code: string | null; rec_quote_item_id: string | null; status: string; quote_path: string | null;
+  work_id: string | null; cc_code: string | null; rec_quote_item_id: string | null; status: string; quote_path: string | null; link_url: string | null;
 };
 export type RecData = {
   req: ScRow; items: RecItem[]; quotes: QuoteLite[]; qItems: QuoteItemLite[];
@@ -30,7 +30,7 @@ export function useRecData(id: string | null) {
     queryFn: async (): Promise<RecData | null> => {
       const [r, it, q] = await Promise.all([
         supabase.from("purchase_requests").select("*").eq("id", id!).maybeSingle(),
-        supabase.from("purchase_request_items").select("id, item_no, quantity, unit, description, budget, notes, work_id, cc_code, rec_quote_item_id, status, quote_path").eq("request_id", id!).order("item_no"),
+        supabase.from("purchase_request_items").select("id, item_no, quantity, unit, description, budget, notes, work_id, cc_code, rec_quote_item_id, status, quote_path, link_url").eq("request_id", id!).order("item_no"),
         supabase.from("purchase_quotes").select("*").eq("request_id", id!).order("created_at"),
       ]);
       if (r.error) throw r.error;
@@ -63,17 +63,39 @@ export async function openQuoteFile(path: string) {
 
 const baseName = (p: string) => p.split("/").pop()!.replace(/^[0-9a-f-]{36}-/, "");
 
-/** Cotações anexadas pelo solicitante (no item ou na verba total) entram na recomendação como as do comprador. */
+const isUrl = (p: string) => /^https?:\/\//i.test(p);
+const linkUrl = (v: string) => (isUrl(v.trim()) ? v.trim() : `https://${v.trim()}`);
+const linkName = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
+
+/**
+ * Cotações anexadas pelo solicitante (no item ou na verba total) e os links de referência dos itens (do solicitante ou
+ * do validador) entram na recomendação como as do comprador.
+ */
 async function ensureRequesterQuotes(d: RecData): Promise<string[]> {
   const known = new Set(d.quotes.map((q) => q.file_path));
-  const paths = [d.req.quote_path, ...d.items.map((i) => i.quote_path)].filter((p): p is string => !!p && !/^https?:\/\//.test(p) && !known.has(p));
-  const uniq = [...new Set(paths)];
-  if (!uniq.length) return [];
+  const files = [d.req.quote_path, ...d.items.map((i) => i.quote_path)].filter((p): p is string => !!p && !known.has(p));
+  const links = d.items.map((i) => i.link_url?.trim()).filter((p): p is string => !!p).map(linkUrl).filter((p) => !known.has(p));
+  const rows = [
+    ...[...new Set(files)].map((p) => ({ request_id: d.req.id, file_path: p, file_name: isUrl(p) ? linkName(p) : baseName(p), source: "solicitante", kind: isUrl(p) ? "link" : "file" })),
+    ...[...new Set(links)].map((p) => ({ request_id: d.req.id, file_path: p, file_name: linkName(p), source: "solicitante", kind: "link" })),
+  ];
+  if (!rows.length) return [];
   const { data, error } = await supabase.from("purchase_quotes")
-    .upsert(uniq.map((p) => ({ request_id: d.req.id, file_path: p, file_name: baseName(p), source: "solicitante" })), { onConflict: "request_id,file_path", ignoreDuplicates: true })
+    .upsert(rows, { onConflict: "request_id,file_path", ignoreDuplicates: true })
     .select("id");
   if (error) throw error;
   return (data ?? []).map((x) => x.id);
+}
+
+/** Traz as cotações/links do solicitante e do validador e já lê as novas; devolve quantas entraram. */
+export async function importRequesterQuotes(d: RecData): Promise<number> {
+  try {
+    const fresh = await ensureRequesterQuotes(d);
+    for (const id of fresh) {
+      try { await readPurchaseQuote({ data: { quoteId: id } }); } catch { /* fica com erro na cotação */ }
+    }
+    return fresh.length;
+  } catch { return 0; }
 }
 
 const ACCEPT = ".pdf,image/*,.xlsx,.xls,.xlsm,.csv";
@@ -140,10 +162,21 @@ export function QuotesAttachDialog({ row, onClose, onDone }: { row: ScRow | null
     await read(ids);
   };
 
+  const [link, setLink] = useState("");
+  const addLink = async () => {
+    if (!row || !link.trim()) return;
+    const url = linkUrl(link);
+    const ins = await supabase.from("purchase_quotes").insert({ request_id: row.id, file_path: url, file_name: linkName(url), source: "comprador", kind: "link" }).select("id").single();
+    if (ins.error) { toast.error(ins.error.code === "23505" ? "Este link já está nas cotações" : ins.error.message); return; }
+    setLink("");
+    await refresh();
+    await read([ins.data.id]);
+  };
+
   const remove = async (q: QuoteLite) => {
     const { error } = await supabase.from("purchase_quotes").delete().eq("id", q.id);
     if (error) { toast.error(error.message); return; }
-    if (q.source === "comprador") await supabase.storage.from("purchase-photos").remove([q.file_path]);
+    if (q.source === "comprador" && !isUrl(q.file_path)) await supabase.storage.from("purchase-photos").remove([q.file_path]);
     await refresh();
   };
 
@@ -158,8 +191,15 @@ export function QuotesAttachDialog({ row, onClose, onDone }: { row: ScRow | null
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Paperclip className="h-4 w-4" /> Cotações · {row?.number}</DialogTitle>
-            <DialogDescription>PDF, foto ou Excel. Cada cotação é lida pela IA (fornecedor, prazo, pagamento e itens). As cotações anexadas pelo solicitante já entram aqui.</DialogDescription>
+            <DialogDescription>PDF, foto, Excel ou link. Cada cotação é lida pela IA (fornecedor, prazo, pagamento e itens). As cotações e os links anexados pelo solicitante e pelo validador já entram aqui.</DialogDescription>
           </DialogHeader>
+          {!locked && (
+            <div className="flex gap-2">
+              <Input placeholder="Colar link da cotação (loja, anúncio, PDF…)" value={link} onChange={(e) => setLink(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void addLink(); }} />
+              <Button variant="outline" disabled={!link.trim()} onClick={() => void addLink()}><Link2 className="h-4 w-4" /> Adicionar link</Button>
+            </div>
+          )}
           {locked && <p className="rounded-md bg-amber-500/10 p-2 text-xs">Esta SC está em aprovação: as cotações não mudam até a decisão (ou puxe de volta na Recomendação).</p>}
           <div className="max-h-[50vh] space-y-2 overflow-y-auto">
             {data.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
@@ -169,7 +209,9 @@ export function QuotesAttachDialog({ row, onClose, onDone }: { row: ScRow | null
               const isReading = reading.has(q.id);
               return (
                 <div key={q.id} className="flex items-center gap-3 rounded-md border border-border p-2 text-sm">
-                  <button type="button" className="shrink-0" title="Abrir arquivo" onClick={() => void openQuoteFile(q.file_path)}><FileText className="h-5 w-5 text-primary" /></button>
+                  <button type="button" className="shrink-0" title={isUrl(q.file_path) ? "Abrir link" : "Abrir arquivo"} onClick={() => void openQuoteFile(q.file_path)}>
+                    {isUrl(q.file_path) ? <Link2 className="h-5 w-5 text-primary" /> : <FileText className="h-5 w-5 text-primary" />}
+                  </button>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium">{q.supplier ?? q.file_name ?? baseName(q.file_path)}</div>
                     <div className="truncate text-xs text-muted-foreground">

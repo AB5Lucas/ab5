@@ -1254,6 +1254,13 @@
       "when": 1795603851083,
       "tag": "0191_purchase_notify_item_bought",
       "breakpoints": true
+    },
+    {
+      "idx": 179,
+      "version": "7",
+      "when": 1795603852083,
+      "tag": "0192_purchase_buyer_edit_dual_approval",
+      "breakpoints": true
     }
   ]
 }

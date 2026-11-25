@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Ban, Eye, Paperclip, Pencil, Undo2 } from "lucide-react";
@@ -17,7 +17,6 @@ import { ScReportButton } from "@/components/compras/sc-report-dialog";
 import { Pill, ScTable, todayISO, StatusFilter, statusCounts, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 import { SC_DONE_STATUSES, SC_STATUSES, statusClass } from "@/lib/purchase-requests";
 import { QuotesAttachDialog } from "@/components/compras/quotes";
-import { RecommendationView } from "@/components/compras/recommendation-view";
 import { recCols, useRecTotals } from "@/components/compras/rec-list";
 
 export const Route = createFileRoute("/_authenticated/compras/comprador")({
@@ -64,7 +63,8 @@ function Page() {
   const [tab, setTab] = useState(() => (typeof location !== "undefined" && ["recomendacao", "aprovadores"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "solicitacoes"));
   const changeTab = (v: string) => { setTab(v); try { history.replaceState(history.state, "", `${location.pathname}${location.search}#${v}`); } catch { /* ignora */ } };
   const [attachRow, setAttachRow] = useState<ScRow | null>(null);
-  const [openRec, setOpenRec] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const openRec = (id: string) => void navigate({ to: "/compras/solicitacoes/$id", params: { id }, search: { tab: "recomendacao" } });
   const openRows = useMemo(() => (list.data ?? []).filter((r) => !done(r) || r.fa_state), [list.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const totals = useRecTotals(openRows);
   const recRows = openRows.filter((r) => r.fa_state || (totals.get(r.id)?.quotes ?? 0) > 0);
@@ -120,20 +120,16 @@ function Page() {
           )}
         </TabsContent>
         <TabsContent value="recomendacao" className="mt-4 space-y-4">
-          {openRec ? <RecommendationView requestId={openRec} mode="comprador" onBack={() => setOpenRec(null)} /> : (
-            <>
-              <p className="text-sm text-muted-foreground">SCs com cotações anexadas (clipe na aba Solicitações). Abra para ver a melhor escolha de cada item e enviar ao aprovador.</p>
-              <ScTable rows={recRows} clientName={clientName} extraCols={recCols(totals)} actions={(r) => (
-                <Button size="sm" variant="outline" onClick={() => setOpenRec(r.id)}><Eye className="h-3.5 w-3.5" /> Abrir</Button>
-              )} endActions={(r) => (
-                <Button size="icon" variant="ghost" className="h-7 w-7" title="Cotações" onClick={() => setAttachRow(r)}><Paperclip className="h-4 w-4 text-primary" /></Button>
-              )} />
-            </>
-          )}
+          <p className="text-sm text-muted-foreground">SCs com cotações anexadas. Abra para ver a melhor escolha de cada item (aba Recomendação de compras dentro da SC) e enviar ao aprovador.</p>
+          <ScTable rows={recRows} clientName={clientName} extraCols={recCols(totals)} actions={(r) => (
+            <Button size="sm" variant="outline" onClick={() => openRec(r.id)}><Eye className="h-3.5 w-3.5" /> Abrir</Button>
+          )} endActions={(r) => (
+            <Button size="icon" variant="ghost" className="h-7 w-7" title="Cotações" onClick={() => setAttachRow(r)}><Paperclip className="h-4 w-4 text-primary" /></Button>
+          )} />
         </TabsContent>
         <TabsContent value="aprovadores" className="mt-4"><ApproversPanel /></TabsContent>
       </Tabs>
-      <QuotesAttachDialog row={attachRow} onClose={() => setAttachRow(null)} onDone={(id) => { changeTab("recomendacao"); setOpenRec(id); }} />
+      <QuotesAttachDialog row={attachRow} onClose={() => setAttachRow(null)} onDone={(id) => openRec(id)} />
       <Dialog open={!!returning} onOpenChange={(o) => !o && setReturning(null)}>
         <DialogContent>
           <DialogHeader>

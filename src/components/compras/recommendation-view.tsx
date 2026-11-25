@@ -1,9 +1,12 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, BadgeCheck, Check, ChevronsRight, Columns3, Eye, FileText, Info, Link2, Paperclip, Send, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { useAccess } from "@/hooks/use-access";
+import { useActionHistory, type ActionHistory } from "@/hooks/use-action-history";
+import { UndoRedoButtons } from "@/components/compras/undo-redo";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -15,7 +18,7 @@ import { Table, TableBody, TableCell, TableFooter, TableHeader, TableRow } from 
 import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 import { ScHeaderCard } from "@/components/compras/sc-header-card";
 import { Pill, todayISO, useClientsList, useScUsers } from "@/components/compras/sc-shared";
-import { QuoteMatchingDialog, QuotesAttachDialog, openQuoteFile, useRecData, type RecData } from "@/components/compras/quotes";
+import { QuoteMatchingDialog, QuotesAttachDialog, importRequesterQuotes, openQuoteFile, useRecData, type RecData } from "@/components/compras/quotes";
 import {
   CRITERIA, RULE_LABEL, approvalRule, budgetSignal, nextOption, recommendation, scBudget, type Criterion, type FaRule, type RecRow,
 } from "@/lib/purchase-quotes";
@@ -34,12 +37,21 @@ export function BudgetDot({ total, budget }: { total: number | null | undefined;
 }
 
 /** Quem pode aprovar agora (igual a purchase_fa_can_decide no banco). */
-export function canDecide(r: RecData["req"], uid: string | undefined): boolean {
+/** Lado de quem aprova na aprovação dupla (igual a purchase_fa_side): gestor do cliente/validador, senão comprador. */
+export function faSide(uid: string | undefined, who: { isBuyer: boolean; isGestor: boolean }): "gestor" | "comprador" | null {
+  if (!uid) return null;
+  if (who.isGestor) return "gestor";
+  if (uid === FA_VITORIA || who.isBuyer) return "comprador";
+  return null;
+}
+/** Quem pode aprovar agora (igual a purchase_fa_can_decide no banco). */
+export function canDecide(r: RecData["req"], uid: string | undefined, who: { isBuyer: boolean; isGestor: boolean } = { isBuyer: false, isGestor: false }): boolean {
   if (!uid || r.fa_state !== "em_aprovacao") return false;
   const rule = approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO());
   if (uid === FA_DIRECTOR) return true;
-  if (uid === FA_VITORIA) return rule !== "diretor";
-  return rule === "dupla" && (uid === r.approver_id || uid === r.substitute_id);
+  if (rule === "verba") return uid === FA_VITORIA;
+  if (rule === "dupla") { const side = faSide(uid, who); return !!side && side !== r.fa_partial_side; }
+  return false;
 }
 
 type Col = ColumnDef<RecRow> & { cell: (r: RecRow) => ReactNode; className?: string; fixed?: boolean };
@@ -49,9 +61,21 @@ type Col = ColumnDef<RecRow> & { cell: (r: RecRow) => ReactNode; className?: str
  * Mesmo cabeçalho da SC; itens com a melhor escolha pelos critérios, botão para a próxima melhor e o resumo
  * (cotações analisadas, fornecedores e critérios).
  */
-export function RecommendationView({ requestId, mode, onBack }: { requestId: string; mode: "comprador" | "aprovacao"; onBack: () => void }) {
+export function RecommendationView({ requestId, mode, onBack, embedded, history: outerHistory, isGestor = false }: {
+  requestId: string; mode: "comprador" | "aprovacao"; onBack?: () => void;
+  /** Dentro da página da SC (aba Recomendação): sem Voltar/título, o cabeçalho já está na página. */
+  embedded?: boolean;
+  /** Desfazer/refazer da página (comprador): critérios e escolhas entram nele. */
+  history?: ActionHistory;
+  /** O usuário é gestor desta SC (cliente/validador), para a aprovação dupla. */
+  isGestor?: boolean;
+}) {
   const qc = useQueryClient();
-  const { user } = useCurrentUser();
+  const { user, isAdmin } = useCurrentUser();
+  const { canAccess } = useAccess();
+  const isBuyer = isAdmin || canAccess("/compras/comprador");
+  const ownHistory = useActionHistory();
+  const history = outerHistory ?? ownHistory;
   const data = useRecData(requestId);
   const clients = useClientsList();
   const users = useScUsers();
@@ -80,6 +104,16 @@ export function RecommendationView({ requestId, mode, onBack }: { requestId: str
   const editable = mode === "comprador" && !!r && r.stage === "compras" && r.fa_state !== "em_aprovacao";
   const readQuotes = (d?.quotes ?? []).filter((q) => q.read_status === "lido");
 
+  const rpcCriteria = async (c: Criterion[]) => {
+    const { error } = await supabase.rpc("purchase_rec_set_criteria" as never, { _id: requestId, _criteria: c } as never);
+    if (error) { toast.error(error.message); throw error; }
+    await invalidate();
+  };
+  const rpcChoose = async (item: string, qi: string | null) => {
+    const { error } = await supabase.rpc("purchase_rec_choose" as never, { _item: item, _quote_item: qi } as never);
+    if (error) { toast.error(error.message); throw error; }
+    await invalidate();
+  };
   const setCriteria = useMutation({
     mutationFn: async (c: Criterion[]) => {
       const { error } = await supabase.rpc("purchase_rec_set_criteria" as never, { _id: requestId, _criteria: c } as never);
@@ -126,7 +160,11 @@ export function RecommendationView({ requestId, mode, onBack }: { requestId: str
       const { error } = await supabase.rpc("purchase_fa_decide" as never, { _id: requestId, _approve: decision === "aprovado", _notes: decNotes } as never);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success(decision === "aprovado" ? "Aprovada: voltou ao Comprador" : "Recusada: voltou ao Comprador"); setDecision(""); setDecNotes(""); void invalidate(); onBack(); },
+    onSuccess: () => {
+      const partial = decision === "aprovado" && r?.fa_rule !== "verba" && approvalRule(Number(r?.fa_total ?? 0), r?.fa_budget == null ? null : Number(r.fa_budget), r?.due_date ?? null, todayISO()) === "dupla" && user?.id !== FA_DIRECTOR && !r?.fa_partial_side;
+      toast.success(partial ? "Sua aprovação foi registrada: falta a do outro lado (comprador ou gestor)" : decision === "aprovado" ? "Aprovada: voltou ao Comprador" : "Recusada: voltou ao Comprador");
+      setDecision(""); setDecNotes(""); void invalidate(); if (!partial) onBack?.();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const ack = useMutation({
@@ -137,6 +175,14 @@ export function RecommendationView({ requestId, mode, onBack }: { requestId: str
     onSuccess: () => { toast.success("Ciência registrada"); void invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // Cotações e links do solicitante/validador entram sozinhos (o comprador não precisa abrir o clipe).
+  const imported = useRef(false);
+  useEffect(() => {
+    if (imported.current || mode !== "comprador" || !d || d.req.stage !== "compras" || d.req.fa_state === "em_aprovacao" || !isBuyer) return;
+    imported.current = true;
+    void importRequesterQuotes(d).then((n) => { if (n) void invalidate(); });
+  }, [d, mode, isBuyer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (data.isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
   if (!d || !r || !rec) return <p className="text-sm text-muted-foreground">Solicitação não encontrada ou sem acesso.</p>;
@@ -177,7 +223,11 @@ export function RecommendationView({ requestId, mode, onBack }: { requestId: str
           <div className="flex items-center gap-1">
             {editable && next && (
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" title={`Próxima melhor escolha: ${next.quote.supplier ?? "—"} · ${brl(next.total)}`} disabled={choose.isPending}
-                onClick={() => choose.mutate({ item: x.item.id, qi: x.options.indexOf(next) === 0 ? null : next.quoteItem.id })}>
+                onClick={() => {
+                  const qi = x.options.indexOf(next) === 0 ? null : next.quoteItem.id;
+                  const before = x.item.rec_quote_item_id;
+                  choose.mutate({ item: x.item.id, qi }, { onSuccess: () => history.push({ label: `Item ${x.item.item_no}: ${next.quote.supplier ?? "próxima escolha"}`, undo: () => rpcChoose(x.item.id, before), redo: () => rpcChoose(x.item.id, qi) }) });
+                }}>
                 <ChevronsRight className="h-3.5 w-3.5" /> Próxima
               </Button>
             )}
@@ -203,15 +253,30 @@ export function RecommendationView({ requestId, mode, onBack }: { requestId: str
   const rule = r.fa_state === "em_aprovacao"
     ? approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO())
     : approvalRule(rec.total, budget, r.due_date, todayISO());
-  const mayDecide = mode === "aprovacao" && canDecide(r, user?.id);
+  const who = { isBuyer, isGestor };
+  const mayDecide = mode === "aprovacao" && canDecide(r, user?.id, who);
+  const partialWaiting = r.fa_state === "em_aprovacao" && !!r.fa_partial_side;
+  // Aprovador: desfazer/refazer da escolha (Aprovado/Recusado) e da observação antes de enviar.
+  const changeDecision = (v: typeof decision) => {
+    const before = decision;
+    if (before === v) return;
+    setDecision(v);
+    history.push({ label: `Decisão: ${v === "aprovado" ? "Aprovado" : v === "recusado" ? "Recusado" : "—"}`, undo: () => setDecision(before), redo: () => setDecision(v) });
+  };
+  const notesStart = useRef<string | null>(null);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Voltar</Button>
-        <span className={`inline-block h-3 w-3 rounded-full ${statusDot(r.status)}`} title={r.status} />
-        <h2 className="font-display text-xl font-semibold uppercase tracking-wide">{r.number}</h2>
+        {!embedded && <>
+          {onBack && <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Voltar</Button>}
+          <span className={`inline-block h-3 w-3 rounded-full ${statusDot(r.status)}`} title={r.status} />
+          <h2 className="font-display text-xl font-semibold uppercase tracking-wide">{r.number}</h2>
+        </>}
         <div className="ml-auto flex flex-wrap gap-2">
+          {!outerHistory && (mode === "aprovacao" ? mayDecide : editable) && (
+            <UndoRedoButtons undoLabels={history.undoLabels} redoLabels={history.redoLabels} onUndo={(n) => void history.undo(n)} onRedo={(n) => void history.redo(n)} />
+          )}
           {editable && <Button variant="outline" size="sm" onClick={() => setAttach(true)}><Paperclip className="h-4 w-4" /> Cotações</Button>}
           {editable && readQuotes.length > 0 && <Button variant="outline" size="sm" onClick={() => setMatching(true)}><Link2 className="h-4 w-4" /> Vincular itens</Button>}
           {editable && <Button size="sm" disabled={!rec.covered} onClick={() => setSending(true)}><Send className="h-4 w-4" /> Enviar ao Aprovador</Button>}
@@ -228,7 +293,7 @@ export function RecommendationView({ requestId, mode, onBack }: { requestId: str
         <div className="panel flex flex-wrap items-end gap-3 p-3">
           <div className="space-y-1">
             <Label className="block text-xs">Decisão</Label>
-            <Select value={decision} onValueChange={(v) => setDecision(v as typeof decision)}>
+            <Select value={decision} onValueChange={(v) => changeDecision(v as typeof decision)}>
               <SelectTrigger className="w-44"><SelectValue placeholder="Escolha" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="aprovado"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Aprovado</span></SelectItem>
@@ -238,7 +303,13 @@ export function RecommendationView({ requestId, mode, onBack }: { requestId: str
           </div>
           <div className="min-w-64 flex-1 space-y-1">
             <Label htmlFor="fa-dec" className="block text-xs">{decision === "recusado" ? "Motivo da recusa (obrigatório)" : "Observação (opcional)"}</Label>
-            <Textarea id="fa-dec" rows={1} className="min-h-9" value={decNotes} onChange={(e) => setDecNotes(e.target.value)} />
+            <Textarea id="fa-dec" rows={1} className="min-h-9" value={decNotes} onChange={(e) => setDecNotes(e.target.value)}
+              onFocus={() => { notesStart.current = decNotes; }}
+              onBlur={() => {
+                const before = notesStart.current ?? "", after = decNotes;
+                notesStart.current = null;
+                if (before !== after) history.push({ label: "Observação da decisão", undo: () => setDecNotes(before), redo: () => setDecNotes(after) });
+              }} />
           </div>
           <Button disabled={!decision || decide.isPending || (decision === "recusado" && !decNotes.trim())} onClick={() => decide.mutate()}>
             <Send className="h-4 w-4" /> Enviar ao Comprador
@@ -247,7 +318,10 @@ export function RecommendationView({ requestId, mode, onBack }: { requestId: str
       )}
 
       <FaBanner r={r} userName={userName} rule={rule} />
-      <ScHeaderCard r={r} clientName={clientName} />
+      {mode === "aprovacao" && partialWaiting && !mayDecide && (
+        <p className="rounded-md bg-muted p-2 text-xs">Aguardando a aprovação do {r.fa_partial_side === "gestor" ? "comprador" : "gestor"}.</p>
+      )}
+      {!embedded && <ScHeaderCard r={r} clientName={clientName} />}
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
@@ -260,7 +334,8 @@ export function RecommendationView({ requestId, mode, onBack }: { requestId: str
                   onClick={() => {
                     const n = on ? criteria.filter((x) => x !== c.value) : [...criteria, c.value];
                     if (!n.length) { toast.info("Deixe ao menos um critério"); return; }
-                    setCriteria.mutate(n);
+                    const before = criteria;
+                    setCriteria.mutate(n, { onSuccess: () => history.push({ label: `Critérios: ${n.map((k) => CRITERIA.find((c) => c.value === k)?.label).join(" + ")}`, undo: () => rpcCriteria(before), redo: () => rpcCriteria(n) }) });
                   }}
                   className={cn("inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors disabled:cursor-default",
                     on ? "border-foreground bg-foreground text-background" : "border-border bg-background text-muted-foreground hover:bg-muted")}>
@@ -373,6 +448,9 @@ function FaBanner({ r, userName, rule }: { r: RecData["req"]; userName: Map<stri
       <div className="rounded-md border border-orange-500/40 bg-orange-500/10 p-3 text-sm">
         <b>Em aprovação</b> desde {when(r.fa_sent_at)}{r.fa_sent_by ? ` · enviada por ${userName.get(r.fa_sent_by) ?? "—"}` : ""} · total {brl(r.fa_total)} · verba {brl(r.fa_budget)}
         <div className="text-xs text-muted-foreground">{RULE_LABEL[rule]}</div>
+        {r.fa_partial_side && (
+          <div className="mt-1 text-xs"><b>Aprovação dupla:</b> aprovada por {userName.get(r.fa_partial_by ?? "") ?? "—"} ({r.fa_partial_side}) em {when(r.fa_partial_at)} · falta o {r.fa_partial_side === "gestor" ? "comprador" : "gestor"}</div>
+        )}
         {r.fa_notes && <div className="mt-1 text-xs"><b>Comprador:</b> {r.fa_notes}</div>}
       </div>
     );
