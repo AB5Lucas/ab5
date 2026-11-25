@@ -246,9 +246,11 @@ function AtividadesOverview() {
                 <div className="mt-3"><HoverBars dark data={d.series.map((s) => ({ label: s.label, value: s.a }))} format={brl} /></div>
               </OverviewCard>
             )}
-            {can("/obras/resultado") && (
-              <OverviewCard title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
-                <LineArea height="h-28" data={d.series} format={(p) => brl(p.a)} />
+            {can("/obras") && (
+              <OverviewCard title="Serviços com equipe" to="/obras" linkLabel="Ver serviços" hint="Serviços com pessoas escaladas no período (por dia no mês; por mês no ano)">
+                <Big value={d.svcCount} />
+                <p className="text-xs text-muted-foreground">serviços com alocação {P.unit === "day" ? "no mês" : "no período"}</p>
+                <div className="mt-3"><LineArea height="h-16" data={d.svcSeries.map((x) => ({ label: x.label, a: x.value }))} format={(x) => `${x.a} serviços`} /></div>
               </OverviewCard>
             )}
             {can("/obras/resultado") && (
@@ -295,9 +297,9 @@ function AtividadesOverview() {
                   <div onClick={(e) => e.preventDefault()}><RdoTiles cols={d.cols} unit={P.unit} /></div>
                 </OverviewCard>
               )}
-              {can("/obras") && (
-                <OverviewCard className="flex-1" title="Pessoas no Pátio" to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio; cor mais forte = mais pessoas no dia">
-                  <div onClick={(e) => e.preventDefault()}><PatioCalendar days={d.patioDays} unit={P.unit} total={d.patioCount} workforce={workforceQ.data ?? 0} /></div>
+              {can("/obras/resultado") && (
+                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
+                  <LineArea height="h-44" data={d.series} format={(p) => brl(p.a)} />
                 </OverviewCard>
               )}
             </div>
@@ -317,10 +319,8 @@ function AtividadesOverview() {
               </OverviewCard>
             )}
             {can("/obras") && (
-              <OverviewCard title="Serviços com equipe" to="/obras" linkLabel="Ver serviços" hint="Serviços com pessoas escaladas no período (por dia no mês; por mês no ano)">
-                <Big value={d.svcCount} />
-                <p className="text-xs text-muted-foreground">serviços com alocação {P.unit === "day" ? "no mês" : "no período"}</p>
-                <div className="mt-3"><LineArea height="h-16" data={d.svcSeries.map((x) => ({ label: x.label, a: x.value }))} format={(x) => `${x.a} serviços`} /></div>
+              <OverviewCard title="Pessoas no Pátio" to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no período">
+                <div onClick={(e) => e.preventDefault()}><PatioCalendar days={d.patioDays} unit={P.unit} total={d.patioCount} workforce={workforceQ.data ?? 0} /></div>
               </OverviewCard>
             )}
           </div>
