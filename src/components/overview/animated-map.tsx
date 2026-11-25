@@ -34,6 +34,9 @@ export function ufOf(lon: number, lat: number) { return Object.keys(STATES).find
 
 export function AnimatedMap({ clients, region, className, extra, focus, selected }: { clients: MapClient[]; region: string; /** "BR" ou a UF */ className?: string; extra?: React.ReactNode; focus?: { lon: number; lat: number; n: number; uf?: string | null } | null; selected?: string | null }) {
   const [run, setRun] = useState(0);
+  // Inclinação 3D só no mapa inteiro: com zoom o mapa fica plano (o navegador desenha a camada inclinada em baixa resolução).
+  const [tilted, setTilted] = useState(false);
+  useEffect(() => { setTilted(false); }, [run]);
   const [hover, setHover] = useState<MapClient | null>(null);
   const [citiesBy, setCitiesBy] = useState<Record<string, number[][][]>>({});
   const boxRef = useRef<HTMLDivElement>(null);
@@ -152,7 +155,8 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   return (
     <div ref={boxRef} className={`relative overflow-hidden text-foreground ${className ?? ""}`} style={{ perspective: "1400px" }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-      <div key={run} className="amap-stage h-full w-full">
+      <div key={run} className={`amap-stage h-full w-full ${tilted ? "amap-done" : ""} ${view.k > 1.15 ? "amap-flat" : ""}`}
+        onAnimationEnd={(e) => { if (e.animationName === "amap-tilt") setTilted(true); }}>
         <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${W / view.k} ${H / view.k}`} shapeRendering="geometricPrecision" className="h-full w-full cursor-grab touch-none active:cursor-grabbing" preserveAspectRatio="xMidYMid meet"
           onPointerDown={(e) => { if (anim.current) { cancelAnimationFrame(anim.current); anim.current = null; } (e.target as Element).setPointerCapture?.(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; }}
           onPointerMove={(e) => {
@@ -165,7 +169,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
           {paths.map((p, i) => (
             <path key={p.key} d={p.d} pathLength={1} className="amap-line" style={{ animationDelay: `${region === "BR" ? i * 40 : 0}ms` }} />
           ))}
-          {cityPath && <path d={cityPath} className="amap-cities" strokeWidth={view.k > 2 ? 0.8 : 0.6} style={{ vectorEffect: "non-scaling-stroke", strokeOpacity: view.k > 2 ? 0.55 : undefined }} />}
+          {cityPath && <path d={cityPath} className="amap-cities" strokeWidth={view.k > 2 ? 1 : 0.7} style={{ vectorEffect: "non-scaling-stroke", strokeOpacity: view.k > 2 ? 0.55 : undefined }} />}
           {pts.map((p, i) => (
             <g key={p.c.id} className="amap-pin" style={{ animationDelay: `${(regionChangedAt.current ? 1100 : 2600) + i * 40}ms` }}
               onMouseEnter={() => setHover(p.c)} onMouseLeave={() => setHover(null)}>
