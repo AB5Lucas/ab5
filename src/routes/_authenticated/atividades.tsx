@@ -229,13 +229,23 @@ function HubOverview() {
       const k = keyOf(dt); if (costBy.has(k)) { costBy.set(k, costBy.get(k)! + sp.normal + sp.extra); laborBy.set(k, (laborBy.get(k) ?? 0) + sp.normal + sp.extra); }
       const cn = w.clients?.name ?? "—"; const m = moBy.get(cn) ?? { normal: 0, extra: 0 }; m.normal += sp.normal; m.extra += sp.extra; moBy.set(cn, m);
     }
-    for (const e of q.data.costs ?? []) { if (!workBy.has(e.work_id)) continue; const k = keyOf(String(e.entry_date).slice(0, 10)); if (costBy.has(k)) costBy.set(k, costBy.get(k)! + (Number(e.amount) || 0)); }
+    // Lançamentos de custo (compras, MO lançada, ferramentas…) vêm quase todos no último dia do mês (competência):
+    // na visão por dia são espalhados igualmente pelos dias do mês no período, senão o gráfico vira um pico no dia 31.
+    const spread = (dt: string): [string, number][] => {
+      if (P.unit !== "day") { const k = keyOf(dt); return costBy.has(k) ? [[k, 1]] : []; }
+      const days = P.buckets.filter((b) => b.startsWith(dt.slice(0, 7)));
+      return days.map((b) => [b, 1 / days.length]);
+    };
+    for (const e of q.data.costs ?? []) { if (!workBy.has(e.work_id)) continue; for (const [k, f] of spread(String(e.entry_date).slice(0, 10))) costBy.set(k, costBy.get(k)! + (Number(e.amount) || 0) * f); }
     // Transporte próprio: km rodado × R$ 1,35 (principal = km × 2 × viagens; extras = extra_km); manutenção não conta.
     const expBy = new Map<string, { mo: number; tr: number; mat: number }>(P.buckets.map((b) => [b, { mo: 0, tr: 0, mat: 0 }]));
     for (const [dt, km] of q.data.km) { const k = keyOf(dt.slice(0, 10)); if (costBy.has(k)) { costBy.set(k, costBy.get(k)! + km * KM_RATE); expBy.get(k)!.tr += km * KM_RATE; } }
     for (const e of q.data.costs ?? []) {
-      if (!workBy.has(e.work_id)) continue; const x = expBy.get(keyOf(String(e.entry_date).slice(0, 10))); if (!x) continue;
-      if (e.category === "mao_obra") x.mo += Number(e.amount) || 0; else if (e.category === "materiais" || e.category === "ferramentas") x.mat += Number(e.amount) || 0;
+      if (!workBy.has(e.work_id)) continue;
+      for (const [k, f] of spread(String(e.entry_date).slice(0, 10))) {
+        const x = expBy.get(k)!; const v = (Number(e.amount) || 0) * f;
+        if (e.category === "mao_obra") x.mo += v; else if (e.category === "materiais" || e.category === "ferramentas") x.mat += v;
+      }
     }
     // Imposto de 18,5% sobre todo o faturado do dia.
     for (const b of P.buckets) costBy.set(b, costBy.get(b)! + (byBucket.get(b) ?? 0) * FIN_TAX);
@@ -343,16 +353,16 @@ function HubOverview() {
             )}
             <div className="flex flex-col gap-3 lg:grid lg:min-h-0 lg:grid-rows-2">
               {can("/externo/relatorio-diario") && (
-                <OverviewCard className="lg:min-h-0" bodyClassName="min-h-0" title={P.unit === "day" ? "RDOs por dia" : "RDOs por mês (média por dia)"} to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
+                <OverviewCard className="pb-6 lg:min-h-0" bodyClassName="min-h-0" title={P.unit === "day" ? "RDOs por dia" : "RDOs por mês (média por dia)"} to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
                   hint="Altura = clientes com equipe escalada no mês; cada quadradinho é um cliente com RDO">
                   <div className="h-full min-h-0" onClick={(e) => e.preventDefault()}><RdoTiles fill cols={d.cols} unit={P.unit} /></div>
                 </OverviewCard>
               )}
               {can("/obras/resultado") && (
-                <OverviewCard className="flex-1 lg:min-h-0" bodyClassName="flex min-h-0 flex-col" title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = imposto de 18,5% do faturado + MO das escalações (com encargos e HE) + transporte (km × R$ 1,35) + materiais, ferramentas, terceiros e andaimes lançados no dia">
+                <OverviewCard className="flex-1 pb-6 lg:min-h-0" bodyClassName="flex min-h-0 flex-col" title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = imposto de 18,5% do faturado + MO das escalações (com encargos e HE) + transporte (km × R$ 1,35) + materiais, ferramentas, terceiros e andaimes lançados no dia">
                   <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                       <div className="mb-1 flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Faturado</span><span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-muted-foreground" />Despesas</span></div>
-                      <LineArea height="h-40 lg:h-full" className="lg:min-h-[90px] lg:flex-1" data={d.billedCost} format={(p) => `Faturado ${brl(p.a)} · Despesas ${brl(p.b ?? 0)}`} />
+                      <LineArea height="h-40 lg:h-auto lg:min-h-0 lg:flex-1" className="lg:min-h-[90px] lg:flex-1" data={d.billedCost} format={(p) => `Faturado ${brl(p.a)} · Despesas ${brl(p.b ?? 0)}`} />
                   </div>
                 </OverviewCard>
               )}

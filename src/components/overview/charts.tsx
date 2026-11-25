@@ -130,7 +130,7 @@ export function LineArea({ data, format, height = "h-44", className }: { data: {
   const sel = hover ?? data.length - 1;
   const [sx, sy] = pt(sel, data[sel]?.a ?? 0);
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative flex flex-col", className)}>
       <svg viewBox="0 0 100 50" preserveAspectRatio="none" className={cn(height, "w-full overflow-visible")}
         onMouseMove={(e) => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); setHover(Math.round(((e.clientX - r.left) / r.width) * n)); }}
         onMouseLeave={() => setHover(null)}>
@@ -153,7 +153,7 @@ export function LineArea({ data, format, height = "h-44", className }: { data: {
           <p className="tabular-nums text-muted-foreground">{format(data[sel]!)}</p>
         </div>
       )}
-      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground"><span>{data[0]?.label}</span><span>{data[data.length - 1]?.label}</span></div>
+      <div className="mt-1 flex shrink-0 justify-between text-[10px] text-muted-foreground"><span>{data[0]?.label}</span><span>{data[data.length - 1]?.label}</span></div>
     </div>
   );
 }

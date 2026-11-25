@@ -30,20 +30,20 @@ export function RdoTiles({ cols, unit, fill }: { cols: TileCol[]; unit: "day" | 
   return (
     <div className={cn("flex flex-col gap-4 md:flex-row", fill && "h-full min-h-0")}>
       <div className={cn("min-w-0 flex-1", fill && "h-full min-h-0")}>
-        <div className={cn("flex items-end gap-[3px]", fill && "h-full items-stretch")}>
+        <div className={cn("flex items-end gap-[3px]", fill && "h-full overflow-hidden")}>
           {cols.map((col, ci) => {
             const cap = Math.ceil(col.max / per);
             const f = Math.round(col.fin / per), dr = Math.min(cap - f, Math.round(col.draft / per));
             return (
               <button key={col.key} type="button" onClick={() => setSel(sel === ci ? null : ci)} title={`${col.title}: ${col.fin + col.draft} de ${col.max} clientes`}
-                className={cn("flex flex-1 flex-col items-stretch gap-[3px] rounded-md p-[2px] transition-colors", fill && "h-full min-h-0", ci === i && "bg-muted ring-1 ring-border")}>
+                className={cn("flex flex-1 flex-col items-stretch gap-[3px] rounded-md p-[2px] transition-colors", fill && "justify-end", ci === i && "bg-muted ring-1 ring-border")}>
                 {Array.from({ length: rows }, (_, r) => {
                   const fromBottom = rows - 1 - r;
                   const cls = fromBottom >= cap ? "bg-transparent"
                     : fromBottom < f ? "bg-foreground"
                     : fromBottom < f + dr ? "bg-foreground/45"
                     : "border border-dashed border-border bg-muted/40";
-                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", fill ? "min-h-[4px] flex-1" : "h-5", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
+                  return <span key={r} className={cn("ov-grow w-full rounded-[4px]", fill ? "aspect-square max-h-6" : "h-5", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
                 })}
                 <span className="mt-1 shrink-0 text-center text-[10px] tabular-nums text-muted-foreground">{ci % step === 0 || ci === i ? col.label : "\u00a0"}</span>
               </button>
