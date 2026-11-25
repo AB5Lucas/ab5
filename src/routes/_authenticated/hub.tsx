@@ -338,19 +338,10 @@ function HubOverview() {
                 </OverviewCard>
               )}
               {can("/obras/resultado") && (
-                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = imposto de 18,5% do faturado + MO das escalações (com encargos e HE) + transporte (km × R$ 1,35) + materiais, ferramentas, terceiros e andaimes lançados no dia; pizza = faturado de Serviços × Indústria">
-                  <div className="grid gap-5 md:grid-cols-[1fr_200px]">
-                    <div className="min-w-0">
+                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = imposto de 18,5% do faturado + MO das escalações (com encargos e HE) + transporte (km × R$ 1,35) + materiais, ferramentas, terceiros e andaimes lançados no dia">
+                  <div className="min-w-0">
                       <div className="mb-1 flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Faturado</span><span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-muted-foreground" />Despesas</span></div>
                       <LineArea height="h-52" data={d.billedCost} format={(p) => `Faturado ${brl(p.a)} · Despesas ${brl(p.b ?? 0)}`} />
-                    </div>
-                    <div className="flex flex-col items-center justify-center gap-3 border-t pt-3 md:border-l md:border-t-0 md:pl-4 md:pt-0">
-                      <Pie frac={d.cur ? (d.cur - d.ind) / d.cur : 0} />
-                      <div className="w-full space-y-0.5 text-[11px]">
-                        <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-foreground" />Serviços</span><span className="tabular-nums font-medium">{brl(d.cur - d.ind)}</span></div>
-                        <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-foreground/25" />Indústria</span><span className="tabular-nums font-medium">{brl(d.ind)}</span></div>
-                      </div>
-                    </div>
                   </div>
                 </OverviewCard>
               )}
@@ -406,18 +397,3 @@ function MoBars({ rows, limit = 99 }: { rows: { label: string; normal: number; e
   );
 }
 
-function Pie({ frac }: { frac: number }) {
-  const f = Math.max(0, Math.min(1, frac)), a = f * 2 * Math.PI;
-  const x = 50 + 46 * Math.sin(a), y = 50 - 46 * Math.cos(a);
-  const pct = (v: number) => `${Math.round(v * 100)}%`;
-  const mid = (t: number) => [50 + 26 * Math.sin(t), 50 - 26 * Math.cos(t)] as const;
-  const [sx, sy] = mid(a / 2), [ix, iy] = mid(a + (2 * Math.PI - a) / 2);
-  return (
-    <svg viewBox="0 0 100 100" className="ov-fade h-32 w-32">
-      <circle cx="50" cy="50" r="46" className="fill-foreground/25" />
-      {f >= 1 ? <circle cx="50" cy="50" r="46" className="fill-foreground" /> : f > 0 && <path d={`M50 50 L50 4 A46 46 0 ${f > 0.5 ? 1 : 0} 1 ${x} ${y} Z`} className="fill-foreground stroke-background" strokeWidth="1.5" />}
-      {f > 0.08 && <text x={sx} y={sy} textAnchor="middle" dominantBaseline="middle" className="fill-background text-[9px] font-semibold">{pct(f)}</text>}
-      {f < 0.92 && <text x={ix} y={iy} textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-[9px] font-semibold">{pct(1 - f)}</text>}
-    </svg>
-  );
-}
