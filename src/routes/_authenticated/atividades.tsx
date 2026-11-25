@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
@@ -68,7 +68,7 @@ function AtividadesOverview() {
   const P = useMemo(() => periodOf(period, today), [period, isoOf(today)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const q = useQuery({
-    queryKey: ["overview", "atividades", P.from, P.to],
+    queryKey: ["overview", "atividades", P.from, P.to], placeholderData: keepPreviousData,
     staleTime: 2 * 60_000,
     refetchInterval: 5 * 60_000,
     queryFn: async () => {
@@ -88,13 +88,13 @@ function AtividadesOverview() {
   const finStart = P.from, finEnd = P.unit === "day" ? `${P.yms[0]}-${pad(new Date(Number(P.yms[0]!.slice(0, 4)), Number(P.yms[0]!.slice(5, 7)), 0).getDate())}` : `${P.yms[0]!.slice(0, 4)}-12-31`;
   const fWorks = useQuery({ queryKey: ["fin-works"], enabled: canResult, queryFn: async () => (await supabase.from("works").select("*, clients(name)").order("name")).data ?? [] });
   const holidays = useQuery({ queryKey: ["holidays-dates"], enabled: canResult, queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string) });
-  const fActive = useQuery({ queryKey: ["fin-active", finStart, finEnd], enabled: canResult, queryFn: () => loadFinanceActive(finStart, finEnd) });
+  const fActive = useQuery({ queryKey: ["fin-active", finStart, finEnd], placeholderData: keepPreviousData, enabled: canResult, queryFn: () => loadFinanceActive(finStart, finEnd) });
   const shared = useQuery({ queryKey: ["fin-shared"], enabled: canResult, staleTime: 60_000, queryFn: loadResultShared });
   const fList = useMemo(() => financeList(fWorks.data ?? [], fActive.data, finStart, finEnd).filter((w: any) => scope.allowWork(w)), [fWorks.data, fActive.data, finStart, finEnd, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
   const batches = useMemo(() => financeBatches(fList), [fList]);
   const batchKey = useMemo(() => batches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [batches]);
   const raws = useQuery({
-    queryKey: ["fin-client-raw", batchKey, finEnd], staleTime: 60_000,
+    queryKey: ["fin-client-raw", batchKey, finEnd], placeholderData: keepPreviousData, staleTime: 60_000,
     enabled: canResult && !!shared.data && !!fActive.data,
     queryFn: () => loadFinanceRaws(batches, shared.data!, { until: finEnd }),
   });
@@ -103,7 +103,7 @@ function AtividadesOverview() {
     const s = directorSummary(fList, raws.data, P.yms, holidays.data ?? [], fWorks.data ?? []);
     const months = s.months.filter((m) => m.pct != null);
     const avg = months.length ? months.reduce((a, m) => a + m.pct!, 0) / months.length : null;
-    return { avg, months: s.months, works: (s.works ?? []).filter((w: any) => w.comp > 0 && w.pct != null).sort((a: any, b: any) => b.pct - a.pct) };
+    return { avg, months: s.months, clients: (s.clients ?? []).filter((c: any) => c.comp > 0 && c.pct != null).sort((a: any, b: any) => b.pct - a.pct) };
   }, [raws.data, fList, P.yms, holidays.data, fWorks.data]);
 
   const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
@@ -217,7 +217,7 @@ function AtividadesOverview() {
   const fmtPct = (v: number | null | undefined) => (v == null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 
   return (
-    <div className="space-y-5">
+    <div className={cn("space-y-5 transition-opacity duration-300", (q.isPlaceholderData || raws.isPlaceholderData) && "opacity-70")}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">Atividades</h1>
@@ -258,7 +258,7 @@ function AtividadesOverview() {
                     <Big value={fmtPct(margin.avg)} />
                     <p className="text-xs text-muted-foreground">{margin.months.length > 1 ? `média de ${margin.months.filter((m) => m.pct != null).length} meses` : "no mês"}</p>
                     <div className="mt-2"><MarginLine data={P.unit === "day"
-                      ? margin.works.map((w: any) => ({ label: `${w.client} · ${w.name}`, pct: w.pct }))
+                      ? margin.clients.map((c: any) => ({ label: c.name, pct: c.pct }))
                       : margin.months.filter((m) => m.pct != null).map((m) => ({ label: `${monthLabel(m.ym)}/${m.ym.slice(2, 4)}`, pct: m.pct! }))} /></div>
                   </>
                 ) : <div className="h-16 animate-pulse rounded-lg bg-muted" />}

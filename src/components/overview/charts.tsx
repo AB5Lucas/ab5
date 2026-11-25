@@ -331,7 +331,7 @@ export function HoverBars({ data, format, dark, height = "h-16" }: { data: { lab
       <div className={cn("flex w-full items-end gap-[2px]", height)}>
         {data.map((x, i) => (
           <span key={i} onMouseEnter={() => setHover(i)} className="flex h-full flex-1 items-end">
-            <span className={cn("ov-grow w-full rounded-[3px] transition-colors", i === sel ? (dark ? "bg-background" : "bg-foreground") : dark ? "bg-background/30" : "bg-foreground/20")}
+            <span className={cn("ov-grow w-full rounded-[3px] transition-all duration-500", i === sel ? (dark ? "bg-background" : "bg-foreground") : dark ? "bg-background/30" : "bg-foreground/20")}
               style={{ height: `${x.value > 0 ? Math.max(6, (x.value / max) * 100) : 3}%`, animationDelay: `${i * 20}ms` }} />
           </span>
         ))}

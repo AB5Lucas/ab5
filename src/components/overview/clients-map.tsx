@@ -21,6 +21,7 @@ export function ClientsMap({ clients, className }: { clients: MapClient[]; class
   const pick = (c: MapClient) => {
     const sp = inState("SP", c.lon, c.lat);
     if (!sp && region === "SP") setRegion("BR");
+    if (sp && region === "BR") setRegion("SP");
     setSelected(c.id); setFocus((f) => ({ lon: c.lon, lat: c.lat, n: (f?.n ?? 0) + 1 }));
   };
   const listed = [...base].sort((a, b) => (b.billed ?? 0) - (a.billed ?? 0) || a.name.localeCompare(b.name));

@@ -53,3 +53,4 @@
 - [ ] Contratações: vermelho para abertas sem tratamento, laranja para pendentes em andamento; testar.
 - [ ] Agendamentos: permitir mesmo colaborador/dia em horários diferentes na criação, edição e remarcação; testar na tela.
 - [x] Programação: bolinhas de VT e Prêmio Viagem na caixa personalizada e nos funcionários; 8 testes aprovados, alternância individual e persistência conferidas na tela autenticada, sem alterar cálculos de benefícios.
+- [x] Atividades: troca de filtro sem tela branca
