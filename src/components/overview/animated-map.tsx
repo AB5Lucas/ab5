@@ -32,12 +32,12 @@ const loadCities = (uf: string) => {
 /** UF do ponto pelo contorno dos estados. */
 export function ufOf(lon: number, lat: number) { return Object.keys(STATES).find((uf) => inState(uf, lon, lat)) ?? null; }
 
-export function AnimatedMap({ clients, region, className, extra, focus, selected }: { clients: MapClient[]; region: "SP" | "BR"; className?: string; extra?: React.ReactNode; focus?: { lon: number; lat: number; n: number; uf?: string | null } | null; selected?: string | null }) {
+export function AnimatedMap({ clients, region, className, extra, focus, selected }: { clients: MapClient[]; region: string; /** "BR" ou a UF */ className?: string; extra?: React.ReactNode; focus?: { lon: number; lat: number; n: number; uf?: string | null } | null; selected?: string | null }) {
   const [run, setRun] = useState(0);
   const [hover, setHover] = useState<MapClient | null>(null);
   const [citiesBy, setCitiesBy] = useState<Record<string, number[][][]>>({});
   const boxRef = useRef<HTMLDivElement>(null);
-  const [ratio, setRatio] = useState(region === "SP" ? 0.62 : 0.9);
+  const [ratio, setRatio] = useState(region !== "BR" ? 0.62 : 0.9);
   useEffect(() => {
     const el = boxRef.current; if (!el) return;
     const ro = new ResizeObserver(([e]) => { const r = e!.contentRect; if (r.width > 0 && r.height > 0) setRatio(r.height / r.width); });
@@ -71,8 +71,8 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   useEffect(() => { setView({ x: 0, y: 0, k: 1 }); }, [run]);
   const showUfs = useMemo(() => {
     const set = new Set<string>();
-    if (region === "SP" || view.k >= 2) set.add("SP");
-    if (focus?.uf) set.add(focus.uf);
+    if (region !== "BR") set.add(region);
+    else { if (view.k >= 2) set.add("SP"); if (focus?.uf) set.add(focus.uf); }
     return [...set];
   }, [region, view.k >= 2, focus?.uf]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -80,7 +80,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   }, [showUfs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { paths, project } = useMemo(() => {
-    const keys = region === "SP" ? ["SP"] : Object.keys(STATES);
+    const keys = region !== "BR" ? [region] : Object.keys(STATES);
     const rings = keys.flatMap((k) => STATES[k] ?? []);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const r of rings) for (const p of r) { const x = p[0]!, y = p[1]!; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -100,21 +100,21 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   };
   useLayoutEffect(() => {
     if (prevRegion.current === region) return;
-    prevRegion.current = region; regionChangedAt.current = performance.now();
+    const prev = prevRegion.current; prevRegion.current = region; regionChangedAt.current = performance.now();
     if (anim.current) cancelAnimationFrame(anim.current);
     // começa enquadrando a região anterior na projeção nova e anima até a região toda
-    const from = fitBox(region === "BR" ? ["SP"] : Object.keys(STATES));
+    const from = fitBox(region === "BR" ? [prev] : Object.keys(STATES));
     viewRef.current = from; setView(from);
     animateTo({ x: 0, y: 0, k: 1 }, 1100);
   }, [region]); // eslint-disable-line react-hooks/exhaustive-deps
   const cityPath = useMemo(() => {
-    const cities = showUfs.flatMap((uf) => (region === "SP" && uf !== "SP" ? [] : citiesBy[uf] ?? []));
+    const cities = showUfs.flatMap((uf) => (region !== "BR" && uf !== region ? [] : citiesBy[uf] ?? []));
     if (!cities.length) return "";
     return cities.map((r) => "M" + r.map((p) => project(p[0]!, p[1]!).map((v) => v.toFixed(1)).join(",")).join("L") + "Z").join("");
   }, [citiesBy, showUfs, project, region]);
 
   const max = Math.max(1, ...clients.map((c) => c.billed ?? 0));
-  const pts = clients.map((c) => ({ c, xy: project(c.lon, c.lat), r: (region === "SP" ? 4 : 3) + Math.sqrt((c.billed ?? 0) / max) * (region === "SP" ? 8 : 6) }))
+  const pts = clients.map((c) => ({ c, xy: project(c.lon, c.lat), r: (region !== "BR" ? 4 : 3) + Math.sqrt((c.billed ?? 0) / max) * (region !== "BR" ? 8 : 6) }))
     .filter((p) => p.xy[0] > -50 && p.xy[0] < W + 50 && p.xy[1] > -50 && p.xy[1] < H + 50)
     .sort((a, b) => b.r - a.r); // menores por cima, mais fáceis de pegar
 
@@ -131,7 +131,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   useEffect(() => {
     if (!focus) return;
     const [fx, fy] = project(focus.lon, focus.lat);
-    const k = region === "SP" ? 5 : 8, vw = W / k, vh = H / k;
+    const k = region !== "BR" ? 5 : 8, vw = W / k, vh = H / k;
     const wait = Math.max(30, 1150 - (performance.now() - regionChangedAt.current));
     const t = setTimeout(() => animateTo({ k, x: Math.min(W - vw, Math.max(0, fx - vw / 2)), y: Math.min(H - vh, Math.max(0, fy - vh / 2)) }, 900), wait);
     return () => clearTimeout(t);
