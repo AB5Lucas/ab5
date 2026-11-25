@@ -123,7 +123,7 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
               {cols.map((c) => (
                 <Fragment key={c.key}>
                   <FilterHead column={c} rows={rowsForColumn(rows, cols, filters, c.key)} filters={filters} setFilters={setFilters} sort={sort} setSort={setSort} />
-                  {actions && c.key === "date" && <TableHead>Ações</TableHead>}
+                  {actions && c.key === "status" && <TableHead>Ações</TableHead>}
                 </Fragment>
               ))}
             </TableRow>
@@ -138,7 +138,7 @@ export function ScTable({ rows, clientName, actions, showRequester = true }: {
                   {cols.map((c) => (
                     <Fragment key={c.key}>
                       <TableCell className={c.className} title={c.key === "buyer" ? r.buyer_notes ?? undefined : c.key === "stage" ? r.return_notes ?? r.approver_notes ?? undefined : undefined}>{c.cell(r, dl)}</TableCell>
-                      {actions && c.key === "date" && <TableCell className="whitespace-nowrap">{actions(r)}</TableCell>}
+                      {actions && c.key === "status" && <TableCell className="whitespace-nowrap">{actions(r)}</TableCell>}
                     </Fragment>
                   ))}
                 </TableRow>
