@@ -98,7 +98,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   }, [cities, project, region, view.k >= 2]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const max = Math.max(1, ...clients.map((c) => c.billed ?? 0));
-  const pts = clients.map((c) => ({ c, xy: project(c.lon, c.lat), r: (region === "SP" ? 8 : 6) + Math.sqrt((c.billed ?? 0) / max) * (region === "SP" ? 14 : 10) }))
+  const pts = clients.map((c) => ({ c, xy: project(c.lon, c.lat), r: (region === "SP" ? 4 : 3) + Math.sqrt((c.billed ?? 0) / max) * (region === "SP" ? 8 : 6) }))
     .filter((p) => p.xy[0] > -50 && p.xy[0] < W + 50 && p.xy[1] > -50 && p.xy[1] < H + 50)
     .sort((a, b) => b.r - a.r); // menores por cima, mais fáceis de pegar
 

@@ -288,7 +288,7 @@ function AtividadesOverview() {
                 ) : <p className="py-8 text-center text-xs text-background/70">Nenhum cliente com endereço localizado.</p>}
               </OverviewCard>
             )}
-            <div className="grid gap-4">
+            <div className="flex flex-col gap-4">
               {can("/externo/relatorio-diario") && (
                 <OverviewCard title={P.unit === "day" ? "RDOs por dia" : "RDOs por mês (média por dia)"} to="/externo/relatorio-diario" linkLabel="Abrir Relatório Diário"
                   hint="Altura = clientes com equipe escalada no mês; cada quadradinho é um cliente com RDO">
@@ -296,8 +296,8 @@ function AtividadesOverview() {
                 </OverviewCard>
               )}
               {can("/obras/resultado") && (
-                <OverviewCard title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
-                  <LineArea height="h-24" data={d.series} format={(p) => brl(p.a)} />
+                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
+                  <LineArea height="h-40" data={d.series} format={(p) => brl(p.a)} />
                 </OverviewCard>
               )}
             </div>
