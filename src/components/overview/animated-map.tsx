@@ -32,7 +32,7 @@ const loadCities = (uf: string) => {
 /** UF do ponto pelo contorno dos estados. */
 export function ufOf(lon: number, lat: number) { return Object.keys(STATES).find((uf) => inState(uf, lon, lat)) ?? null; }
 
-export function AnimatedMap({ clients, region, className, extra, focus, selected }: { clients: MapClient[]; region: string; /** "BR" ou a UF */ className?: string; extra?: React.ReactNode; focus?: { lon: number; lat: number; n: number; uf?: string | null } | null; selected?: string | null }) {
+export function AnimatedMap({ clients, region, className, extra, focus, selected, onPick }: { onPick?: (c: MapClient) => void; clients: MapClient[]; region: string; /** "BR" ou a UF */ className?: string; extra?: React.ReactNode; focus?: { lon: number; lat: number; n: number; uf?: string | null } | null; selected?: string | null }) {
   const [run, setRun] = useState(0);
   // Inclinação 3D só no mapa inteiro: com zoom o mapa fica plano (o navegador desenha a camada inclinada em baixa resolução).
   const [tilted, setTilted] = useState(false);
@@ -171,8 +171,9 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
           ))}
           {cityPath && <path d={cityPath} className="amap-cities" strokeWidth={view.k > 2 ? 1 : 0.7} style={{ vectorEffect: "non-scaling-stroke", strokeOpacity: view.k > 2 ? 0.55 : undefined }} />}
           {pts.map((p, i) => (
-            <g key={p.c.id} className="amap-pin" style={{ animationDelay: `${(regionChangedAt.current ? 1100 : 2600) + i * 40}ms` }}
-              onMouseEnter={() => setHover(p.c)} onMouseLeave={() => setHover(null)}>
+            <g key={p.c.id} className="amap-pin"
+              onMouseEnter={() => setHover(p.c)} onMouseLeave={() => setHover(null)}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPick?.(p.c); }} style={{ animationDelay: `${(regionChangedAt.current ? 1100 : 2600) + i * 40}ms`, cursor: onPick ? "pointer" : undefined }}>
               <circle cx={p.xy[0]} cy={p.xy[1]} r={(p.r + 10) * inv} fill="transparent" />
               <circle cx={p.xy[0]} cy={p.xy[1]} r={p.r * inv} className={hover?.id === p.c.id || selected === p.c.id ? "fill-primary stroke-background" : "fill-foreground stroke-background"} strokeWidth={2.5 * inv} fillOpacity={0.88} />
             </g>

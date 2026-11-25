@@ -52,11 +52,11 @@ export function ClientsMap({ clients, className }: { clients: MapClient[]; class
         <button type="button" className={btn} title={all ? "Mostrar só clientes com atividade no período" : "Mostrar todos os clientes"} aria-pressed={all} onClick={(e) => { stop(e); setAll((v) => !v); }}>
           {all ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
         </button>
-      </>} focus={focus} selected={selected} />
+      </>} focus={focus} selected={selected} onPick={(m) => { pick(m); window.setTimeout(() => document.getElementById(`cm-${m.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); }} />
     </div>
     <ul className="max-h-[480px] space-y-0.5 overflow-y-auto pr-1 text-xs">
       {listed.map((c) => (
-        <li key={c.id}>
+        <li key={c.id} id={`cm-${c.id}`}>
           <button type="button" onClick={(e) => { stop(e); pick(c); }}
             className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted ${selected === c.id ? "bg-muted" : ""}`}>
             <span className={`h-2 w-2 shrink-0 rounded-full ${c.active ? "bg-foreground" : "bg-foreground/25"}`} />
