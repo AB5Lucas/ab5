@@ -1,4 +1,5 @@
 import { loadDriverBonus, periodOf } from "@/lib/closing";
+import { invalidateDriverBonus } from "@/lib/invalidate-driver-bonus";
 import { CountUp } from "@/components/count-up";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -91,12 +92,12 @@ export function DriverBonusPage() {
         : await supabase.from("driver_bonus_rules").insert(payload);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(editing ? "Regra atualizada" : "Regra criada");
       setOpen(false);
       setEditing(null);
       setForm(emptyForm);
-      queryClient.invalidateQueries({ queryKey: ["db-rules"] });
+      await invalidateDriverBonus(queryClient);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -106,9 +107,9 @@ export function DriverBonusPage() {
       const { error } = await supabase.from("driver_bonus_rules").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Regra excluída");
-      queryClient.invalidateQueries({ queryKey: ["db-rules"] });
+      await invalidateDriverBonus(queryClient);
     },
     onError: (e: Error) => toast.error(e.message),
   });
