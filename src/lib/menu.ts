@@ -56,6 +56,7 @@ const RAW_GROUPS: MenuGroup[] = [
   {
     label: "Planejamento",
     icon: CalendarDays,
+    overview: "/planejamento",
     items: [
       { title: "Programação", url: "/programacao/diaria", icon: CalendarDays },
       { title: "Serviços", url: "/programacao/servicos", icon: ListChecks },

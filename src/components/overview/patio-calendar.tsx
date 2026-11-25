@@ -8,13 +8,19 @@ export type PatioDay = { key: string; label: string; title: string; value: numbe
 
 const WD = ["S", "T", "Q", "Q", "S", "S", "D"];
 
-function tone(v: number, max: number) {
+function tone(v: number, max: number, dark?: boolean) {
+  if (dark) {
+    if (!v) return "border border-dashed border-background/30 text-background/50";
+    const r = v / Math.max(1, max);
+    return r > 0.75 ? "bg-background text-foreground" : r > 0.5 ? "bg-background/70 text-foreground" : r > 0.25 ? "bg-background/40 text-background" : "bg-background/15 text-background";
+  }
   if (!v) return "border border-dashed border-border text-muted-foreground";
   const r = v / Math.max(1, max);
   return r > 0.75 ? "bg-foreground text-background" : r > 0.5 ? "bg-foreground/70 text-background" : r > 0.25 ? "bg-foreground/40 text-foreground" : "bg-foreground/15 text-foreground";
 }
 
-export function PatioCalendar({ days, unit, total, workforce }: { days: PatioDay[]; unit: "day" | "month"; total: number; workforce: number }) {
+export function PatioCalendar({ days, unit, total, workforce, dark }: { days: PatioDay[]; unit: "day" | "month"; total: number; workforce: number; dark?: boolean }) {
+  const mut = dark ? "text-background/60" : "text-muted-foreground";
   const max = Math.max(1, ...days.map((d) => d.value));
   const lead = unit === "day" && days[0] ? (new Date(`${days[0].key}T12:00:00`).getDay() + 6) % 7 : 0;
   const share = workforce ? total / workforce : 0;
@@ -25,23 +31,39 @@ export function PatioCalendar({ days, unit, total, workforce }: { days: PatioDay
     <div className="flex flex-col gap-5 md:flex-row">
       <div className="min-w-0 flex-1">
         <div className={cn("grid gap-1", unit === "day" ? "grid-cols-7" : "grid-cols-6")}>
-          {unit === "day" && WD.map((w, i) => <span key={i} className="pb-0.5 text-center text-[10px] font-medium text-muted-foreground">{w}</span>)}
+          {unit === "day" && WD.map((w, i) => <span key={i} className={cn("pb-0.5 text-center text-[10px] font-medium", mut)}>{w}</span>)}
           {Array.from({ length: lead }, (_, i) => <span key={`l${i}`} />)}
           {days.map((d, i) => (
             <div key={d.key} title={`${d.title}: ${d.value} ${d.value === 1 ? "pessoa" : "pessoas"}`}
-              className={cn("ov-grow mx-auto flex aspect-square w-full max-w-7 flex-col items-center justify-center rounded-full text-[11px] font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max))}
+              className={cn("ov-grow mx-auto flex aspect-square w-full max-w-7 flex-col items-center justify-center rounded-full text-[11px] font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max, dark))}
               style={{ animationDelay: `${i * 18}ms` }}>
               {d.value || d.label}
             </div>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <div className={cn("mt-3 flex items-center gap-1.5 text-[10px]", mut)}>
           <span>Menos</span>
-          {["border border-dashed border-border", "bg-foreground/15", "bg-foreground/40", "bg-foreground/70", "bg-foreground"].map((c) => <span key={c} className={cn("h-2.5 w-2.5 rounded-full", c)} />)}
+          {(dark ? ["border border-dashed border-background/30", "bg-background/15", "bg-background/40", "bg-background/70", "bg-background"] : ["border border-dashed border-border", "bg-foreground/15", "bg-foreground/40", "bg-foreground/70", "bg-foreground"]).map((c) => <span key={c} className={cn("h-2.5 w-2.5 rounded-full", c)} />)}
           <span>Mais</span>
           <span className="ml-auto">{unit === "day" ? "número = pessoas no dia" : "média por dia no mês"}</span>
         </div>
       </div>
+      {dark ? (
+        <div className="flex w-full flex-col gap-3 border-t border-background/20 pt-3 md:w-48 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-background/60">{unit === "day" ? "No mês" : "No período"}</p>
+            <p className="font-display text-3xl font-semibold leading-tight tabular-nums">{total}</p>
+            <p className="text-[11px] text-background/60">pessoas diferentes no Pátio</p>
+          </div>
+          <div>
+            <div className="flex items-baseline justify-between text-xs"><span className="text-background/60">Do efetivo</span><span className="font-semibold tabular-nums">{(share * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</span></div>
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-background/15"><div className="h-full rounded-full bg-background transition-[width] duration-700" style={{ width: `${Math.min(100, share * 100)}%` }} /></div>
+            <p className="mt-1 text-[10px] text-background/60">{total} de {workforce} colaboradores ativos</p>
+          </div>
+          <div className="flex justify-between text-xs"><span className="text-background/60">Média por dia</span><b className="tabular-nums">{avg}</b></div>
+          <div className="flex justify-between text-xs"><span className="text-background/60">Pico</span><b className="tabular-nums">{peak ? `${peak.value} · ${peak.title}` : "—"}</b></div>
+        </div>
+      ) : (
       <SummaryPanel>
         <SummaryHead label={unit === "day" ? "No mês" : "No período"} value={total} sub="pessoas diferentes no Pátio" />
         <div>
@@ -52,6 +74,7 @@ export function PatioCalendar({ days, unit, total, workforce }: { days: PatioDay
         <SummaryRow label="Média por dia" value={avg} />
         <SummaryRow label="Pico" value={peak ? `${peak.value} · ${peak.title}` : "—"} />
       </SummaryPanel>
+      )}
     </div>
   );
 }
