@@ -6907,6 +6907,10 @@ export type Database = {
         Args: { p_order: string; p_quote: string; p_work: string }
         Returns: string
       }
+      billing_note_post_to_work: {
+        Args: { _note: string; _work: string }
+        Returns: string
+      }
       billing_note_replace: {
         Args: { _entry: string; _note: string }
         Returns: undefined
@@ -7104,6 +7108,10 @@ export type Database = {
           _user: string
         }
         Returns: string
+      }
+      overview_period_data: {
+        Args: { _from: string; _to: string }
+        Returns: Json
       }
       prev_business_day: { Args: { _date: string }; Returns: string }
       purchase_apply_policy: {
