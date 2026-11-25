@@ -34,6 +34,13 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
   const lastPick = useRef<PatioDay | null>(null);
   if (pick) lastPick.current = pick;
   const view = pick ?? lastPick.current; // conteúdo fica durante a animação de saída
+  // Troca de um dia para outro com a lista aberta: os nomes entram de lado (dia posterior pela direita, anterior pela esquerda).
+  const prevKey = useRef<string | null>(null);
+  const dir = useRef(1);
+  if (pick && prevKey.current !== pick.key) {
+    dir.current = prevKey.current && pick.key < prevKey.current ? -1 : 1;
+    prevKey.current = pick.key;
+  }
   return (
     <div className={cn("flex flex-col md:flex-row", compact ? "gap-4" : "gap-5")}>
       <div className="min-w-0 flex-1">
@@ -76,6 +83,7 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
         </div>
           {/* Pessoas do dia escolhido: entram no lugar do resumo. */}
           <div className={cn("absolute inset-0 flex flex-col pt-3 transition-all duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] md:left-5 md:pt-0", pick ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0")}>
+            <div key={view?.key ?? "none"} className="patio-swap flex min-h-0 flex-1 flex-col" style={{ ["--swap-from" as string]: `${dir.current * 32}px` }}>
             <p className="text-[10px] font-medium uppercase tracking-wider text-background/60">{view?.title}</p>
             <p className="font-display text-2xl font-semibold leading-tight tabular-nums">{view?.value ?? 0} <span className="text-sm font-normal text-background/60">{view?.value === 1 ? "pessoa no Pátio" : "pessoas no Pátio"}</span></p>
             <ul className="scroll-on-dark mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 text-xs">
@@ -87,6 +95,7 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
                 </li>
               ))}
             </ul>
+            </div>
             <p className="mt-1 text-[10px] text-background/50">Clique no dia de novo para voltar ao resumo.</p>
           </div>
         </div>
