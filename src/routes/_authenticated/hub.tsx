@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { laborSplit } from "@/lib/hub-labor";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
@@ -83,14 +84,18 @@ function HubOverview() {
     staleTime: 2 * 60_000,
     refetchInterval: 5 * 60_000,
     queryFn: async () => {
-      const [works, billing, rdos, allocs] = await Promise.all([
+      const [works, billing, rdos, allocs, wf, costs, people, hol] = await Promise.all([
         fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, status, active, order_value, orders, clients(name)").order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("work_entries").select("work_id, entry_date, amount").eq("category", "faturamento").eq("sync_cancelled", false).order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("rdos").select("id, work_id, client_id, report_date, status").gte("report_date", P.from).lte("report_date", P.to).order("id").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("daily_allocations").select("id, work_id, collaborator_id, daily_schedules!inner(schedule_date)")
           .gte("daily_schedules.schedule_date", P.from).lte("daily_schedules.schedule_date", P.to).not("work_id", "is", null).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("rdo_workforce").select("id, collaborator_id, work_id, report_date, worked_hours").gte("report_date", P.from).lte("report_date", P.to).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("work_entries").select("id, work_id, entry_date, amount, category").in("category", ["mao_obra", "terceiros", "materiais", "ferramentas", "andaimes"]).gte("entry_date", P.from).lte("entry_date", P.to).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("collaborators").select("id, salary, contract_type").order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("holidays").select("id, date").order("id").range(a, b)),
       ]);
-      return { works, billing, rdos, allocs };
+      return { works, billing, rdos, allocs, wf, costs, people, hol };
     },
   });
 
@@ -208,7 +213,28 @@ function HubOverview() {
       return { key: b, label: monthLabel(b), title: `${monthLabel(b)}/${b.slice(2, 4)}`, max, fin: Math.round(fin / n), draft: Math.round(draft / n), expected: Math.round(exp / n), totalFin: fin, totalDraft: draft, totalExpected: exp };
     });
 
+    // Despesas por dia (MO das escalações + lançamentos de custo) e MO normal × HE por cliente.
+    const hol = new Set<string>(q.data.hol.map((h: any) => String(h.date)));
+    const person = new Map<string, any>(q.data.people.map((p: any) => [p.id, p]));
+    const wfH = new Map<string, number>(), wfDay = new Map<string, number>();
+    for (const r of q.data.wf) { if (r.worked_hours == null) continue; const h = Number(r.worked_hours) || 0; wfH.set(`${r.collaborator_id}|${r.work_id}|${r.report_date}`, h); wfDay.set(`${r.collaborator_id}|${r.report_date}`, (wfDay.get(`${r.collaborator_id}|${r.report_date}`) ?? 0) + h); }
+    const costBy = new Map<string, number>(P.buckets.map((b) => [b, 0]));
+    const moBy = new Map<string, { normal: number; extra: number }>();
+    for (const a of q.data.allocs) {
+      const w = workBy.get(a.work_id); if (!w || !a.collaborator_id) continue;
+      const dt = String(a.daily_schedules?.schedule_date ?? "").slice(0, 10); if (!dt) continue;
+      const p = person.get(a.collaborator_id); const rate = Number(p?.salary) || 0; if (!rate) continue;
+      const h = wfH.get(`${a.collaborator_id}|${a.work_id}|${dt}`) ?? wfDay.get(`${a.collaborator_id}|${dt}`) ?? 8;
+      const sp = laborSplit(h, rate, p?.contract_type === "pj", dt, hol);
+      const k = keyOf(dt); if (costBy.has(k)) costBy.set(k, costBy.get(k)! + sp.normal + sp.extra);
+      const cn = w.clients?.name ?? "—"; const m = moBy.get(cn) ?? { normal: 0, extra: 0 }; m.normal += sp.normal; m.extra += sp.extra; moBy.set(cn, m);
+    }
+    for (const e of q.data.costs) { if (!workBy.has(e.work_id)) continue; const k = keyOf(String(e.entry_date).slice(0, 10)); if (costBy.has(k)) costBy.set(k, costBy.get(k)! + (Number(e.amount) || 0)); }
+    const moRows = [...moBy.entries()].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.normal + b.extra - a.normal - a.extra).slice(0, 7);
+    let ind = 0;
+    for (const [n, v] of byClient) if (/^industria$/i.test(n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim())) ind += v;
     return {
+      billedCost: P.buckets.map((b) => ({ label: bLabel(b), a: byBucket.get(b) ?? 0, b: costBy.get(b) ?? 0 })), moRows, ind,
       patioDays: P.buckets.map((b) => ({ key: b, label: P.unit === "day" ? String(Number(b.slice(8, 10))) : monthLabel(b), title: bLabel(b), value: patioBy.get(b)!.size })), patioCount: patioAll.size,
       byClientId, activeIds, svcSeries, pplSeries, svcCount: svcAll.size, cur, prev, ordered, openBalance, top, cols,
       series: P.buckets.map((b) => ({ label: P.unit === "day" ? `${b.slice(8, 10)}/${b.slice(5, 7)}` : `${monthLabel(b)}/${b.slice(2, 4)}`, a: byBucket.get(b) ?? 0 })),
@@ -308,14 +334,26 @@ function HubOverview() {
                 </OverviewCard>
               )}
               {can("/obras/resultado") && (
-                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturamento por dia" : "Faturamento por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Notas lançadas nos serviços no período">
-                  <LineArea height="h-44" data={d.series} format={(p) => brl(p.a)} />
+                <OverviewCard className="flex-1" title={P.unit === "day" ? "Faturado × despesas por dia" : "Faturado × despesas por mês"} to="/obras/resultado" linkLabel="Abrir Resultados" hint="Despesas = MO das escalações (valor hora × encargos, com HE) + lançamentos de custo do dia; círculo = faturado de Serviços × Indústria">
+                  <div className="grid gap-5 md:grid-cols-[1fr_200px]">
+                    <div className="min-w-0">
+                      <div className="mb-1 flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-foreground" />Faturado</span><span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-muted-foreground" />Despesas</span></div>
+                      <LineArea height="h-36" data={d.billedCost} format={(p) => `Faturado ${brl(p.a)} · Despesas ${brl(p.b ?? 0)}`} />
+                    </div>
+                    <div className="flex flex-col items-center justify-center gap-2 border-t pt-3 md:border-l md:border-t-0 md:pl-4 md:pt-0">
+                      <Donut frac={d.cur ? (d.cur - d.ind) / d.cur : 0} center={d.cur ? `${Math.round(((d.cur - d.ind) / d.cur) * 100)}%` : "—"} sub="serviços" size="h-28 w-28" />
+                      <div className="w-full space-y-0.5 text-[11px]">
+                        <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-foreground" />Serviços</span><span className="tabular-nums font-medium">{brl(d.cur - d.ind)}</span></div>
+                        <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-muted" />Indústria</span><span className="tabular-nums font-medium">{brl(d.ind)}</span></div>
+                      </div>
+                    </div>
+                  </div>
                 </OverviewCard>
               )}
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
             {can("/obras") && (
               <OverviewCard title={`Clientes que mais faturaram — ${pLabel}`} to="/clientes" linkLabel="Ver clientes">
                 {d.top.length ? <RankBars rows={d.top} format={brl} /> : <p className="py-8 text-center text-xs text-muted-foreground">Nenhuma nota lançada no período.</p>}
@@ -333,6 +371,11 @@ function HubOverview() {
                 <div onClick={(e) => e.preventDefault()}><PatioCalendar days={d.patioDays} unit={P.unit} total={d.patioCount} workforce={workforceQ.data ?? 0} /></div>
               </OverviewCard>
             )}
+            {can("/obras/resultado") && (
+              <OverviewCard title="MO: horas normais × HE" to="/fechamentos/financeiro" linkLabel="Ver financeiro" hint="Custo de mão de obra das escalações por cliente; HE = acima de 8 h, sábado ×1,6, domingo/feriado ×2">
+                <MoBars rows={d.moRows} />
+              </OverviewCard>
+            )}
           </div>
         </>
       )}
@@ -340,3 +383,26 @@ function HubOverview() {
   );
 }
 
+
+function MoBars({ rows }: { rows: { label: string; normal: number; extra: number }[] }) {
+  const max = Math.max(1, ...rows.map((r) => r.normal + r.extra));
+  const tot = rows.reduce((a, r) => ({ n: a.n + r.normal, x: a.x + r.extra }), { n: 0, x: 0 });
+  if (!rows.length) return <p className="py-8 text-center text-xs text-muted-foreground">Sem escalações no período.</p>;
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-3 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-foreground" />Normais {brl(tot.n)}</span>
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-foreground/35" />HE {brl(tot.x)}</span>
+      </div>
+      {rows.map((r) => (
+        <div key={r.label} title={`${r.label}: normais ${brl(r.normal)} · HE ${brl(r.extra)}`}>
+          <div className="flex justify-between text-[11px]"><span className="truncate">{r.label}</span><span className="tabular-nums text-muted-foreground">{brl(r.normal + r.extra)}</span></div>
+          <div className="mt-0.5 flex h-2 overflow-hidden rounded-full bg-muted" style={{ width: `${((r.normal + r.extra) / max) * 100}%` }}>
+            <span className="ov-grow h-full bg-foreground" style={{ width: `${(r.normal / Math.max(1, r.normal + r.extra)) * 100}%` }} />
+            <span className="ov-grow h-full bg-foreground/35" style={{ width: `${(r.extra / Math.max(1, r.normal + r.extra)) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
