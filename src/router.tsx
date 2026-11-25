@@ -23,10 +23,16 @@ const refreshLogin = () => {
 export const getRouter = () => {
   // 30 s de cache: listas de apoio (clientes, obras...) não são relidas a cada tela; as gravações já invalidam o que mudam.
   // Depois de qualquer gravação (useMutation), os avisos do menu são relidos (agrupado em 1,5 s); antes só a cada 5 min.
+  let flushTimer: ReturnType<typeof setTimeout> | undefined;
   let badgeTimer: ReturnType<typeof setTimeout> | undefined;
   const mutationCache = new MutationCache({
     onError: (e) => { if (isJwtExpired(e)) refreshLogin(); },
     onSettled: () => {
+      // Compras: envia na hora as notificações que a gravação gerou (SC enviada, validada, devolvida, pedido incluído…).
+      if (typeof window !== "undefined" && window.location.pathname.startsWith("/compras")) {
+        clearTimeout(flushTimer);
+        flushTimer = setTimeout(() => { void import("@/lib/notifications-flush.functions").then((m) => m.flushNotifications()).catch(() => {}); }, 800);
+      }
       clearTimeout(badgeTimer);
       badgeTimer = setTimeout(() => {
         for (const queryKey of MENU_BADGE_KEYS) void queryClient.invalidateQueries({ queryKey });
