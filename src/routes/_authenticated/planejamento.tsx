@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
@@ -16,6 +16,8 @@ export const Route = createFileRoute("/_authenticated/planejamento")({
 
 const STATIC = 5 * 60_000;
 const pad = (n: number) => String(n).padStart(2, "0");
+const isoOf = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+const addDays = (iso: string, n: number) => isoOf(new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86400000));
 const todayIso = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
 const brDay = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
@@ -24,6 +26,25 @@ const ABSENCE: Record<string, "folga" | "ferias" | "atestado" | "falta"> = {
   folga: "folga", ferias: "ferias", atestado: "atestado", medico: "atestado", afastado: "atestado", licenca: "atestado", falta: "falta",
 };
 const ABS_LABEL = { folga: "Folgas", ferias: "Férias", atestado: "Atestados", falta: "Faltas" } as const;
+
+type Period = "hoje" | "amanha" | "semana" | "mes";
+const PERIODS: { key: Period; label: string }[] = [
+  { key: "hoje", label: "Hoje" }, { key: "amanha", label: "Amanhã" }, { key: "semana", label: "Esta semana" }, { key: "mes", label: "Mês atual" },
+];
+/** Período do filtro (dias de from a to) e o mês do calendário do Pátio. */
+function rangeOf(p: Period, today: string) {
+  if (p === "hoje") return { from: today, to: today };
+  if (p === "amanha") { const t = addDays(today, 1); return { from: t, to: t }; }
+  if (p === "semana") {
+    const wd = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7; // seg = 0
+    const mon = addDays(today, -wd);
+    return { from: mon, to: addDays(mon, 6) };
+  }
+  const ym = today.slice(0, 7);
+  const last = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).getUTCDate();
+  return { from: `${ym}-01`, to: `${ym}-${pad(last)}` };
+}
+const daysBetween = (from: string, to: string) => { const out: string[] = []; for (let d = from; d <= to; d = addDays(d, 1)) out.push(d); return out; };
 
 /** Visão geral do módulo Planejamento (layout montado pelo usuário no artefato, 25/11). */
 function PlanejamentoOverview() {
@@ -37,27 +58,31 @@ function PlanejamentoOverview() {
 
 function Overview() {
   const today = todayIso();
-  const ym = today.slice(0, 7);
-  const lastDay = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0).getDate();
-  const from = `${ym}-01`, to = `${ym}-${pad(lastDay)}`;
+  const [period, setPeriod] = useState<Period>("hoje");
+  const R = rangeOf(period, today);
+  const single = R.from === R.to;
+  // Mês do calendário do Pátio e das barras: o mês do início do período.
+  const ym = R.from.slice(0, 7);
+  const lastDay = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).getUTCDate();
+  const mFrom = `${ym}-01`, mTo = `${ym}-${pad(lastDay)}`;
+  const qFrom = R.from < mFrom ? R.from : mFrom, qTo = R.to > mTo ? R.to : mTo;
 
   const worksQ = useQuery({ queryKey: ["overview", "plan-works"], staleTime: STATIC, queryFn: () => fetchAll<any>((a, b) => supabase.from("works").select("id, name, client_id, status, active, clients(name)").order("id").range(a, b)) });
-  const monthQ = useQuery({
-    queryKey: ["overview", "plan-month", from, to], staleTime: 60_000,
-    queryFn: () => fetchAll<any>((a, b) => supabase.from("daily_allocations").select("work_id, collaborator_id, daily_schedules!inner(schedule_date)")
-      .gte("daily_schedules.schedule_date", from).lte("daily_schedules.schedule_date", to).order("id").range(a, b)),
+  const allocQ = useQuery({
+    queryKey: ["overview", "plan-alloc", qFrom, qTo], staleTime: 60_000, placeholderData: keepPreviousData,
+    queryFn: () => fetchAll<any>((a, b) => supabase.from("daily_allocations").select("work_id, collaborator_id, service_assigned, daily_schedules!inner(schedule_date)")
+      .gte("daily_schedules.schedule_date", qFrom).lte("daily_schedules.schedule_date", qTo).order("id").range(a, b)),
   });
-  const todayQ = useQuery({
-    queryKey: ["overview", "plan-today", today], staleTime: 60_000,
+  const rangeQ = useQuery({
+    queryKey: ["overview", "plan-range", R.from, R.to], staleTime: 60_000, placeholderData: keepPreviousData,
     queryFn: async () => {
-      const [alloc, boxes, off, vac, veh] = await Promise.all([
-        fetchAll<any>((a, b) => supabase.from("daily_allocations").select("work_id, collaborator_id, service_assigned, daily_schedules!inner(schedule_date)").eq("daily_schedules.schedule_date", today).order("id").range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("collaborator_id, box_key, daily_schedules!inner(schedule_date)").eq("daily_schedules.schedule_date", today).order("id").range(a, b)),
-        supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", today).or(`end_date.gte.${today},and(end_date.is.null,date.eq.${today})`),
-        supabase.from("vacations").select("collaborator_id, status").lte("start_date", today).gte("end_date", today),
-        supabase.from("vehicle_schedules").select("vehicle_id, driver_id, client_id, km, is_maintenance, maintenance_kind, external_place, adm_place, is_suzano_local, vehicles(plate, model)").eq("schedule_date", today),
+      const [boxes, off, vac, veh] = await Promise.all([
+        fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("collaborator_id, box_key, daily_schedules!inner(schedule_date)").gte("daily_schedules.schedule_date", R.from).lte("daily_schedules.schedule_date", R.to).order("id").range(a, b)),
+        supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", R.to).or(`end_date.gte.${R.from},and(end_date.is.null,date.gte.${R.from})`),
+        supabase.from("vacations").select("collaborator_id, status").lte("start_date", R.to).gte("end_date", R.from),
+        fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("id, schedule_date, vehicle_id, driver_id, client_id, km, is_maintenance, maintenance_kind, external_place, adm_place, is_suzano_local, vehicles(plate, model)").gte("schedule_date", R.from).lte("schedule_date", R.to).order("id").range(a, b)),
       ]);
-      return { alloc, boxes, off: off.data ?? [], vac: (vac.data ?? []).filter((v) => v.status !== "cancelled" && v.status !== "cancelada"), veh: veh.data ?? [] };
+      return { boxes, off: off.data ?? [], vac: (vac.data ?? []).filter((v) => !/cancel/i.test(v.status ?? "")), veh };
     },
   });
   const cadQ = useQuery({
@@ -72,81 +97,114 @@ function Overview() {
   });
 
   const d = useMemo(() => {
-    if (!worksQ.data || !monthQ.data || !todayQ.data || !cadQ.data) return null;
-    const work = new Map(worksQ.data.map((w: any) => [w.id, w]));
-    const clientOf = (wid: string | null) => (wid ? (work.get(wid) as any)?.clients?.name ?? "—" : "—");
+    if (!worksQ.data || !allocQ.data || !rangeQ.data || !cadQ.data) return null;
+    const work = new Map<string, any>(worksQ.data.map((w: any) => [w.id, w]));
+    const clientOf = (wid: string | null) => (wid ? work.get(wid)?.clients?.name ?? "—" : "—");
     const clientName = new Map(cadQ.data.clients.map((c) => [c.id, c.name]));
     const person = new Map(cadQ.data.collabs.map((c: any) => [c.id, c.full_name as string]));
     const workforce = cadQ.data.collabs.filter((c: any) => c.status === "active").length;
-    // Mês: pessoas por dia e Pátio.
-    const days = Array.from({ length: lastDay }, (_, i) => `${ym}-${pad(i + 1)}`);
-    const ppl = new Map(days.map((x) => [x, new Set<string>()]));
-    const patio = new Map(days.map((x) => [x, new Set<string>()]));
+    const dateOf = (a: any) => a.daily_schedules?.schedule_date as string;
+    // Barras: dias do período (um dia só → o mês, para ter contexto).
+    const barDays = single ? daysBetween(mFrom, mTo).filter((x) => x <= (R.from > today ? R.from : today)) : daysBetween(R.from, R.to);
+    const ppl = new Map(daysBetween(qFrom, qTo).map((x) => [x, new Set<string>()]));
+    const patio = new Map(daysBetween(mFrom, mTo).map((x) => [x, new Set<string>()]));
     const patioAll = new Set<string>();
-    for (const a of monthQ.data) {
-      const dt = a.daily_schedules?.schedule_date as string;
+    for (const a of allocQ.data) {
+      const dt = dateOf(a);
       ppl.get(dt)?.add(a.collaborator_id);
-      if (norm(clientOf(a.work_id)) === "PATIO") { patio.get(dt)?.add(a.collaborator_id); patioAll.add(a.collaborator_id); }
+      if (norm(clientOf(a.work_id)) === "PATIO" && patio.has(dt)) { patio.get(dt)!.add(a.collaborator_id); patioAll.add(a.collaborator_id); }
     }
-    const past = days.filter((x) => x <= today);
-    const series = past.map((x) => ({ label: brDay(x), value: ppl.get(x)!.size, tip: `${brDay(x)}: ${ppl.get(x)!.size} pessoas` }));
-    const withPpl = series.filter((s) => s.value > 0);
-    const avg = withPpl.length ? Math.round(withPpl.reduce((a, s) => a + s.value, 0) / withPpl.length) : 0;
-    const patioDays = days.map((x) => ({ key: x, label: String(Number(x.slice(8, 10))), title: brDay(x), value: patio.get(x)!.size }));
-    // Hoje: escalações por cliente.
-    const byClient = new Map<string, { people: Set<string>; works: Set<string>; pend: Set<string> }>();
-    for (const a of todayQ.data.alloc) {
+    const series = barDays.map((x) => ({ label: brDay(x), value: ppl.get(x)?.size ?? 0, tip: `${brDay(x)}: ${ppl.get(x)?.size ?? 0} pessoas` }));
+    const rangeDays = daysBetween(R.from, R.to);
+    const withPpl = rangeDays.map((x) => ppl.get(x)?.size ?? 0).filter((v) => v > 0);
+    const avg = withPpl.length ? Math.round(withPpl.reduce((a, v) => a + v, 0) / withPpl.length) : 0;
+    const patioDays = daysBetween(mFrom, mTo).map((x) => ({ key: x, label: String(Number(x.slice(8, 10))), title: brDay(x), value: patio.get(x)!.size }));
+    // Escalações do período por cliente e serviço.
+    type G = { people: Set<string>; pd: number; works: Map<string, Set<string>>; pend: Set<string>; days: Set<string> };
+    const byClient = new Map<string, G>();
+    const inRange = allocQ.data.filter((a: any) => dateOf(a) >= R.from && dateOf(a) <= R.to);
+    for (const a of inRange) {
       const c = clientOf(a.work_id);
-      const g = byClient.get(c) ?? { people: new Set(), works: new Set(), pend: new Set() };
-      g.people.add(a.collaborator_id);
-      if (a.service_assigned) g.works.add(a.work_id); else g.pend.add(a.collaborator_id);
+      const g = byClient.get(c) ?? { people: new Set(), pd: 0, works: new Map(), pend: new Set(), days: new Set() };
+      g.people.add(a.collaborator_id); g.pd++; g.days.add(dateOf(a));
+      if (a.service_assigned) { const s = g.works.get(a.work_id) ?? new Set<string>(); s.add(a.collaborator_id); g.works.set(a.work_id, s); }
+      else g.pend.add(a.collaborator_id);
       byClient.set(c, g);
     }
-    const clients = [...byClient.entries()].map(([name, g]) => ({ name, people: g.people.size, works: g.works.size, pend: g.pend.size }))
-      .sort((a, b) => b.people - a.people);
-    const todayPeople = new Set(todayQ.data.alloc.map((a: any) => a.collaborator_id)).size;
+    const clients = [...byClient.entries()].map(([name, g]) => ({
+      name, people: g.people.size, personDays: g.pd, days: g.days.size, pend: g.pend.size,
+      works: [...g.works.entries()].map(([wid, s]) => ({ name: work.get(wid)?.name ?? "—", n: s.size })).sort((a, b) => b.n - a.n),
+    })).sort((a, b) => b.people - a.people);
+    const people = new Set(inRange.map((a: any) => a.collaborator_id)).size;
     const activeWorks = worksQ.data.filter((w: any) => w.active !== false && w.status !== "completed").length;
-    // Ausências de hoje (quadros do dia + folgas/férias lançadas).
+    // Ausências do período (pessoas diferentes por tipo).
     const abs = { folga: new Set<string>(), ferias: new Set<string>(), atestado: new Set<string>(), falta: new Set<string>() };
-    for (const b of todayQ.data.boxes) { const k = ABSENCE[b.box_key]; if (k) abs[k].add(b.collaborator_id); }
-    for (const o of todayQ.data.off) abs.folga.add(o.collaborator_id);
-    for (const v of todayQ.data.vac) abs.ferias.add(v.collaborator_id);
+    for (const b of rangeQ.data.boxes) { const k = ABSENCE[b.box_key]; if (k) abs[k].add(b.collaborator_id); }
+    for (const o of rangeQ.data.off) abs.folga.add(o.collaborator_id);
+    for (const v of rangeQ.data.vac) abs.ferias.add(v.collaborator_id);
     const absParts = (Object.keys(abs) as (keyof typeof abs)[]).map((k) => ({ key: k, label: ABS_LABEL[k], n: abs[k].size }));
     const absTotal = new Set(Object.values(abs).flatMap((s) => [...s])).size;
-    // Transporte de hoje.
-    const vehicles = todayQ.data.veh.map((v: any) => {
+    // Transporte: um por veículo (no período: dias, km somado, cliente e motorista mais frequentes).
+    const byVeh = new Map<string, { plate: string; model: string; days: Set<string>; maintDays: number; km: number; clients: Map<string, number>; drivers: Map<string, number> }>();
+    for (const v of rangeQ.data.veh) {
       const maint = !!v.is_maintenance;
       const client = maint ? (v.maintenance_kind === "revisao" ? "REVISÃO" : "MANUTENÇÃO")
         : v.is_suzano_local ? "SUZANO LOCAL" : v.external_place ?? v.adm_place ?? (v.client_id ? clientName.get(v.client_id) ?? "—" : "—");
-      return { plate: v.vehicles?.plate ?? "—", model: v.vehicles?.model ?? "", client, maint, driver: v.driver_id ? (person.get(v.driver_id) ?? "").split(" ")[0] : "a definir", km: maint ? null : Number(v.km ?? 0) };
-    }).sort((a: any, b: any) => Number(a.maint) - Number(b.maint) || a.client.localeCompare(b.client));
+      const g = byVeh.get(v.vehicle_id) ?? { plate: v.vehicles?.plate ?? "—", model: v.vehicles?.model ?? "", days: new Set(), maintDays: 0, km: 0, clients: new Map(), drivers: new Map() };
+      g.days.add(v.schedule_date); if (maint) g.maintDays++; else g.km += Number(v.km ?? 0);
+      g.clients.set(client, (g.clients.get(client) ?? 0) + 1);
+      const dn = v.driver_id ? (person.get(v.driver_id) ?? "").split(" ")[0]! : "a definir";
+      g.drivers.set(dn, (g.drivers.get(dn) ?? 0) + 1);
+      byVeh.set(v.vehicle_id, g);
+    }
+    const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+    const vehicles = [...byVeh.values()].map((g) => {
+      const cl = top(g.clients);
+      const maint = g.maintDays === g.days.size;
+      return { plate: g.plate, model: g.model, client: cl[0] ?? "—", more: cl.length - 1, maint, driver: top(g.drivers)[0] ?? "—", km: maint ? null : g.km, days: g.days.size };
+    }).sort((a, b) => Number(a.maint) - Number(b.maint) || a.client.localeCompare(b.client));
+    const worksSet = new Set(inRange.filter((a: any) => a.service_assigned).map((a: any) => a.work_id));
+    const worksByClient = clients.filter((c) => c.works.length).map((c) => ({ name: c.name, n: c.works.length }));
     return {
-      series, avg, todayPeople, patioDays, patioCount: patioAll.size, workforce, clients, activeWorks, absParts, absTotal, vehicles,
-      kmTotal: vehicles.reduce((a: number, v: any) => a + (v.km ?? 0), 0), maint: vehicles.filter((v: any) => v.maint).length,
-      worksToday: clients.reduce((a, c) => a + c.works, 0), pendTotal: clients.reduce((a, c) => a + c.pend, 0),
+      series, avg, people, patioDays, patioCount: patioAll.size, workforce, clients, activeWorks, absParts, absTotal, vehicles,
+      kmTotal: vehicles.reduce((a, v) => a + (v.km ?? 0), 0), maint: vehicles.filter((v) => v.maint).length,
+      worksCount: worksSet.size, worksByClient, pendTotal: clients.reduce((a, c) => a + c.pend, 0),
     };
-  }, [worksQ.data, monthQ.data, todayQ.data, cadQ.data, today, ym, lastDay]);
+  }, [worksQ.data, allocQ.data, rangeQ.data, cadQ.data, R.from, R.to, single, today, mFrom, mTo, qFrom, qTo]);
 
+  const pLabel = period === "hoje" ? "hoje" : period === "amanha" ? "amanhã" : period === "semana" ? "esta semana" : "mês atual";
+  const when = single ? brDay(R.from) : `${brDay(R.from)} a ${brDay(R.to)}`;
   const month = MONTHS[Number(ym.slice(5, 7)) - 1];
+  const loadingNew = allocQ.isPlaceholderData || rangeQ.isPlaceholderData;
   return (
-    <div className="flex flex-col gap-3 lg:h-[calc(100dvh-6.5rem)] lg:min-h-[640px]">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="font-display text-xl font-semibold tracking-tight">Planejamento</h1>
-        <p className="hidden text-xs text-muted-foreground md:block">Hoje, {brDay(today)}. Clique em um quadro para abrir a página.</p>
+    <div className={cn("flex flex-col gap-3 transition-opacity duration-300 lg:h-[calc(100dvh-6.5rem)] lg:min-h-[680px]", loadingNew && "opacity-70")}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-baseline gap-3">
+          <h1 className="font-display text-xl font-semibold tracking-tight">Planejamento</h1>
+          <p className="hidden text-xs text-muted-foreground md:block">{when}. Clique em um quadro para abrir a página.</p>
+        </div>
+        <div className="flex rounded-full border bg-muted/40 p-0.5 text-xs">
+          {PERIODS.map((p) => (
+            <button key={p.key} type="button" onClick={() => setPeriod(p.key)}
+              className={cn("rounded-full px-3 py-1 transition-colors duration-300", period === p.key ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}>
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
       {!d ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />)}</div>
       ) : (
         <>
-          <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-[auto_minmax(0,1fr)]">
-            <OverviewCard dark title="Pessoas escaladas por dia" to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas alocadas nos clientes na Programação" bodyClassName="flex flex-col">
+          <div className="grid shrink-0 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-[auto_14rem]">
+            <OverviewCard dark title={single ? `Pessoas escaladas — ${pLabel}` : `Pessoas escaladas por dia — ${pLabel}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas alocadas nos clientes na Programação" bodyClassName="flex flex-col">
               <div className="flex items-baseline gap-2">
-                <Big dark value={d.todayPeople} />
-                <span className="text-xs text-background/60">hoje · média do mês {d.avg}</span>
+                <Big dark value={single ? d.people : d.avg} />
+                <span className="text-xs text-background/60">{single ? `${pLabel} · média do mês ${Math.round(d.series.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.series.filter((s) => s.value).length))}` : `média por dia · ${d.people} pessoas diferentes`}</span>
               </div>
-              <div className="mt-auto pt-2"><HoverBars dark data={d.series} format={(v) => `${v} pessoas`} height="h-16" /></div>
+              <div className="mt-auto pt-2"><HoverBars dark data={d.series} format={(v) => `${v} pessoas`} height="h-14" /></div>
             </OverviewCard>
-            <OverviewCard title="Ausências — hoje" to="/ausencias" linkLabel="Ver Ausências" hint="Folgas, férias, atestados e faltas do dia (quadros da Programação e lançamentos)">
+            <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Ver Ausências" hint="Folgas, férias, atestados e faltas (quadros da Programação e lançamentos); no período, pessoas diferentes">
               <div className="flex items-baseline gap-2"><Big value={d.absTotal} /><span className="text-xs text-muted-foreground">fora da escala</span></div>
               <div className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-muted">
                 {d.absParts.map((p, i) => <span key={p.key} className={cn("ov-grow h-full", ["bg-foreground", "bg-foreground/65", "bg-foreground/40", "bg-foreground/20"][i])} style={{ width: `${(p.n / Math.max(1, d.absParts.reduce((a, x) => a + x.n, 0))) * 100}%` }} />)}
@@ -157,58 +215,81 @@ function Overview() {
                 ))}
               </div>
             </OverviewCard>
-            <OverviewCard title="Transporte — hoje" to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Veículos na escala da Transporte hoje" className="xl:row-span-2 min-h-0" bodyClassName="flex min-h-0 flex-col">
+            <OverviewCard title={`Transporte — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Veículos na escala da Transporte no período" className="min-h-0 xl:row-span-2" bodyClassName="flex min-h-0 flex-col">
               <div className="grid grid-cols-3 gap-2">
-                {[[d.vehicles.length, "veículos"], [d.maint, "manutenção"], [d.kmTotal, "km de ida"]].map(([v, l]) => (
-                  <div key={l as string}><div className="font-display text-2xl font-semibold tabular-nums"><CountUp value={v as number} /></div><div className="text-[11px] text-muted-foreground">{l}</div></div>
+                {([[d.vehicles.length, "veículos"], [d.maint, "manutenção"], [d.kmTotal, "km de ida"]] as const).map(([v, l]) => (
+                  <div key={l}><div className="font-display text-2xl font-semibold tabular-nums"><CountUp value={v} /></div><div className="text-[11px] text-muted-foreground">{l}</div></div>
                 ))}
               </div>
               <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
-                {!d.vehicles.length && <p className="py-6 text-center text-xs text-muted-foreground">Sem escala de veículos hoje.</p>}
-                {d.vehicles.map((v: any, i: number) => (
-                  <div key={`${v.plate}-${i}`} className="grid grid-cols-[4.2rem_minmax(0,1fr)_3rem] items-center gap-2 border-b border-border/60 py-1.5 text-xs last:border-0">
+                {!d.vehicles.length && <p className="py-6 text-center text-xs text-muted-foreground">Sem escala de veículos no período.</p>}
+                {d.vehicles.map((v, i) => (
+                  <div key={`${v.plate}-${i}`} className="grid grid-cols-[4.2rem_minmax(0,1fr)_3.4rem] items-center gap-2 border-b border-border/60 py-1.5 text-xs last:border-0">
                     <span className="font-display text-[13px] font-semibold">{v.plate}</span>
                     <span className="min-w-0">
-                      <span className={cn("block truncate", v.maint ? "italic text-muted-foreground" : "font-medium")}>{v.client}</span>
-                      <span className="block truncate text-[10.5px] text-muted-foreground">{v.model} · {v.driver}</span>
+                      <span className={cn("block truncate", v.maint ? "italic text-muted-foreground" : "font-medium")}>{v.client}{v.more > 0 && <span className="font-normal text-muted-foreground"> +{v.more}</span>}</span>
+                      <span className="block truncate text-[10.5px] text-muted-foreground">{v.model} · {v.driver}{!single && ` · ${v.days} ${v.days === 1 ? "dia" : "dias"}`}</span>
                     </span>
                     <span className="text-right text-[11px] tabular-nums text-muted-foreground">{v.km == null ? "—" : `${v.km} km`}</span>
                   </div>
                 ))}
               </div>
             </OverviewCard>
-            <OverviewCard title="Sem serviço distribuído — hoje" to="/programacao/servicos" linkLabel="Abrir Serviços" hint="Pessoas escaladas no cliente ainda sem serviço na aba Serviços">
+            <OverviewCard title={`Sem serviço distribuído — ${pLabel}`} to="/programacao/servicos" linkLabel="Abrir Serviços" hint="Pessoas escaladas no cliente ainda sem serviço na aba Serviços">
               <div className="flex items-baseline gap-2"><Big value={d.pendTotal} /><span className="text-xs text-muted-foreground">pessoas na aba Serviços</span></div>
               <ClientBars rows={d.clients.filter((c) => c.pend > 0).map((c) => ({ name: c.name, n: c.pend }))} empty="Todos distribuídos." limit={4} />
             </OverviewCard>
-            <OverviewCard dark title={`Pessoas no Pátio — ${month}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no mês" className="md:col-span-2 min-h-0" bodyClassName="min-h-0 overflow-hidden">
-              <div onClick={(e) => e.preventDefault()}><PatioCalendar dark days={d.patioDays} unit="day" total={d.patioCount} workforce={d.workforce} /></div>
+            <OverviewCard dark title={`Pessoas no Pátio — ${month}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no mês" className="min-h-0 md:col-span-2" bodyClassName="min-h-0 overflow-hidden">
+              <div onClick={(e) => e.preventDefault()}><PatioCalendar dark compact days={d.patioDays} unit="day" total={d.patioCount} workforce={d.workforce} /></div>
             </OverviewCard>
-            <OverviewCard title="Serviços com equipe — hoje" to="/programacao/servicos" linkLabel="Abrir Serviços" hint="Serviços com gente distribuída hoje, por cliente" className="min-h-0 xl:col-start-4" bodyClassName="min-h-0 overflow-hidden">
-              <div className="flex items-baseline gap-2"><Big value={d.worksToday} /><span className="text-xs text-muted-foreground">de {d.activeWorks} serviços ativos</span></div>
-              <ClientBars rows={d.clients.filter((c) => c.works > 0).map((c) => ({ name: c.name, n: c.works }))} empty="Nenhum serviço com equipe hoje." limit={8} />
+            <OverviewCard title={`Serviços com equipe — ${pLabel}`} to="/programacao/servicos" linkLabel="Abrir Serviços" hint="Serviços com gente distribuída no período, por cliente" className="min-h-0 xl:col-start-4" bodyClassName="min-h-0 overflow-hidden">
+              <div className="flex items-baseline gap-2"><Big value={d.worksCount} /><span className="text-xs text-muted-foreground">de {d.activeWorks} serviços ativos</span></div>
+              <ClientBars rows={d.worksByClient} empty="Nenhum serviço com equipe." limit={5} />
             </OverviewCard>
           </div>
-          <OverviewCard title={`Escalações de hoje — ${d.clients.length} clientes · ${d.worksToday} serviços · ${d.todayPeople} pessoas`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas por cliente hoje" className="shrink-0 lg:h-40" bodyClassName="min-h-0 overflow-hidden">
-            {!d.clients.length ? <p className="py-6 text-center text-xs text-muted-foreground">Programação de hoje sem escalações.</p> : (
-              <div className="grid h-full auto-rows-fr grid-cols-2 gap-2 overflow-hidden sm:grid-cols-4 lg:grid-flow-col lg:auto-cols-fr lg:grid-cols-none lg:grid-rows-1">
-                {d.clients.slice(0, 10).map((c) => (
-                  <div key={c.name} className="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-muted/40 px-2.5 py-2">
-                    <span className="truncate text-[11px] font-semibold tracking-wide">{c.name}</span>
-                    <span className="flex items-baseline gap-1"><span className="font-display text-2xl font-semibold leading-none tabular-nums"><CountUp value={c.people} /></span><span className="text-[11px] text-muted-foreground">pessoas</span></span>
-                    <span className="flex h-3.5 flex-wrap gap-[3px] overflow-hidden">
-                      {Array.from({ length: Math.min(c.people, 24) }, (_, i) => <span key={i} className={cn("h-1.5 w-1.5 rounded-[2px]", i < c.people - c.pend ? "bg-foreground" : "bg-foreground/25")} />)}
-                    </span>
-                    <span className="mt-auto flex justify-between gap-1 text-[10.5px] text-muted-foreground">
-                      <span>{c.works} {c.works === 1 ? "serviço" : "serviços"}</span><span className="truncate">{c.pend ? `${c.pend} sem serviço` : "distribuído"}</span>
-                    </span>
-                  </div>
-                ))}
+          <OverviewCard title={`Escalações — ${pLabel} · ${d.clients.length} clientes · ${d.worksCount} serviços · ${d.people} pessoas`} to="/programacao/diaria" linkLabel="Abrir Programação"
+            hint="Pessoas escaladas por cliente e serviço no período" className="min-h-[20rem] lg:min-h-0 lg:flex-1" bodyClassName="min-h-0 overflow-hidden">
+            {!d.clients.length ? <p className="py-10 text-center text-xs text-muted-foreground">Sem escalações no período.</p> : (
+              <div className="grid h-full grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:auto-cols-fr lg:grid-flow-col lg:grid-cols-none lg:grid-rows-1 lg:overflow-hidden">
+                {d.clients.slice(0, 8).map((c) => <ClientTile key={c.name} c={c} single={single} />)}
               </div>
             )}
           </OverviewCard>
         </>
       )}
+    </div>
+  );
+}
+
+type ClientRow = { name: string; people: number; personDays: number; days: number; pend: number; works: { name: string; n: number }[] };
+/** Quadro de um cliente na faixa de Escalações: pessoas, distribuição, serviços com quantas pessoas cada. */
+function ClientTile({ c, single }: { c: ClientRow; single: boolean }) {
+  const max = Math.max(1, ...c.works.map((w) => w.n));
+  const shown = c.works.slice(0, 6);
+  return (
+    <div className="flex min-h-0 min-w-0 flex-col gap-1.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5">
+      <span className="truncate text-[11px] font-semibold tracking-wide" title={c.name}>{c.name}</span>
+      <span className="flex items-baseline gap-1">
+        <span className="font-display text-3xl font-semibold leading-none tabular-nums"><CountUp value={c.people} /></span>
+        <span className="text-[11px] text-muted-foreground">pessoas{!single && ` · ${c.personDays} diárias`}</span>
+      </span>
+      <span className="flex h-3.5 flex-wrap gap-[3px] overflow-hidden" aria-hidden="true">
+        {Array.from({ length: Math.min(c.people, 30) }, (_, i) => <span key={i} className={cn("h-1.5 w-1.5 rounded-[2px]", i < c.people - c.pend ? "bg-foreground" : "bg-foreground/25")} />)}
+      </span>
+      <span className="flex justify-between gap-1 text-[10.5px] text-muted-foreground">
+        <span>{c.works.length} {c.works.length === 1 ? "serviço" : "serviços"}</span>
+        <span className={cn("truncate", c.pend > 0 && "font-medium text-foreground")}>{c.pend ? `${c.pend} sem serviço` : "distribuído"}</span>
+      </span>
+      <div className="mt-0.5 min-h-0 flex-1 space-y-1 overflow-hidden border-t border-border/70 pt-1.5">
+        {!shown.length && <p className="text-[10.5px] text-muted-foreground">Ainda sem serviço distribuído.</p>}
+        {shown.map((w) => (
+          <div key={w.name} title={`${w.name}: ${w.n} ${w.n === 1 ? "pessoa" : "pessoas"}`}>
+            <div className="flex justify-between gap-2 text-[10.5px]"><span className="truncate">{w.name}</span><span className="tabular-nums text-muted-foreground">{w.n}</span></div>
+            <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-background"><div className="ov-grow h-full rounded-full bg-foreground/70" style={{ width: `${(w.n / max) * 100}%` }} /></div>
+          </div>
+        ))}
+        {c.works.length > shown.length && <p className="text-[10px] text-muted-foreground">+{c.works.length - shown.length} serviços</p>}
+      </div>
     </div>
   );
 }

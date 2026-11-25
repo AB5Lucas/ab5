@@ -19,7 +19,7 @@ function tone(v: number, max: number, dark?: boolean) {
   return r > 0.75 ? "bg-foreground text-background" : r > 0.5 ? "bg-foreground/70 text-background" : r > 0.25 ? "bg-foreground/40 text-foreground" : "bg-foreground/15 text-foreground";
 }
 
-export function PatioCalendar({ days, unit, total, workforce, dark }: { days: PatioDay[]; unit: "day" | "month"; total: number; workforce: number; dark?: boolean }) {
+export function PatioCalendar({ days, unit, total, workforce, dark, compact }: { days: PatioDay[]; unit: "day" | "month"; total: number; workforce: number; dark?: boolean; compact?: boolean }) {
   const mut = dark ? "text-background/60" : "text-muted-foreground";
   const max = Math.max(1, ...days.map((d) => d.value));
   const lead = unit === "day" && days[0] ? (new Date(`${days[0].key}T12:00:00`).getDay() + 6) % 7 : 0;
@@ -28,20 +28,20 @@ export function PatioCalendar({ days, unit, total, workforce, dark }: { days: Pa
   const avg = withPeople.length ? Math.round(withPeople.reduce((a, d) => a + d.value, 0) / withPeople.length) : 0;
   const peak = withPeople.reduce<PatioDay | null>((a, d) => (!a || d.value > a.value ? d : a), null);
   return (
-    <div className="flex flex-col gap-5 md:flex-row">
+    <div className={cn("flex flex-col md:flex-row", compact ? "gap-4" : "gap-5")}>
       <div className="min-w-0 flex-1">
-        <div className={cn("grid gap-1", unit === "day" ? "grid-cols-7" : "grid-cols-6")}>
+        <div className={cn("grid", compact ? "gap-0.5" : "gap-1", unit === "day" ? "grid-cols-7" : "grid-cols-6")}>
           {unit === "day" && WD.map((w, i) => <span key={i} className={cn("pb-0.5 text-center text-[10px] font-medium", mut)}>{w}</span>)}
           {Array.from({ length: lead }, (_, i) => <span key={`l${i}`} />)}
           {days.map((d, i) => (
             <div key={d.key} title={`${d.title}: ${d.value} ${d.value === 1 ? "pessoa" : "pessoas"}`}
-              className={cn("ov-grow mx-auto flex aspect-square w-full max-w-7 flex-col items-center justify-center rounded-full text-[11px] font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max, dark))}
+              className={cn("ov-grow mx-auto flex aspect-square w-full flex-col items-center justify-center rounded-full", compact ? "max-w-[1.2rem] text-[9px]" : "max-w-7 text-[11px]", " font-semibold tabular-nums transition-transform hover:scale-110", tone(d.value, max, dark))}
               style={{ animationDelay: `${i * 18}ms` }}>
               {d.value || d.label}
             </div>
           ))}
         </div>
-        <div className={cn("mt-3 flex items-center gap-1.5 text-[10px]", mut)}>
+        <div className={cn("mt-3 flex items-center gap-1.5 text-[10px]", mut, compact && "hidden")}>
           <span>Menos</span>
           {(dark ? ["border border-dashed border-background/30", "bg-background/15", "bg-background/40", "bg-background/70", "bg-background"] : ["border border-dashed border-border", "bg-foreground/15", "bg-foreground/40", "bg-foreground/70", "bg-foreground"]).map((c) => <span key={c} className={cn("h-2.5 w-2.5 rounded-full", c)} />)}
           <span>Mais</span>
@@ -49,10 +49,10 @@ export function PatioCalendar({ days, unit, total, workforce, dark }: { days: Pa
         </div>
       </div>
       {dark ? (
-        <div className="flex w-full flex-col gap-3 border-t border-background/20 pt-3 md:w-48 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+        <div className={cn("flex w-full flex-col border-t border-background/20 pt-3 md:w-48 md:border-l md:border-t-0 md:pl-5 md:pt-0", compact ? "gap-2" : "gap-3")}>
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider text-background/60">{unit === "day" ? "No mês" : "No período"}</p>
-            <p className="font-display text-3xl font-semibold leading-tight tabular-nums">{total}</p>
+            <p className={cn("font-display font-semibold leading-tight tabular-nums", compact ? "text-2xl" : "text-3xl")}>{total}</p>
             <p className="text-[11px] text-background/60">pessoas diferentes no Pátio</p>
           </div>
           <div>
