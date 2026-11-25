@@ -3,7 +3,9 @@
  * Variáveis (Lovable › Cloud › Secrets):
  *  - Push: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (ex.: mailto:ti@empresa.com.br)
  *  - E-mail (Resend): RESEND_API_KEY, NOTIFY_EMAIL_FROM (ex.: "AB5 Hub <avisos@dominio-verificado.com.br>")
- *  - WhatsApp, um dos dois:
+ *  - WhatsApp, um dos três:
+ *      Z-API Omni (painel novo app.omni.z-api.io): ZAPI_OMNI_SECRET_KEY (Segurança › Credenciais da API, a Chave de API secreta,
+ *        não a Public Key pk_…) e ZAPI_OMNI_CHANNEL_ID (canal WhatsApp conectado); POST /v1/channels/{id}/messages, Bearer
  *      Z-API: ZAPI_INSTANCE_ID, ZAPI_TOKEN e, se a conta exigir, ZAPI_CLIENT_TOKEN
  *      Meta Cloud API: WHATSAPP_CLOUD_TOKEN, WHATSAPP_PHONE_NUMBER_ID e WHATSAPP_TEMPLATE (modelo aprovado com 1 variável no corpo),
  *        opcional WHATSAPP_TEMPLATE_LANG (padrão pt_BR)
@@ -21,8 +23,9 @@ export function vapidKeys(): VapidKeys | null {
   return { publicKey, privateKey, subject: env("VAPID_SUBJECT") ?? "mailto:nao-responda@ab5.com.br" };
 }
 
-export type WhatsAppProvider = "zapi" | "meta" | null;
+export type WhatsAppProvider = "omni" | "zapi" | "meta" | null;
 export function whatsappProvider(): WhatsAppProvider {
+  if (env("ZAPI_OMNI_SECRET_KEY") && env("ZAPI_OMNI_CHANNEL_ID")) return "omni";
   if (env("ZAPI_INSTANCE_ID") && env("ZAPI_TOKEN")) return "zapi";
   if (env("WHATSAPP_CLOUD_TOKEN") && env("WHATSAPP_PHONE_NUMBER_ID") && env("WHATSAPP_TEMPLATE")) return "meta";
   return null;
@@ -83,12 +86,19 @@ ${url ? `<p><a href="${esc(url)}" style="background:#111;color:#fff;padding:8px 
 
 export async function sendWhatsApp(phone: string | null, text: string): Promise<SendResult> {
   const provider = whatsappProvider();
-  if (!provider) return { status: "skipped_no_config", error: "Provedor de WhatsApp não configurado (Z-API ou Meta Cloud API)" };
+  if (!provider) return { status: "skipped_no_config", error: "Provedor de WhatsApp não configurado (Z-API Omni, Z-API ou Meta Cloud API)" };
   const to = normalizeWhatsApp(phone);
   if (!to) return { status: "skipped_no_target", error: "Usuário sem WhatsApp válido" };
   try {
     let res: Response;
-    if (provider === "zapi") {
+    if (provider === "omni") {
+      // Z-API Omni: recipient.identifier = DDI + DDD + número, sem "+" (developer.omni.z-api.io/en/messages/send-text).
+      res = await fetch(`https://api.omni.z-api.io/v1/channels/${encodeURIComponent(env("ZAPI_OMNI_CHANNEL_ID")!)}/messages`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env("ZAPI_OMNI_SECRET_KEY")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient: { identifier: to.replace(/\D/g, "") }, content: { type: "TEXT", body: { message: text } } }),
+      });
+    } else if (provider === "zapi") {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       const ct = env("ZAPI_CLIENT_TOKEN");
       if (ct) headers["Client-Token"] = ct;
