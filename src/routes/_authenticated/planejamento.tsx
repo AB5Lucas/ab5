@@ -4,7 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
-import { Big, HoverBars, OverviewCard } from "@/components/overview/charts";
+import { Big, Donut, HoverBars, OverviewCard } from "@/components/overview/charts";
 import { PatioCalendar } from "@/components/overview/patio-calendar";
 import { CountUp } from "@/components/count-up";
 import { cn } from "@/lib/utils";
@@ -15,8 +15,6 @@ export const Route = createFileRoute("/_authenticated/planejamento")({
 });
 
 const STATIC = 5 * 60_000;
-/** Quadros da 1ª linha: metade da altura (número e detalhe lado a lado). */
-const ROW1 = "py-3 min-h-0";
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoOf = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 const addDays = (iso: string, n: number) => isoOf(new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86400000));
@@ -198,23 +196,24 @@ function Overview() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />)}</div>
       ) : (
         <>
-          <div className="grid shrink-0 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-[6.5rem_14rem]">
-            <OverviewCard dark title={single ? `Pessoas escaladas — ${pLabel}` : `Pessoas escaladas por dia — ${pLabel}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas alocadas nos clientes na Programação" className={ROW1} bodyClassName="mt-1 flex min-h-0 items-end gap-3">
-              <div className="shrink-0">
-                <Big dark value={single ? d.people : d.avg} />
-                <p className="text-[10.5px] leading-tight text-background/60">{single ? `média do mês ${Math.round(d.series.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.series.filter((s) => s.value).length))}` : `por dia · ${d.people} pessoas`}</p>
-              </div>
-              <div className="min-w-0 flex-1"><HoverBars dark data={d.series} format={(v) => `${v} pessoas`} height="h-10" /></div>
+          <div className="grid shrink-0 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-[13.25rem_13.25rem]">
+            <OverviewCard dark title={single ? `Pessoas escaladas — ${pLabel}` : `Pessoas escaladas por dia — ${pLabel}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas alocadas nos clientes na Programação" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
+              <Big dark value={single ? d.people : d.avg} />
+              <p className="text-xs text-background/60">{single ? `${pLabel} · média do mês ${Math.round(d.series.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.series.filter((s) => s.value).length))}` : `média por dia · ${d.people} pessoas diferentes`}</p>
+              <div className="mt-auto pt-2"><HoverBars dark data={d.series} format={(v) => `${v} pessoas`} height="h-16" /></div>
             </OverviewCard>
-            <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Ver Ausências" hint="Folgas, férias, atestados e faltas (quadros da Programação e lançamentos); no período, pessoas diferentes" className={ROW1} bodyClassName="mt-1 flex min-h-0 items-end gap-3">
-              <div className="shrink-0">
-                <Big value={d.absTotal} />
-                <p className="text-[10.5px] leading-tight text-muted-foreground">fora da escala</p>
-              </div>
-              <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-2 gap-y-0.5 text-[11px]">
-                {d.absParts.map((p, i) => (
-                  <span key={p.key} className="flex items-center gap-1.5 truncate"><span className={cn("h-2 w-2 shrink-0 rounded-sm", ["bg-foreground", "bg-foreground/65", "bg-foreground/40", "bg-foreground/20"][i])} />{p.label} <b className="tabular-nums">{p.n}</b></span>
-                ))}
+            <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Ver Ausências" hint="Folgas, férias, atestados e faltas (quadros da Programação e lançamentos); no período, pessoas diferentes" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
+              <Big value={d.absTotal} />
+              <p className="text-xs text-muted-foreground">fora da escala</p>
+              <div className="mt-auto">
+                <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
+                  {d.absParts.map((p, i) => <span key={p.key} className={cn("ov-grow h-full", ["bg-foreground", "bg-foreground/65", "bg-foreground/40", "bg-foreground/20"][i])} style={{ width: `${(p.n / Math.max(1, d.absParts.reduce((a, x) => a + x.n, 0))) * 100}%` }} />)}
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  {d.absParts.map((p, i) => (
+                    <span key={p.key} className="flex items-center gap-1.5"><span className={cn("h-2 w-2 rounded-sm", ["bg-foreground", "bg-foreground/65", "bg-foreground/40", "bg-foreground/20"][i])} />{p.label} <b className="tabular-nums">{p.n}</b></span>
+                  ))}
+                </div>
               </div>
             </OverviewCard>
             <OverviewCard title={`Transporte — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Veículos na escala da Transporte no período" className="min-h-0 xl:row-span-2" bodyClassName="flex min-h-0 flex-col">
@@ -237,12 +236,27 @@ function Overview() {
                 ))}
               </div>
             </OverviewCard>
-            <OverviewCard title={`Sem serviço distribuído — ${pLabel}`} to="/programacao/servicos" linkLabel="Abrir Serviços" hint="Pessoas escaladas no cliente ainda sem serviço na aba Serviços" className={ROW1} bodyClassName="mt-1 flex min-h-0 items-end gap-3">
-              <div className="shrink-0">
-                <Big value={d.pendTotal} />
-                <p className="text-[10.5px] leading-tight text-muted-foreground">na aba Serviços</p>
-              </div>
-              <div className="min-w-0 flex-1"><ClientBars rows={d.clients.filter((c) => c.pend > 0).map((c) => ({ name: c.name, n: c.pend }))} empty="Todos distribuídos." limit={2} tight /></div>
+            <OverviewCard title={`Sem serviço distribuído — ${pLabel}`} to="/programacao/servicos" linkLabel="Abrir Serviços" hint="Pessoas escaladas no cliente ainda sem serviço na aba Serviços, em relação a todos os escalados" className="min-h-0">
+              {(() => {
+                const pend = d.pendTotal, tot = d.people, dist = Math.max(0, tot - pend);
+                const rows = d.clients.filter((c) => c.pend > 0).sort((x, y) => y.pend - x.pend);
+                return (
+                  <div className="grid grid-cols-2 items-center gap-3">
+                    <div className="min-w-0">
+                      <Big value={pend} />
+                      <p className="text-xs text-muted-foreground">sem serviço de {tot} escalados</p>
+                      <div className="mt-2 space-y-0.5 text-[11px]">
+                        {!rows.length && <p className="text-muted-foreground">Todos distribuídos.</p>}
+                        {rows.slice(0, 3).map((c) => (
+                          <div key={c.name} className="flex justify-between gap-2"><span className="truncate">{c.name}</span><b className="tabular-nums">{c.pend}</b></div>
+                        ))}
+                        {rows.length > 3 && <p className="text-[10px] text-muted-foreground">+{rows.length - 3} clientes</p>}
+                      </div>
+                    </div>
+                    <Donut frac={tot ? dist / tot : 0} center={tot ? `${Math.round((dist / tot) * 100)}%` : "—"} sub="distribuído" size="h-36 w-36" />
+                  </div>
+                );
+              })()}
             </OverviewCard>
             <OverviewCard dark title={`Pessoas no Pátio — ${month}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no mês" className="min-h-0 md:col-span-2" bodyClassName="min-h-0 overflow-hidden">
               <div onClick={(e) => e.preventDefault()}><PatioCalendar dark compact days={d.patioDays} unit="day" total={d.patioCount} workforce={d.workforce} /></div>
