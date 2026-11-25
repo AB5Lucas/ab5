@@ -3,7 +3,7 @@ import type React from "react";
  * Mapa dos clientes (Atividades): desenho próprio (sem API). Por padrão só clientes com atividade no período
  * (faturamento, escala ou RDO); o olho mostra todos. Botão de expandir alterna SP/Brasil no próprio quadro.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Maximize2, Minimize2 } from "lucide-react";
 import { AnimatedMap, BR_DRAW_MS, inState, ufOf } from "./animated-map";
 
@@ -30,15 +30,18 @@ export function ClientsMap({ clients, className, fill }: { clients: MapClient[];
   const list = region !== "BR" ? base.filter((c) => inState(region, c.lon, c.lat)) : base;
   const [focus, setFocus] = useState<{ lon: number; lat: number; n: number; uf?: string | null } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  // Contador que nunca repete (o mapa usa n para saber se aquele foco já foi animado).
+  const focusSeq = useRef(0);
   const pick = (c: MapClient) => {
     if (selected === c.id) { setSelected(null); setFocus(null); return; }
     const sp = inState("SP", c.lon, c.lat);
     void sp; const uf = ufOf(c.lon, c.lat);
     // SP: mapa de SP; outro estado: Brasil inteiro com as cidades só do estado do cliente.
     const target = uf || "SP";
-    const go = () => { setRegion(target); setSelected(c.id); setFocus((f) => ({ lon: c.lon, lat: c.lat, n: (f?.n ?? 0) + 1, uf })); };
+    const go = () => { setRegion(target); setSelected(c.id); setFocus({ lon: c.lon, lat: c.lat, n: ++focusSeq.current, uf }); };
     // Troca de estado: abre o Brasil inteiro e depois entra só no estado do cliente.
-    if (target !== region && region !== "BR") { setRegion("BR"); setSelected(c.id); window.setTimeout(go, BR_DRAW_MS); }
+    // Sai do zoom do cliente atual direto para o Brasil (focus nulo: o movimento é só o da região) e depois entra no outro estado.
+    if (target !== region && region !== "BR") { setFocus(null); setSelected(c.id); setRegion("BR"); window.setTimeout(go, BR_DRAW_MS); }
     else go();
   };
   const listed = [...base].sort((a, b) => (b.billed ?? 0) - (a.billed ?? 0) || a.name.localeCompare(b.name));

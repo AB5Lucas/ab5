@@ -59,8 +59,11 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   // Animação da câmera (viewBox): zoom, foco e troca SP ↔ Brasil.
   const anim = useRef<number | null>(null);
   const viewRef = useRef(view); viewRef.current = view;
+  // Durante o movimento da câmera os contornos das cidades ficam escondidos (são milhares de linhas: redesenhar a cada quadro travava).
+  const [moving, setMoving] = useState(false);
   const animateTo = (t: { x: number; y: number; k: number }, ms = 800, smooth = false) => {
     if (anim.current) cancelAnimationFrame(anim.current);
+    setMoving(true);
     const f = viewRef.current, t0 = performance.now();
     // smooth: começa e termina devagar (troca de região); padrão: só desacelera no fim.
     const ease = smooth ? (u: number) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2) : (u: number) => 1 - Math.pow(1 - u, 3);
@@ -72,6 +75,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
       const cx = fc[0]! + (tc[0]! - fc[0]!) * e, cy = fc[1]! + (tc[1]! - fc[1]!) * e;
       setView({ k, x: cx - W / k / 2, y: cy - H / k / 2 });
       anim.current = u < 1 ? requestAnimationFrame(step) : null;
+      if (u >= 1) setMoving(false);
     };
     anim.current = requestAnimationFrame(step);
   };
@@ -95,7 +99,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   // No 1º desenho com o estado novo o efeito ainda não rodou: prevRegion ainda é "BR", então os vizinhos já ficam
   // (sem isso eles saíam e voltavam, recomeçando a animação de desenho).
   const keepAll = region !== "BR" && (ghost !== "off" || prevRegion.current === "BR");
-  const { paths, project } = useMemo(() => {
+  const { paths, project, unproject } = useMemo(() => {
     const keys = region !== "BR" ? [region] : Object.keys(STATES);
     const drawKeys = keepAll ? Object.keys(STATES) : keys;
     const rings = keys.flatMap((k) => STATES[k] ?? []);
@@ -105,9 +109,10 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     const s = Math.min((W * 0.99) / ((x1 - x0) * k), (H * 0.92) / (y1 - y0));
     const ox = (W - (x1 - x0) * k * s) / 2, oy = (H - (y1 - y0) * s) / 2;
     const project = (lon: number, lat: number): [number, number] => [ox + (lon - x0) * k * s, oy + (y1 - lat) * s];
+    const unproject = (x: number, y: number): [number, number] => [x0 + (x - ox) / (k * s), y1 - (y - oy) / s];
     const ring = (r: number[][]) => "M" + r.map((p) => project(p[0]!, p[1]!).map((v) => v.toFixed(1)).join(",")).join("L") + "Z";
     const paths = drawKeys.map((key) => ({ key, d: (STATES[key] ?? []).map(ring).join("") }));
-    return { paths, project, ring };
+    return { paths, project, unproject, ring };
   }, [region, H, keepAll]); // eslint-disable-line react-hooks/exhaustive-deps
   const fitBox = (uf: string[]) => {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -115,23 +120,43 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
     const k = Math.min(W / (x1 - x0), H / (y1 - y0)) * 0.95;
     return { k, x: (x0 + x1) / 2 - W / k / 2, y: (y0 + y1) / 2 - H / k / 2 };
   };
+  // Câmera no cliente escolhido (mais perto no estado, um pouco menos no Brasil).
+  const focusView = (f: { lon: number; lat: number }) => {
+    const [fx, fy] = project(f.lon, f.lat);
+    const k = region !== "BR" ? 5 : 8, vw = W / k, vh = H / k;
+    return { k, x: Math.min(W - vw, Math.max(0, fx - vw / 2)), y: Math.min(H - vh, Math.max(0, fy - vh / 2)) };
+  };
+  // Projeção do último desenho: na troca de região a câmera parte exatamente do que estava na tela (sem salto).
+  const projRef = useRef<{ unproject: (x: number, y: number) => [number, number] } | null>(null);
+  const focusDone = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (prevRegion.current === region) return;
     const prev = prevRegion.current; prevRegion.current = region; regionChangedAt.current = performance.now();
     if (anim.current) cancelAnimationFrame(anim.current);
-    // começa enquadrando a região anterior na projeção nova e anima até a região toda
-    const from = fitBox(region === "BR" ? [prev] : Object.keys(STATES));
+    // Ponto de partida = o enquadramento atual (ex.: zoom num cliente) levado para a projeção nova.
+    const old = projRef.current, v = viewRef.current;
+    let from = fitBox(region === "BR" ? [prev] : Object.keys(STATES));
+    if (old) {
+      const [lonA, latA] = old.unproject(v.x, v.y), [lonB, latB] = old.unproject(v.x + W / v.k, v.y + H / v.k);
+      const [ax, ay] = project(lonA, latA), [bx, by] = project(lonB, latB);
+      const k = Math.max(0.2, Math.min(W / Math.max(1e-6, bx - ax), H / Math.max(1e-6, by - ay)));
+      from = { k, x: (ax + bx) / 2 - W / k / 2, y: (ay + by) / 2 - H / k / 2 };
+    }
     viewRef.current = from; setView(from);
-    // Devagar, a pedido: indo para o Brasil, espera as silhuetas dos estados começarem a aparecer e afasta com suavidade;
-    // entrando num estado, aproxima com suavidade. REGION_WAIT + REGION_MS também atrasa os pontos e o foco no cliente.
+    // Destino: o cliente escolhido (entrada direta, um movimento só) ou a região inteira.
+    const toFocus = focus && region !== "BR" ? focusView(focus) : null;
+    if (toFocus && focus) focusDone.current = focus.n;
+    // Indo para o Brasil, espera as silhuetas dos estados começarem a aparecer; os movimentos começam e terminam devagar.
     const wait = region === "BR" ? REGION_WAIT : 0;
-    const t = window.setTimeout(() => animateTo({ x: 0, y: 0, k: 1 }, REGION_MS, true), wait);
+    const ms = toFocus ? REGION_MS + 500 : REGION_MS;
+    const t = window.setTimeout(() => animateTo(toFocus ?? { x: 0, y: 0, k: 1 }, ms, true), wait);
     const fromBR = prev === "BR" && region !== "BR";
     setGhost(fromBR ? "on" : "off");
-    const t2 = fromBR ? window.setTimeout(() => setGhost("fading"), REGION_MS) : 0;
-    const t3 = fromBR ? window.setTimeout(() => setGhost("off"), REGION_MS + 700) : 0;
+    const t2 = fromBR ? window.setTimeout(() => setGhost("fading"), ms) : 0;
+    const t3 = fromBR ? window.setTimeout(() => setGhost("off"), ms + 700) : 0;
     return () => { window.clearTimeout(t); window.clearTimeout(t2); window.clearTimeout(t3); };
   }, [region]); // eslint-disable-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => { projRef.current = { unproject }; }, [unproject]);
   const cityPath = useMemo(() => {
     const cities = showUfs.flatMap((uf) => (region !== "BR" && uf !== region ? [] : citiesBy[uf] ?? []));
     if (!cities.length) return "";
@@ -152,15 +177,17 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
   };
   const zoom = (f: number, cx = W / 2, cy = H / 2) => setView((v) => zoomTarget(v, f, cx, cy));
   const zoomAnim = (f: number) => animateTo(zoomTarget(viewRef.current, f), 450);
-  // Aproxima no cliente escolhido na lista (depois do reset de região).
+  // Cliente escolhido / tirado na mesma região. Quando a região também muda, o efeito da região já faz o movimento
+  // (um só, sem dois zooms brigando); aqui só espera o que falta dele.
   useEffect(() => {
-    if (!focus) { if (viewRef.current.k > 1) animateTo({ x: 0, y: 0, k: 1 }, 1400, true); return; }
-    const [fx, fy] = project(focus.lon, focus.lat);
-    const k = region !== "BR" ? 5 : 8, vw = W / k, vh = H / k;
-    const wait = Math.max(30, REGION_WAIT + REGION_MS + 50 - (performance.now() - regionChangedAt.current));
-    const t = setTimeout(() => animateTo({ k, x: Math.min(W - vw, Math.max(0, fx - vw / 2)), y: Math.min(H - vh, Math.max(0, fy - vh / 2)) }, 1400, true), wait);
+    const sinceRegion = performance.now() - regionChangedAt.current;
+    if (!focus) { if (sinceRegion > 100 && viewRef.current.k > 1) animateTo({ x: 0, y: 0, k: 1 }, 1400, true); return; }
+    if (focusDone.current === focus.n) return;
+    focusDone.current = focus.n;
+    const wait = Math.max(0, REGION_WAIT + REGION_MS + 50 - sinceRegion);
+    const t = setTimeout(() => animateTo(focusView(focus), 1400, true), wait);
     return () => clearTimeout(t);
-  }, [focus?.n ?? 0, project]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focus?.n ?? 0]); // eslint-disable-line react-hooks/exhaustive-deps
   const toSvg = (e: { clientX: number; clientY: number }) => {
     const r = svgRef.current!.getBoundingClientRect();
     return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H] as const;
@@ -179,7 +206,7 @@ export function AnimatedMap({ clients, region, className, extra, focus, selected
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
       <div key={run} className={`amap-stage h-full w-full ${tilted ? "amap-done" : ""} ${view.k > 1.15 ? "amap-flat" : ""}`}
         onAnimationEnd={(e) => { if (e.animationName === "amap-tilt") setTilted(true); }}>
-        <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${W / view.k} ${H / view.k}`} shapeRendering="geometricPrecision" className="h-full w-full cursor-grab touch-none active:cursor-grabbing" preserveAspectRatio="xMidYMid meet"
+        <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${W / view.k} ${H / view.k}`} shapeRendering="geometricPrecision" className={`h-full w-full cursor-grab touch-none active:cursor-grabbing ${moving ? "amap-moving" : ""}`} preserveAspectRatio="xMidYMid meet"
           onPointerDown={(e) => { if (anim.current) { cancelAnimationFrame(anim.current); anim.current = null; } (e.target as Element).setPointerCapture?.(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; }}
           onPointerMove={(e) => {
             const d = drag.current; if (!d || view.k === 1) return;
