@@ -6,6 +6,7 @@ import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
 import { Big, Donut, HoverBars, OverviewCard } from "@/components/overview/charts";
 import { PatioCalendar } from "@/components/overview/patio-calendar";
+import { Pie3D } from "@/components/overview/pie-3d";
 import { CountUp } from "@/components/count-up";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +23,6 @@ const todayIso = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
 const brDay = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-const ABSENCE: Record<string, "folga" | "ferias" | "atestado" | "falta"> = {
-  folga: "folga", ferias: "ferias", atestado: "atestado", medico: "atestado", afastado: "atestado", licenca: "atestado", falta: "falta",
-};
-const ABS_LABEL = { folga: "Folgas", ferias: "Férias", atestado: "Atestados", falta: "Faltas" } as const;
 
 type Period = "hoje" | "amanha" | "semana" | "mes";
 const PERIODS: { key: Period; label: string }[] = [
@@ -77,13 +74,10 @@ function Overview() {
   const rangeQ = useQuery({
     queryKey: ["overview", "plan-range", R.from, R.to], staleTime: 60_000, placeholderData: keepPreviousData,
     queryFn: async () => {
-      const [boxes, off, vac, veh] = await Promise.all([
-        fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("collaborator_id, box_key, daily_schedules!inner(schedule_date)").gte("daily_schedules.schedule_date", R.from).lte("daily_schedules.schedule_date", R.to).order("id").range(a, b)),
-        supabase.from("days_off").select("collaborator_id, date, end_date").lte("date", R.to).or(`end_date.gte.${R.from},and(end_date.is.null,date.gte.${R.from})`),
-        supabase.from("vacations").select("collaborator_id, status").lte("start_date", R.to).gte("end_date", R.from),
+      const [veh] = await Promise.all([
         fetchAll<any>((a, b) => supabase.from("vehicle_schedules").select("id, schedule_date, vehicle_id, driver_id, client_id, km, is_maintenance, maintenance_kind, external_place, adm_place, is_suzano_local, vehicles(plate, model)").gte("schedule_date", R.from).lte("schedule_date", R.to).order("id").range(a, b)),
       ]);
-      return { boxes, off: off.data ?? [], vac: (vac.data ?? []).filter((v) => !/cancel/i.test(v.status ?? "")), veh };
+      return { veh };
     },
   });
   // Mesma ordem dos veículos da aba Transporte (preferência salva por usuário).
@@ -93,6 +87,11 @@ function Overview() {
       const { data } = await supabase.from("vehicle_view_prefs").select("hidden_vehicle_ids, vehicle_order").maybeSingle();
       return { hidden: (data?.hidden_vehicle_ids ?? []) as string[], order: (data?.vehicle_order ?? []) as string[] };
     },
+  });
+  // Frota inteira (para a pizza de veículos: em operação, manutenção, revisão, sem escala).
+  const fleetQ = useQuery({
+    queryKey: ["overview", "plan-fleet"], staleTime: STATIC,
+    queryFn: async () => (await supabase.from("vehicles").select("id, plate, model, status").order("plate")).data ?? [],
   });
   const cadQ = useQuery({
     queryKey: ["overview", "plan-cad"], staleTime: STATIC,
@@ -147,16 +146,6 @@ function Overview() {
     })).sort((a, b) => b.people - a.people);
     const people = new Set(inRange.map((a: any) => a.collaborator_id)).size;
     const activeWorks = worksQ.data.filter((w: any) => w.active !== false && w.status !== "completed").length;
-    // Ausências do período (pessoas diferentes por tipo).
-    const abs = { folga: new Set<string>(), ferias: new Set<string>(), atestado: new Set<string>(), falta: new Set<string>() };
-    for (const b of rangeQ.data.boxes) { const k = ABSENCE[b.box_key]; if (k) abs[k].add(b.collaborator_id); }
-    for (const o of rangeQ.data.off) abs.folga.add(o.collaborator_id);
-    for (const v of rangeQ.data.vac) abs.ferias.add(v.collaborator_id);
-    const absParts = (Object.keys(abs) as (keyof typeof abs)[]).map((k) => ({
-      key: k, label: ABS_LABEL[k], n: abs[k].size,
-      names: [...abs[k]].map((id) => person.get(id) ?? "—").sort((a, b) => a.localeCompare(b, "pt-BR")),
-    }));
-    const absTotal = new Set(Object.values(abs).flatMap((s) => [...s])).size;
     // Transporte: um por veículo (no período: dias, km somado, cliente e motorista mais frequentes).
     const byVeh = new Map<string, { plate: string; model: string; days: Set<string>; maintDays: number; km: number; clients: Map<string, number>; drivers: Map<string, number> }>();
     for (const v of rangeQ.data.veh) {
@@ -177,14 +166,31 @@ function Overview() {
       const maint = g.maintDays === g.days.size;
       return { rank: rank.get(vid) ?? Number.MAX_SAFE_INTEGER, plate: g.plate, model: g.model, client: cl[0] ?? "—", more: cl.length - 1, maint, driver: top(g.drivers)[0] ?? "—", km: maint ? null : g.km, days: g.days.size };
     }).sort((a, b) => a.rank - b.rank || a.plate.localeCompare(b.plate, "pt-BR"));
+    // Pizza de veículos: cada veículo ativo (fora os ocultos na Transporte) numa situação no período —
+    // em operação (algum frete) > manutenção > revisão > sem escala.
+    const hiddenVeh = new Set(vehOrderQ.data?.hidden ?? []);
+    const vState = new Map<string, "op" | "man" | "rev">();
+    for (const v of rangeQ.data.veh) {
+      const k = !v.is_maintenance ? "op" : v.maintenance_kind === "revisao" ? "rev" : "man";
+      const prev = vState.get(v.vehicle_id);
+      if (!prev || (k === "op") || (k === "man" && prev === "rev")) vState.set(v.vehicle_id, k);
+    }
+    const fleetRows = (fleetQ.data ?? []).filter((v) => v.status !== "inactive" && !hiddenVeh.has(v.id));
+    const vehLabel = (v: { plate: string | null; model: string | null }) => [v.plate, v.model].filter(Boolean).join(" · ");
+    const VEH_PARTS: [string, string][] = [["op", "Em operação"], ["man", "Manutenção"], ["rev", "Revisão"], ["none", "Sem escala"]];
+    const vehParts = VEH_PARTS.map(([key, label]) => {
+      const list = fleetRows.filter((v) => (vState.get(v.id) ?? "none") === key)
+        .sort((x, y) => (rank.get(x.id) ?? 1e9) - (rank.get(y.id) ?? 1e9) || String(x.plate).localeCompare(String(y.plate)));
+      return { key, label, n: list.length, names: list.map(vehLabel) };
+    });
     const worksSet = new Set(inRange.filter((a: any) => a.service_assigned).map((a: any) => a.work_id));
     const worksByClient = clients.filter((c) => c.works.length).map((c) => ({ name: c.name, n: c.works.length }));
     return {
-      series, avg, people, patioDays, patioCount: patioAll.size, workforce, clients, activeWorks, absParts, absTotal, vehicles,
+      series, avg, people, patioDays, patioCount: patioAll.size, workforce, clients, activeWorks, vehParts, fleetTotal: fleetRows.length, vehicles,
       kmTotal: vehicles.reduce((a, v) => a + (v.km ?? 0), 0), maint: vehicles.filter((v) => v.maint).length,
       worksCount: worksSet.size, worksByClient, pendTotal: clients.reduce((a, c) => a + c.pend, 0),
     };
-  }, [worksQ.data, allocQ.data, rangeQ.data, cadQ.data, vehOrderQ.data, R.from, R.to, single, today, mFrom, mTo, qFrom, qTo]);
+  }, [worksQ.data, allocQ.data, rangeQ.data, cadQ.data, vehOrderQ.data, fleetQ.data, R.from, R.to, single, today, mFrom, mTo, qFrom, qTo]);
 
   const pLabel = period === "hoje" ? "hoje" : period === "amanha" ? "amanhã" : period === "semana" ? "esta semana" : "mês atual";
   const when = single ? brDay(R.from) : `${brDay(R.from)} a ${brDay(R.to)}`;
@@ -265,8 +271,8 @@ function Overview() {
             <OverviewCard dark title={`Pessoas no Pátio — ${month}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no mês" className="min-h-0 md:col-span-2" bodyClassName="min-h-0 overflow-hidden">
               <div onClick={(e) => e.preventDefault()}><PatioCalendar dark big days={d.patioDays} unit="day" total={d.patioCount} workforce={d.workforce} /></div>
             </OverviewCard>
-            <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Ver Ausências" hint="Folgas, férias, atestados e faltas (quadros da Programação e lançamentos); no período, pessoas diferentes. Clique numa fatia para ver as pessoas." className="min-h-0 xl:col-start-4" bodyClassName="flex min-h-0 flex-col">
-              <AbsencePie total={d.absTotal} parts={d.absParts} />
+            <OverviewCard title={`Veículos — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Situação de cada veículo da frota no período (em operação, manutenção, revisão ou sem escala na Transporte). Clique numa fatia para ver os veículos." className="min-h-0 xl:col-start-4" bodyClassName="flex min-h-0 flex-col">
+              <Pie3D total={d.fleetTotal} totalLabel="veículos na frota" parts={d.vehParts} unit={["veículo", "veículos"]} badge={(n) => n.split(" · ")[0]!.slice(0, 3)} />
             </OverviewCard>
           </div>
           <OverviewCard title={`Escalações — ${pLabel} · ${d.clients.length} clientes · ${d.worksCount} serviços · ${d.people} pessoas`} to="/programacao/servicos" linkLabel="Abrir Serviços"
@@ -327,106 +333,3 @@ function ClientBars({ rows, empty, limit, tight }: { rows: { name: string; n: nu
   );
 }
 
-type AbsPart = { key: string; label: string; n: number; names: string[] };
-const PIE_TONES = [1, 0.65, 0.4, 0.2];
-/** Fatia da pizza (ângulos em voltas, 0 = topo). */
-/** Pizza 3D: elipse inclinada (RX × RY) com espessura DEPTH desenhada em camadas mais escuras por baixo. */
-const RX = 48, RY = 30, CY = 34, DEPTH = 12;
-function slicePath(a0: number, a1: number, dy = 0) {
-  const p = (t: number) => `${(50 + RX * Math.sin(2 * Math.PI * t)).toFixed(2)} ${(CY + dy - RY * Math.cos(2 * Math.PI * t)).toFixed(2)}`;
-  const mid = (a0 + a1) / 2; // dois arcos: cobre também a pizza inteira (uma só situação)
-  return `M50 ${CY + dy} L${p(a0)} A${RX} ${RY} 0 0 1 ${p(mid)} A${RX} ${RY} 0 0 1 ${p(a1)} Z`;
-}
-/** Cor da fatia (tom do texto sobre o fundo do quadro) e da lateral (mais escura). */
-const toneFill = (tone: number, side = false) =>
-  side ? `color-mix(in oklab, color-mix(in oklab, var(--foreground) ${Math.round(tone * 100)}%, var(--card)) 72%, black)`
-    : `color-mix(in oklab, var(--foreground) ${Math.round(tone * 100)}%, var(--card))`;
-
-/**
- * Ausências em pizza (folgas, férias, atestados, faltas). Clicar numa fatia: a pizza encolhe para o canto, as outras
- * fatias somem e a lista das pessoas entra; clicar de novo na fatia (pizza pequena) faz o caminho inverso.
- */
-function AbsencePie({ total, parts }: { total: number; parts: AbsPart[] }) {
-  const [sel, setSel] = useState<string | null>(null);
-  const [hover, setHover] = useState<string | null>(null);
-  const sum = parts.reduce((a, p) => a + p.n, 0);
-  const cur = parts.find((p) => p.key === sel) ?? null;
-  // Mantém o conteúdo da última fatia enquanto a lista sai (animação de volta).
-  const lastRef = useRef<AbsPart | null>(null);
-  if (cur) lastRef.current = cur;
-  const view = cur ?? lastRef.current;
-  let acc = 0;
-  const slices = parts.filter((p) => p.n > 0).map((p) => {
-    const i = parts.indexOf(p);
-    const a0 = acc / sum; acc += p.n; const a1 = acc / sum;
-    return { ...p, i, a0, a1, mid: (a0 + a1) / 2 };
-  });
-  const stop = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); };
-  return (
-    <div className="relative min-h-[14rem] flex-1 overflow-hidden" onClick={stop}>
-      {/* Pizza: no centro com a legenda; com fatia escolhida, encolhe para o canto de cima. */}
-      <div className={cn("absolute flex items-center gap-4 transition-all duration-700 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
-        "left-0 top-0", cur ? "h-16 w-16" : "h-full w-full")}>
-        <div className={cn("relative aspect-[100/82] shrink-0 transition-all duration-700", cur ? "h-14 max-w-16 cursor-pointer" : "h-full max-w-[60%]")}
-          title={cur ? "Clique para voltar à pizza" : undefined} onClick={cur ? (e) => { stop(e); setSel(null); } : undefined}>
-          {!sum ? (
-            <div className="flex h-full items-center justify-center rounded-full border border-dashed text-xs text-muted-foreground">Ninguém fora</div>
-          ) : (
-            <svg viewBox="0 0 100 82" className="h-full w-full overflow-visible">
-              {/* 1º as laterais de todas as fatias (de trás para a frente), depois os topos: assim nenhuma lateral cobre o topo de outra. */}
-              {(["side", "top"] as const).map((layer) => slices.map((sl) => {
-                const out = (hover === sl.key && !cur) ? 4 : 0;
-                const dx = out * Math.sin(2 * Math.PI * sl.mid), dy = -out * 0.62 * Math.cos(2 * Math.PI * sl.mid);
-                const hidden = cur && cur.key !== sl.key;
-                const tone = PIE_TONES[sl.i]!;
-                return (
-                  <g key={`${layer}-${sl.key}`} style={{ transform: `translate(${dx}px, ${dy}px)`, opacity: hidden ? 0 : 1, transition: "transform 300ms, opacity 500ms" }}>
-                    {layer === "side"
-                      ? Array.from({ length: DEPTH }, (_, k) => DEPTH - k).map((k) => <path key={k} d={slicePath(sl.a0, sl.a1, k)} style={{ fill: toneFill(tone, true) }} />)
-                      : <>
-                        <path d={slicePath(sl.a0, sl.a1)} style={{ fill: toneFill(tone) }} className="stroke-card" strokeWidth="0.6" />
-                        <title>{`${sl.label}: ${sl.n}`}</title>
-                        {!cur && <path d={slicePath(sl.a0, sl.a1)} fill="transparent" className="cursor-pointer"
-                          onMouseEnter={() => setHover(sl.key)} onMouseLeave={() => setHover(null)} onClick={(e) => { stop(e); setHover(null); setSel(sl.key); }} />}
-                      </>}
-                  </g>
-                );
-              }))}
-            </svg>
-          )}
-        </div>
-        <div className={cn("min-w-0 space-y-2 transition-opacity duration-300", cur ? "pointer-events-none opacity-0" : "opacity-100 delay-300")}>
-          <div><span className="font-display text-3xl font-semibold tabular-nums"><CountUp value={total} /></span><p className="text-xs text-muted-foreground">fora da escala</p></div>
-          {parts.map((p, i) => (
-            <button key={p.key} type="button" disabled={!p.n} onMouseEnter={() => setHover(p.key)} onMouseLeave={() => setHover(null)}
-              onClick={(e) => { stop(e); setHover(null); setSel(p.key); }}
-              className="flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-left text-xs hover:bg-muted disabled:opacity-50">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-foreground" style={{ opacity: PIE_TONES[i] }} />
-              <span className="flex-1">{p.label}</span><b className="tabular-nums">{p.n}</b>
-            </button>
-          ))}
-          <p className="text-[10px] text-muted-foreground">Clique numa fatia para ver as pessoas.</p>
-        </div>
-      </div>
-      {/* Pessoas da fatia escolhida. */}
-      <div className={cn("absolute inset-0 flex flex-col transition-all duration-700 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
-        cur ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-8 opacity-0")}>
-        <div className="flex h-16 items-center gap-3 pl-20">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{view?.label}</p>
-            <p className="text-xs text-muted-foreground">{view?.n} {view?.n === 1 ? "pessoa" : "pessoas"}{sum ? ` · ${Math.round(((view?.n ?? 0) / sum) * 100)}%` : ""} · clique na fatia para voltar</p>
-          </div>
-        </div>
-        <ul className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 text-xs">
-          {(view?.names ?? []).map((n, i) => (
-            <li key={`${n}-${i}`} className="flex items-center gap-2 rounded-md border border-border/60 px-2 py-1"
-              style={{ transition: "opacity 400ms, transform 400ms", transitionDelay: cur ? `${200 + Math.min(i, 20) * 25}ms` : "0ms", opacity: cur ? 1 : 0, transform: cur ? "none" : "translateY(6px)" }}>
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-semibold">{n.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("")}</span>
-              <span className="truncate">{n}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
