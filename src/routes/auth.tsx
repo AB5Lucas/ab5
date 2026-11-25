@@ -41,7 +41,7 @@ function AuthPage() {
   // Já logado (ex.: recarregou a página): vai direto para o sistema.
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/hub", replace: true });
+      if (data.session) navigate({ to: "/atividades", replace: true });
     });
   }, [navigate]);
 
@@ -64,7 +64,7 @@ function AuthPage() {
       navigate({ to: "/reset-password" });
       return;
     }
-    navigate({ to: "/hub" });
+    navigate({ to: "/atividades" });
   }
 
   async function handleSignUp(e: React.FormEvent) {
@@ -91,7 +91,7 @@ function AuthPage() {
       return;
     }
     if (data.session) {
-      navigate({ to: "/hub" });
+      navigate({ to: "/atividades" });
       return;
     }
     toast.success("Cadastro criado. Confirme o e-mail para acessar o sistema.");

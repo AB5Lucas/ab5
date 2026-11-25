@@ -22,7 +22,7 @@ function useInvertedTheme() {
   return dark ? "light-inverse" : "dark";
 }
 
-export function ClientsMap({ clients, className }: { clients: MapClient[]; className?: string }) {
+export function ClientsMap({ clients, className, fill }: { clients: MapClient[]; className?: string; fill?: boolean }) {
   const [region, setRegion] = useState<string>("SP");
   const [all, setAll] = useState(false);
   const themeCls = useInvertedTheme();
@@ -45,7 +45,7 @@ export function ClientsMap({ clients, className }: { clients: MapClient[]; class
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
   const stop = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); };
   return (
-    <div className={`${themeCls} grid gap-3 text-foreground md:grid-cols-[1fr_240px]`}><div className="relative">
+    <div className={`${themeCls} grid gap-3 text-foreground md:grid-cols-[1fr_240px] ${fill ? "h-full min-h-0 md:grid-rows-[minmax(0,1fr)]" : ""}`}><div className={fill ? "relative h-full min-h-0" : "relative"}>
       <AnimatedMap clients={list} region={region} className={className ?? "h-[340px] w-full rounded-xl border"} extra={<>
         <button type="button" className={btn} title={region !== "BR" ? "Expandir (Brasil)" : "Voltar para SP"} onClick={(e) => { stop(e); setSelected(null); setFocus(null); setRegion((r) => (r !== "BR" ? "BR" : "SP")); }}>
           {region !== "BR" ? <Maximize2 className="h-3.5 w-3.5" /> : <Minimize2 className="h-3.5 w-3.5" />}
@@ -55,7 +55,7 @@ export function ClientsMap({ clients, className }: { clients: MapClient[]; class
         </button>
       </>} focus={focus} selected={selected} onPick={(m) => { pick(m); window.setTimeout(() => document.getElementById(`cm-${m.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); }} />
     </div>
-    <ul className="max-h-[480px] space-y-0.5 overflow-y-auto pr-1 text-xs">
+    <ul className={`${fill ? "max-h-[240px] md:max-h-full" : "max-h-[480px]"} space-y-0.5 overflow-y-auto pr-1 text-xs`}>
       {listed.map((c) => (
         <li key={c.id} id={`cm-${c.id}`}>
           <button type="button" onClick={(e) => { stop(e); pick(c); }}

@@ -8,8 +8,8 @@ import { ArrowUpRight } from "lucide-react";
 import { CountUp } from "@/components/count-up";
 import { cn } from "@/lib/utils";
 
-export function OverviewCard({ title, to, linkLabel, dark, className, children, hint }: {
-  title: string; to: string; linkLabel: string; dark?: boolean; className?: string; children: ReactNode; hint?: string;
+export function OverviewCard({ title, to, linkLabel, dark, className, bodyClassName, children, hint }: {
+  title: string; to: string; linkLabel: string; dark?: boolean; className?: string; bodyClassName?: string; children: ReactNode; hint?: string;
 }) {
   return (
     <Link to={to} title={hint}
@@ -20,7 +20,7 @@ export function OverviewCard({ title, to, linkLabel, dark, className, children, 
         <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border transition-transform duration-300 group-hover:rotate-45",
           dark ? "border-background/25" : "border-border")}><ArrowUpRight className="h-3.5 w-3.5" /></span>
       </div>
-      <div className="mt-2 flex-1">{children}</div>
+      <div className={cn("mt-2 flex-1", bodyClassName)}>{children}</div>
       <p className={cn("mt-3 text-[11px] underline-offset-4 group-hover:underline", dark ? "text-background/70" : "text-muted-foreground")}>{linkLabel}</p>
     </Link>
   );
@@ -114,7 +114,7 @@ export function HatchBars({ data, format, highlight }: { data: { label: string; 
 }
 
 /** Linha suave com área e ponto/balão ao passar o mouse; segunda série tracejada (comparação). */
-export function LineArea({ data, format, height = "h-44" }: { data: { label: string; a: number; b?: number; tip?: string }[]; format: (d: { a: number; b?: number }) => string; height?: string }) {
+export function LineArea({ data, format, height = "h-44", className }: { data: { label: string; a: number; b?: number; tip?: string }[]; format: (d: { a: number; b?: number }) => string; height?: string; className?: string }) {
   const id = useId().replace(/:/g, "");
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...data.flatMap((d) => [d.a, d.b ?? 0]));
@@ -130,7 +130,7 @@ export function LineArea({ data, format, height = "h-44" }: { data: { label: str
   const sel = hover ?? data.length - 1;
   const [sx, sy] = pt(sel, data[sel]?.a ?? 0);
   return (
-    <div className="relative">
+    <div className={cn("relative", className)}>
       <svg viewBox="0 0 100 50" preserveAspectRatio="none" className={cn(height, "w-full overflow-visible")}
         onMouseMove={(e) => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); setHover(Math.round(((e.clientX - r.left) / r.width) * n)); }}
         onMouseLeave={() => setHover(null)}>
