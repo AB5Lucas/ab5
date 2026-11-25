@@ -78,7 +78,7 @@ export function PatioCalendar({ days, unit, total, workforce, dark, compact, big
           <div className={cn("absolute inset-0 flex flex-col pt-3 transition-all duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] md:left-5 md:pt-0", pick ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0")}>
             <p className="text-[10px] font-medium uppercase tracking-wider text-background/60">{view?.title}</p>
             <p className="font-display text-2xl font-semibold leading-tight tabular-nums">{view?.value ?? 0} <span className="text-sm font-normal text-background/60">{view?.value === 1 ? "pessoa no Pátio" : "pessoas no Pátio"}</span></p>
-            <ul className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 text-xs">
+            <ul className="scroll-on-dark mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 text-xs">
               {(view?.names ?? []).map((n, i) => (
                 <li key={`${view?.key}-${n}-${i}`} className="flex items-center gap-2 rounded-md bg-background/10 px-2 py-1"
                   style={{ transition: "opacity 400ms, transform 400ms", transitionDelay: `${150 + Math.min(i, 20) * 25}ms`, opacity: pick ? 1 : 0, transform: pick ? "none" : "translateX(8px)" }}>

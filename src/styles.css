@@ -345,3 +345,10 @@
    botões "outline" (bg-background) ficam num tom próprio, entre o fundo e o quadro. */
 .dark { --shadow-panel: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 1px 2px oklch(0 0 0 / 0.5), 0 10px 28px oklch(0 0 0 / 0.45); }
 .dark .panel .bg-background { background-color: oklch(0.27 0 0); }
+
+/* Barra de rolagem dentro de quadro escuro (OverviewCard dark): acompanha a cor do quadro (tons do fundo da página). */
+.scroll-on-dark { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--background) 35%, transparent) transparent; }
+.scroll-on-dark::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-on-dark::-webkit-scrollbar-track { background: transparent; }
+.scroll-on-dark::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--background) 35%, transparent); border-radius: 999px; }
+.scroll-on-dark::-webkit-scrollbar-thumb:hover { background: color-mix(in oklab, var(--background) 55%, transparent); }
