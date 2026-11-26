@@ -292,11 +292,11 @@ function Overview() {
             </div>
           </OverviewCard>
 
-          <OverviewCard title="Contratações" to="/demandas/contratacoes" linkLabel="Abrir Contratações" hint="Vagas das solicitações de contratação (canceladas fora): atendidas e a atender" className="min-h-0">
+          <OverviewCard title="Contratações" to="/demandas/contratacoes" linkLabel="Abrir Contratações" hint="Vagas das solicitações de contratação (canceladas fora): atendidas e a atender" className="min-h-0" bodyClassName="flex min-h-0 flex-col justify-center">
             {(() => {
               const tot = d.filled + d.vagas;
               return (
-                <div className="grid grid-cols-2 items-center gap-3">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4">
                   <div className="min-w-0 space-y-2">
                     <div>
                       <div className="font-display text-3xl font-semibold leading-none tabular-nums"><CountUp value={d.vagas} /></div>
@@ -310,7 +310,7 @@ function Overview() {
                       {Array.from({ length: Math.min(tot, 24) }, (_, i) => <span key={i} className={cn("tile-snap h-2 w-2 rounded-[2px]", i < Math.round((d.filled / Math.max(1, tot)) * Math.min(tot, 24)) ? "bg-foreground" : "border border-dashed border-border bg-muted/40")} style={{ animationDelay: `${i * 30}ms` }} />)}
                     </div>
                   </div>
-                  <Donut frac={tot ? d.filled / tot : 0} center={tot ? `${Math.round((d.filled / tot) * 100)}%` : "—"} sub="atendidas" size="h-36 w-36" />
+                  <Donut frac={tot ? d.filled / tot : 0} center={tot ? `${Math.round((d.filled / tot) * 100)}%` : "—"} sub="atendidas" size="h-[9.75rem] w-[9.75rem]" />
                 </div>
               );
             })()}
