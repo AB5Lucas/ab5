@@ -103,7 +103,7 @@ function Overview() {
     const comp = lines.reduce((a, l) => a + (l.monthPct != null && l.margin ? l.margin / (l.monthPct / 100) : 0), 0);
     const pct = marginPercent(margin, comp);
     const below = lines.filter((l) => l.monthPct != null && l.monthPct < MARGIN_GOAL).length;
-    return { lines, billed, tax, mo, transport, materials, margin, spent: tax + mo + transport + materials, ordered, open: ordered - billedToDate, hN, hE, heByClient, pct, below };
+    return { lines, billed, tax, mo, transport, materials, margin, spent: tax + mo + transport + materials, ordered, billedToDate, open: ordered - billedToDate, hN, hE, heByClient, pct, below };
   }, [shown, end]);
 
   const toggle = (m: number) => setMonths((x) => (x.includes(m) ? x.filter((y) => y !== m) : [...x, m]));
@@ -164,11 +164,14 @@ function Overview() {
 
             <OverviewCard title="Pedidos faturados" to="/fechamentos/suzano" linkLabel="Abrir Pedidos" hint="Pedidos dos serviços exibidos com data até o fim do período × o que já foi faturado neles até essa data" className="min-h-0" bodyClassName="flex items-center">
               <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                <div className="min-w-0 space-y-2">
-                  <div><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={brlK(d.billed)} /></p><p className="text-[11px] text-muted-foreground">faturado no período</p></div>
-                  <div><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.open)} /></p><p className="text-[11px] text-muted-foreground">em aberto de {brlK(d.ordered)} em pedidos</p></div>
+                <div className="min-w-0 space-y-1.5">
+                  <div><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={brlK(d.ordered)} /></p><p className="text-[11px] text-muted-foreground">em pedidos (todos, até o fim do período)</p></div>
+                  <div className="flex gap-4">
+                    <div><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.billedToDate)} /></p><p className="text-[11px] text-muted-foreground">faturado deles</p></div>
+                    <div><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.open)} /></p><p className="text-[11px] text-muted-foreground">em aberto</p></div>
+                  </div>
                 </div>
-                <Donut frac={d.ordered ? d.open / d.ordered : 0} center={d.ordered ? `${Math.round((d.open / d.ordered) * 100)}%` : "—"} sub="em aberto" size="h-32 w-32" />
+                <Donut frac={d.ordered ? d.billedToDate / d.ordered : 0} center={d.ordered ? `${Math.round((d.billedToDate / d.ordered) * 100)}%` : "—"} sub="faturado" size="h-32 w-32" />
               </div>
             </OverviewCard>
 
