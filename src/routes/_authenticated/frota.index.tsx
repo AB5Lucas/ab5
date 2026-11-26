@@ -443,11 +443,11 @@ function FuelConsumption({ rows }: { rows: any[] }) {
           ))}
         </div>
       </div>
-      <div className="flex w-52 shrink-0 flex-col gap-4 border-l pl-5">
-        <div><p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total abastecido</p><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={`${n(total)} L`} /></p></div>
+      <div className="flex w-44 shrink-0 flex-col gap-3 border-l pl-4">
+        <div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</p><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={`${n(total)} L`} /></p></div>
         {FUEL_KINDS.map((k, i) => { const v = kinds.get(k.key) ?? 0; return (
           <div key={k.key} className="text-xs">
-            <div className="flex justify-between"><span className="text-muted-foreground">{k.key}</span><span className="font-semibold tabular-nums">{n(v)} L</span></div>
+            <div className="flex justify-between"><span>{k.key}</span><span className="font-semibold tabular-nums">{n(v)} L</span></div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"><div className={cn("ov-widen h-full rounded-full", TONES[i])} style={{ width: `${total ? (v / total) * 100 : 0}%` }} /></div>
           </div>
         ); })}
