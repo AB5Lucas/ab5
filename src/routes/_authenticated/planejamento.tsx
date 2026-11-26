@@ -223,7 +223,7 @@ function Overview() {
         <DashboardSkeleton />
       ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
+          <div className="grid gap-3 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-[13.25rem_minmax(0,1fr)]">
             <OverviewCard dark title={single ? `Pessoas escaladas — ${pLabel}` : `Pessoas escaladas por dia — ${pLabel}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas alocadas nos clientes na Programação" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
               <Big dark value={single ? d.people : d.avg} />
               <p className="text-xs text-background/60">{single ? `${pLabel} · média do mês ${Math.round(d.series.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.series.filter((s) => s.value).length))}` : `média por dia · ${d.people} pessoas diferentes`}</p>
@@ -233,7 +233,7 @@ function Overview() {
               <div className="flex items-baseline gap-2"><Big value={d.worksCount} /><span className="text-xs text-muted-foreground">de {d.activeWorks} serviços ativos</span></div>
               <ClientBars rows={d.worksByClient} empty="Nenhum serviço com equipe." limit={4} />
             </OverviewCard>
-            <OverviewCard title={`Transporte — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Veículos na escala da Transporte no período" className="min-h-0 xl:row-span-2" bodyClassName="flex min-h-0 flex-col">
+            <OverviewCard title={`Transporte — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Veículos na escala da Transporte no período" className="min-h-0 lg:row-span-2" bodyClassName="flex min-h-0 flex-col">
               <div className="grid grid-cols-3 gap-2">
                 {([[d.vehicles.length, "veículos"], [d.maint, "manutenção"], [d.kmTotal, "km de ida"]] as const).map(([v, l]) => (
                   <div key={l}><div className="font-display text-2xl font-semibold tabular-nums"><CountUp value={v} /></div><div className="text-[11px] text-muted-foreground">{l}</div></div>
@@ -278,14 +278,14 @@ function Overview() {
             <OverviewCard dark title={`Pessoas no Pátio — ${month}`} to="/programacao/diaria" linkLabel="Abrir Programação" hint="Pessoas escaladas no cliente Pátio no mês" className="min-h-0 md:col-span-2" bodyClassName="min-h-0 overflow-hidden">
               <div onClick={(e) => e.preventDefault()}><PatioCalendar dark big days={d.patioDays} unit="day" total={d.patioCount} workforce={d.workforce} /></div>
             </OverviewCard>
-            <OverviewCard title={`Veículos — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Situação de cada veículo da frota no período (em operação, manutenção, revisão ou sem escala na Transporte). Clique numa fatia para ver os veículos." className="min-h-0 xl:col-start-4" bodyClassName="flex min-h-0 flex-col">
+            <OverviewCard title={`Veículos — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Situação de cada veículo da frota no período (em operação, manutenção, revisão ou sem escala na Transporte). Clique numa fatia para ver os veículos." className="min-h-0 lg:col-start-4" bodyClassName="flex min-h-0 flex-col">
               <Pie3D total={d.fleetTotal} totalLabel="veículos na frota" parts={d.vehParts} unit={["veículo", "veículos"]} badge={(n) => n.split(" · ")[0]!.slice(0, 3)} />
             </OverviewCard>
           </div>
           <OverviewCard title={`Escalações — ${pLabel} · ${d.clients.length} clientes · ${d.worksCount} serviços · ${d.people} pessoas`} to="/programacao/servicos" linkLabel="Abrir Serviços"
-            hint="Pessoas escaladas por cliente no período" className="shrink-0 xl:h-[13.25rem]" bodyClassName="min-h-0 overflow-hidden">
+            hint="Pessoas escaladas por cliente no período" className="shrink-0 lg:h-[13.25rem]" bodyClassName="min-h-0 overflow-hidden">
             {!d.clients.length ? <p className="py-10 text-center text-xs text-muted-foreground">Sem escalações no período.</p> : (
-              <div className="grid h-full grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:auto-cols-fr xl:grid-flow-col xl:grid-cols-none xl:grid-rows-1 xl:overflow-hidden">
+              <div className="grid h-full grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:auto-cols-fr lg:grid-flow-col lg:grid-cols-none lg:grid-rows-1 lg:overflow-hidden">
                 {d.clients.slice(0, 8).map((c, i) => (
                   <ClientTile key={c.name} c={c} single={single} index={i}
                     onOpen={c.clientId ? () => void nav({ to: "/programacao/servicos", search: { client: c.clientId!, date: single ? R.from : today } }) : undefined} />

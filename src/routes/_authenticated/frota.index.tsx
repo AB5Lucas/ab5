@@ -221,7 +221,7 @@ function Overview({ canCost }: { canCost: boolean }) {
       {!d ? (
         <DashboardSkeleton />
       ) : (
-        <div key={`${R.from}|${R.to}`} className="fleet-dashboard-layout grid min-h-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)_minmax(0,1fr)]">
+        <div key={`${R.from}|${R.to}`} className="fleet-dashboard-layout grid min-h-0 flex-1 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:grid-rows-[13.25rem_minmax(0,1fr)_minmax(0,1fr)]">
 
           <OverviewCard dark title={`Km rodados — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Km da escala da Transporte (ida e volta × viagens + obras adicionais)" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
             <Big dark value={Math.round(d.km).toLocaleString("pt-BR")} />
@@ -269,24 +269,24 @@ function Overview({ canCost }: { canCost: boolean }) {
             })()}
           </OverviewCard>
 
-          <ResultCard title={`Manutenções e revisões — ${year}`} className="min-h-48 xl:min-h-0 xl:col-start-4 xl:row-start-1">
+          <ResultCard title={`Manutenções e revisões — ${year}`} className="min-h-48 lg:min-h-0 lg:col-start-4 lg:row-start-1">
             {annualQ.isPending ? <ResultChartSkeleton /> : <MaintenanceYear rows={annualQ.data ?? []} year={year} />}
           </ResultCard>
 
 
-          <ResultCard title={`Manutenções e revisões — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} className="min-h-[22rem] xl:min-h-0 xl:col-start-3 xl:col-span-2 xl:row-start-2 xl:row-span-2">
+          <ResultCard title={`Manutenções e revisões — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} className="min-h-[22rem] lg:min-h-0 lg:col-start-3 lg:col-span-2 lg:row-start-2 lg:row-span-2">
             <MaintCalendar ym={ym} calFrom={calFrom} calTo={calTo} range={R} today={today} maintDays={d.maintDays} suggestions={d.suggestions} selected={selectedDay} onSelect={setSelectedDay} />
           </ResultCard>
-                <ResultCard dark title={single ? `Orçado × gasto por veículo — ${when}` : `Orçado × gasto por dia — ${when}`} className="min-h-64 xl:min-h-0 xl:col-start-1 xl:col-span-2 xl:row-start-2">
+                <ResultCard dark title={single ? `Orçado × gasto por veículo — ${when}` : `Orçado × gasto por dia — ${when}`} className="min-h-64 lg:min-h-0 lg:col-start-1 lg:col-span-2 lg:row-start-2">
                   {canCost ? budget.error || expQ.error ? <p className="text-sm text-background/60">Não foi possível carregar os custos.</p> : !budget.data || expQ.isPending ? <ResultChartSkeleton /> : (
                     <div className="flex h-full min-h-0 flex-col">
                       <div className="mb-2 flex flex-wrap gap-4 text-xs text-background/60"><span>Orçado <CountUp value={brl(comparison.reduce((sum, x) => sum + x.a, 0))} /></span><span>Gasto <CountUp value={brl(comparison.reduce((sum, x) => sum + x.b, 0))} /></span></div>
                       <div className="mb-2 flex gap-4 text-[10px] text-background/60"><span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-background" />Orçado</span><span className="flex items-center gap-1"><span className="w-3 border-t border-dashed border-background/60" />Gasto</span></div>
-                      <LineArea className="min-h-0 flex-1 [--color-foreground:var(--background)] [&_.stroke-foreground]:stroke-background [&_.stroke-muted-foreground\/60]:stroke-background/60 [&_.text-muted-foreground]:text-background/60 [&_.bg-popover]:text-foreground [&_.bg-popover_.text-muted-foreground]:text-muted-foreground" height="h-36 xl:h-auto xl:min-h-0 xl:flex-1" data={comparison} format={(x) => `Orçado ${brl(x.a)} · Gasto ${brl(x.b ?? 0)}`} />
+                      <LineArea className="min-h-0 flex-1 [--color-foreground:var(--background)] [&_.stroke-foreground]:stroke-background [&_.stroke-muted-foreground\/60]:stroke-background/60 [&_.text-muted-foreground]:text-background/60 [&_.bg-popover]:text-foreground [&_.bg-popover_.text-muted-foreground]:text-muted-foreground" height="h-36 lg:h-auto lg:min-h-0 lg:flex-1" data={comparison} format={(x) => `Orçado ${brl(x.a)} · Gasto ${brl(x.b ?? 0)}`} />
                     </div>
                   ) : <p className="text-sm text-background/60">Custos disponíveis para quem tem acesso à Visão Geral.</p>}
                 </ResultCard>
-                <ResultCard title={`Consumo de combustível — ${when}`} className="min-h-64 xl:min-h-0 xl:col-start-1 xl:col-span-2 xl:row-start-3">
+                <ResultCard title={`Consumo de combustível — ${when}`} className="min-h-64 lg:min-h-0 lg:col-start-1 lg:col-span-2 lg:row-start-3">
                   {fuelQ.isPending ? <ResultChartSkeleton /> : <FuelConsumption rows={fuelQ.data ?? []} />}
                 </ResultCard>
         </div>

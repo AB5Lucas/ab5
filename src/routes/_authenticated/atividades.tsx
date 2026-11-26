@@ -344,7 +344,7 @@ function HubOverview() {
         <DashboardSkeleton />
       ) : (
         <>
-          <div className="grid shrink-0 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid shrink-0 gap-3 md:grid-cols-2 lg:grid-cols-4">
             {can("/obras/resultado") && (
               <OverviewCard dark title={`Faturado — ${pLabel}`} to="/obras/resultado" linkLabel="Ver Resultados" hint="Notas lançadas nos serviços no período, comparadas ao período anterior equivalente">
                 <Big dark value={brl(d.cur)} delta={delta(d.cur, d.prev)} />

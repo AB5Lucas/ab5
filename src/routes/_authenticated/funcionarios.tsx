@@ -257,7 +257,7 @@ function Overview() {
         </div>
       </div>
       {!d ? <DashboardSkeleton /> : (
-        <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid gap-3 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-[13.25rem_minmax(0,1fr)_minmax(0,1fr)]">
           <OverviewCard dark title="Colaboradores ativos" to="/colaboradores" linkLabel="Abrir Colaboradores" hint="Colaboradores ativos no cadastro, por tipo de contrato" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
             <div className="flex items-baseline justify-between gap-2">
               <Big dark value={d.total} />
@@ -340,21 +340,21 @@ function Overview() {
           </OverviewCard>
 
           <OverviewCard title={`Treinamentos por dia — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} to="/documentos/agendamentos" linkLabel="Abrir Agendamentos"
-            hint="Pessoas em treinamento em cada dia do mês (realizados e agendados; cancelados fora). Clique num dia para ver só ele." className="min-h-0 pb-6 md:col-span-2 xl:col-span-2 xl:col-start-3 xl:row-start-2" bodyClassName="min-h-0">
+            hint="Pessoas em treinamento em cada dia do mês (realizados e agendados; cancelados fora). Clique num dia para ver só ele." className="min-h-0 pb-6 md:col-span-2 lg:col-span-2 lg:col-start-3 lg:row-start-2" bodyClassName="min-h-0">
             <div className="h-full min-h-0" onClick={(e) => e.preventDefault()}>
               {trQ.data ? <TrainingTiles rows={trQ.data} from={mFrom} to={mTo} today={today} /> : null}
             </div>
           </OverviewCard>
           <OverviewCard dark title={`Equipe — ${day === today ? "hoje" : brDay(day)}`} to="/colaboradores" linkLabel="Abrir Colaboradores"
             hint="Um círculo por colaborador ativo, na cor da situação do dia. Troque o agrupamento para ver as pessoas se reorganizarem; clique num grupo para destacá-lo."
-            className="min-h-0 md:col-span-2 xl:col-start-1 xl:row-span-2 xl:row-start-2" bodyClassName="flex min-h-0 flex-col">
+            className="min-h-0 md:col-span-2 lg:col-start-1 lg:row-span-2 lg:row-start-2" bodyClassName="flex min-h-0 flex-col">
             {dayQ.data ? <TeamMosaic dark people={d.team} title={`${d.team.length} colaboradores ativos · ${single ? brDay(day) : "hoje"}`} /> : null}
           </OverviewCard>
-          <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas diferentes com folga, férias, atestado ou falta no período (quadros da Programação + Ausências). Clique numa fatia para ver as pessoas." className="min-h-0 xl:col-start-3 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
+          <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas diferentes com folga, férias, atestado ou falta no período (quadros da Programação + Ausências). Clique numa fatia para ver as pessoas." className="min-h-0 lg:col-start-3 lg:row-start-3" bodyClassName="flex min-h-0 flex-col">
             <Pie3D total={d.absAll} totalLabel="pessoas ausentes" parts={d.absParts} unit={["pessoa", "pessoas"]} compact />
           </OverviewCard>
 
-          <OverviewCard title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0 pb-6 xl:col-start-4 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
+          <OverviewCard title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0 pb-6 lg:col-start-4 lg:row-start-3" bodyClassName="flex min-h-0 flex-col">
             <div className="flex items-baseline gap-2"><Big value={d.absToday} /><p className="text-xs text-muted-foreground">ausentes hoje · média {Math.round(d.absSeries.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.absSeries.filter((s) => s.value).length))} por dia</p></div>
             <LineArea height="h-24 lg:h-auto lg:min-h-0 lg:flex-1" className="mt-2 lg:min-h-[70px] lg:flex-1" data={d.absSeries.map((x) => ({ label: x.label, a: x.value, tip: x.label }))} format={(p) => `${p.a} ${p.a === 1 ? "ausente" : "ausentes"}`} />
           </OverviewCard>

@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /** Tela de referência dos dashboards (área de conteúdo do monitor do Lucas). */
 const REF_H = 997;
+const MIN_W = 1280;
 const CHROME_H = 104; // cabeçalho + margens (6,5rem), como antes
 
 /**
@@ -22,7 +23,8 @@ export function FitScreen({ children }: { children: ReactNode }) {
       const h = REF_H - CHROME_H;
       const availH = window.innerHeight - CHROME_H;
       // Altura manda (sem rolar); a largura sempre preenche a tela toda.
-      const scale = Math.max(0.5, Math.min(1.6, availH / h));
+      // Largura mínima virtual de 1280 px: em telas estreitas tudo encolhe em vez de espremer as colunas.
+      const scale = Math.max(0.5, Math.min(1.6, availH / h, availW / MIN_W));
       const w = availW / scale;
       setFit({ scale, w, h, ml: 0 });
     };

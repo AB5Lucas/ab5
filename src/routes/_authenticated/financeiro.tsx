@@ -1,6 +1,6 @@
 import { Fragment, Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccess } from "@/hooks/use-access";
@@ -19,6 +19,7 @@ import { buildFinanceGroups, financeBatches, financeList, loadFinanceActive, loa
 import { MARGIN_GOAL } from "@/lib/director-overview";
 import { marginPercent } from "@/lib/result-labor";
 import { cn } from "@/lib/utils";
+import { readSnapshot, writeSnapshot } from "@/lib/dash-snapshot";
 
 export const Route = createFileRoute("/_authenticated/financeiro")({
   pendingComponent: DashboardSkeleton,
@@ -85,21 +86,29 @@ function Overview() {
   const end = yms.length ? monthEnd(yms[yms.length - 1]!) : `${year}-12-31`;
 
   // Mesmas consultas (e chaves) do Fechamento: os números são idênticos e o cache é compartilhado.
-  const works = useQuery({ queryKey: ["fin-works"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("works").select("*, clients(name)").order("name")).data ?? [] });
+  // Último retrato salvo no navegador: abre na hora e as consultas atualizam por trás.
+  const [snap, setSnap] = useState<{ year: string; works: any[]; active: Set<string>; raws: Map<string, any> } | null>(null);
+  useEffect(() => { readSnapshot<any>("financeiro").then((v) => v && setSnap(v)); }, []);
+  const snapY = snap && snap.year === year ? snap : null;
+  const works = useQuery({ queryKey: ["fin-works"], staleTime: 10 * 60_000, placeholderData: () => snap?.works as any, queryFn: async () => (await supabase.from("works").select("*, clients(name)").order("name")).data ?? [] });
   const holidays = useQuery({ queryKey: ["holidays-dates"], queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string) });
   // O ano inteiro é lido uma vez; trocar meses ou clientes só refaz a conta na tela (instantâneo).
   const yStart = `${year}-01-01`, yEnd = `${year}-12-31`;
-  const active = useQuery({ queryKey: ["fin-active", yStart, yEnd], staleTime: 10 * 60_000, placeholderData: keepPreviousData, queryFn: () => loadFinanceActive(yStart, yEnd) });
+  const active = useQuery({ queryKey: ["fin-active", yStart, yEnd], staleTime: 10 * 60_000, placeholderData: (prev) => prev ?? snapY?.active, queryFn: () => loadFinanceActive(yStart, yEnd) });
   const scope = useWorkScope();
   const list = useMemo(() => financeList(works.data ?? [], active.data, yStart, yEnd).filter((w: any) => scope.allowWork(w)), [works.data, active.data, yStart, yEnd, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
   const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 10 * 60_000, queryFn: loadResultShared });
   const batches = useMemo(() => financeBatches(list), [list]);
   const batchKey = useMemo(() => batches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [batches]);
   const raws = useQuery({
-    queryKey: ["fin-client-raw", batchKey, yEnd], staleTime: 10 * 60_000, placeholderData: keepPreviousData,
-    enabled: !!shared.data && !!active.data,
+    queryKey: ["fin-client-raw", batchKey, yEnd], staleTime: 10 * 60_000, placeholderData: (prev) => prev ?? snapY?.raws,
+    enabled: !!shared.data && !!active.data && !active.isPlaceholderData && !works.isPlaceholderData,
     queryFn: () => loadFinanceRaws(batches, shared.data!, { until: yEnd }),
   });
+  useEffect(() => {
+    if (raws.data && !raws.isPlaceholderData && active.data && !active.isPlaceholderData && works.data && !works.isPlaceholderData)
+      writeSnapshot("financeiro", { year, works: works.data, active: active.data, raws: raws.data });
+  }, [raws.data, raws.isPlaceholderData, active.data, active.isPlaceholderData, works.data, works.isPlaceholderData, year]);
   const groups = useMemo(() => buildFinanceGroups(list, raws.data ?? EMPTY, yms, year, holidays.data ?? [], works.data ?? []), [list, raws.data, yms, year, holidays.data, works.data]);
   const shown = useMemo(() => groups.filter((g) => !hidden.includes(g.key)), [groups, hidden]);
 
@@ -120,7 +129,7 @@ function Overview() {
   }, [shown, end]);
 
   const years = Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - 3 + i));
-  const loading = !scope.ready || works.isLoading || active.isLoading || shared.isLoading || (list.length > 0 && !raws.data);
+  const loading = !scope.ready || !works.data || !active.data || (list.length > 0 && !raws.data);
   const stale = raws.isPlaceholderData || active.isPlaceholderData;
   const when = !yms.length ? "Selecione ao menos um mês" : yms.length === 1 ? `${MONTHS[months[0]! - 1]}/${year}` : `${yms.length} meses de ${year}`;
   const maxBilled = Math.max(1, ...shown.map((g) => g.lines.reduce((a, l) => a + l.billed, 0)));
