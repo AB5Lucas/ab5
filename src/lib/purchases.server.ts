@@ -52,7 +52,7 @@ async function monthHours(ym: string) {
 
 async function loadRefs() {
   const [c, w, rules, redirects] = await Promise.all([
-    supabaseAdmin.from("clients").select("id, name, cc_prefix"),
+    supabaseAdmin.from("clients").select("id, name, cc_prefix, cc_alt_prefixes"),
     supabaseAdmin.from("works").select("id, client_id, cc_suffix"),
     supabaseAdmin.from("purchase_exclusion_rules").select("*"),
     supabaseAdmin.from("purchase_cc_redirects").select("*"),
@@ -61,7 +61,7 @@ async function loadRefs() {
   if (w.error) throw w.error;
   if (rules.error) throw rules.error;
   if (redirects.error) throw redirects.error;
-  const clients: PClient[] = (c.data ?? []).map((x) => ({ id: x.id, prefix: x.cc_prefix }));
+  const clients: PClient[] = (c.data ?? []).map((x) => ({ id: x.id, prefix: x.cc_prefix, altPrefixes: ((x as { cc_alt_prefixes?: string[] | null }).cc_alt_prefixes ?? []) }));
   const works: PWork[] = (w.data ?? []).flatMap((x) => x.client_id ? [{ id: x.id, client_id: x.client_id, suffix: x.cc_suffix }] : []);
   const industryClients = new Set((c.data ?? []).filter((x) => isIndustryClient(x.name)).map((x) => x.id));
   const industryWorkIds = new Set(works.filter((x) => industryClients.has(x.client_id)).map((x) => x.id));

@@ -80,7 +80,7 @@ function ComprasPage() {
       // Paginado e com ordem estável (id desempata): as linhas de CC passam de 1000 (corte silencioso do PostgREST).
       const [lRows, c, wRows, decRows] = await Promise.all([
         fetchAll<Tables<"purchase_cc_lines">>((a, b) => supabase.from("purchase_cc_lines").select("*").order("ref_month", { ascending: false }).order("cc_code").order("id").range(a, b)),
-        supabase.from("clients").select("id, name, cc_prefix").order("name"),
+        supabase.from("clients").select("id, name, cc_prefix, cc_alt_prefixes").order("name"),
         fetchAll<{ id: string; name: string; client_id: string | null; active: boolean }>((a, b) => supabase.from("works").select("id, name, client_id, active").order("name").order("id").range(a, b)),
         fetchAll<Tables<"purchase_asset_decisions">>((a, b) => supabase.from("purchase_asset_decisions").select("*").order("id").range(a, b)),
       ]);
@@ -98,7 +98,7 @@ function ComprasPage() {
       }
       const prefOk = (cc: string | null | undefined) => {
         if (!scope.scoped) return true;
-        const cl = c.data.find((x) => x.cc_prefix && String(cc ?? "").startsWith(x.cc_prefix));
+        const cl = c.data.find((x) => x.cc_prefix && String(cc ?? "").startsWith(x.cc_prefix)) ?? c.data.find((x) => ((x as { cc_alt_prefixes?: string[] | null }).cc_alt_prefixes ?? []).includes(String(cc ?? "").slice(0, 4)));
         return !!cl && scope.allowClient(cl.id);
       };
       const lines = (l.data as Line[]).filter((x) => prefOk((x as { cc_code?: string | null }).cc_code));
@@ -126,7 +126,7 @@ function ComprasPage() {
         if (to && (date ?? `${l.ref_month}-01`) > to) continue;
         const targetWork = d?.works.find((w) => w.id === l.target_work_id);
         const clientId = targetWork?.client_id ?? l.target_client_id;
-        const client = clientId ? d?.clients.find((c) => c.id === clientId) : d?.clients.find((c) => c.cc_prefix === (l.effective_cc ?? l.cc_code).slice(0, 4));
+        const client = clientId ? d?.clients.find((c) => c.id === clientId) : (d?.clients.find((c) => c.cc_prefix === (l.effective_cc ?? l.cc_code).slice(0, 4)) ?? d?.clients.find((c) => ((c as { cc_alt_prefixes?: string[] | null }).cc_alt_prefixes ?? []).includes((l.effective_cc ?? l.cc_code).slice(0, 4))));
         const cat = (state.category ?? purchaseCategory(it.code, isIndustryClient(client?.name))) as PurchaseCategory;
         if (hiddenCats.has(cat)) continue;
         if (s && !normalizePurchaseText(`${it.code} ${it.desc} ${l.cc_code} ${l.cc_name ?? ""}`).includes(s)) continue;

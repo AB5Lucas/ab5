@@ -1611,6 +1611,7 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          cc_alt_prefixes: string[]
           cc_prefix: string | null
           city: string | null
           created_at: string
@@ -1641,6 +1642,7 @@ export type Database = {
         Insert: {
           active?: boolean
           address?: string | null
+          cc_alt_prefixes?: string[]
           cc_prefix?: string | null
           city?: string | null
           created_at?: string
@@ -1671,6 +1673,7 @@ export type Database = {
         Update: {
           active?: boolean
           address?: string | null
+          cc_alt_prefixes?: string[]
           cc_prefix?: string | null
           city?: string | null
           created_at?: string

@@ -1,7 +1,8 @@
 /** Compras por centro de custo: leitura do relatório e rateio entre serviços. */
 export type CcItem = { code: string; desc: string; qty: number; amount: number; date?: string | null };
 export type CcLine = { cc: string; name: string; amount: number; items: CcItem[] };
-export type PClient = { id: string; prefix: string | null };
+/** altPrefixes: outros prefixos de CC do mesmo cliente (clients.cc_alt_prefixes; ex.: 2111 GENERAL MILLS = Três Corações). */
+export type PClient = { id: string; prefix: string | null; altPrefixes?: string[] };
 export type PWork = { id: string; client_id: string; suffix: string | null };
 export type Direction = { client_id?: string | null; work_id?: string | null };
 export type Allocation = { status: "launched" | "pending"; reason: string | null; parts: { work_id: string; amount: number }[] };
@@ -159,7 +160,7 @@ function split(total: number, ids: string[], hours: Map<string, number>) {
  */
 export function allocatePurchase(cc: string, amount: number, clients: PClient[], works: PWork[], hours: Map<string, number>, dir?: Direction): Allocation {
   if (dir?.work_id) return { status: "launched", reason: null, parts: [{ work_id: dir.work_id, amount }] };
-  const client = dir?.client_id ? clients.find((c) => c.id === dir.client_id) : clients.find((c) => c.prefix && c.prefix === cc.slice(0, 4));
+  const client = dir?.client_id ? clients.find((c) => c.id === dir.client_id) : clients.find((c) => c.prefix && c.prefix === cc.slice(0, 4)) ?? clients.find((c) => (c.altPrefixes ?? []).includes(cc.slice(0, 4)));
   if (!client) return { status: "pending", reason: "Nenhum cliente com este prefixo", parts: [] };
   const own = works.filter((w) => w.client_id === client.id);
   const suffix = cc.length > 4 ? cc.slice(4) : null;

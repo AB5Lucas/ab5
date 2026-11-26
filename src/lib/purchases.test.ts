@@ -120,3 +120,18 @@ describe("rateio de compras", () => {
     expect(purchaseFileMonth("01.10.2026-22.10.2026.xls")).toEqual({ ym: "2026-10", end: "2026-10-22" });
   });
 });
+
+describe("outros prefixos do cliente", () => {
+  it("CC com prefixo alternativo vai para os serviços do cliente (ex.: 2111 = Três Corações)", () => {
+    const cs = [{ id: "tc", prefix: "2117", altPrefixes: ["2111"] }];
+    const ws = [{ id: "t1", client_id: "tc", suffix: null }, { id: "t2", client_id: "tc", suffix: null }];
+    const a = allocatePurchase("2111999", 100, cs, ws, new Map([["t1", 30], ["t2", 70]]));
+    expect(a.status).toBe("launched");
+    expect(a.parts).toEqual([{ work_id: "t1", amount: 30 }, { work_id: "t2", amount: 70 }]);
+  });
+  it("o prefixo principal de outro cliente vence o alternativo", () => {
+    const cs = [{ id: "a", prefix: null, altPrefixes: ["2004"] }, { id: "mars", prefix: "2004" }];
+    const a = allocatePurchase("2004999", 10, cs, [{ id: "m", client_id: "mars", suffix: null }], new Map([["m", 1]]));
+    expect(a.parts[0]!.work_id).toBe("m");
+  });
+});

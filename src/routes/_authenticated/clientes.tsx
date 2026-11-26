@@ -94,6 +94,7 @@ type FormState = {
   toll_amount: string;
   trips_per_day: string;
   cc_prefix: string;
+  cc_alt_prefixes: string;
   manager_id: string;
   substitute_manager_id: string;
 };
@@ -118,6 +119,7 @@ const emptyForm: FormState = {
   toll_amount: "",
   trips_per_day: "1",
   cc_prefix: "",
+  cc_alt_prefixes: "",
   manager_id: NONE,
   substitute_manager_id: NONE,
 };
@@ -265,6 +267,7 @@ function ClientsPage() {
         toll_amount: form.has_toll ? Number(form.toll_amount.replace(",", ".")) || 0 : 0,
         trips_per_day: Math.max(1, Number(form.trips_per_day) || 1),
         cc_prefix: nn(form.cc_prefix),
+        cc_alt_prefixes: [...new Set(form.cc_alt_prefixes.split(/[^0-9]+/).filter((x) => x.length === 4 && x !== form.cc_prefix.trim()))],
         manager_id: ref(form.manager_id),
         substitute_manager_id: ref(form.substitute_manager_id),
       };
@@ -401,6 +404,7 @@ function ClientsPage() {
       toll_amount: c.toll_amount != null ? String(c.toll_amount) : "",
       trips_per_day: String(c.trips_per_day ?? 1),
       cc_prefix: c.cc_prefix ?? "",
+      cc_alt_prefixes: ((c as { cc_alt_prefixes?: string[] | null }).cc_alt_prefixes ?? []).join(", "),
       manager_id: c.manager_id ?? NONE,
       substitute_manager_id: c.substitute_manager_id ?? NONE,
     });
@@ -634,6 +638,10 @@ function ClientsPage() {
             <div className="space-y-1">
               <Label>Prefixo CC (4 números)</Label>
               <Input inputMode="numeric" maxLength={4} placeholder="Ex.: 2004" value={form.cc_prefix} onChange={(e) => set("cc_prefix", e.target.value.replace(/\D/g, ""))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Outros prefixos de CC (opcional)</Label>
+              <Input inputMode="numeric" placeholder="Ex.: 2111" title="Outros prefixos que o relatório de Compras usa para este mesmo cliente; separe por vírgula" value={form.cc_alt_prefixes} onChange={(e) => set("cc_alt_prefixes", e.target.value.replace(/[^0-9, ]/g, ""))} />
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Foto de referência da fachada ou da fábrica (opcional)</Label>
