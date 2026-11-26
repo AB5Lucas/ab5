@@ -168,7 +168,9 @@ function Page() {
   // continua vendo só a Recomendação. Recusada volta ao comprador refazer (aí as abas voltam).
   const isApproverOfSc = !!r && !!user?.id && (!!faPerms.data?.exec || !!faPerms.data?.oper || !!faPerms.data?.shared || faIsGestor
     || r.fa_decided_by === user.id || r.fa_partial_by === user.id);
-  const approverView = !!r && ((r.fa_state === "em_aprovacao" && (!!faPerms.data?.decide.has(id) || isApproverOfSc))
+  // Na própria SC o solicitante vê a Solicitação normal (só vira tela de aprovação se ele mesmo tiver de decidir agora).
+  const ownSc = !!r && r.requester_id === user?.id && !faPerms.data?.decide.has(id);
+  const approverView = !!r && !ownSc && ((r.fa_state === "em_aprovacao" && (!!faPerms.data?.decide.has(id) || isApproverOfSc))
     || (r.fa_state === "aprovada" && isApproverOfSc));
   useUndoRedoKeys(buyerHistory, isBuyer && !editMode && !approverView);
   const buyerCanEdit = isBuyer && r?.fa_state !== "em_aprovacao";
