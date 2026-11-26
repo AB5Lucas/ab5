@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
 import { menuUrlFor, MENU_GROUPS } from "@/lib/menu";
+import { DashboardWarmup } from "@/components/dashboard-warmup";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
 let cachedUser: import("@supabase/supabase-js").User | null = null;
@@ -131,6 +132,7 @@ function AuthenticatedLayout() {
               </div>
             ) : (
               <>
+                <DashboardWarmup />
                 {dashboardPending && <DashboardSkeleton />}
                 <div className={dashboardPending ? "hidden" : "contents"}><PageEnter><Outlet /></PageEnter></div>
               </>

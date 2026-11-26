@@ -46,7 +46,7 @@ export const getRouter = () => {
     mutationCache,
     queryCache,
     defaultOptions: {
-      queries: { staleTime: 30_000, retry: (n, e) => { if (isJwtExpired(e)) { refreshLogin(); return n < 2; } return n < 3; }, retryDelay: jwtDelay },
+      queries: { staleTime: 30_000, gcTime: 30 * 60_000, retry: (n, e) => { if (isJwtExpired(e)) { refreshLogin(); return n < 2; } return n < 3; }, retryDelay: jwtDelay },
       mutations: { retry: (n, e) => { if (!isJwtExpired(e)) return false; refreshLogin(); return n < 2; }, retryDelay: jwtDelay },
     },
   });
