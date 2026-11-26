@@ -1,3 +1,4 @@
+import { MENU_GROUPS } from "@/lib/menu";
 import { FitScreen } from "@/components/overview/fit-screen";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -50,7 +51,8 @@ const daysBetween = (from: string, to: string) => { const out: string[] = []; fo
 function PlanejamentoOverview() {
   const { canAccess, loading } = useAccess();
   const nav = useNavigate();
-  const allowed = canAccess("/programacao/diaria");
+  // Dashboard aberto a quem acessa qualquer página do módulo.
+  const allowed = (MENU_GROUPS.find((g) => g.overview === "/planejamento")?.items ?? []).some((i) => canAccess(i.url));
   useEffect(() => { if (!loading && !allowed) nav({ to: "/dashboard", replace: true }); }, [loading, allowed]); // eslint-disable-line react-hooks/exhaustive-deps
   if (loading) return <DashboardSkeleton />;
   if (!allowed) return null;

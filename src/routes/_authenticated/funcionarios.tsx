@@ -1,3 +1,4 @@
+import { MENU_GROUPS } from "@/lib/menu";
 import { FitScreen } from "@/components/overview/fit-screen";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -58,7 +59,8 @@ const HIRING_OPEN = new Set(["aberta", "analise", "aguardando", "processo", "par
 function FuncionariosOverview() {
   const { canAccess, loading } = useAccess();
   const nav = useNavigate();
-  const allowed = canAccess("/colaboradores");
+  // Dashboard aberto a quem acessa qualquer página do módulo.
+  const allowed = (MENU_GROUPS.find((g) => g.overview === "/funcionarios")?.items ?? []).some((i) => canAccess(i.url));
   useEffect(() => { if (!loading && !allowed) nav({ to: "/dashboard", replace: true }); }, [loading, allowed]); // eslint-disable-line react-hooks/exhaustive-deps
   if (loading) return <DashboardSkeleton />;
   if (!allowed) return null;

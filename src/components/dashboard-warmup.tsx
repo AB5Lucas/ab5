@@ -30,12 +30,12 @@ export function DashboardWarmup() {
     if (typeof window === "undefined" || window.innerWidth < 1024) return;
     const conn = (navigator as { connection?: { saveData?: boolean } }).connection;
     if (conn?.saveData) return;
-    const fleetItems = MENU_GROUPS.find((g) => g.overview === "/frota")?.items ?? [];
+    const anyOf = (ov: string) => (MENU_GROUPS.find((g) => g.overview === ov)?.items ?? []).some((i) => canAccess(i.url));
     const list = [
-      { path: "/planejamento", ok: canAccess("/programacao/diaria") },
-      { path: "/funcionarios", ok: canAccess("/colaboradores") },
+      { path: "/planejamento", ok: anyOf("/planejamento") },
+      { path: "/funcionarios", ok: anyOf("/funcionarios") },
       { path: "/atividades", ok: role === "admin" || role === "coordenador" },
-      { path: "/frota", ok: fleetItems.some((i) => canAccess(i.url)) },
+      { path: "/frota", ok: anyOf("/frota") },
     ].filter((x) => x.ok).map((x) => x.path);
     if (!list.length) return;
     let cancelled = false;
