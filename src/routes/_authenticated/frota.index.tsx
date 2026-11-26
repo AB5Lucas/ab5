@@ -429,25 +429,25 @@ function FuelConsumption({ rows }: { rows: any[] }) {
   const n = (v: number, d = 0) => v.toLocaleString("pt-BR", { maximumFractionDigits: d, minimumFractionDigits: d });
   if (!rows.length) return <p className="text-xs text-muted-foreground">Sem abastecimentos no período.</p>;
   return (
-    <div className="flex h-full min-h-0 gap-4">
+    <div className="flex h-full min-h-0 gap-6">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="mb-1 grid grid-cols-[4.5rem_minmax(0,1fr)_4rem_3.5rem] gap-2 text-[10px] uppercase tracking-wide text-muted-foreground"><span>Veículo</span><span>Litros</span><span className="text-right">L</span><span className="text-right">km/L</span></div>
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+        <div className="mb-2 grid grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_5rem] gap-4 border-b pb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"><span>Placa</span><span>Consumo no período</span><span className="text-right">Litros</span><span className="text-right">Média km/L</span></div>
+        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-2">
           {vehicles.map((v, i) => (
-            <div key={v.plate} className="ov-fade grid grid-cols-[4.5rem_minmax(0,1fr)_4rem_3.5rem] items-center gap-2 text-[11px]" style={{ animationDelay: `${i * 50}ms` }}>
+            <div key={v.plate} className="ov-fade grid grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_5rem] items-center gap-4 text-xs" style={{ animationDelay: `${i * 50}ms` }}>
               <span className="font-medium tabular-nums">{v.plate}</span>
               <span className="h-1.5 overflow-hidden rounded-full bg-muted"><span className="ov-widen block h-full rounded-full bg-foreground/70" style={{ width: `${(v.liters / maxL) * 100}%`, animationDelay: `${i * 50}ms` }} /></span>
-              <span className="text-right tabular-nums">{n(v.liters)}</span>
-              <span className="text-right font-semibold tabular-nums" title={v.kml == null ? "Precisa de 2 notas com km no período" : undefined}>{v.kml == null ? "—" : n(v.kml, 1)}</span>
+              <span className="text-right tabular-nums">{n(v.liters)} L</span>
+              <span className="text-right font-semibold tabular-nums" title={v.kml == null ? "Precisa de 2 notas com km no período" : undefined}>{v.kml == null ? "—" : `${n(v.kml, 1)} km/L`}</span>
             </div>
           ))}
         </div>
       </div>
-      <div className="flex w-44 shrink-0 flex-col gap-3 border-l pl-4">
-        <div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</p><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={`${n(total)} L`} /></p></div>
+      <div className="flex w-52 shrink-0 flex-col gap-4 border-l pl-5">
+        <div><p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total abastecido</p><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={`${n(total)} L`} /></p></div>
         {FUEL_KINDS.map((k, i) => { const v = kinds.get(k.key) ?? 0; return (
           <div key={k.key} className="text-xs">
-            <div className="flex justify-between"><span>{k.key}</span><span className="font-semibold tabular-nums">{n(v)} L</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">{k.key}</span><span className="font-semibold tabular-nums">{n(v)} L</span></div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"><div className={cn("ov-widen h-full rounded-full", TONES[i])} style={{ width: `${total ? (v / total) * 100 : 0}%` }} /></div>
           </div>
         ); })}
