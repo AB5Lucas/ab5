@@ -297,7 +297,6 @@ function HubOverview() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h1 className="font-display text-xl font-semibold tracking-tight">Atividades</h1>
-          <p className="hidden text-xs text-muted-foreground md:block">Clique em um quadro para abrir a página.</p>
         </div>
         <div className="flex rounded-full border bg-muted/40 p-0.5 text-xs">
           {PERIODS.map((p) => (
