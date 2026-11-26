@@ -1066,6 +1066,84 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_work_entries_20261126: {
+        Row: {
+          amount: number | null
+          category: string | null
+          competence_month: string | null
+          created_at: string | null
+          description: string | null
+          entry_date: string | null
+          id: string | null
+          industry_invoice_id: string | null
+          industry_order_id: string | null
+          industry_part: string | null
+          industry_part_ref: string | null
+          purchase_cc_id: string | null
+          purchase_item_key: string | null
+          recurrence_id: string | null
+          recurrence_month: string | null
+          split_group: string | null
+          split_note: string | null
+          split_total: number | null
+          sync_cancelled: boolean | null
+          sync_note_id: string | null
+          sync_split_note_id: string | null
+          updated_at: string | null
+          work_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          category?: string | null
+          competence_month?: string | null
+          created_at?: string | null
+          description?: string | null
+          entry_date?: string | null
+          id?: string | null
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
+          purchase_cc_id?: string | null
+          purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
+          sync_cancelled?: boolean | null
+          sync_note_id?: string | null
+          sync_split_note_id?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          category?: string | null
+          competence_month?: string | null
+          created_at?: string | null
+          description?: string | null
+          entry_date?: string | null
+          id?: string | null
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
+          purchase_cc_id?: string | null
+          purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
+          sync_cancelled?: boolean | null
+          sync_note_id?: string | null
+          sync_split_note_id?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
       backup_works_orders_20261110: {
         Row: {
           id: string | null
@@ -2440,6 +2518,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fleet_budget_cache: {
+        Row: {
+          computed_at: string
+          computed_by: string | null
+          value: number
+          ym: string
+        }
+        Insert: {
+          computed_at?: string
+          computed_by?: string | null
+          value: number
+          ym: string
+        }
+        Update: {
+          computed_at?: string
+          computed_by?: string | null
+          value?: number
+          ym?: string
+        }
+        Relationships: []
       }
       fleet_expense_files: {
         Row: {
@@ -4837,6 +4936,39 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_sync_files: {
+        Row: {
+          debug: Json | null
+          etag: string | null
+          file_path: string
+          message: string | null
+          ok: boolean
+          size: number | null
+          synced_at: string
+          ym: string
+        }
+        Insert: {
+          debug?: Json | null
+          etag?: string | null
+          file_path: string
+          message?: string | null
+          ok?: boolean
+          size?: number | null
+          synced_at?: string
+          ym: string
+        }
+        Update: {
+          debug?: Json | null
+          etag?: string | null
+          file_path?: string
+          message?: string | null
+          ok?: boolean
+          size?: number | null
+          synced_at?: string
+          ym?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
@@ -6969,10 +7101,10 @@ export type Database = {
           hh_enabled: boolean
           hh_rates: Json
           id: string
+          is_stock: boolean
           latitude: number | null
           longitude: number | null
           monthly_enabled: boolean
-          is_stock: boolean
           name: string
           neighborhood: string | null
           night_shift: boolean
@@ -7013,10 +7145,10 @@ export type Database = {
           hh_enabled?: boolean
           hh_rates?: Json
           id?: string
+          is_stock?: boolean
           latitude?: number | null
           longitude?: number | null
           monthly_enabled?: boolean
-          is_stock?: boolean
           name: string
           neighborhood?: string | null
           night_shift?: boolean
@@ -7057,10 +7189,10 @@ export type Database = {
           hh_enabled?: boolean
           hh_rates?: Json
           id?: string
+          is_stock?: boolean
           latitude?: number | null
           longitude?: number | null
           monthly_enabled?: boolean
-          is_stock?: boolean
           name?: string
           neighborhood?: string | null
           night_shift?: boolean
@@ -7429,8 +7561,13 @@ export type Database = {
         Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
         Returns: boolean
       }
+      purchase_fa_item_decide: {
+        Args: { _item: string; _reason: string; _status: string }
+        Returns: undefined
+      }
       purchase_fa_my_gestor_ids: { Args: never; Returns: string[] }
       purchase_fa_recall: { Args: { _id: string }; Returns: undefined }
+      purchase_fa_restore_items: { Args: { _id: string }; Returns: undefined }
       purchase_fa_rule_of: {
         Args: { _budget: number; _due: string; _total: number }
         Returns: string
