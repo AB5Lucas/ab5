@@ -4202,6 +4202,35 @@ export type Database = {
           },
         ]
       }
+      purchase_alcadas: {
+        Row: {
+          alcada: string
+          created_at: string
+          created_by: string | null
+          user_id: string
+        }
+        Insert: {
+          alcada: string
+          created_at?: string
+          created_by?: string | null
+          user_id: string
+        }
+        Update: {
+          alcada?: string
+          created_at?: string
+          created_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_alcadas_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_approvers: {
         Row: {
           approver_id: string | null
@@ -7515,6 +7544,16 @@ export type Database = {
         Returns: Json
       }
       prev_business_day: { Args: { _date: string }; Returns: string }
+      purchase_alcada_editor: { Args: never; Returns: boolean }
+      purchase_alcada_has: {
+        Args: { _a: string; _uid: string }
+        Returns: boolean
+      }
+      purchase_alcada_members: { Args: { _a: string }; Returns: string[] }
+      purchase_alcada_set: {
+        Args: { _alcada: string; _on: boolean; _user: string }
+        Returns: undefined
+      }
       purchase_apply_policy: {
         Args: { _entries: Json; _line: string; _summary: Json }
         Returns: number
@@ -7560,6 +7599,8 @@ export type Database = {
         Returns: undefined
       }
       purchase_fa_director: { Args: never; Returns: string }
+      purchase_fa_exec_for: { Args: { _client: string }; Returns: string[] }
+      purchase_fa_is_exec: { Args: { _uid: string }; Returns: boolean }
       purchase_fa_is_gestor: {
         Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
         Returns: boolean
@@ -7577,6 +7618,7 @@ export type Database = {
         Returns: boolean
       }
       purchase_fa_my_gestor_ids: { Args: never; Returns: string[] }
+      purchase_fa_my_perms: { Args: never; Returns: Json }
       purchase_fa_recall: { Args: { _id: string }; Returns: undefined }
       purchase_fa_restore_items: { Args: { _id: string }; Returns: undefined }
       purchase_fa_rule: {
