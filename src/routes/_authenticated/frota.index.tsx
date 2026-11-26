@@ -221,7 +221,7 @@ function Overview({ canCost }: { canCost: boolean }) {
       {!d ? (
         <DashboardSkeleton />
       ) : (
-        <div className="fleet-dashboard-layout grid min-h-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)_minmax(0,1fr)]">
+        <div key={`${R.from}|${R.to}`} className="fleet-dashboard-layout grid min-h-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)_minmax(0,1fr)]">
 
           <OverviewCard dark title={`Km rodados — ${pLabel}`} to="/veiculos/transporte" linkLabel="Abrir Transporte" hint="Km da escala da Transporte (ida e volta × viagens + obras adicionais)" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
             <Big dark value={Math.round(d.km).toLocaleString("pt-BR")} />

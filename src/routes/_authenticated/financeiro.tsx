@@ -161,7 +161,7 @@ function Overview() {
         </div>
 
         {loading || !yms.length ? (yms.length ? <DashboardSkeleton /> : <p className="text-sm text-muted-foreground">Selecione ao menos um mês.</p>) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
+          <div key={`${year}|${yms.join(",")}|${hidden.join(",")}`} className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
             <OverviewCard dark title="Resultado do período" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Faturado, todas as despesas e a margem; os % são sobre o faturado" className="min-h-0">
               <div className="invert-scope">
                 <div className="grid grid-cols-3 gap-2">
@@ -292,7 +292,7 @@ function Overview() {
                               <td className="px-3"><CostBar lines={[l]} total={cost(l)} /></td>
                               <td className={cn("px-3 text-right tabular-nums", l.margin < 0 && "text-destructive")}>{brl(l.margin)}</td>
                               <td className="px-3 text-center"><Chip pct={l.monthPct} margin={l.margin} /></td>
-                              <td className="px-3"><div className="flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full bg-foreground/70" style={{ width: `${Math.min(100, Math.max(0, l.progress))}%` }} /></div><span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">{Math.round(l.progress)}%</span></div></td>
+                              <td className="px-3"><div className="flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="ov-widen h-full bg-foreground/70" style={{ width: `${Math.min(100, Math.max(0, l.progress))}%` }} /></div><span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">{Math.round(l.progress)}%</span></div></td>
                               <td className="px-3 text-right text-[12px] tabular-nums" title={`Margem acumulada: ${brl(l.total.margin)}`}><MarginPercent value={l.total.pct} margin={l.total.margin} /></td>
                             </tr>
                           ))}
@@ -328,7 +328,7 @@ function CostBar({ lines, total }: { lines: FinanceLine[]; total: number }) {
   const p = COST_PARTS.map((x) => [x.label, lines.reduce((a, l) => a + l[x.key], 0), x.cls] as const);
   return (
     <div className="flex items-center gap-2" title={p.map(([n, v]) => `${n}: ${brl(v)}`).join("\n")}>
-      <div className="flex h-1.5 flex-1 gap-px overflow-hidden rounded-full bg-muted">{p.map(([n, v, c]) => <div key={n} className={cn("h-full", c)} style={{ width: `${total ? (v / total) * 100 : 0}%` }} />)}</div>
+      <div className="ov-widen flex h-1.5 flex-1 gap-px overflow-hidden rounded-full bg-muted">{p.map(([n, v, c]) => <div key={n} className={cn("h-full", c)} style={{ width: `${total ? (v / total) * 100 : 0}%` }} />)}</div>
       <span className="w-9" />
     </div>
   );
@@ -351,7 +351,7 @@ function OrderBar({ o }: { o: { ordered: number; billed: number } }) {
   const f = o.billed / o.ordered;
   return (
     <div className="flex items-center gap-2" title={`${brl(o.billed)} faturados de ${brl(o.ordered)} em pedidos`}>
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full bg-foreground/70" style={{ width: `${Math.min(100, f * 100)}%` }} /></div>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="ov-widen h-full bg-foreground/70" style={{ width: `${Math.min(100, f * 100)}%` }} /></div>
       <span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">{Math.round(f * 100)}%</span>
     </div>
   );
@@ -375,7 +375,7 @@ function BandGauge({ pct }: { pct: number | null }) {
   return (
     <div className="relative">
       <svg viewBox="0 0 160 92" className="h-[8.75rem] w-auto overflow-visible">
-        {GAUGE_BANDS.map((b) => <path key={b.label} d={arc(b.from + 1.6, b.to - 1.6)} fill="none" strokeWidth="11" strokeLinecap="round" className={b.stroke} />)}
+        {GAUGE_BANDS.map((b, i) => <path key={b.label} d={arc(b.from + 1.6, b.to - 1.6)} pathLength={1} fill="none" strokeWidth="11" strokeLinecap="round" className={cn("ov-draw", b.stroke)} style={{ animationDelay: `${i * 140}ms` }} />)}
         {Array.from({ length: 26 }, (_, i) => i * 2).map((t) => { const [x1, y1] = pt(t, r - 11), [x2, y2] = pt(t, r - (t % 10 ? 14 : 17)); return <line key={t} x1={x1} y1={y1} x2={x2} y2={y2} className="stroke-foreground/30" strokeWidth={t % 10 ? 0.6 : 1} />; })}
         {[0, 10, MARGIN_GOAL, 35, GAUGE_MAX].map((t) => { const [x, y] = pt(t, r + 12); return <text key={t} x={x} y={y + 2} textAnchor="middle" className="fill-muted-foreground text-[6.5px]">{t}%</text>; })}
         <g className="gauge-needle" style={{ transform: `rotate(${ang}deg)`, transformOrigin: `${cx}px ${cy}px` }}>
