@@ -146,10 +146,13 @@ function ComprasPage() {
     try {
       const r = await sync();
       const p = r.reduce((a, x) => a + x.pending, 0), l = r.reduce((a, x) => a + x.launched, 0);
-      const read = r.filter((x) => !x.skipped && !x.error).map((x) => `${x.ym.slice(5)}/${x.ym.slice(0, 4)}`);
+      const read = r.filter((x) => !x.skipped && (!x.error || x.launched + x.pending > 0)).map((x) => `${x.ym.slice(5)}/${x.ym.slice(0, 4)}`);
       const same = r.filter((x) => x.skipped).length;
       toast.success(`Sincronizado: ${read.length ? `${read.join(", ")} lido(s), ` : ""}${l} centros lançados, ${p} pendentes${same ? ` · ${same} mês(es) sem mudança no arquivo` : ""}`);
-      for (const x of r.filter((y) => y.error)) toast.error(`Relatório ${x.ym.slice(5)}/${x.ym.slice(0, 4)} (${x.file}) não foi lido: ${x.error}`, { duration: 15000 });
+      for (const x of r.filter((y) => y.error)) {
+        const partial = x.launched + x.pending > 0;
+        toast.error(`Relatório ${x.ym.slice(5)}/${x.ym.slice(0, 4)} (${x.file}) ${partial ? "lido em parte" : "não foi lido"}: ${x.error}`, { duration: 20000 });
+      }
       qc.invalidateQueries({ queryKey: ["purchase-lines"] });
     } catch (e) { toast.error(e instanceof Error ? e.message : "Falha na sincronização"); }
     finally { setBusy(false); }

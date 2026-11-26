@@ -69,6 +69,16 @@ export function purchaseItemEntries(items: CcItem[], total: number, allocation: 
 
 /** Relatório "Compras de Produtos por Centro de Custo" (ABCOM003). */
 export function parsePurchaseReport(rows: unknown[][]): CcLine[] {
+  return parsePurchaseReportChecked(rows).lines;
+}
+
+/**
+ * Como parsePurchaseReport, mas com opts.lenient um CC cujo "Total C/C" não bate com a soma dos itens não
+ * interrompe o arquivo: fica fora de lines (não lança nada) e vai para issues com os dois valores.
+ */
+export function parsePurchaseReportChecked(rows: unknown[][], opts: { lenient?: boolean } = {}): { lines: CcLine[]; issues: { cc: string; message: string }[] } {
+  const issues: { cc: string; message: string }[] = [];
+  const bad = new Set<string>();
   const normalize = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
   type Columns = { code: number; desc: number; qty: number; total: number; date?: number };
   let columns: Columns | null = null;
@@ -105,7 +115,13 @@ export function parsePurchaseReport(rows: unknown[][]): CcLine[] {
     if (!cur) continue;
     if (labels.some((c) => c === "totalcc" || c === "totalcentrocusto")) {
       const subtotal = cells.filter(numeric);
-      if (subtotal.length !== 1 || Math.abs(cur.amount - value(subtotal[0])) > 0.011) throw error(`total do CC ${cur.cc} não confere na linha ${rowIndex + 1}`);
+      if (subtotal.length !== 1 || Math.abs(cur.amount - value(subtotal[0])) > 0.011) {
+        const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        const detail = `total do CC ${cur.cc} não confere na linha ${rowIndex + 1} (itens lidos ${fmt(cur.amount)} em ${cur.items.length} itens; relatório ${subtotal.length === 1 ? fmt(value(subtotal[0])) : "sem valor único"})`;
+        if (!opts.lenient) throw error(detail);
+        issues.push({ cc: cur.cc, message: detail });
+        bad.add(cur.cc);
+      }
       continue;
     }
     // O exportador ABCOM003 omite Código/Descrição e mescla cabeçalhos em
@@ -131,7 +147,7 @@ export function parsePurchaseReport(rows: unknown[][]): CcLine[] {
     cur.amount = Math.round((cur.amount + it.amount) * 100) / 100;
   }
   if (!anchors) throw error("cabeçalho Quantidade e Valor Total não encontrado");
-  return [...map.values()].filter((l) => l.amount !== 0);
+  return { lines: [...map.values()].filter((l) => l.amount !== 0 && !bad.has(l.cc)), issues };
 }
 
 /** Mês de referência pelo fim do período do nome do arquivo (ex.: 01.10.2026-22.10.2026.xls). */

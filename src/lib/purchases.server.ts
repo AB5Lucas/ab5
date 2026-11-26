@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
-import { STOCK_REASON, STOCK_WORK_NAME, allocatePurchase, isIndustryClient, parsePurchaseReport, purchaseFileMonth, purchaseItemEntries, type CcItem, type PClient, type PWork } from "./purchases";
+import { STOCK_REASON, STOCK_WORK_NAME, allocatePurchase, isIndustryClient, parsePurchaseReportChecked, purchaseFileMonth, purchaseItemEntries, type CcItem, type PClient, type PWork } from "./purchases";
 import { assetCategory, clientPurchaseExclusionReason, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, installmentPlan, purchaseItemKeys, purchaseDecisionRequired, type AssetDecision, type ExclusionRule, type PurchaseItemState } from "./purchase-policy";
 import { purchaseMonthHours } from "./purchase-hours";
 
@@ -263,10 +263,11 @@ export async function executePurchaseSync(c: Credentials, opts: { force?: boolea
     const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
     if (!sheet) throw new Error(`Relatório vazio: ${file}`);
     const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "" });
-    const lines = parsePurchaseReport(rows);
+    // CC com total divergente fica de fora (sem lançar e sem apagar o que já havia); os demais entram.
+    const { lines, issues } = parsePurchaseReportChecked(rows, { lenient: true });
     const { data: existing, error } = await supabaseAdmin.from("purchase_cc_lines").select("id, cc_code").eq("ref_month", ym);
     if (error) throw error;
-    const keep = new Set(lines.map((l) => l.cc));
+    const keep = new Set([...lines.map((l) => l.cc), ...issues.map((i) => i.cc)]);
     const stale = (existing ?? []).filter((e) => !keep.has(e.cc_code)).map((e) => e.id);
     if (stale.length) { const d = await supabaseAdmin.from("purchase_cc_lines").delete().in("id", stale); if (d.error) throw d.error; }
     let launched = 0, pending = 0;
@@ -278,8 +279,14 @@ export async function executePurchaseSync(c: Credentials, opts: { force?: boolea
       const st = await applyLine(row.id, refs, hoursCache);
       if (st === "launched") launched++; else pending++;
     }
-    out.push({ ym, file: f.name, launched, pending });
-    await log(ym, f, true, null);
+    if (issues.length) {
+      const msg = `ABCOM003: ${issues.map((i) => i.message).join("; ")}. ${issues.length === 1 ? "Esse CC ficou" : "Esses CCs ficaram"} sem lançar; os demais foram importados.`;
+      out.push({ ym, file: f.name, launched, pending, error: msg });
+      await log(ym, f, false, msg);
+    } else {
+      out.push({ ym, file: f.name, launched, pending });
+      await log(ym, f, true, null);
+    }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`Compras ${ym} (${f.path}): ${msg}`);
