@@ -293,7 +293,7 @@ function HubOverview() {
   return (
     <FitScreen>
     // Altura fixa da tela (cabeçalho 3,5rem + margens 3rem): tudo cabe sem rolar; abaixo de lg volta à altura natural.
-    <div className={cn("flex flex-col gap-3 transition-opacity duration-300 lg:h-[calc(100dvh-6.5rem)] lg:min-h-[640px]", periodQ.isPlaceholderData && "opacity-70")}>
+    <div className={cn("flex flex-col gap-3 transition-opacity duration-300 lg:h-full", periodQ.isPlaceholderData && "opacity-70")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h1 className="font-display text-xl font-semibold tracking-tight">Atividades</h1>
