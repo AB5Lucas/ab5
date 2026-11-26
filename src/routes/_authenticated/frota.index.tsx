@@ -344,14 +344,14 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
             {weeks.map((wk) => {
               const sug = byWeek.get(wk[0]!) ?? [];
               return (
-                <div key={wk[0]} className={cn("grid min-h-0 grid-cols-7 gap-1 rounded-lg p-0.5 transition-colors", sug.length && "bg-muted ring-1 ring-border")}>
+                <div key={wk[0]} className="grid min-h-0 grid-cols-7 gap-1 p-0.5">
                   {wk.map((dt) => {
                     const ev = maintDays.get(dt) ?? [];
                     const inMonth = dt.startsWith(ym);
                     const inRange = dt >= range.from && dt <= range.to;
                     return (
                       <Button variant="ghost" key={dt} aria-label={`Selecionar dia ${brDay(dt)}`} aria-pressed={selected === dt} onClick={() => onSelect(dt)} title={ev.length ? ev.map((e) => `${e.plate} · ${e.kind === "rev" ? "Revisão" : "Manutenção"}`).join("\n") : brDay(dt)}
-                        className={cn("h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-foreground hover:bg-foreground/10", selected === dt && "ring-2 ring-foreground bg-foreground/10", inMonth ? "bg-muted/50" : "opacity-35",
+                        className={cn("h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-foreground hover:bg-foreground/10", selected === dt && "ring-2 ring-foreground bg-foreground/10", inMonth ? (sug.length ? "bg-amber-500/20 hover:bg-amber-500/30 dark:bg-amber-400/20" : "bg-muted/50") : "opacity-35",
                           inRange && "outline outline-1 outline-border", dt === today && "bg-foreground/10")}>
                         <span className={cn("text-[10px] tabular-nums", dt === today ? "font-bold" : "text-muted-foreground")}>{Number(dt.slice(8, 10))}</span>
                         {ev.slice(0, 2).map((e, i) => (
@@ -372,7 +372,7 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
             {weeks.map((wk) => {
               const sug = byWeek.get(wk[0]!) ?? [];
               return (
-                <div key={wk[0]} className={cn("flex min-h-0 flex-col justify-center overflow-hidden rounded-lg px-1.5 text-[10px]", sug.length && "bg-muted ring-1 ring-border")}>
+                <div key={wk[0]} className="flex min-h-0 flex-col justify-center overflow-hidden px-1.5 text-[10px]">
                   {sug.slice(0, 2).map((s) => (
                     <span key={s.vehicleId} className="truncate" title={`${s.plate}: ${s.reason} (vencimento previsto ${brDay(s.due)})`}>
                       <b>{s.plate}</b> <span className="text-muted-foreground">· {s.reason}</span>
@@ -388,7 +388,7 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1"><span className="rounded bg-foreground/20 px-1 font-semibold text-foreground">ABC</span> manutenção</span>
         <span className="flex items-center gap-1"><span className="rounded bg-background px-1 font-semibold text-foreground">ABC</span> revisão</span>
-        <span className="flex items-center gap-1"><span className="h-2.5 w-4 rounded-sm bg-muted ring-1 ring-border" /> semana sugerida para marcar a revisão</span>
+        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500/20 dark:bg-amber-400/20" /> dias da semana sugerida para marcar a revisão</span>
         {outside.length > 0 && <span className="ml-auto truncate">Depois: {outside.slice(0, 3).map((s) => `${s.plate} (sem. ${brDay(s.week)})`).join(", ")}</span>}
       </div>
     </div>

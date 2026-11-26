@@ -79,8 +79,8 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
   useEffect(() => {
     if (!dashboardDate || !scroller.current) return;
     const node = scroller.current;
-    // No dashboard: cabe na altura do quadro, mas nunca menos de 1,1 px por minuto (66 px por hora); o resto rola.
-    const observer = new ResizeObserver(() => setPx(Math.max(1.1, node.clientHeight / (END - START))));
+    // No dashboard: cabe na altura do quadro, mas nunca menos de 2 px por minuto (120 px por hora); o resto rola.
+    const observer = new ResizeObserver(() => setPx(Math.max(2, node.clientHeight / (END - START))));
     observer.observe(node);
     return () => observer.disconnect();
   }, [dashboardDate]);
