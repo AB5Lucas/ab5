@@ -5,6 +5,7 @@ import { AlertTriangle, Check, FileText, Link2, Loader2, Paperclip, RefreshCw, T
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -163,6 +164,7 @@ export function QuotesAttachDialog({ row, onClose, onDone }: { row: ScRow | null
   };
 
   const [link, setLink] = useState("");
+  const [dragOver, setDragOver] = useState(false);
   const addLink = async () => {
     if (!row || !link.trim()) return;
     const url = linkUrl(link);
@@ -201,9 +203,13 @@ export function QuotesAttachDialog({ row, onClose, onDone }: { row: ScRow | null
             </div>
           )}
           {locked && <p className="rounded-md bg-amber-500/10 p-2 text-xs">Esta SC está em aprovação: as cotações não mudam até a decisão (ou puxe de volta na Recomendação).</p>}
-          <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+          <div className={`max-h-[50vh] space-y-2 overflow-y-auto rounded-md transition-colors ${dragOver ? "bg-primary/5 ring-2 ring-primary/50" : ""}`}
+            onDragOver={(e) => { if (locked) return; e.preventDefault(); setDragOver(true); }}
+            onDragLeave={(e) => { if (e.currentTarget.contains(e.relatedTarget as Node | null)) return; setDragOver(false); }}
+            onDrop={(e) => { if (locked) return; e.preventDefault(); setDragOver(false); void upload(e.dataTransfer.files); }}>
             {data.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
-            {!data.isLoading && !quotes.length && <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">Nenhuma cotação anexada.</p>}
+            {!data.isLoading && !quotes.length && <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">Nenhuma cotação anexada.{!locked && <><br /><span className="text-xs">Arraste os arquivos para cá ou clique em Anexar cotações.</span></>}</p>}
+            {!data.isLoading && quotes.length > 0 && !locked && <p className="text-center text-[11px] text-muted-foreground">Arraste mais arquivos para cá para anexar.</p>}
             {quotes.map((q) => {
               const n = qItems.filter((x) => x.quote_id === q.id).length;
               const isReading = reading.has(q.id);
@@ -267,14 +273,14 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
   const items = useMemo(() => [...data.items].sort((a, b) => a.item_no - b.item_no), [data.items]);
   const readQuotes = data.quotes.filter((q) => q.read_status === "lido");
   const qById = new Map(readQuotes.map((q) => [q.id, q]));
-  const lines = data.qItems.filter((x) => qById.has(x.quote_id));
+  const [lines, setLines] = useState<QuoteItemLite[]>(() => data.qItems.filter((x) => qById.has(x.quote_id)));
   const [edits, setEdits] = useState<Record<string, Edit>>(() =>
     Object.fromEntries(lines.map((l) => [l.id, { request_item_id: l.request_item_id, conv_factor: String(l.conv_factor), conv_type: l.conv_type, discarded: l.discarded, price: "" }])));
   // Faltou na leitura: preço do item, fornecedor, prazo de pagamento ou de entrega → campo para digitar (obrigatório para seguir).
   const noPrice = (l: QuoteItemLite) => quoteUnitPrice(l) == null;
   const [qEdits, setQEdits] = useState<Record<string, QEdit>>(() =>
     Object.fromEntries(readQuotes.map((q) => [q.id, { supplier: "", payment: "", delivery: "" }])));
-  const qMiss = (q: QuoteLite) => ({ supplier: !q.supplier?.trim(), payment: q.payment_days == null, delivery: q.delivery_days == null });
+  const qMiss = (q: QuoteLite) => ({ supplier: !q.supplier?.trim(), payment: q.payment_days == null || (q.payment_days === 0 && !q.payment_terms?.trim()), delivery: q.delivery_days == null });
   const setQ = (id: string, p: Partial<QEdit>) => setQEdits((e) => ({ ...e, [id]: { ...e[id]!, ...p } }));
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -282,6 +288,28 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
   const cur = step < last ? items[step]! : null;
   const ed = (id: string) => edits[id]!;
   const set = (id: string, p: Partial<Edit>) => setEdits((e) => ({ ...e, [id]: { ...e[id]!, ...p } }));
+  // Repetir um item da cotação em outro item da SC (ex.: a mesma trena pedida em duas linhas): grava uma cópia ligada a este item.
+  const [repeating, setRepeating] = useState(false);
+  const repeat = async (srcId: string) => {
+    if (!cur) return;
+    const src = lines.find((l) => l.id === srcId); if (!src) return;
+    setRepeating(true);
+    try {
+      const e = ed(src.id);
+      const typed = numIn(e.price);
+      const { data: row, error } = await supabase.from("purchase_quote_items").insert({
+        quote_id: src.quote_id, line_no: src.line_no, description: src.description, quantity: src.quantity, unit: src.unit,
+        unit_price: src.unit_price ?? (typed != null && typed > 0 ? typed : null), total: src.total, request_item_id: cur.id,
+        conv_factor: Number(e.conv_factor.replace(",", ".")) || 1, conv_type: e.conv_type, discarded: false,
+      } as never).select("*").single();
+      if (error) throw error;
+      const copy = row as unknown as QuoteItemLite;
+      setLines((ls) => [...ls, copy]);
+      setEdits((x) => ({ ...x, [copy.id]: { request_item_id: cur.id, conv_factor: String(copy.conv_factor), conv_type: copy.conv_type, discarded: false, price: e.price } }));
+      toast.success("Item da cotação repetido neste item da SC");
+    } catch (err) { toast.error((err as Error).message); }
+    setRepeating(false);
+  };
   const shown = cur ? lines.filter((l) => !ed(l.id).discarded && ed(l.id).request_item_id === cur.id) : lines.filter((l) => !ed(l.id).discarded && !ed(l.id).request_item_id);
   // O que ainda falta digitar nas linhas deste passo (bloqueia o OK).
   const okNum = (v: string, min: number) => { const x = numIn(v); return x != null && !Number.isNaN(x) && x >= min; };
@@ -304,7 +332,7 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
       const m = qMiss(q), e = qEdits[id]!;
       const patch: Record<string, unknown> = {};
       if (m.supplier && e.supplier.trim()) patch["supplier"] = e.supplier.trim();
-      if (m.payment && okNum(e.payment, 0)) patch["payment_days"] = Math.round(numIn(e.payment)!);
+      if (m.payment && okNum(e.payment, 0)) { patch["payment_days"] = Math.round(numIn(e.payment)!); if (!qById.get(id)!.payment_terms?.trim()) patch["payment_terms"] = `${Math.round(numIn(e.payment)!)} dias (digitado)`; }
       if (m.delivery && okNum(e.delivery, 0)) patch["delivery_days"] = Math.round(numIn(e.delivery)!);
       if (Object.keys(patch).length) { const { error } = await supabase.from("purchase_quotes").update(patch as never).eq("id", id); if (error) throw error; }
     }
@@ -362,6 +390,24 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
             <div><div className="text-[11px] uppercase text-muted-foreground">Quantidade</div><div className="font-medium">{cur.quantity} {cur.unit}</div></div>
             <div><div className="text-[11px] uppercase text-muted-foreground">Produto</div><div className="font-medium">{cur.description}</div></div>
             <div><div className="text-[11px] uppercase text-muted-foreground">Verba</div><div className="font-medium">{brl(cur.budget)}</div></div>
+          </div>
+        )}
+        {cur && lines.some((l) => !ed(l.id).discarded && ed(l.id).request_item_id !== cur.id) && (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label className="block text-xs">Repetir item da cotação neste item</Label>
+              <Select value="" onValueChange={(v) => void repeat(v)} disabled={repeating}>
+                <SelectTrigger className="h-8 w-[34rem] max-w-full text-xs"><SelectValue placeholder="Escolha um item já vinculado a outro item da SC…" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {lines.filter((l) => !ed(l.id).discarded && ed(l.id).request_item_id !== cur.id).map((l) => {
+                    const it = items.find((i) => i.id === ed(l.id).request_item_id);
+                    const up = quoteUnitPrice(l);
+                    return <SelectItem key={l.id} value={l.id}>{qById.get(l.quote_id)?.supplier ?? "—"} · {l.description.slice(0, 45)}{up != null ? ` · ${brl(up)}` : ""}{it ? ` (no item ${it.item_no})` : " (sem vínculo)"}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            {repeating && <Loader2 className="mb-2 h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
         )}
         <div className="max-h-[50vh] overflow-auto rounded-md border border-border">

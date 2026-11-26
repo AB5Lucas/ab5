@@ -205,7 +205,9 @@ export function parseQuoteReading(text: string): QuoteReading {
   return {
     supplier: str(o.fornecedor), supplier_doc: str(o.cnpj), quote_number: str(o.numero),
     quote_date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null,
-    payment_terms: str(o.condicao_pagamento), payment_days: int(o.prazo_pagamento_dias), delivery_days: int(o.prazo_entrega_dias),
+    payment_terms: str(o.condicao_pagamento),
+    // Sem condição escrita, 0 dia é o "não sei" da leitura (vira campo para o comprador digitar), não "à vista".
+    payment_days: str(o.condicao_pagamento) ? int(o.prazo_pagamento_dias) : (int(o.prazo_pagamento_dias) || null), delivery_days: int(o.prazo_entrega_dias),
     freight: money(o.frete), total: money(o.total),
     items: (Array.isArray(o.itens) ? o.itens : []).map((i: any) => ({
       description: str(i?.descricao) ?? "", quantity: money(i?.quantidade), unit: str(i?.unidade), unit_price: money(i?.valor_unitario),
