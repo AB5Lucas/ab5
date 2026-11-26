@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
-import { Big, Donut, HoverBars, OverviewCard } from "@/components/overview/charts";
+import { Big, Donut, Gauge, LineArea, OverviewCard } from "@/components/overview/charts";
 import { Pie3D } from "@/components/overview/pie-3d";
 import { CountUp } from "@/components/count-up";
 import { TeamMosaic, type TeamPerson, type TeamStatus } from "@/components/overview/team-mosaic";
@@ -327,30 +327,30 @@ function Overview() {
                       <div key={l} className="flex justify-between gap-2"><span className={cn(l === "Em dia" ? "text-muted-foreground" : "font-medium")}>{l}</span><b className="tabular-nums"><CountUp value={n} /></b></div>
                     ))}
                   </div>
-                  <Donut frac={d.aso.ok / tot} center={`${Math.round((d.aso.ok / tot) * 100)}%`} sub="em dia" size="h-36 w-36" />
+                  <Gauge pct={(d.aso.ok / tot) * 100} label="em dia" sub={`${d.aso.ok} de ${d.total} ativos`} />
                 </div>
               );
             })()}
           </OverviewCard>
 
-          <OverviewCard dark title={`Treinamentos por dia — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} to="/documentos/agendamentos" linkLabel="Abrir Agendamentos"
+          <OverviewCard title={`Treinamentos por dia — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} to="/documentos/agendamentos" linkLabel="Abrir Agendamentos"
             hint="Pessoas em treinamento em cada dia do mês (realizados e agendados; cancelados fora). Clique num dia para ver só ele." className="min-h-0 pb-6 md:col-span-2 xl:col-span-2 xl:col-start-3 xl:row-start-2" bodyClassName="min-h-0">
             <div className="h-full min-h-0" onClick={(e) => e.preventDefault()}>
-              {trQ.data ? <TrainingTiles dark rows={trQ.data} from={mFrom} to={mTo} today={today} /> : null}
+              {trQ.data ? <TrainingTiles rows={trQ.data} from={mFrom} to={mTo} today={today} /> : null}
             </div>
           </OverviewCard>
-          <OverviewCard title={`Equipe — ${day === today ? "hoje" : brDay(day)}`} to="/colaboradores" linkLabel="Abrir Colaboradores"
+          <OverviewCard dark title={`Equipe — ${day === today ? "hoje" : brDay(day)}`} to="/colaboradores" linkLabel="Abrir Colaboradores"
             hint="Um círculo por colaborador ativo, na cor da situação do dia. Troque o agrupamento para ver as pessoas se reorganizarem; clique num grupo para destacá-lo."
             className="min-h-0 md:col-span-2 xl:col-start-1 xl:row-span-2 xl:row-start-2" bodyClassName="flex min-h-0 flex-col">
-            {dayQ.data ? <TeamMosaic people={d.team} title={`${d.team.length} colaboradores ativos · ${single ? brDay(day) : "hoje"}`} /> : null}
+            {dayQ.data ? <TeamMosaic dark people={d.team} title={`${d.team.length} colaboradores ativos · ${single ? brDay(day) : "hoje"}`} /> : null}
           </OverviewCard>
           <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas diferentes com folga, férias, atestado ou falta no período (quadros da Programação + Ausências). Clique numa fatia para ver as pessoas." className="min-h-0 xl:col-start-3 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
             <Pie3D total={d.absAll} totalLabel="pessoas ausentes" parts={d.absParts} unit={["pessoa", "pessoas"]} compact />
           </OverviewCard>
 
-          <OverviewCard title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0 xl:col-start-4 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
+          <OverviewCard title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0 pb-6 xl:col-start-4 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
             <div className="flex items-baseline gap-2"><Big value={d.absToday} /><p className="text-xs text-muted-foreground">ausentes hoje · média {Math.round(d.absSeries.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.absSeries.filter((s) => s.value).length))} por dia</p></div>
-            <div className="mt-auto pt-2"><HoverBars data={d.absSeries} format={(v) => `${v} ausentes`} height="h-24" /></div>
+            <LineArea height="h-24 lg:h-auto lg:min-h-0 lg:flex-1" className="mt-2 lg:min-h-[70px] lg:flex-1" data={d.absSeries.map((x) => ({ label: x.label, a: x.value, tip: x.label }))} format={(p) => `${p.a} ${p.a === 1 ? "ausente" : "ausentes"}`} />
           </OverviewCard>
 
         </div>

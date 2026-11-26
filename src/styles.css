@@ -396,3 +396,13 @@
 }
 .tile-snap { animation: tile-snap 650ms cubic-bezier(0.32, 0.72, 0, 1) both; }
 @media (prefers-reduced-motion: reduce) { .tile-snap { animation: none; } }
+
+/* Inverte as cores do tema dentro de um quadro escuro (ex.: mosaico da Equipe no dashboard de Funcionários). */
+:root { --ink: var(--foreground); --paper: var(--background); }
+.invert-scope {
+  --foreground: var(--paper); --background: var(--ink); --card: var(--ink); --popover: var(--ink); --popover-foreground: var(--paper);
+  --muted: color-mix(in oklab, var(--paper) 12%, var(--ink));
+  --muted-foreground: color-mix(in oklab, var(--paper) 62%, var(--ink));
+  --border: color-mix(in oklab, var(--paper) 20%, var(--ink));
+  color: var(--foreground);
+}

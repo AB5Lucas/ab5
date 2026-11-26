@@ -121,7 +121,7 @@ function placeOf(groups: Group[], f: Fit, hover: string | null): Layout {
 const twoNames = (n: string) => n.trim().split(/\s+/).filter((w, i) => i === 0 || !/^(d[aeo]s?|e)$/i.test(w)).slice(0, 2)
   .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
 
-export function TeamMosaic({ people, title }: { people: TeamPerson[]; title: string }) {
+export function TeamMosaic({ people, title, dark }: { people: TeamPerson[]; title: string; dark?: boolean }) {
   const [mode, setMode] = useState<Mode>("status");
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -148,7 +148,7 @@ export function TeamMosaic({ people, title }: { people: TeamPerson[]; title: str
   const stop = (e: React.SyntheticEvent) => { e.preventDefault(); e.stopPropagation(); };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2" onClick={stop}>
+    <div className={cn("flex h-full min-h-0 flex-col gap-2", dark && "invert-scope")} onClick={stop}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] text-muted-foreground">{title}</p>
         <div className="flex rounded-full border bg-muted/40 p-0.5 text-[11px]">
