@@ -55,7 +55,7 @@ function Page() {
   const changeTab = (v: string) => { setTab(v); try { history.replaceState(history.state, "", `${location.pathname}${location.search}#${v}`); } catch { /* ignora */ } };
   const [attachRow, setAttachRow] = useState<ScRow | null>(null);
   const navigate = useNavigate();
-  const openRec = (id: string) => void navigate({ to: "/compras/solicitacoes/$id", params: { id }, search: { tab: "recomendacao" } });
+  const openRec = (id: string) => void navigate({ to: "/compras/solicitacoes/$id", params: { id }, search: { tab: "recomendacao", from: "comprador" } });
   const openRows = useMemo(() => (list.data ?? []).filter((r) => !done(r) || r.fa_state), [list.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const totals = useRecTotals(openRows);
   const recRows = openRows.filter((r) => r.fa_state || (totals.get(r.id)?.quotes ?? 0) > 0);
@@ -93,7 +93,7 @@ function Page() {
             <div className="ml-auto"><ScReportButton /></div>
           </div>
           {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
-            <ScTable rows={rows} clientName={clientName} actions={(r) => (
+            <ScTable rows={rows} clientName={clientName} linkFrom="comprador" actions={(r) => (
               <div className="flex gap-1">
                 <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "", date: r.status_at }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
                 <Button size="sm" variant="ghost" title="Devolver ao validador ou ao solicitante" onClick={() => setReturning(r)}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
@@ -112,7 +112,7 @@ function Page() {
         </TabsContent>
         <TabsContent value="recomendacao" className="mt-4 space-y-4">
           <p className="text-sm text-muted-foreground">SCs com cotações anexadas. Abra para ver a melhor escolha de cada item (aba Recomendação de compras dentro da SC) e enviar ao aprovador.</p>
-          <ScTable rows={recRows} clientName={clientName} extraCols={recCols(totals)} actions={(r) => (
+          <ScTable rows={recRows} clientName={clientName} linkFrom="comprador" extraCols={recCols(totals)} actions={(r) => (
             <Button size="sm" variant="outline" onClick={() => openRec(r.id)}><Eye className="h-3.5 w-3.5" /> Abrir</Button>
           )} endActions={(r) => (
             <Button size="icon" variant="ghost" className="h-7 w-7" title="Cotações" onClick={() => setAttachRow(r)}><Paperclip className="h-4 w-4 text-primary" /></Button>

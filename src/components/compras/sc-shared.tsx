@@ -70,7 +70,9 @@ export function StatusFilter({ value, onChange, counts, exclude = [] }: { value:
 
 /** Tabela de controle (mesmas colunas da aba CONTROLE DE SC que o sistema usa); cada título filtra/ordena como no Excel. */
 export type ScExtraCol = ColumnDef<ScRow> & { cell: (r: ScRow) => ReactNode; className?: string };
-export function ScTable({ rows, clientName, actions, showRequester = true, extraCols = [], endActions }: {
+export function ScTable({ rows, clientName, actions, showRequester = true, extraCols = [], endActions, linkFrom }: {
+  /** Origem passada ao abrir a SC (ex.: "comprador"). */
+  linkFrom?: "comprador";
   rows: ScRow[]; clientName: Map<string, string>; actions?: (r: ScRow) => ReactNode; showRequester?: boolean;
   /** Colunas a mais depois do Status (ex.: melhor escolha × verba na Recomendação). */
   extraCols?: ScExtraCol[];
@@ -86,7 +88,7 @@ export function ScTable({ rows, clientName, actions, showRequester = true, extra
     { key: "number", label: "Nº da solicitação", values: (r) => [r.number], sort: (r) => r.number, className: "whitespace-nowrap font-medium",
       cell: (r) => <>
         <span className={cn("mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle", statusDot(r.status))} title={r.status} aria-label={`Status: ${r.status}`} />
-        <Link to="/compras/solicitacoes/$id" params={{ id: r.id }} className="text-primary hover:underline">{r.number}</Link>
+        <Link to="/compras/solicitacoes/$id" params={{ id: r.id }} search={linkFrom ? { from: linkFrom } : {}} className="text-primary hover:underline">{r.number}</Link>
       </> },
     { key: "date", label: "Data", values: (r) => [brDate(r.request_date)], sort: (r) => r.request_date, cell: (r) => brDate(r.request_date) },
     { key: "status", label: "Status", values: (r) => [r.status], className: "whitespace-nowrap",

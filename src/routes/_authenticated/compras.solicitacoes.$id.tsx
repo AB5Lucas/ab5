@@ -36,7 +36,9 @@ export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")
   head: () => ({ meta: [{ title: "Solicitação de Compra | AB5 Hub" }, { name: "description", content: "Itens da solicitação de compra (modelo FR-CPS-SC)." }] }),
   // Aberta pelo número = só visualizar; ?edit=1 (lápis em Ações) abre já em edição.
   // ?tab=recomendacao abre direto na Recomendação de compras (comprador).
-  validateSearch: (s: Record<string, unknown>): { edit?: boolean; tab?: "recomendacao" } => ({
+  // ?from=comprador = aberta pela tela do Comprador (SC aprovada mostra as duas abas).
+  validateSearch: (s: Record<string, unknown>): { edit?: boolean; tab?: "recomendacao"; from?: "comprador" } => ({
+    ...(s["from"] === "comprador" ? { from: "comprador" as const } : {}),
     ...(s["edit"] === true || s["edit"] === 1 || s["edit"] === "1" || s["edit"] === "true" ? { edit: true } : {}),
     ...(s["tab"] === "recomendacao" ? { tab: "recomendacao" as const } : {}),
   }),
@@ -118,7 +120,7 @@ function Page() {
   const canSendDraft = !!r && r.stage === "rascunho" && (r.requester_id === user?.id || isAdmin);
   // O validador (gestor ou substituto) também pode editar a SC enquanto ela está com ele, antes de validar.
   const isValidator = !!r && !!user?.id && r.stage === "aprovacao" && (isAdmin || r.approver_id === user.id || r.substitute_id === user.id);
-  const { edit: editParam, tab: tabParam } = Route.useSearch();
+  const { edit: editParam, tab: tabParam, from: fromParam } = Route.useSearch();
   const [editMode, setEditMode] = useState(!!editParam);
   const canEdit = canSendDraft || isValidator;
   const editable = canEdit && editMode;
@@ -170,7 +172,7 @@ function Page() {
   // Na própria SC o solicitante vê a Solicitação normal (só vira tela de aprovação se ele mesmo tiver de decidir agora).
   const ownSc = !!r && r.requester_id === user?.id && !faPerms.data?.decide.has(id);
   const approverView = !!r && !ownSc && ((r.fa_state === "em_aprovacao" && (!!faPerms.data?.decide.has(id) || isApproverOfSc))
-    || (r.fa_state === "aprovada" && isApproverOfSc));
+    || (r.fa_state === "aprovada" && isApproverOfSc && fromParam !== "comprador"));
   useUndoRedoKeys(buyerHistory, isBuyer && !editMode && !approverView);
   const buyerCanEdit = isBuyer && r?.fa_state !== "em_aprovacao";
   const headerEdits = useQuery({
