@@ -97,7 +97,7 @@ function Page() {
               <div className="flex gap-1">
                 <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "", date: r.status_at }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
                 <Button size="sm" variant="ghost" title="Devolver ao validador ou ao solicitante" onClick={() => setReturning(r)}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
-                {r.stage === "compras" && <Button size="sm" variant="ghost" className="text-destructive" title="Cancelar a SC inteira" onClick={() => { setCancelling(r); setCancelReason(""); }}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}
+                {r.stage === "compras" && !done(r) && <Button size="sm" variant="ghost" className="text-destructive" title="Cancelar a SC inteira" onClick={() => { setCancelling(r); setCancelReason(""); }}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}
               </div>
             )} endActions={(r) => {
               const n = totals.get(r.id)?.quotes ?? 0;

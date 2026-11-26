@@ -1352,6 +1352,13 @@
       "when": 1795717578219,
       "tag": "0204_finance_history",
       "breakpoints": true
+    },
+    {
+      "idx": 193,
+      "version": "7",
+      "when": 1795717638219,
+      "tag": "0205_purchase_no_cancel_done",
+      "breakpoints": true
     }
   ]
 }

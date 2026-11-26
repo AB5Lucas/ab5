@@ -21,8 +21,7 @@ import { SearchSelect } from "@/components/search-select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PRINT_REQUIRED, Pill, ScHeaderDialog, ScRemoveDialog, todayISO, useClientsList, useScRemove, useScUsers, type ScRow } from "@/components/compras/sc-shared";
 import {
-  SC_CATEGORIES, SC_ITEM_STATUSES, SC_NATURES, SC_PRIORITIES, SC_UNITS, itemStatusClass, STAGE_LABEL, brDate, brl, budgetMissing, deadlineControl, deliveryLabel, priorityClass, statusClass, statusDot, type ScStage,
-} from "@/lib/purchase-requests";
+  SC_CATEGORIES, SC_ITEM_STATUSES, SC_NATURES, SC_PRIORITIES, SC_UNITS, itemStatusClass, STAGE_LABEL, brDate, brl, budgetMissing, deadlineControl, deliveryLabel, priorityClass, statusClass, statusDot, type ScStage, SC_DONE_STATUSES } from "@/lib/purchase-requests";
 import type { Tables } from "@/integrations/supabase/types";
 import { useEditHistory } from "@/hooks/use-edit-history";
 import { UndoRedoButtons } from "@/components/compras/undo-redo";
@@ -549,7 +548,7 @@ function Page() {
               <Undo2 className="h-4 w-4" /> Puxar de volta
             </Button>
           )}
-          {r.requester_id === user?.id && (r.stage === "aprovacao" || r.stage === "compras") && <Button variant="outline" size="sm" onClick={() => setRemoving(r)}><Ban className="h-4 w-4" /> Cancelar SC</Button>}
+          {r.requester_id === user?.id && (r.stage === "aprovacao" || r.stage === "compras") && !SC_DONE_STATUSES.includes(r.status) && <Button variant="outline" size="sm" onClick={() => setRemoving(r)}><Ban className="h-4 w-4" /> Cancelar SC</Button>}
         </div>
       </div>
 

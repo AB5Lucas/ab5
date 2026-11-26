@@ -151,7 +151,7 @@ function Page() {
           <div className="flex gap-1">
             {r.stage === "aprovacao" && editBtn(r)}
             {copyBtn(r)}
-            {(r.stage === "aprovacao" || r.stage === "compras") && <Button size="sm" variant="outline" onClick={() => setRemoving(r)}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}
+            {(r.stage === "aprovacao" || r.stage === "compras") && !done(r) && <Button size="sm" variant="outline" onClick={() => setRemoving(r)}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}
           </div>
         )} />
       )}
