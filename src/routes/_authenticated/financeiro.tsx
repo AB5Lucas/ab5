@@ -1,4 +1,4 @@
-import { Fragment, Suspense, lazy, useEffect, useId, useMemo, useState } from "react";
+import { Fragment, Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
@@ -178,7 +178,7 @@ function Overview() {
             </OverviewCard>
 
             <OverviewCard title="Pedidos faturados" to="/fechamentos/suzano" linkLabel="Abrir Pedidos" hint="Pedidos dos serviços exibidos com data até o fim do período × o que já foi faturado neles até essa data" className="min-h-0" bodyClassName="flex items-center">
-              <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <div className="grid w-full grid-cols-2 items-center gap-3">
                 <div className="min-w-0 space-y-1.5">
                   <div><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={brlK(d.ordered)} /></p><p className="text-[11px] text-muted-foreground">em pedidos (todos, até o fim do período)</p></div>
                   <div className="flex gap-4">
@@ -186,21 +186,29 @@ function Overview() {
                     <div><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.open)} /></p><p className="text-[11px] text-muted-foreground">em aberto</p></div>
                   </div>
                 </div>
-                <Donut frac={d.ordered ? d.billedToDate / d.ordered : 0} center={d.ordered ? `${Math.round((d.billedToDate / d.ordered) * 100)}%` : "—"} sub="faturado" size="h-32 w-32" />
+                <Donut frac={d.ordered ? d.billedToDate / d.ordered : 0} center={d.ordered ? `${Math.round((d.billedToDate / d.ordered) * 100)}%` : "—"} sub="faturado" size="h-32 w-32 justify-self-center" />
               </div>
             </OverviewCard>
 
             <OverviewCard title="Horas normais × extras" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Horas de MO dos serviços exibidos: normais = até 8 h em dia útil; extras = acima disso, sábado, domingo e feriado" className="min-h-0">
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-                <Donut frac={d.hN + d.hE ? d.hE / (d.hN + d.hE) : 0} center={d.hN + d.hE ? `${Math.round((d.hE / (d.hN + d.hE)) * 100)}%` : "—"} sub="extras" size="h-24 w-24" />
-                <div className="space-y-1 text-[11px]">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Normais</span><b className="tabular-nums">{hrs(d.hN)}</b></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Extras</span><b className="tabular-nums">{hrs(d.hE)}</b></div>
-                  <p className="pt-1 text-[10px] uppercase tracking-wide text-muted-foreground">Mais HE</p>
-                  {d.heByClient.map((c) => (
-                    <div key={c.name}>
-                      <div className="flex justify-between gap-2"><span className="truncate">{c.name}</span><span className="tabular-nums text-muted-foreground">{hrs(c.e)}</span></div>
-                      <div className="h-1 overflow-hidden rounded-full bg-muted"><div className="ov-widen h-full bg-foreground" style={{ width: `${(c.e / Math.max(1, c.n + c.e)) * 100}%` }} /></div>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-end justify-between">
+                    <div><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={d.hN + d.hE ? `${Math.round((d.hE / (d.hN + d.hE)) * 100)}%` : "—"} /></p><p className="text-[11px] text-muted-foreground">das horas são extras</p></div>
+                    <div className="flex gap-4 text-right text-[11px]">
+                      <div><p className="font-semibold tabular-nums text-foreground">{hrs(d.hN)}</p><p className="flex items-center justify-end gap-1 text-muted-foreground"><span className="h-2 w-2 rounded-full bg-foreground/25" />normais</p></div>
+                      <div><p className="font-semibold tabular-nums text-foreground">{hrs(d.hE)}</p><p className="flex items-center justify-end gap-1 text-muted-foreground"><span className="h-2 w-2 rounded-full bg-foreground" />extras</p></div>
+                    </div>
+                  </div>
+                  <HourBar n={d.hN} e={d.hE} className="mt-2 h-2.5" />
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Clientes com mais hora extra</p>
+                  {d.heByClient.map((c, i) => (
+                    <div key={c.name} className="grid grid-cols-[6.5rem_minmax(0,1fr)_3.2rem] items-center gap-2 text-[11px]">
+                      <span className="truncate">{c.name}</span>
+                      <HourBar n={c.n} e={c.e} className="h-1.5" delay={i * 90} />
+                      <span className="text-right tabular-nums text-muted-foreground">{hrs(c.e)}</span>
                     </div>
                   ))}
                 </div>
@@ -323,23 +331,44 @@ function CostBar({ lines, total }: { lines: FinanceLine[]; total: number }) {
   );
 }
 
-/** Seta "stonks" subindo em degraus; o preenchimento sobe até a margem (escala 0–50%), com traço na meta. */
-function StepArrow({ pct, goal, max = 50 }: { pct: number | null; goal: number; max?: number }) {
-  const id = useId().replace(/:/g, "");
-  const f = Math.max(0, Math.min(1, (pct ?? 0) / max));
-  // Degraus de baixo-esquerda até a ponta em cima-direita.
-  const path = "M4 116 L4 98 L24 98 L24 78 L44 78 L44 58 L64 58 L64 38 L74 38 L74 26 L62 26 L84 4 L106 26 L94 26 L94 38 L94 116 Z";
-  const top = 4, bottom = 116, h = bottom - top;
-  const y = bottom - f * h, gy = bottom - Math.min(1, goal / max) * h;
+/** Barra normais (claro) × extras (cheio), proporcional ao total de horas. */
+function HourBar({ n, e, className, delay = 0 }: { n: number; e: number; className?: string; delay?: number }) {
+  const t = n + e || 1;
   return (
-    <svg viewBox="0 0 112 120" className="h-[9.5rem] w-auto overflow-visible">
-      <defs><clipPath id={`a${id}`}><path d={path} /></clipPath></defs>
-      <path d={path} className="fill-muted stroke-border" strokeWidth="1" />
-      <g clipPath={`url(#a${id})`}>
-        <rect x="0" width="112" y={y} height={bottom - y} className={cn("ov-rise", (pct ?? 0) < 0 ? "fill-destructive/70" : "fill-foreground")} style={{ transformOrigin: "50% 100%" }} />
-      </g>
-      <line x1="0" x2="112" y1={gy} y2={gy} className="stroke-foreground/60" strokeWidth="1" strokeDasharray="3 2" />
-      <text x="110" y={gy - 2} textAnchor="end" className="fill-muted-foreground text-[7px]">meta {goal}%</text>
+    <div className={cn("flex overflow-hidden rounded-full bg-muted", className)} title={`Normais ${hrs(n)} · Extras ${hrs(e)}`}>
+      <div className="ov-widen h-full bg-foreground/25" style={{ width: `${(n / t) * 100}%`, animationDelay: `${delay}ms` }} />
+      <div className="ov-widen h-full bg-foreground" style={{ width: `${(e / t) * 100}%`, animationDelay: `${delay + 120}ms` }} />
+    </div>
+  );
+}
+
+/** Gráfico de colunas subindo com a seta em zigue-zague por cima; as colunas enchem até a margem (escala 0–50%), traço na meta. */
+function StepArrow({ pct, goal, max = 50 }: { pct: number | null; goal: number; max?: number }) {
+  const f = Math.max(0, Math.min(1, (pct ?? 0) / max));
+  const bars = [30, 48, 40, 66, 86]; // alturas (de 0 a 100) das colunas
+  const base = 112, top = 22, h = base - top;
+  const fillTo = base - f * h, gy = base - Math.min(1, goal / max) * h;
+  const x = (i: number) => 8 + i * 21;
+  const pts = bars.map((b, i) => [x(i) + 7, base - (b / 100) * h - 10] as const);
+  const [lx, ly] = pts[pts.length - 1]!;
+  const neg = (pct ?? 0) < 0;
+  return (
+    <svg viewBox="0 0 120 120" className="h-[9.5rem] w-auto overflow-visible">
+      <line x1="2" x2="118" y1={base} y2={base} className="stroke-border" strokeWidth="1" />
+      {bars.map((b, i) => {
+        const y = base - (b / 100) * h;
+        const fy = Math.max(y, fillTo);
+        return (
+          <g key={i}>
+            <rect x={x(i)} y={y} width="14" height={base - y} rx="2" className="fill-muted stroke-border" strokeWidth="0.6" />
+            {fy < base && <rect x={x(i)} y={fy} width="14" height={base - fy} rx="2" className={cn("ov-rise", neg ? "fill-destructive/70" : "fill-foreground")} style={{ animationDelay: `${i * 90}ms` }} />}
+          </g>
+        );
+      })}
+      <polyline points={pts.map((p) => p.join(",")).join(" ")} fill="none" className="ov-draw stroke-foreground" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+      <polygon points={`${lx + 9},${ly - 13} ${lx - 4},${ly - 10} ${lx + 5},${ly + 1}`} className="fill-foreground" />
+      <line x1="0" x2="120" y1={gy} y2={gy} className="stroke-foreground/60" strokeWidth="1" strokeDasharray="3 2" />
+      <text x="118" y={gy + 8} textAnchor="end" className="fill-muted-foreground text-[7px]">meta {goal}%</text>
     </svg>
   );
 }
