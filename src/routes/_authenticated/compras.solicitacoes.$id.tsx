@@ -159,12 +159,17 @@ function Page() {
   // Aprovador com a SC em aprovação: só a Recomendação de compras (com status por item e resumo da IA), sem a aba Solicitação.
   const faGestorIds = useQuery({
     queryKey: ["fa-gestor-ids", user?.id],
-    enabled: !!user?.id && r?.fa_state === "em_aprovacao",
+    enabled: !!user?.id && !!r?.fa_state,
     queryFn: async () => new Set(((await supabase.rpc("purchase_fa_my_gestor_ids" as never)).data as unknown as string[] | null) ?? []),
   });
   const faIsGestor = !!faGestorIds.data?.has(id);
   const faPerms = useFaPerms();
-  const approverView = !!r && r.fa_state === "em_aprovacao" && !!faPerms.data?.decide.has(id);
+  // Também depois da aprovação: quem aprova (alçada Executiva/Operacional/Compartilhada, gestor da SC ou quem decidiu)
+  // continua vendo só a Recomendação. Recusada volta ao comprador refazer (aí as abas voltam).
+  const isApproverOfSc = !!r && !!user?.id && (!!faPerms.data?.exec || !!faPerms.data?.oper || !!faPerms.data?.shared || faIsGestor
+    || r.fa_decided_by === user.id || r.fa_partial_by === user.id);
+  const approverView = !!r && ((r.fa_state === "em_aprovacao" && (!!faPerms.data?.decide.has(id) || isApproverOfSc))
+    || (r.fa_state === "aprovada" && isApproverOfSc));
   useUndoRedoKeys(buyerHistory, isBuyer && !editMode && !approverView);
   const buyerCanEdit = isBuyer && r?.fa_state !== "em_aprovacao";
   const headerEdits = useQuery({
