@@ -316,7 +316,7 @@ function Overview() {
             })()}
           </OverviewCard>
 
-          <OverviewCard title="ASO dos ativos" to="/consulta" linkLabel="Abrir Consulta" hint={`Situação do ASO de cada colaborador ativo hoje (vencendo = próximos ${DOC_WARN_DAYS} dias)`} className="min-h-0" bodyClassName="flex min-h-0 flex-col justify-center">
+          <OverviewCard title="ASO dos ativos" to="/consulta" linkLabel="Abrir Consulta" hint={`Situação do ASO de cada colaborador ativo hoje (vencendo = próximos ${DOC_WARN_DAYS} dias)`} className="min-h-0" bodyClassName="flex min-h-0 flex-col justify-center pb-5">
             {(() => {
               const parts = [
                 { label: "Em dia", n: d.aso.ok, cls: "stroke-foreground", dot: "bg-foreground" },

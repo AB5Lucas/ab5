@@ -64,7 +64,7 @@ export function Pie3D({ total, totalLabel, parts, unit = ["pessoa", "pessoas"], 
       {/* Pizza: no centro com a legenda; com fatia escolhida, encolhe para o canto de cima. */}
       <div className={cn("absolute flex items-center gap-4 transition-all duration-700 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
         "left-0 top-0", cur ? "h-16 w-16" : "h-full w-full")}>
-        <div className={cn("relative aspect-[100/82] shrink-0 transition-all duration-700", cur ? "h-14 max-w-16 cursor-pointer" : "h-full max-w-[60%]")}
+        <div className={cn("relative aspect-[100/82] shrink-0 transition-all duration-700", cur ? "h-14 max-w-16 cursor-pointer" : compact ? "h-[80%] max-w-[50%]" : "h-full max-w-[60%]")}
           title={cur ? "Clique para voltar à pizza" : undefined} onClick={cur ? (e) => { stop(e); setSel(null); } : undefined}>
           {!sum ? (
             <div className="flex h-full items-center justify-center rounded-full border border-dashed text-xs text-muted-foreground">Ninguém fora</div>
