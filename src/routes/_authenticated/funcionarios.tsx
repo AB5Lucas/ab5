@@ -8,7 +8,6 @@ import { useAccess } from "@/hooks/use-access";
 import { Big, Donut, HoverBars, OverviewCard } from "@/components/overview/charts";
 import { Pie3D } from "@/components/overview/pie-3d";
 import { CountUp } from "@/components/count-up";
-import { SummaryHead, SummaryPanel, SummaryRow } from "@/components/overview/patio-calendar";
 import { cn } from "@/lib/utils";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 import { DOC_WARN_DAYS } from "@/lib/doc-status";
@@ -208,7 +207,7 @@ function Overview() {
         </div>
       </div>
       {!d ? <DashboardSkeleton /> : (
-        <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)_12rem]">
+        <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)_minmax(0,1fr)]">
           <OverviewCard dark title="Colaboradores ativos" to="/colaboradores" linkLabel="Abrir Colaboradores" hint="Colaboradores ativos no cadastro, por tipo de contrato" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
             <div className="flex items-baseline justify-between gap-2">
               <Big dark value={d.total} />
@@ -269,7 +268,7 @@ function Overview() {
             })()}
           </OverviewCard>
 
-          <OverviewCard title="ASO dos ativos" to="/consulta" linkLabel="Abrir Consulta" hint={`Situação do ASO de cada colaborador ativo hoje (vencendo = próximos ${DOC_WARN_DAYS} dias)`} className="min-h-0">
+          <OverviewCard title="ASO dos ativos" to="/consulta" linkLabel="Abrir Consulta" hint={`Situação do ASO de cada colaborador ativo hoje (vencendo = próximos ${DOC_WARN_DAYS} dias)`} className="min-h-0 xl:col-span-2 xl:col-start-2 xl:row-start-3">
             {(() => {
               const tot = Math.max(1, d.total);
               const rows: [string, number][] = [["Em dia", d.aso.ok], ["Vencendo", d.aso.soon], ["Vencidos", d.aso.late], ["Sem ASO", d.aso.none]];
@@ -286,22 +285,22 @@ function Overview() {
             })()}
           </OverviewCard>
 
-          <OverviewCard title={`Treinamentos por dia — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} to="/documentos/agendamentos" linkLabel="Abrir Agendamentos"
-            hint="Pessoas em treinamento em cada dia do mês (realizados e agendados; cancelados fora). Clique num dia para ver só ele." className="min-h-0 pb-6 md:col-span-2 xl:col-span-3 xl:row-start-2" bodyClassName="min-h-0">
+          <OverviewCard dark title={`Treinamentos por dia — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} to="/documentos/agendamentos" linkLabel="Abrir Agendamentos"
+            hint="Pessoas em treinamento em cada dia do mês (realizados e agendados; cancelados fora). Clique num dia para ver só ele." className="min-h-0 pb-6 md:col-span-2 xl:col-start-1 xl:row-start-2" bodyClassName="min-h-0">
             <div className="h-full min-h-0" onClick={(e) => e.preventDefault()}>
-              {trQ.data ? <TrainingTiles rows={trQ.data} from={mFrom} to={mTo} today={today} /> : null}
+              {trQ.data ? <TrainingTiles dark rows={trQ.data} from={mFrom} to={mTo} today={today} /> : null}
             </div>
           </OverviewCard>
-          <OverviewCard title="Pessoas por função" to="/colaboradores" linkLabel="Abrir Colaboradores" hint="Colaboradores ativos por função (todos os níveis juntos)" className="min-h-0 xl:col-start-4 xl:row-span-2 xl:row-start-2" bodyClassName="min-h-0 overflow-y-auto pr-1">
+          <OverviewCard title="Pessoas por função" to="/colaboradores" linkLabel="Abrir Colaboradores" hint="Colaboradores ativos por função (todos os níveis juntos)" className="min-h-0 xl:col-start-4 xl:row-span-3 xl:row-start-1" bodyClassName="min-h-0 overflow-y-auto pr-1">
             <FunctionBars rows={d.functions} />
           </OverviewCard>
           <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas diferentes com folga, férias, atestado ou falta no período (quadros da Programação + Ausências). Clique numa fatia para ver as pessoas." className="min-h-0 xl:col-start-1 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
             <Pie3D total={d.absAll} totalLabel="pessoas ausentes" parts={d.absParts} unit={["pessoa", "pessoas"]} compact />
           </OverviewCard>
 
-          <OverviewCard dark title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0 xl:col-span-2 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
-            <div className="flex items-baseline gap-2"><Big dark value={d.absToday} /><p className="text-xs text-background/60">ausentes hoje · média {Math.round(d.absSeries.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.absSeries.filter((s) => s.value).length))} por dia</p></div>
-            <div className="mt-auto pt-2"><HoverBars dark data={d.absSeries} format={(v) => `${v} ausentes`} height="h-14" /></div>
+          <OverviewCard title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0 xl:col-start-3 xl:row-start-2" bodyClassName="flex min-h-0 flex-col">
+            <div className="flex items-baseline gap-2"><Big value={d.absToday} /><p className="text-xs text-muted-foreground">ausentes hoje · média {Math.round(d.absSeries.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.absSeries.filter((s) => s.value).length))} por dia</p></div>
+            <div className="mt-auto pt-2"><HoverBars data={d.absSeries} format={(v) => `${v} ausentes`} height="h-24" /></div>
           </OverviewCard>
 
 
@@ -332,7 +331,10 @@ function FunctionBars({ rows }: { rows: { name: string; n: number }[] }) {
  * Treinamentos em quadradinhos, como o quadro de RDOs: cada coluna = dia do mês, cada quadradinho = pessoas em treinamento
  * (escuro = realizado, médio = agendado, contorno vermelho suave = agendado em dia passado). Clicar num dia mostra o resumo dele.
  */
-function TrainingTiles({ rows, from, to, today }: { rows: any[]; from: string; to: string; today: string }) {
+function TrainingTiles({ rows, from, to, today, dark }: { rows: any[]; from: string; to: string; today: string; dark?: boolean }) {
+  const K = dark
+    ? { done: "bg-background", sched: "bg-background/45", empty: "border border-dashed border-background/25 bg-background/5", sel: "bg-background/10 ring-1 ring-background/30", now: "ring-1 ring-background/40", mut: "text-background/60", line: "border-background/15", track: "bg-background/15" }
+    : { done: "bg-foreground", sched: "bg-foreground/45", empty: "border border-dashed border-border bg-muted/40", sel: "bg-muted ring-1 ring-border", now: "ring-1 ring-foreground/30", mut: "text-muted-foreground", line: "border-border", track: "bg-muted" };
   const [sel, setSel] = useState<number | null>(null);
   const days = daysBetween(from, to);
   const cols = days.map((x) => {
@@ -362,36 +364,45 @@ function TrainingTiles({ rows, from, to, today }: { rows: any[]; from: string; t
             const f = Math.ceil(col.done / per), s = Math.ceil(col.sched / per);
             return (
               <button key={col.key} type="button" onClick={() => setSel(sel === ci ? null : ci)} title={`${col.title}: ${col.done} realizados, ${col.sched} agendados`}
-                className={cn("flex flex-1 flex-col items-stretch justify-end gap-[3px] rounded-md p-[2px] transition-colors", ci === sel && "bg-muted ring-1 ring-border", col.key === today && ci !== sel && "ring-1 ring-foreground/30")}>
+                className={cn("flex flex-1 flex-col items-stretch justify-end gap-[3px] rounded-md p-[2px] transition-colors", ci === sel && K.sel, col.key === today && ci !== sel && K.now)}>
                 {Array.from({ length: nRows }, (_, r) => {
                   const fromBottom = nRows - 1 - r;
-                  const cls = fromBottom < f ? "bg-foreground"
-                    : fromBottom < f + s ? (col.late ? "bg-foreground/45 ring-1 ring-destructive/50" : "bg-foreground/45")
-                    : "border border-dashed border-border bg-muted/40";
+                  const cls = fromBottom < f ? K.done
+                    : fromBottom < f + s ? cn(K.sched, col.late && "ring-1 ring-destructive/60")
+                    : K.empty;
                   return <span key={r} className={cn("ov-grow aspect-square max-h-6 w-full rounded-[4px]", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
                 })}
-                <span className="mt-1 shrink-0 text-center text-[10px] tabular-nums text-muted-foreground">{ci % step === 0 || ci === sel ? col.label : "\u00a0"}</span>
+                <span className={cn("mt-1 shrink-0 text-center text-[10px] tabular-nums", K.mut)}>{ci % step === 0 || ci === sel ? col.label : "\u00a0"}</span>
               </button>
             );
           })}
         </div>
       </div>
-      <SummaryPanel>
-        <SummaryHead label={c0 ? c0.title : "Resumo do mês"} value={list.length} sub={`treinamentos · ${new Set(list.map((r) => r.collaborator_id)).size} pessoas`} />
-        <div className="flex h-2 overflow-hidden rounded-full bg-muted">
-          <div className="h-full bg-foreground transition-[width] duration-700" style={{ width: list.length ? `${(done / list.length) * 100}%` : 0 }} />
-          <div className="h-full bg-foreground/45 transition-[width] duration-700" style={{ width: list.length ? `${(sched / list.length) * 100}%` : 0 }} />
+      <div className={cn("flex w-full flex-col gap-3 border-t pt-3 md:w-52 md:border-l md:border-t-0 md:pl-5 md:pt-0", K.line)}>
+        <div>
+          <p className={cn("text-[10px] font-medium uppercase tracking-wider", K.mut)}>{c0 ? c0.title : "Resumo do mês"}</p>
+          <p className="font-display text-3xl font-semibold leading-tight tabular-nums"><CountUp value={list.length} /></p>
+          <p className={cn("text-[11px]", K.mut)}>treinamentos · {new Set(list.map((r) => r.collaborator_id)).size} pessoas</p>
         </div>
-        <div className="space-y-0.5">
-          <SummaryRow dot="bg-foreground" label="Realizados" value={done} sub={pct(done)} />
-          <SummaryRow dot="bg-foreground/45" label="Agendados" value={sched} sub={pct(sched)} />
-          {late > 0 && <SummaryRow dot="bg-foreground/45 ring-1 ring-destructive/50" label="Atrasados" value={late} sub={pct(late)} />}
+        <div className={cn("flex h-2 overflow-hidden rounded-full", K.track)}>
+          <div className={cn("h-full transition-[width] duration-700", K.done)} style={{ width: list.length ? `${(done / list.length) * 100}%` : 0 }} />
+          <div className={cn("h-full transition-[width] duration-700", K.sched)} style={{ width: list.length ? `${(sched / list.length) * 100}%` : 0 }} />
+        </div>
+        <div className="space-y-0.5 text-xs">
+          {([[K.done, "Realizados", done], [K.sched, "Agendados", sched], ...(late > 0 ? [[cn(K.sched, "ring-1 ring-destructive/60"), "Atrasados", late]] : [])] as [string, string, number][]).map(([dot, l, v]) => (
+            <div key={l} className="flex items-center gap-2 px-1 py-0.5">
+              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-[3px]", dot)} />
+              <span className={cn("min-w-0 flex-1 truncate", K.mut)}>{l}</span>
+              <span className="font-semibold tabular-nums">{v}</span>
+              <span className={cn("w-11 text-right text-[10px] tabular-nums", K.mut)}>{pct(v)}</span>
+            </div>
+          ))}
         </div>
         <div className="space-y-0.5 text-[11px]">
-          {topTr.map(([n, v]) => <div key={n} className="flex justify-between gap-2"><span className="truncate text-muted-foreground">{n}</span><b className="tabular-nums">{v}</b></div>)}
+          {topTr.map(([n, v]) => <div key={n} className="flex justify-between gap-2"><span className={cn("truncate", K.mut)}>{n}</span><b className="tabular-nums">{v}</b></div>)}
         </div>
-        <p className="mt-auto text-[10px] leading-relaxed text-muted-foreground">{c0 ? "Clique de novo para ver o mês" : "Clique num dia para ver só ele"}<br />1 quadradinho = {per} {per === 1 ? "pessoa" : "pessoas"}</p>
-      </SummaryPanel>
+        <p className={cn("mt-auto text-[10px] leading-relaxed", K.mut)}>{c0 ? "Clique de novo para ver o mês" : "Clique num dia para ver só ele"}<br />1 quadradinho = {per} {per === 1 ? "pessoa" : "pessoas"}</p>
+      </div>
     </div>
   );
 }
