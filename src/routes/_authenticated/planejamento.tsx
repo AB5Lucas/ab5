@@ -1,3 +1,4 @@
+import { FitScreen } from "@/components/overview/fit-screen";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -200,7 +201,8 @@ function Overview() {
   const month = MONTHS[Number(ym.slice(5, 7)) - 1];
   const loadingNew = allocQ.isPlaceholderData || rangeQ.isPlaceholderData;
   return (
-    <div className={cn("flex flex-col gap-3 transition-opacity duration-300 xl:h-[calc(100dvh-6.5rem)] xl:min-h-[640px]", loadingNew && "opacity-70")}>
+    <FitScreen>
+    <div className={cn("flex flex-col gap-3 transition-opacity duration-300 lg:h-full", loadingNew && "opacity-70")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h1 className="font-display text-xl font-semibold tracking-tight">Planejamento</h1>
@@ -292,6 +294,7 @@ function Overview() {
         </>
       )}
     </div>
+    </FitScreen>
   );
 }
 

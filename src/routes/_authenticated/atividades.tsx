@@ -1,3 +1,4 @@
+import { FitScreen } from "@/components/overview/fit-screen";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -290,6 +291,7 @@ function HubOverview() {
   const pLabel = PERIODS.find((x) => x.key === period)!.label.toLowerCase();
 
   return (
+    <FitScreen>
     // Altura fixa da tela (cabeçalho 3,5rem + margens 3rem): tudo cabe sem rolar; abaixo de lg volta à altura natural.
     <div className={cn("flex flex-col gap-3 transition-opacity duration-300 lg:h-[calc(100dvh-6.5rem)] lg:min-h-[640px]", periodQ.isPlaceholderData && "opacity-70")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -409,6 +411,7 @@ function HubOverview() {
         </>
       )}
     </div>
+    </FitScreen>
   );
 }
 

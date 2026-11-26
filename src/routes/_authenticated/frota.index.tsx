@@ -1,3 +1,4 @@
+import { FitScreen } from "@/components/overview/fit-screen";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -196,7 +197,8 @@ function Overview({ canCost }: { canCost: boolean }) {
   const when = single ? brDay(R.from) : `${brDay(R.from)} a ${brDay(R.to)}`;
   const loadingNew = schedQ.isPlaceholderData;
   return (
-    <div className={cn("flex flex-col gap-3 transition-opacity duration-300 xl:h-[calc(100dvh-6.5rem)] xl:min-h-[640px]", loadingNew && "opacity-70")}>
+    <FitScreen>
+    <div className={cn("flex flex-col gap-3 transition-opacity duration-300 lg:h-full", loadingNew && "opacity-70")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h1 className="font-display text-xl font-semibold tracking-tight">Veículos</h1>
@@ -305,6 +307,7 @@ function Overview({ canCost }: { canCost: boolean }) {
         </div>
       )}
     </div>
+    </FitScreen>
   );
 }
 
