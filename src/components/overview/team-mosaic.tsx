@@ -71,7 +71,7 @@ function fitOf(groups: Group[], W: number, H: number): Fit | null {
   return null;
 }
 /** Largura (em casas) do balão aberto ao passar o mouse: cabe o nome e o local. */
-const PILL_PX = 150;
+const PILL_CELLS = 4;
 /**
  * Posições de cada círculo. Com alguém no mouse, ele ocupa várias casas (o balão): os seguintes do grupo andam para a
  * frente e descem de linha; perto da borda direita o balão abre para a esquerda e quem estava ali vai para depois dele.
@@ -80,7 +80,7 @@ const PILL_PX = 150;
 function placeOf(groups: Group[], f: Fit, hover: string | null): Layout {
   const { size, gap, cw, per } = f;
   const step = size + gap;
-  const cells = Math.max(2, Math.min(per, Math.ceil((PILL_PX + gap) / step)));
+  const cells = Math.max(1, Math.min(per, PILL_CELLS));
   const colsH: number[] = [];
   const pos = new Map<string, { x: number; y: number }>();
   const heads: Layout["heads"] = [];
@@ -125,6 +125,17 @@ export function TeamMosaic({ people, title, dark }: { people: TeamPerson[]; titl
   const [mode, setMode] = useState<Mode>("status");
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
+  // Troca de balão só depois que o mouse para um instante sobre outro círculo (e só por movimento real do mouse):
+  // os círculos que deslizam por baixo do cursor não disparam a troca, senão um balão abria o outro em cadeia.
+  const pending = useRef<{ id: string | null; t: ReturnType<typeof setTimeout> | null }>({ id: null, t: null });
+  const want = (id: string | null) => {
+    const pd = pending.current;
+    if (pd.id === id && pd.t) return;
+    if (pd.t) clearTimeout(pd.t);
+    pd.id = id;
+    pd.t = setTimeout(() => { pd.t = null; setHover(id); }, id === null ? 120 : hover ? 140 : 40);
+  };
+  useEffect(() => () => { if (pending.current.t) clearTimeout(pending.current.t); }, []);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [ready, setReady] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -160,7 +171,7 @@ export function TeamMosaic({ people, title, dark }: { people: TeamPerson[]; titl
           ))}
         </div>
       </div>
-      <div ref={ref} className="relative min-h-0 flex-1" onMouseLeave={() => setHover(null)}>
+      <div ref={ref} className="relative min-h-0 flex-1" onMouseLeave={() => want(null)}>
         {L && L.heads.map((h) => (
           <button key={`${mode}:${h.key}`} type="button" onClick={(e) => { stop(e); setSel(sel === h.key ? null : h.key); }}
             className={cn("absolute flex items-baseline truncate text-left text-[10.5px] font-semibold uppercase tracking-wide transition-[transform,opacity] duration-700 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
@@ -178,7 +189,7 @@ export function TeamMosaic({ people, title, dark }: { people: TeamPerson[]; titl
           const dim = sel && groupOf.get(p.id) !== sel;
           const where = p.status === "sem" ? "Sem escala" : p.status === "patio" ? "Pátio" : p.detail;
           return (
-            <span key={p.id} onMouseEnter={() => setHover(p.id)}
+            <span key={p.id} onMouseMove={() => { if (hover !== p.id || pending.current.t) want(p.id); }}
               className={cn("absolute left-0 top-0 flex items-center overflow-hidden rounded-full font-semibold leading-none",
                 "transition-[transform,width,height,opacity,box-shadow] duration-[700ms] [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
                 m.dot, m.text, open ? "z-10 justify-start shadow-lg" : "justify-center", open && (p.status === "sem" || p.status === "ausente") && "bg-card")}
