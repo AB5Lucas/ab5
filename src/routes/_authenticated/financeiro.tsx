@@ -146,7 +146,9 @@ function Overview() {
               <div className="flex rounded-full border bg-muted/40 p-0.5 text-xs">
                 {MONTHS.map((m, i) => (
                   <button key={m} type="button" onClick={() => toggle(i + 1)}
-                    className={cn("rounded-full px-2.5 py-1 transition-colors duration-300", months.includes(i + 1) ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}>{m}</button>
+                    className={cn("px-2.5 py-1 transition-all duration-300", months.includes(i + 1)
+                      ? cn("bg-foreground text-background", !months.includes(i) && "rounded-l-full", !months.includes(i + 2) && "rounded-r-full")
+                      : "rounded-full text-muted-foreground hover:text-foreground")}>{m}</button>
                 ))}
                 <button type="button" onClick={() => setMonths(months.length === 12 ? [] : MONTHS.map((_, i) => i + 1))} className="rounded-full px-2.5 py-1 text-muted-foreground hover:text-foreground">{months.length === 12 ? "Limpar" : "Ano todo"}</button>
               </div>
