@@ -401,9 +401,7 @@ function Page() {
         ? <InlineSelect key="p" value={r.priority} options={SC_PRIORITIES.map((p) => p.value)} render={(v) => <Pill className={priorityClass(v)}>{v}</Pill>} onChange={(v) => void buyerEdit("priority", "Prioridade", r.priority, v)} />
         : r.priority ? <Pill key="p" className={priorityClass(r.priority)}>{r.priority}</Pill> : "—"],
     ],
-    [["Cliente", cName], ["Prazo de entrega", buyerCanEdit
-      ? <Input key={`d-${r.due_date}`} type="date" className="h-7 w-40 text-xs" defaultValue={r.due_date ?? ""} onBlur={(e) => void buyerEdit("due_date", "Prazo de entrega", r.due_date, e.target.value || null)} />
-      : brDate(r.due_date)], ["Local de entrega", deliveryLabel(r, cName)]],
+    [["Cliente", cName], ["Prazo de entrega", brDate(r.due_date)], ["Local de entrega", deliveryLabel(r, cName)]],
     [
       ["Envio", r.sent_at ? new Date(r.sent_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "não enviado"],
       ["Controle de prazo", <Pill key="d" className={dl.cls}>{dl.label}</Pill>],

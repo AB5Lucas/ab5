@@ -178,6 +178,9 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
 
   // Cotações e links do solicitante/validador entram sozinhos (o comprador não precisa abrir o clipe).
   const imported = useRef(false);
+  // Observação da decisão (início da digitação), para o desfazer. Fica antes dos retornos: hooks sempre na mesma ordem.
+  const notesStart = useRef<string | null>(null);
+  const [confirmValor, setConfirmValor] = useState<Criterion[] | null>(null);
   useEffect(() => {
     if (imported.current || mode !== "comprador" || !d || d.req.stage !== "compras" || d.req.fa_state === "em_aprovacao" || !isBuyer) return;
     imported.current = true;
@@ -253,6 +256,10 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   const rule = r.fa_state === "em_aprovacao"
     ? approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO())
     : approvalRule(rec.total, budget, r.due_date, todayISO());
+  const applyCriteria = (n: Criterion[]) => {
+    const before = criteria;
+    setCriteria.mutate(n, { onSuccess: () => history.push({ label: `Critérios: ${n.map((k) => CRITERIA.find((c) => c.value === k)?.label).join(" + ")}`, undo: () => rpcCriteria(before), redo: () => rpcCriteria(n) }) });
+  };
   const who = { isBuyer, isGestor };
   const mayDecide = mode === "aprovacao" && canDecide(r, user?.id, who);
   const partialWaiting = r.fa_state === "em_aprovacao" && !!r.fa_partial_side;
@@ -263,7 +270,6 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
     setDecision(v);
     history.push({ label: `Decisão: ${v === "aprovado" ? "Aprovado" : v === "recusado" ? "Recusado" : "—"}`, undo: () => setDecision(before), redo: () => setDecision(v) });
   };
-  const notesStart = useRef<string | null>(null);
 
   return (
     <div className="space-y-4">
@@ -334,8 +340,9 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
                   onClick={() => {
                     const n = on ? criteria.filter((x) => x !== c.value) : [...criteria, c.value];
                     if (!n.length) { toast.info("Deixe ao menos um critério"); return; }
-                    const before = criteria;
-                    setCriteria.mutate(n, { onSuccess: () => history.push({ label: `Critérios: ${n.map((k) => CRITERIA.find((c) => c.value === k)?.label).join(" + ")}`, undo: () => rpcCriteria(before), redo: () => rpcCriteria(n) }) });
+                    // Desligar o Valor pede confirmação (a escolha deixa de olhar o preço).
+                    if (on && c.value === "valor") { setConfirmValor(n); return; }
+                    applyCriteria(n);
                   }}
                   className={cn("inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors disabled:cursor-default",
                     on ? "border-foreground bg-foreground text-background" : "border-border bg-background text-muted-foreground hover:bg-muted")}>
@@ -391,6 +398,21 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
 
       {attach && <QuotesAttachDialog row={r} onClose={() => setAttach(false)} onDone={() => void invalidate()} />}
       {matching && <QuoteMatchingDialog data={d} onClose={() => setMatching(false)} onFinish={() => { setMatching(false); void invalidate(); }} />}
+
+      <Dialog open={!!confirmValor} onOpenChange={(o) => !o && setConfirmValor(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Desativar o critério Valor?</DialogTitle>
+            <DialogDescription>
+              Sem o Valor, a melhor escolha de cada item deixa de considerar o preço e passa a olhar só {confirmValor?.map((k) => CRITERIA.find((c) => c.value === k)?.label.toLowerCase()).join(" e ")}. Pode sair mais caro. Deseja realmente desativar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmValor(null)}>Manter o Valor</Button>
+            <Button variant="destructive" onClick={() => { const n = confirmValor!; setConfirmValor(null); applyCriteria(n); }}>Desativar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={sending} onOpenChange={setSending}>
         <DialogContent className="max-w-3xl">
