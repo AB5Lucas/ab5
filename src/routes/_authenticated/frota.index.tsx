@@ -8,16 +8,13 @@ import { useAccess } from "@/hooks/use-access";
 import { MENU_GROUPS } from "@/lib/menu";
 import { Big, Donut, HoverBars, LineArea, OverviewCard } from "@/components/overview/charts";
 import { CountUp } from "@/components/count-up";
-import { useDriverRanking } from "@/components/frota/ranking";
 import { dayKm, dayToll, normalizePlate } from "@/lib/fleet-costs";
 import { closestPlate, currentKm, isoDay, maintenanceState, nextService, type MaintenanceState, type NextService } from "@/lib/fleet-notes";
-import { AgendaTab } from "@/components/logistica/agenda";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ResultCard, ResultChartSkeleton } from "@/components/result-dashboard-shell";
 import { useDashboardBudget } from "@/components/frota/use-dashboard-budget";
 import { fleetDashboardCosts } from "@/lib/fleet-dashboard-costs";
-import { fleetRankingPeriod } from "@/lib/fleet-ranking-period";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
 export const Route = createFileRoute("/_authenticated/frota/")({
@@ -116,7 +113,11 @@ function Overview({ canCost }: { canCost: boolean }) {
       .select("schedule_date, maintenance_kind").eq("is_maintenance", true)
       .gte("schedule_date", `${year}-01-01`).lte("schedule_date", `${year}-12-31`).order("id").range(a, b)),
   });
-  const rank = useDriverRanking(fleetRankingPeriod(today));
+  const fuelQ = useQuery({
+    queryKey: ["overview", "fleet-fuel-use", R.from, R.to], staleTime: 60_000, placeholderData: keepPreviousData,
+    queryFn: () => fetchAll<any>((a, b) => supabase.from("fleet_fuel_notes").select("id, plate, plate_fix, km, km_fix, fuel, quantity, issued_at")
+      .gte("issued_at", `${R.from}T00:00:00-03:00`).lte("issued_at", `${R.to}T23:59:59-03:00`).order("id").range(a, b)),
+  });
 
   const d = useMemo(() => {
     if (!vehiclesQ.data || !schedQ.data || !maintQ.data) return null;
@@ -272,26 +273,6 @@ function Overview({ canCost }: { canCost: boolean }) {
             {annualQ.isPending ? <ResultChartSkeleton /> : <MaintenanceYear rows={annualQ.data ?? []} year={year} />}
           </ResultCard>
 
-          <OverviewCard title="Ranking dos motoristas — últimos 30 dias" to="/frota/notas" linkLabel="Abrir Abastecimento" hint="% das notas de abastecimento entregues (foto do cupom); os últimos 2 dias ainda estão no prazo" className="min-h-0 xl:col-start-2 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
-            <div className="flex items-baseline gap-2">
-              <Big value={rank.overall == null ? "—" : `${rank.overall}%`} />
-              <span className="text-xs text-muted-foreground">das notas entregues</span>
-            </div>
-            <div className="mt-2 min-h-0 flex-1 space-y-4 overflow-y-auto">
-              {rank.loading && <p className="text-xs text-muted-foreground">Carregando…</p>}
-              {!rank.loading && !rank.ranking.length && <p className="text-xs text-muted-foreground">Sem abastecimentos no período.</p>}
-              {rank.ranking.map((r, i) => (
-                <div key={r.key} className="ov-fade grid grid-cols-[1rem_minmax(0,1fr)_2.2rem] items-center gap-2 text-[11px]" style={{ animationDelay: `${i * 70}ms` }} title={`${r.name}: ${r.delivered} entregues, ${r.pending} pendentes`}>
-                  <span className="tabular-nums text-muted-foreground">{i + 1}º</span>
-                  <span className="min-w-0">
-                    <span className="block truncate">{r.name}</span>
-                    <span className="mt-0.5 block h-1.5 overflow-hidden rounded-full bg-muted"><span className="ov-widen block h-full rounded-full bg-foreground" style={{ width: `${r.score}%`, animationDelay: `${150 + i * 70}ms` }} /></span>
-                  </span>
-                  <span className="text-right font-semibold tabular-nums"><CountUp value={`${r.score}%`} /></span>
-                </div>
-              ))}
-            </div>
-          </OverviewCard>
 
           <ResultCard title={`Manutenções e revisões — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} className="min-h-[22rem] xl:min-h-0 xl:col-start-3 xl:col-span-2 xl:row-start-2 xl:row-span-2">
             <MaintCalendar ym={ym} calFrom={calFrom} calTo={calTo} range={R} today={today} maintDays={d.maintDays} suggestions={d.suggestions} selected={selectedDay} onSelect={setSelectedDay} />
@@ -305,8 +286,8 @@ function Overview({ canCost }: { canCost: boolean }) {
                     </div>
                   ) : <p className="text-sm text-background/60">Custos disponíveis para quem tem acesso à Visão Geral.</p>}
                 </ResultCard>
-                <ResultCard title={`Logística — ${brDay(selectedDay)}`} className="min-h-64 xl:min-h-0 xl:col-start-1 xl:row-start-3">
-                  <AgendaTab dashboardDate={selectedDay} />
+                <ResultCard title={`Consumo de combustível — ${when}`} className="min-h-64 xl:min-h-0 xl:col-start-1 xl:col-span-2 xl:row-start-3">
+                  {fuelQ.isPending ? <ResultChartSkeleton /> : <FuelConsumption rows={fuelQ.data ?? []} />}
                 </ResultCard>
         </div>
       )}
@@ -419,4 +400,58 @@ function MaintenanceYear({ rows, year }: { rows: { schedule_date: string; mainte
       <div className="flex justify-between gap-1 text-[10px]"><span className="text-muted-foreground">Revisão</span><CountUp value={revision} /></div>
     </div>
   </div>;
+}
+
+const FUEL_KINDS = [{ key: "Gasolina", re: /GASOLINA/i }, { key: "Diesel", re: /DIESEL/i }, { key: "Etanol", re: /ETANOL|ALCOOL|ÁLCOOL/i }] as const;
+
+/** Consumo por veículo (km/L pelo hodômetro das notas, litros) e litros por combustível no período. */
+function FuelConsumption({ rows }: { rows: any[] }) {
+  const kinds = new Map<string, number>(FUEL_KINDS.map((k) => [k.key, 0]));
+  const byPlate = new Map<string, { km: number; l: number }[]>();
+  for (const r of rows) {
+    const kind = FUEL_KINDS.find((k) => k.re.test(r.fuel ?? ""));
+    if (!kind || !r.quantity) continue;
+    kinds.set(kind.key, (kinds.get(kind.key) ?? 0) + Number(r.quantity));
+    const plate = String(r.plate_fix || r.plate || "—").toUpperCase();
+    byPlate.set(plate, [...(byPlate.get(plate) ?? []), { km: Number(r.km_fix ?? r.km ?? 0), l: Number(r.quantity) }]);
+  }
+  const vehicles = [...byPlate.entries()].map(([plate, list]) => {
+    const liters = list.reduce((a, x) => a + x.l, 0);
+    const withKm = list.filter((x) => x.km > 0).sort((a, b) => a.km - b.km);
+    // km/L: km entre a 1ª e a última nota ÷ litros abastecidos depois da 1ª.
+    const dist = withKm.length > 1 ? withKm[withKm.length - 1]!.km - withKm[0]!.km : 0;
+    const used = withKm.slice(1).reduce((a, x) => a + x.l, 0);
+    const kml = dist > 0 && used > 0 && dist / used < 40 ? dist / used : null;
+    return { plate, liters, kml };
+  }).sort((a, b) => b.liters - a.liters);
+  const total = [...kinds.values()].reduce((a, b) => a + b, 0);
+  const maxL = Math.max(1, ...vehicles.map((v) => v.liters));
+  const n = (v: number, d = 0) => v.toLocaleString("pt-BR", { maximumFractionDigits: d, minimumFractionDigits: d });
+  if (!rows.length) return <p className="text-xs text-muted-foreground">Sem abastecimentos no período.</p>;
+  return (
+    <div className="flex h-full min-h-0 gap-4">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="mb-1 grid grid-cols-[4.5rem_minmax(0,1fr)_4rem_3.5rem] gap-2 text-[10px] uppercase tracking-wide text-muted-foreground"><span>Veículo</span><span>Litros</span><span className="text-right">L</span><span className="text-right">km/L</span></div>
+        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+          {vehicles.map((v, i) => (
+            <div key={v.plate} className="ov-fade grid grid-cols-[4.5rem_minmax(0,1fr)_4rem_3.5rem] items-center gap-2 text-[11px]" style={{ animationDelay: `${i * 50}ms` }}>
+              <span className="font-medium tabular-nums">{v.plate}</span>
+              <span className="h-1.5 overflow-hidden rounded-full bg-muted"><span className="ov-widen block h-full rounded-full bg-foreground/70" style={{ width: `${(v.liters / maxL) * 100}%`, animationDelay: `${i * 50}ms` }} /></span>
+              <span className="text-right tabular-nums">{n(v.liters)}</span>
+              <span className="text-right font-semibold tabular-nums" title={v.kml == null ? "Precisa de 2 notas com km no período" : undefined}>{v.kml == null ? "—" : n(v.kml, 1)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex w-44 shrink-0 flex-col gap-3 border-l pl-4">
+        <div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</p><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={`${n(total)} L`} /></p></div>
+        {FUEL_KINDS.map((k, i) => { const v = kinds.get(k.key) ?? 0; return (
+          <div key={k.key} className="text-xs">
+            <div className="flex justify-between"><span>{k.key}</span><span className="font-semibold tabular-nums">{n(v)} L</span></div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"><div className={cn("ov-widen h-full rounded-full", TONES[i])} style={{ width: `${total ? (v / total) * 100 : 0}%` }} /></div>
+          </div>
+        ); })}
+      </div>
+    </div>
+  );
 }
