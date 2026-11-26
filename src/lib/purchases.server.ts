@@ -285,6 +285,10 @@ export async function executePurchaseSync(c: Credentials, opts: { force?: boolea
       const msg = `ABCOM003: ${shown}${more}. O que não conferiu ficou sem lançar; os demais CCs (${lines.length}) foram importados.`;
       out.push({ ym, file: f.name, launched, pending, error: msg });
       await log(ym, f, false, msg);
+      // Diagnóstico: começo do arquivo e as linhas em volta do 1º problema (células não vazias com a coluna).
+      const firstRow = Number(issues[0]?.message.match(/linha (\d+)/)?.[1] ?? 0);
+      const pick = (a: number, b: number) => rows.slice(Math.max(0, a), b).map((r, k) => ({ row: Math.max(0, a) + k + 1, cells: r.map((v, i) => [i, v]).filter(([, v]) => v !== "" && v != null) }));
+      await supabaseAdmin.from("purchase_sync_files" as never).update({ debug: { head: pick(0, 25), around: pick(firstRow - 30, firstRow + 5) } } as never).eq("ym", ym);
     } else {
       out.push({ ym, file: f.name, launched, pending });
       await log(ym, f, true, null);
