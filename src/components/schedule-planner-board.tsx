@@ -1,3 +1,4 @@
+import { ScheduleExportButton } from "@/components/schedule-export-dialog";
 import { ScheduleAlertsButton } from "@/components/schedule-alerts-button";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1077,6 +1078,7 @@ export function SchedulePlannerBoard({
           </Button>
           <WeeklyDaysOffDialog date={date} open={openFolgas} onOpenChange={setOpenFolgas} editable={editable} />
           <LodgingDialog date={date} open={openLodging} onOpenChange={setOpenLodging} editable={editable} />
+          <ScheduleExportButton date={date} />
           <ScheduleAlertsButton date={date} />
         </div>
         <div className="order-4 basis-full empty:hidden">

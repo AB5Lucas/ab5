@@ -59,6 +59,10 @@ export const Route = createFileRoute("/_authenticated/atividades")({
   component: AtividadesOverview,
 });
 
+/** Último mês lido do histórico (planilha de antes do sistema); daí em diante valem os lançamentos do sistema. */
+const HIST_END = "2026-08";
+type HistRow = { ym: string; client: string; fat: number; mo: number; mat: number; andaimes: number; ferr: number; transp: number };
+const normName = (s: string) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
 type Period = "mes" | "anterior" | "ano" | "ano_anterior";
 const PERIODS: { key: Period; label: string }[] = [
   { key: "mes", label: "Mês atual" }, { key: "anterior", label: "Mês anterior" }, { key: "ano", label: "Este ano" }, { key: "ano_anterior", label: "Ano anterior" },
@@ -134,6 +138,8 @@ function HubOverview() {
   const q = { data: worksQ.data && billingQ.data && peopleQ.data && holQ.data && periodQ.data
     ? { works: worksQ.data, billing: billingQ.data, people: peopleQ.data, hol: holQ.data, ...periodQ.data } : undefined };
 
+  // Histórico de antes do sistema (planilha DADOS FINANCEIRO SERVIÇOS, só consulta): faturado e despesas por mês e cliente.
+  const histQ = useQuery({ queryKey: ["overview", "finance-history"], staleTime: STATIC, queryFn: async () => (await supabase.from("finance_history" as never).select("ym, client, fat, mo, mat, andaimes, ferr, transp")).data as unknown as HistRow[] ?? [] });
   const clientsQ = useQuery({ queryKey: ["overview", "clients"], staleTime: STATIC, queryFn: async () => (await supabase.from("clients").select("id, name").eq("active", true)).data ?? [] });
   const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
 
@@ -149,8 +155,27 @@ function HubOverview() {
     let cur = 0, prev = 0;
     const byBucket = new Map(P.buckets.map((b) => [b, 0]));
     const byClient = new Map<string, number>(), byClientId = new Map<string, number>();
+    // Meses até HIST_END vêm só do histórico (os lançamentos manuais desses meses repetiriam a planilha).
+    const clientIdByName = new Map((clientsQ.data ?? []).map((c: any) => [normName(c.name), c.id as string]));
+    const hist = (histQ.data ?? []).filter((h) => {
+      if (!scope.scoped) return true;
+      const id = clientIdByName.get(normName(h.client));
+      return !!id && scope.allowClient(id);
+    });
+    for (const h of hist) {
+      if (h.ym > HIST_END) continue;
+      const dt = `${h.ym}-01`, v = Number(h.fat) || 0;
+      if (!v) continue;
+      if (dt >= P.from.slice(0, 7) + "-01" && dt <= P.to) {
+        cur += v;
+        const k = P.unit === "day" ? dt : h.ym; if (byBucket.has(k)) byBucket.set(k, byBucket.get(k)! + v);
+        byClient.set(h.client, (byClient.get(h.client) ?? 0) + v);
+        const cid = clientIdByName.get(normName(h.client)); if (cid) byClientId.set(cid, (byClientId.get(cid) ?? 0) + v);
+      } else if (dt >= P.prevFrom.slice(0, 7) + "-01" && dt <= P.prevTo) prev += v;
+    }
     for (const e of billing) {
       const dt = String(e.entry_date).slice(0, 10), v = Number(e.amount ?? 0);
+      if (dt.slice(0, 7) <= HIST_END) continue;
       if (dt >= P.from && dt <= P.to) {
         cur += v; servedWorks.add(e.work_id);
         const k = keyOf(dt); if (byBucket.has(k)) byBucket.set(k, byBucket.get(k)! + v);
@@ -252,12 +277,19 @@ function HubOverview() {
       const days = P.buckets.filter((b) => b.startsWith(dt.slice(0, 7)));
       return days.map((b) => [b, 1 / days.length]);
     };
-    for (const e of q.data.costs ?? []) { if (!workBy.has(e.work_id)) continue; for (const [k, f] of spread(String(e.entry_date).slice(0, 10))) costBy.set(k, costBy.get(k)! + (Number(e.amount) || 0) * f); }
+    for (const e of q.data.costs ?? []) { if (!workBy.has(e.work_id) || String(e.entry_date).slice(0, 7) <= HIST_END) continue; for (const [k, f] of spread(String(e.entry_date).slice(0, 10))) costBy.set(k, costBy.get(k)! + (Number(e.amount) || 0) * f); }
     // Transporte próprio: km rodado × R$ 1,35 (principal = km × 2 × viagens; extras = extra_km); manutenção não conta.
     const expBy = new Map<string, { mo: number; tr: number; mat: number }>(P.buckets.map((b) => [b, { mo: 0, tr: 0, mat: 0 }]));
     for (const [dt, km] of q.data.km) { const k = keyOf(dt.slice(0, 10)); if (costBy.has(k)) { costBy.set(k, costBy.get(k)! + km * KM_RATE); expBy.get(k)!.tr += km * KM_RATE; } }
+    for (const h of hist) {
+      if (h.ym > HIST_END || P.unit === "day") continue;
+      const x = expBy.get(h.ym); if (!x) continue;
+      const mo = Number(h.mo) || 0, tr = Number(h.transp) || 0, mat = (Number(h.mat) || 0) + (Number(h.ferr) || 0);
+      x.mo += mo; x.tr += tr; x.mat += mat;
+      costBy.set(h.ym, costBy.get(h.ym)! + mo + tr + mat + (Number(h.andaimes) || 0));
+    }
     for (const e of q.data.costs ?? []) {
-      if (!workBy.has(e.work_id)) continue;
+      if (!workBy.has(e.work_id) || String(e.entry_date).slice(0, 7) <= HIST_END) continue;
       for (const [k, f] of spread(String(e.entry_date).slice(0, 10))) {
         const x = expBy.get(k)!; const v = (Number(e.amount) || 0) * f;
         if (e.category === "mao_obra") x.mo += v; else if (e.category === "materiais" || e.category === "ferramentas") x.mat += v;
@@ -278,7 +310,7 @@ function HubOverview() {
       activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
       statusBars: [["Planejados", "planned"], ["Ativos", "active"], ["Pausados", "paused"], ["Concluídos", "completed"]].map(([l, s]) => ({ label: l!, value: works.filter((w) => w.status === s).length })),
     };
-  }, [worksQ.data, billingQ.data, peopleQ.data, holQ.data, periodQ.data, scope.ready, P]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [worksQ.data, billingQ.data, peopleQ.data, holQ.data, periodQ.data, histQ.data, clientsQ.data, scope.ready, P]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mapa: clientes com endereço localizado (sem os internos da sede), marcador do tamanho do faturado no período.
   const mapClients = useMemo(() => (mapQ.data ?? [])
