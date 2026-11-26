@@ -312,7 +312,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
                   if (v === "RECUSADO") { setRefuseReason(""); setRefuse({ id: it.id, no: it.item_no, desc: it.description, before: it.status, beforeReason: it.fa_item_reason ?? null }); return; }
                   itemDecide.mutate({ item: it.id, no: it.item_no, status: v, reason: null, before: it.status, beforeReason: it.fa_item_reason ?? null });
                 }}>
-                <SelectTrigger className={cn("h-7 w-44 rounded-md border-0 px-2 text-[11px]", itemStatusClass(it.status))}>
+                <SelectTrigger className={cn("h-7 w-44 rounded-md border-0 px-2 text-[11px]", itemStatusClass(it.status), "data-[placeholder]:text-[#FF3300]")}>
                   <SelectValue placeholder="APROVAÇÃO PENDENTE" />
                 </SelectTrigger>
                 <SelectContent>
