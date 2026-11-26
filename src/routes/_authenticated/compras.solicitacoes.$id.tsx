@@ -28,7 +28,7 @@ import { useEditHistory } from "@/hooks/use-edit-history";
 import { UndoRedoButtons } from "@/components/compras/undo-redo";
 import { ScImportButtons, type ScImportItem } from "@/components/compras/sc-import-dialog";
 import { PastePrint } from "@/components/compras/paste-print";
-import { useActionHistory } from "@/hooks/use-action-history";
+import { useActionHistory, useUndoRedoKeys } from "@/hooks/use-action-history";
 import { QuotesAttachDialog } from "@/components/compras/quotes";
 import { RecommendationView } from "@/components/compras/recommendation-view";
 
@@ -154,6 +154,7 @@ function Page() {
   const [scTab, setScTab] = useState<"itens" | "recomendacao">(tabParam === "recomendacao" ? "recomendacao" : "itens");
   const [attachOpen, setAttachOpen] = useState(false);
   const buyerHistory = useActionHistory();
+  useUndoRedoKeys(buyerHistory, isBuyer && !editMode);
   const buyerCanEdit = isBuyer && r?.fa_state !== "em_aprovacao";
   const headerEdits = useQuery({
     queryKey: ["sc-header-edits", id],

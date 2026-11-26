@@ -109,6 +109,12 @@ export function chosenOption(item: ScItemLite, options: Option[]): { option: Opt
   return { option: options[0] ?? null, index: options.length ? 0 : -1, manual: false };
 }
 
+/** Escolha anterior (volta uma posição; da 1ª vai para a última). */
+export function prevOption(options: Option[], index: number): Option | null {
+  if (options.length < 2) return null;
+  return options[(index - 1 + options.length) % options.length]!;
+}
+
 /** Próxima melhor escolha (dá a volta para a primeira). */
 export function nextOption(options: Option[], index: number): Option | null {
   if (options.length < 2) return null;

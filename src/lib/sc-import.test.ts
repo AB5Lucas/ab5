@@ -18,7 +18,7 @@ describe("sc-import", () => {
     expect(parseBrNumber("abc")).toBeNaN();
   });
   it("títulos com e sem acento e variações", () => {
-    expect(headerMap([...SC_IMPORT_COLUMNS])?.size).toBe(8);
+    expect(headerMap([...SC_IMPORT_COLUMNS])?.size).toBe(9);
     const m = headerMap(["Quantidade", "Unidade", "Descricao", "Verba", "Obs", "Serviço"]);
     expect([...m!.values()]).toEqual(["quantity", "unit", "description", "budget", "notes", "work"]);
     expect(headerMap(["Nome", "Valor"])).toBeNull();
@@ -41,19 +41,21 @@ describe("sc-import", () => {
     const m = [
       ["SOLICITAÇÃO DE COMPRAS"],
       [...SC_IMPORT_COLUMNS],
-      [1, "2", "un", "Luva de vaqueta", "R$ 50,00", "tam. G", "Rateio geral", ""],
+      [1, "2", "un", "Luva de vaqueta", "R$ 50,00", "tam. G", "www.loja.com/luva", "Rateio geral", ""],
       [],
-      [2, "x", "PC", "", "", "", "Pintura", "2001"],
-      [3, 3, "fardo", "Estopa", "1.200,5", "", "Manutenção Caldeira", "20.01-999"],
+      [2, "x", "PC", "", "", "", "", "Pintura", "2001"],
+      [3, 3, "fardo", "Estopa", "1.200,5", "", "sem link", "Manutenção Caldeira", "20.01-999"],
     ];
     const { rows, error } = parseScImport(m, works);
     expect(error).toBeUndefined();
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toMatchObject({ line: 3, quantity: "2", unit: "UN", description: "Luva de vaqueta", budget: "50", notes: "tam. G", work_id: SC_IMPORT_RATEIO, cc: "", errors: [] });
+    expect(rows[0]).toMatchObject({ line: 3, quantity: "2", unit: "UN", description: "Luva de vaqueta", budget: "50", notes: "tam. G", link: "https://www.loja.com/luva", work_id: SC_IMPORT_RATEIO, cc: "", errors: [] });
     expect(rows[1]!.line).toBe(5);
     expect(rows[1]!.errors).toHaveLength(3); // qtd, descrição, centro de custo
     expect(rows[2]).toMatchObject({ unit: "FARDO", budget: "1200,5", work_id: "w2", cc: "2001999", errors: [] });
     expect(rows[2]!.warnings[0]).toContain("fora da lista");
+    expect(rows[2]!.link).toBe("");
+    expect(rows[2]!.warnings.some((w) => w.startsWith("Link ignorado"))).toBe(true);
   });
   it("sem títulos: erro geral", () => {
     expect(parseScImport([["a", "b"]], works).error).toBeTruthy();

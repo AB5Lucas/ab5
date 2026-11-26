@@ -14,7 +14,7 @@ async function downloadTemplate(works: ImportWork[]) {
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([[...SC_IMPORT_COLUMNS]]);
-  ws["!cols"] = [6, 8, 12, 50, 14, 30, 40, 12].map((wch) => ({ wch }));
+  ws["!cols"] = [6, 8, 12, 50, 14, 30, 40, 40, 12].map((wch) => ({ wch }));
   XLSX.utils.book_append_sheet(wb, ws, "Itens");
   const names = ["Rateio geral", ...works.map((w) => w.name)];
   const n = Math.max(SC_UNITS.length, names.length);
@@ -69,7 +69,7 @@ export function ScImportButtons({ works, workLabel, onImport }: {
             <DialogTitle>Importar itens</DialogTitle>
             <DialogDescription>
               {preview?.name}: {preview?.rows.length} linha(s). {bad ? `${bad} com erro não entram; corrija a planilha e importe de novo se precisar.` : "Todas prontas."}
-              {" "}Os itens são acrescentados aos da SC; depois clique em Salvar itens.
+              {" "}Os itens são acrescentados aos da SC e salvos automaticamente; o link de cada linha fica no ícone de link do item.
             </DialogDescription>
           </DialogHeader>
           <div className="overflow-x-auto">
@@ -77,7 +77,7 @@ export function ScImportButtons({ works, workLabel, onImport }: {
               <TableHeader>
                 <TableRow>
                   <TableHead>Linha</TableHead><TableHead>Qtd</TableHead><TableHead>Un.</TableHead><TableHead className="min-w-56">Descrição</TableHead>
-                  <TableHead>Verba (R$)</TableHead><TableHead>Observações</TableHead><TableHead>Centro de custo</TableHead><TableHead>CC</TableHead><TableHead className="min-w-48">Situação</TableHead>
+                  <TableHead>Verba (R$)</TableHead><TableHead>Observações</TableHead><TableHead>Link</TableHead><TableHead>Centro de custo</TableHead><TableHead>CC</TableHead><TableHead className="min-w-48">Situação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -89,6 +89,7 @@ export function ScImportButtons({ works, workLabel, onImport }: {
                     <TableCell className="whitespace-pre-wrap">{r.description || "—"}</TableCell>
                     <TableCell>{r.budget || "—"}</TableCell>
                     <TableCell className="max-w-40 truncate" title={r.notes}>{r.notes || "—"}</TableCell>
+                    <TableCell className="max-w-40 truncate">{r.link ? <a href={r.link} target="_blank" rel="noreferrer" className="underline">{r.link.replace(/^https?:\/\//, "")}</a> : "—"}</TableCell>
                     <TableCell>{r.work_id === SC_IMPORT_RATEIO ? "Rateio geral" : workLabel(r.work_id)}</TableCell>
                     <TableCell className="font-mono">{r.cc || "auto"}</TableCell>
                     <TableCell>
@@ -105,7 +106,7 @@ export function ScImportButtons({ works, workLabel, onImport }: {
             <Button variant="outline" onClick={() => setPreview(null)}>Cancelar</Button>
             <Button disabled={!ok.length} onClick={() => {
               onImport(ok.map(({ line: _l, errors: _e, warnings: _w, ...it }) => it));
-              toast.success(`${ok.length} item(ns) acrescentado(s). Confira e clique em Salvar itens.`);
+              toast.success(`${ok.length} item(ns) acrescentado(s) e salvos automaticamente.`);
               setPreview(null);
             }}>Acrescentar {ok.length} item(ns)</Button>
           </DialogFooter>

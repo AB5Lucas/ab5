@@ -250,8 +250,11 @@ export function QuotesAttachDialog({ row, onClose, onDone }: { row: ScRow | null
   );
 }
 
-type Edit = { request_item_id: string | null; conv_factor: string; conv_type: string; discarded: boolean };
-const DISCARD = "__descartar__";
+type Edit = { request_item_id: string | null; conv_factor: string; conv_type: string; discarded: boolean; price: string };
+/** Dados da cotação que a leitura não achou e o comprador digita (fornecedor, prazos em dias). */
+type QEdit = { supplier: string; payment: string; delivery: string };
+const numIn = (v: string) => { const t = v.trim(); if (!t) return null; const x = Number(t.replace(/\./g, "").replace(",", ".")); return Number.isFinite(x) ? x : NaN; };
+const DISCARD = "__descartar__"; // valor interno do item descartado (o botão é a lixeira)
 const NONE = "__nenhum__";
 
 /**
@@ -266,7 +269,13 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
   const qById = new Map(readQuotes.map((q) => [q.id, q]));
   const lines = data.qItems.filter((x) => qById.has(x.quote_id));
   const [edits, setEdits] = useState<Record<string, Edit>>(() =>
-    Object.fromEntries(lines.map((l) => [l.id, { request_item_id: l.request_item_id, conv_factor: String(l.conv_factor), conv_type: l.conv_type, discarded: l.discarded }])));
+    Object.fromEntries(lines.map((l) => [l.id, { request_item_id: l.request_item_id, conv_factor: String(l.conv_factor), conv_type: l.conv_type, discarded: l.discarded, price: "" }])));
+  // Faltou na leitura: preço do item, fornecedor, prazo de pagamento ou de entrega → campo para digitar (obrigatório para seguir).
+  const noPrice = (l: QuoteItemLite) => quoteUnitPrice(l) == null;
+  const [qEdits, setQEdits] = useState<Record<string, QEdit>>(() =>
+    Object.fromEntries(readQuotes.map((q) => [q.id, { supplier: "", payment: "", delivery: "" }])));
+  const qMiss = (q: QuoteLite) => ({ supplier: !q.supplier?.trim(), payment: q.payment_days == null, delivery: q.delivery_days == null });
+  const setQ = (id: string, p: Partial<QEdit>) => setQEdits((e) => ({ ...e, [id]: { ...e[id]!, ...p } }));
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const last = items.length; // passo final = sem vínculo
@@ -274,17 +283,46 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
   const ed = (id: string) => edits[id]!;
   const set = (id: string, p: Partial<Edit>) => setEdits((e) => ({ ...e, [id]: { ...e[id]!, ...p } }));
   const shown = cur ? lines.filter((l) => !ed(l.id).discarded && ed(l.id).request_item_id === cur.id) : lines.filter((l) => !ed(l.id).discarded && !ed(l.id).request_item_id);
+  // O que ainda falta digitar nas linhas deste passo (bloqueia o OK).
+  const okNum = (v: string, min: number) => { const x = numIn(v); return x != null && !Number.isNaN(x) && x >= min; };
+  const missing = (() => {
+    const out: string[] = [];
+    for (const l of shown) {
+      const q = qById.get(l.quote_id); if (!q) continue;
+      const m = qMiss(q), e = qEdits[q.id]!;
+      const who = q.supplier || e.supplier || q.file_name || "cotação";
+      if (noPrice(l) && !(okNum(ed(l.id).price, 0) && numIn(ed(l.id).price)! > 0)) out.push(`valor de "${l.description.slice(0, 30)}"`);
+      if (m.supplier && !e.supplier.trim()) out.push(`fornecedor de ${q.file_name ?? "cotação"}`);
+      if (m.payment && !okNum(e.payment, 0)) out.push(`prazo de pagamento de ${who}`);
+      if (m.delivery && !okNum(e.delivery, 0)) out.push(`prazo de entrega de ${who}`);
+    }
+    return [...new Set(out)];
+  })();
+  const saveQuotes = async (quoteIds: string[]) => {
+    for (const id of new Set(quoteIds)) {
+      const q = qById.get(id); if (!q) continue;
+      const m = qMiss(q), e = qEdits[id]!;
+      const patch: Record<string, unknown> = {};
+      if (m.supplier && e.supplier.trim()) patch["supplier"] = e.supplier.trim();
+      if (m.payment && okNum(e.payment, 0)) patch["payment_days"] = Math.round(numIn(e.payment)!);
+      if (m.delivery && okNum(e.delivery, 0)) patch["delivery_days"] = Math.round(numIn(e.delivery)!);
+      if (Object.keys(patch).length) { const { error } = await supabase.from("purchase_quotes").update(patch as never).eq("id", id); if (error) throw error; }
+    }
+  };
 
   const save = async (ids: string[]) => {
     const changed = ids.filter((id) => {
       const l = lines.find((x) => x.id === id)!, e = ed(id);
-      return l.request_item_id !== e.request_item_id || String(l.conv_factor) !== e.conv_factor || l.conv_type !== e.conv_type || l.discarded !== e.discarded;
+      return l.request_item_id !== e.request_item_id || String(l.conv_factor) !== e.conv_factor || l.conv_type !== e.conv_type || l.discarded !== e.discarded || (noPrice(l) && !!e.price.trim());
     });
     for (const id of changed) {
       const e = ed(id);
       const f = Number(e.conv_factor.replace(",", "."));
+      const l = lines.find((x) => x.id === id)!;
+      const price = noPrice(l) ? numIn(e.price) : null;
       const { error } = await supabase.from("purchase_quote_items").update({
         request_item_id: e.discarded ? null : e.request_item_id, conv_factor: f > 0 ? f : 1, conv_type: e.conv_type, discarded: e.discarded,
+        ...(price != null && price > 0 ? { unit_price: price, total: Math.round(price * Number(l.quantity || 1) * 100) / 100 } : {}),
       }).eq("id", id);
       if (error) throw error;
     }
@@ -294,6 +332,7 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
     try {
       // Grava as linhas mexidas neste passo (as que estavam aqui no começo e as que estão agora).
       const ids = cur ? lines.filter((l) => l.request_item_id === cur.id || ed(l.id).request_item_id === cur.id).map((l) => l.id) : lines.map((l) => l.id);
+      await saveQuotes(shown.map((l) => l.quote_id));
       await save(ids);
       if (step >= last) {
         await save(lines.map((l) => l.id));
@@ -334,6 +373,8 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
                 <TableHead className="text-right">Qtd</TableHead>
                 <TableHead>Un.</TableHead>
                 <TableHead className="text-right">Vlr. unit.</TableHead>
+                <TableHead title="Prazo de pagamento (dias)">Pagto.</TableHead>
+                <TableHead title="Prazo de entrega (dias)">Entrega</TableHead>
                 <TableHead className="w-24">Fator Conv.</TableHead>
                 <TableHead className="w-36">Tipo de Conv</TableHead>
                 {cur && <TableHead className="text-right">Preço na un. da SC</TableHead>}
@@ -342,19 +383,36 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!shown.length && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">{cur ? "Nenhum item das cotações ligado a este item." : "Todos os itens das cotações estão vinculados ou descartados."}</TableCell></TableRow>}
+              {!shown.length && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">{cur ? "Nenhum item das cotações ligado a este item." : "Todos os itens das cotações estão vinculados ou descartados."}</TableCell></TableRow>}
               {shown.map((l) => {
                 const e = ed(l.id);
-                const up = quoteUnitPrice(l);
+                const typed = numIn(e.price);
+                const up = quoteUnitPrice(l) ?? (typed != null && typed > 0 ? typed : null);
                 const f = Number(e.conv_factor.replace(",", "."));
                 const scPrice = up != null ? priceInScUnit(up, f > 0 ? f : 1, e.conv_type) : null;
                 return (
                   <TableRow key={l.id}>
-                    <TableCell className="whitespace-nowrap">{qById.get(l.quote_id)?.supplier ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {qMiss(qById.get(l.quote_id)!).supplier ? (
+                        <Input className={`h-7 w-40 text-xs ${qEdits[l.quote_id]!.supplier.trim() ? "" : "border-destructive"}`} placeholder="Digite o fornecedor" value={qEdits[l.quote_id]!.supplier}
+                          onChange={(ev) => setQ(l.quote_id, { supplier: ev.target.value })} aria-label="Fornecedor" />
+                      ) : qById.get(l.quote_id)?.supplier}
+                    </TableCell>
                     <TableCell>{l.description}</TableCell>
                     <TableCell className="text-right tabular-nums">{l.quantity ?? "—"}</TableCell>
                     <TableCell>{l.unit ?? "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">{brl(up)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {noPrice(l) ? (
+                        <Input className={`ml-auto h-7 w-24 text-right text-xs ${okNum(e.price, 0) && numIn(e.price)! > 0 ? "" : "border-destructive"}`} inputMode="decimal" placeholder="R$ unit." value={e.price}
+                          onChange={(ev) => set(l.id, { price: ev.target.value })} aria-label="Valor unitário" title="A leitura não achou o valor: digite o valor unitário" />
+                      ) : brl(up)}
+                    </TableCell>
+                    <TableCell>{(() => { const q = qById.get(l.quote_id)!; return qMiss(q).payment ? (
+                      <Input className={`h-7 w-16 text-xs ${okNum(qEdits[q.id]!.payment, 0) ? "" : "border-destructive"}`} inputMode="numeric" placeholder="dias" value={qEdits[q.id]!.payment} onChange={(ev) => setQ(q.id, { payment: ev.target.value })} aria-label="Prazo de pagamento (dias)" title="Prazo de pagamento em dias (0 = à vista)" />
+                    ) : `${q.payment_days} d`; })()}</TableCell>
+                    <TableCell>{(() => { const q = qById.get(l.quote_id)!; return qMiss(q).delivery ? (
+                      <Input className={`h-7 w-16 text-xs ${okNum(qEdits[q.id]!.delivery, 0) ? "" : "border-destructive"}`} inputMode="numeric" placeholder="dias" value={qEdits[q.id]!.delivery} onChange={(ev) => setQ(q.id, { delivery: ev.target.value })} aria-label="Prazo de entrega (dias)" title="Prazo de entrega em dias" />
+                    ) : `${q.delivery_days} d`; })()}</TableCell>
                     <TableCell><Input className="h-7 w-20 text-xs" inputMode="decimal" value={e.conv_factor} onChange={(ev) => set(l.id, { conv_factor: ev.target.value })} aria-label="Fator de conversão" /></TableCell>
                     <TableCell>
                       <Select value={e.conv_type} onValueChange={(v) => set(l.id, { conv_type: v })}>
@@ -365,14 +423,19 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
                     {cur && <TableCell className="text-right tabular-nums">{brl(scPrice)}</TableCell>}
                     {cur && <TableCell className="text-right tabular-nums font-medium">{brl(scPrice != null ? scPrice * Number(cur.quantity) : null)}</TableCell>}
                     <TableCell>
-                      <Select value={target(l)} onValueChange={(v) => set(l.id, v === DISCARD ? { discarded: true, request_item_id: null } : { discarded: false, request_item_id: v === NONE ? null : v })}>
-                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent className="max-h-72">
-                          {items.map((i) => <SelectItem key={i.id} value={i.id}>{i.item_no}. {i.description.slice(0, 50)}</SelectItem>)}
-                          {!cur && <SelectItem value={NONE}>Sem vínculo</SelectItem>}
-                          <SelectItem value={DISCARD}>Descartar</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center gap-1">
+                        <Select value={target(l)} onValueChange={(v) => set(l.id, { discarded: false, request_item_id: v === NONE ? null : v })}>
+                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            {items.map((i) => <SelectItem key={i.id} value={i.id}>{i.item_no}. {i.description.slice(0, 50)}</SelectItem>)}
+                            {!cur && <SelectItem value={NONE}>Sem vínculo</SelectItem>}
+                          </SelectContent>
+                        </Select>
+                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Descartar este item da cotação" aria-label="Descartar"
+                          onClick={() => set(l.id, { discarded: true, request_item_id: null })}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -383,12 +446,15 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
         <p className="text-[11px] text-muted-foreground">
           Fator Conv.: mesma quantidade e unidade = 1, Multiplicador. Unidades diferentes, ex.: SC 5 KG e cotação 1 RL (rolo de 5 kg) = fator 5, Divisor.
         </p>
+        {missing.length > 0 && (
+          <p className="text-xs text-destructive">Preencha o que a leitura não achou para continuar: {missing.slice(0, 4).join(", ")}{missing.length > 4 ? ` e mais ${missing.length - 4}` : ""}.</p>
+        )}
         <DialogFooter className="gap-2 sm:justify-between">
           <span className="text-xs text-muted-foreground">Passo {Math.min(step + 1, last + 1)} de {last + 1}</span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>Cancelar</Button>
             {step > 0 && <Button variant="outline" disabled={saving} onClick={() => setStep(step - 1)}>Voltar</Button>}
-            <Button disabled={saving} onClick={() => void ok()}>{saving && <Loader2 className="h-4 w-4 animate-spin" />}{step >= last ? "Concluir" : "OK"}</Button>
+            <Button disabled={saving || missing.length > 0} title={missing.length ? "Preencha os campos em vermelho" : undefined} onClick={() => void ok()}>{saving && <Loader2 className="h-4 w-4 animate-spin" />}{step >= last ? "Concluir" : "OK"}</Button>
           </div>
         </DialogFooter>
       </DialogContent>

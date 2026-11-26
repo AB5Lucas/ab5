@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, BadgeCheck, Check, ChevronsRight, Columns3, Eye, FileText, Info, Link2, Paperclip, Send, Undo2 } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Check, ChevronsLeft, ChevronsRight, Columns3, Eye, FileText, Info, Link2, Paperclip, Send, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
-import { useActionHistory, type ActionHistory } from "@/hooks/use-action-history";
+import { useActionHistory, useUndoRedoKeys, type ActionHistory } from "@/hooks/use-action-history";
 import { UndoRedoButtons } from "@/components/compras/undo-redo";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,7 +20,7 @@ import { ScHeaderCard } from "@/components/compras/sc-header-card";
 import { Pill, todayISO, useClientsList, useScUsers } from "@/components/compras/sc-shared";
 import { QuoteMatchingDialog, QuotesAttachDialog, importRequesterQuotes, openQuoteFile, useRecData, type RecData } from "@/components/compras/quotes";
 import {
-  CRITERIA, RULE_LABEL, approvalRule, budgetSignal, nextOption, recommendation, scBudget, type Criterion, type FaRule, type RecRow,
+  CRITERIA, RULE_LABEL, approvalRule, budgetSignal, nextOption, prevOption, recommendation, scBudget, type Criterion, type FaRule, type RecRow,
 } from "@/lib/purchase-quotes";
 import { brl, statusDot } from "@/lib/purchase-requests";
 import { cn } from "@/lib/utils";
@@ -76,6 +76,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   const isBuyer = isAdmin || canAccess("/compras/comprador");
   const ownHistory = useActionHistory();
   const history = outerHistory ?? ownHistory;
+  useUndoRedoKeys(ownHistory, !outerHistory);
   const data = useRecData(requestId);
   const clients = useClientsList();
   const users = useScUsers();
@@ -222,8 +223,19 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
     { key: "choice", label: "Escolha", values: (x) => [`${x.options.length} opções`], fixed: true, className: "whitespace-nowrap",
       cell: (x) => {
         const next = nextOption(x.options, x.index);
+        const prev = prevOption(x.options, x.index);
         return (
           <div className="flex items-center gap-1">
+            {editable && prev && x.options.length > 2 && (
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" title={`Escolha anterior: ${prev.quote.supplier ?? "—"} · ${brl(prev.total)}`} disabled={choose.isPending}
+                onClick={() => {
+                  const qi = x.options.indexOf(prev) === 0 ? null : prev.quoteItem.id;
+                  const before = x.item.rec_quote_item_id;
+                  choose.mutate({ item: x.item.id, qi }, { onSuccess: () => history.push({ label: `Item ${x.item.item_no}: ${prev.quote.supplier ?? "escolha anterior"}`, undo: () => rpcChoose(x.item.id, before), redo: () => rpcChoose(x.item.id, qi) }) });
+                }}>
+                <ChevronsLeft className="h-3.5 w-3.5" /> Anterior
+              </Button>
+            )}
             {editable && next && (
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" title={`Próxima melhor escolha: ${next.quote.supplier ?? "—"} · ${brl(next.total)}`} disabled={choose.isPending}
                 onClick={() => {
@@ -280,6 +292,11 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
           <h2 className="font-display text-xl font-semibold uppercase tracking-wide">{r.number}</h2>
         </>}
         <div className="ml-auto flex flex-wrap gap-2">
+          {(mode === "aprovacao" ? mayDecide : editable) && (
+            <span className="flex items-center gap-1 self-center text-xs text-muted-foreground" title="Cada mudança (critérios, escolha, cotações) é gravada na hora; não precisa salvar">
+              <Check className="h-3.5 w-3.5" /> Salvo automaticamente
+            </span>
+          )}
           {!outerHistory && (mode === "aprovacao" ? mayDecide : editable) && (
             <UndoRedoButtons undoLabels={history.undoLabels} redoLabels={history.redoLabels} onUndo={(n) => void history.undo(n)} onRedo={(n) => void history.redo(n)} />
           )}

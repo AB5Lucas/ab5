@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Desfazer/refazer de ações já gravadas (Comprador e Aprovador): cada passo guarda como desfazer e refazer
@@ -41,3 +41,28 @@ export function useActionHistory() {
   };
 }
 export type ActionHistory = ReturnType<typeof useActionHistory>;
+
+/**
+ * Ctrl+Z / Ctrl+Y (e Ctrl+Shift+Z) na página para um histórico de ações gravadas. Dentro de campo de texto
+ * fica o desfazer do próprio campo; quadros abertos (diálogos, listas) ficam de fora.
+ */
+export function useUndoRedoKeys(h: ActionHistory, enabled: boolean) {
+  const ref = useRef(h);
+  ref.current = h;
+  useEffect(() => {
+    if (!enabled) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      const isUndo = k === "z" && !e.shiftKey;
+      const isRedo = k === "y" || (k === "z" && e.shiftKey);
+      if (!isUndo && !isRedo) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.("input, textarea, select, [contenteditable=true], [role=dialog], [role=alertdialog], [data-radix-popper-content-wrapper]")) return;
+      e.preventDefault();
+      if (isUndo) void ref.current.undo(); else void ref.current.redo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [enabled]);
+}

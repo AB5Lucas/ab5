@@ -6,11 +6,11 @@
 import { SC_UNITS } from "./purchase-requests";
 
 /** Colunas do modelo (Baixar modelo), nesta ordem. */
-export const SC_IMPORT_COLUMNS = ["Item", "Qtd", "Un. medida", "Descrição", "Verba (R$)", "Observações", "Centro de custo", "CC"] as const;
+export const SC_IMPORT_COLUMNS = ["Item", "Qtd", "Un. medida", "Descrição", "Verba (R$)", "Observações", "Link", "Centro de custo", "CC"] as const;
 
 export const SC_IMPORT_RATEIO = "__rateio__";
 
-type Field = "item" | "quantity" | "unit" | "description" | "budget" | "notes" | "work" | "cc";
+type Field = "item" | "quantity" | "unit" | "description" | "budget" | "notes" | "link" | "work" | "cc";
 
 /** Texto sem acento, minúsculo e só letras/números (para casar títulos e nomes). */
 export const normKey = (s: unknown) =>
@@ -23,6 +23,7 @@ const HEADERS: Record<Field, string[]> = {
   description: ["descricao", "desc", "descricaodoitem", "item descricao", "produto", "material", "especificacao"].map(normKey),
   budget: ["verba", "verbars", "verbar", "valor", "valorrs", "valorestimado", "orcamento"],
   notes: ["obs", "observacao", "observacoes", "obsitem"],
+  link: ["link", "url", "linkdoproduto", "linkproduto", "linkdereferencia", "linkreferencia", "site"],
   work: ["centrodecusto", "centrocusto", "centrodecustos", "servico", "obra"],
   cc: ["cc", "codigocc", "codcc", "ccdigitado"],
 };
@@ -93,7 +94,7 @@ export function matchWork(v: unknown, works: ImportWork[]): { id: string } | { e
 
 export type ImportedRow = {
   line: number; // linha na planilha (1 = primeira)
-  quantity: string; unit: string; description: string; budget: string; notes: string; work_id: string; cc: string;
+  quantity: string; unit: string; description: string; budget: string; notes: string; link: string; work_id: string; cc: string;
   errors: string[]; warnings: string[];
 };
 
@@ -114,7 +115,7 @@ export function parseScImport(matrix: unknown[][], works: ImportWork[]): { rows:
     const line = matrix[i] ?? [];
     const cell = (f: Field) => { for (const [c, ff] of map!) if (ff === f) return line[c]; return undefined; };
     const text = (f: Field) => String(cell(f) ?? "").trim();
-    const meaningful = (["quantity", "unit", "description", "budget", "notes", "work", "cc"] as Field[]).some((f) => text(f) !== "");
+    const meaningful = (["quantity", "unit", "description", "budget", "notes", "link", "work", "cc"] as Field[]).some((f) => text(f) !== "");
     if (!meaningful) continue;
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -131,11 +132,14 @@ export function parseScImport(matrix: unknown[][], works: ImportWork[]): { rows:
     const w = matchWork(cell("work"), works);
     if ("error" in w) errors.push(w.error);
     const cc = text("cc").replace(/[^\w]/g, "");
+    // Link de referência do produto: vira o link do item (o comprador o usa como cotação).
+    let link = text("link");
+    if (link && !/^https?:\/\//i.test(link)) { if (/^www\.|^[\w-]+\.[a-z]{2,}/i.test(link)) link = `https://${link}`; else { warnings.push(`Link ignorado ("${link.slice(0, 40)}")`); link = ""; } }
     rows.push({
       line: i + 1,
       quantity: q != null && Number.isFinite(q) && q > 0 ? toField(q) : text("quantity"),
       unit: u.unit, description, budget: b != null && Number.isFinite(b) && b >= 0 ? toField(b) : "",
-      notes: text("notes"), work_id: "id" in w ? w.id : SC_IMPORT_RATEIO, cc, errors, warnings,
+      notes: text("notes"), link, work_id: "id" in w ? w.id : SC_IMPORT_RATEIO, cc, errors, warnings,
     });
   }
   return { rows };
