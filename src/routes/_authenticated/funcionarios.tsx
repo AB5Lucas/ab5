@@ -8,6 +8,7 @@ import { useAccess } from "@/hooks/use-access";
 import { Big, Donut, HoverBars, OverviewCard } from "@/components/overview/charts";
 import { Pie3D } from "@/components/overview/pie-3d";
 import { CountUp } from "@/components/count-up";
+import { TeamMosaic, type TeamPerson, type TeamStatus } from "@/components/overview/team-mosaic";
 import { cn } from "@/lib/utils";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 import { DOC_WARN_DAYS } from "@/lib/doc-status";
@@ -116,6 +117,23 @@ function Overview() {
       .eq("type", "treinamento").gte("scheduled_date", mFrom).lte("scheduled_date", mTo).neq("status", "cancelado").order("id").range(a, b)),
   });
 
+  // Situação de cada pessoa no dia (mosaico): o dia escolhido, ou hoje quando o filtro tem vários dias.
+  const day = single ? R.from : today;
+  const dayQ = useQuery({
+    queryKey: ["overview", "func-day", day], staleTime: 60_000, placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const [al, box, ap, off, vac, med] = await Promise.all([
+        fetchAll<any>((a, b) => supabase.from("daily_allocations").select("id, collaborator_id, works(name, clients(name)), daily_schedules!inner(schedule_date)").eq("daily_schedules.schedule_date", day).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("daily_status_entries").select("id, collaborator_id, box_key, daily_schedules!inner(schedule_date)").eq("daily_schedules.schedule_date", day).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("appointments").select("id, collaborator_id, type").eq("scheduled_date", day).in("status", ["agendado", "realizado"]).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("days_off").select("id, collaborator_id").lte("date", day).or(`end_date.gte.${day},date.eq.${day}`).order("id").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("vacations").select("id, collaborator_id, status").lte("start_date", day).gte("end_date", day).order("id").range(a, b)),
+        fetchAll<any>((a, b) => (supabase.from("medical_leaves" as never) as any).select("id, collaborator_id").lte("start_date", day).gte("end_date", day).order("id").range(a, b)),
+      ]);
+      return { al, box, ap, off, vac: vac.filter((v: any) => !String(v.status ?? "").startsWith("cancel")), med };
+    },
+  });
+
   const d = useMemo(() => {
     if (!cadQ.data || !absQ.data || !apQ.data || !docsQ.data) return null;
     const collabs = cadQ.data.collabs;
@@ -176,15 +194,45 @@ function Overview() {
 
     // Pessoas ativas por função (sem o nível N1–N4).
     const posName = new Map(cadQ.data.positions.map((p: any) => [p.id, String(p.name ?? "").replace(/\s*N\s*[1-4]\s*$/i, "").trim()]));
-    const fn = new Map<string, number>();
-    for (const c of active) { const n = (c.position_id && posName.get(c.position_id)) || "Sem função"; fn.set(n, (fn.get(n) ?? 0) + 1); }
-    const functions = [...fn.entries()].map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n);
+
+    // Mosaico: situação de cada ativo no dia (ausente > treinamento/ASO/integração > obra/Pátio > sem escala).
+    const team: TeamPerson[] = [];
+    if (dayQ.data) {
+      const st = new Map<string, { status: TeamStatus; place: string }>();
+      const put = (id: string, status: TeamStatus, place: string) => {
+        const rank: Record<TeamStatus, number> = { ausente: 4, doc: 3, obra: 2, patio: 2, sem: 0 };
+        const cur = st.get(id);
+        if (!cur || rank[status] > rank[cur.status]) st.set(id, { status, place });
+      };
+      for (const a of dayQ.data.al) {
+        const cl = a.works?.clients?.name ?? a.works?.name ?? "—";
+        const isPatio = cl.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim() === "PATIO";
+        put(a.collaborator_id, isPatio ? "patio" : "obra", isPatio ? "Pátio" : cl);
+      }
+      const ABS_LABEL: Record<string, string> = { folga: "Folga", ferias: "Férias", atestado: "Atestado", medico: "Atestado", afastado: "Afastado", licenca: "Licença", falta: "Falta", abono: "Abono" };
+      for (const e of dayQ.data.box) {
+        const k = String(e.box_key ?? "");
+        if (ABS_LABEL[k]) put(e.collaborator_id, "ausente", ABS_LABEL[k]!);
+        else if (k === "aso" || k === "personalizada" || k.startsWith("integracao") || k.startsWith("treinamento")) put(e.collaborator_id, "doc", k === "aso" ? "ASO" : k.startsWith("integracao") ? "Integração" : "Treinamento");
+      }
+      for (const a of dayQ.data.ap) put(a.collaborator_id, "doc", TYPE_LABEL[a.type] ?? "Agendamento");
+      for (const o of dayQ.data.off) put(o.collaborator_id, "ausente", "Folga");
+      for (const v of dayQ.data.vac) put(v.collaborator_id, "ausente", "Férias");
+      for (const m of dayQ.data.med) put(m.collaborator_id, "ausente", "Atestado");
+      const cLabel = new Map(CONTRACT.map(([k, l]) => [k, l]));
+      for (const c of active) {
+        const x = st.get(c.id) ?? { status: "sem" as TeamStatus, place: "Sem escala" };
+        team.push({ id: c.id, name: c.full_name, status: x.status, place: x.status === "ausente" ? "Ausente" : x.status === "doc" ? "Treinamento / ASO / Integração" : x.place, detail: x.place,
+          fn: (c.position_id && posName.get(c.position_id)) || "Sem função", contract: cLabel.get(c.contract_type ?? "efetivo") ?? "Efetivo" });
+      }
+    }
 
     return {
+      team,
       total: active.length, contract, hired, notice: notice.map((c: any) => ({ name: c.full_name as string, end: c.notice_end as string | null })).sort((a: any, b: any) => byName(a.name, b.name)),
-      absParts, absAll, absSeries, absToday, apTypes, apTotal: ap.length, apDone, apLate, open, vagas, filled, aso, functions,
+      absParts, absAll, absSeries, absToday, apTypes, apTotal: ap.length, apDone, apLate, open, vagas, filled, aso,
     };
-  }, [cadQ.data, absQ.data, apQ.data, docsQ.data, R.from, R.to, today, mFrom, mTo, qFrom, qTo]);
+  }, [cadQ.data, absQ.data, apQ.data, docsQ.data, dayQ.data, R.from, R.to, today, mFrom, mTo, qFrom, qTo]);
 
   const pLabel = period === "hoje" ? "hoje" : period === "amanha" ? "amanhã" : period === "semana" ? "esta semana" : "mês atual";
   const when = single ? brDay(R.from) : `${brDay(R.from)} a ${brDay(R.to)}`;
@@ -268,7 +316,7 @@ function Overview() {
             })()}
           </OverviewCard>
 
-          <OverviewCard title="ASO dos ativos" to="/consulta" linkLabel="Abrir Consulta" hint={`Situação do ASO de cada colaborador ativo hoje (vencendo = próximos ${DOC_WARN_DAYS} dias)`} className="min-h-0 xl:col-span-2 xl:col-start-2 xl:row-start-3">
+          <OverviewCard title="ASO dos ativos" to="/consulta" linkLabel="Abrir Consulta" hint={`Situação do ASO de cada colaborador ativo hoje (vencendo = próximos ${DOC_WARN_DAYS} dias)`} className="min-h-0">
             {(() => {
               const tot = Math.max(1, d.total);
               const rows: [string, number][] = [["Em dia", d.aso.ok], ["Vencendo", d.aso.soon], ["Vencidos", d.aso.late], ["Sem ASO", d.aso.none]];
@@ -291,39 +339,24 @@ function Overview() {
               {trQ.data ? <TrainingTiles dark rows={trQ.data} from={mFrom} to={mTo} today={today} /> : null}
             </div>
           </OverviewCard>
-          <OverviewCard title="Pessoas por função" to="/colaboradores" linkLabel="Abrir Colaboradores" hint="Colaboradores ativos por função (todos os níveis juntos)" className="min-h-0 xl:col-start-4 xl:row-span-3 xl:row-start-1" bodyClassName="min-h-0 overflow-y-auto pr-1">
-            <FunctionBars rows={d.functions} />
+          <OverviewCard title={`Equipe — ${day === today ? "hoje" : brDay(day)}`} to="/colaboradores" linkLabel="Abrir Colaboradores"
+            hint="Um círculo por colaborador ativo, na cor da situação do dia. Troque o agrupamento para ver as pessoas se reorganizarem; clique num grupo para destacá-lo."
+            className="min-h-0 md:col-span-2 xl:col-start-3 xl:row-span-2 xl:row-start-2" bodyClassName="flex min-h-0 flex-col">
+            {dayQ.data ? <TeamMosaic people={d.team} title={`${d.team.length} colaboradores ativos · ${single ? brDay(day) : "hoje"}`} /> : null}
           </OverviewCard>
           <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas diferentes com folga, férias, atestado ou falta no período (quadros da Programação + Ausências). Clique numa fatia para ver as pessoas." className="min-h-0 xl:col-start-1 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
             <Pie3D total={d.absAll} totalLabel="pessoas ausentes" parts={d.absParts} unit={["pessoa", "pessoas"]} compact />
           </OverviewCard>
 
-          <OverviewCard title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0 xl:col-start-3 xl:row-start-2" bodyClassName="flex min-h-0 flex-col">
+          <OverviewCard title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0 xl:col-start-2 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
             <div className="flex items-baseline gap-2"><Big value={d.absToday} /><p className="text-xs text-muted-foreground">ausentes hoje · média {Math.round(d.absSeries.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.absSeries.filter((s) => s.value).length))} por dia</p></div>
             <div className="mt-auto pt-2"><HoverBars data={d.absSeries} format={(v) => `${v} ausentes`} height="h-24" /></div>
           </OverviewCard>
-
 
         </div>
       )}
     </div>
     </FitScreen>
-  );
-}
-
-function FunctionBars({ rows }: { rows: { name: string; n: number }[] }) {
-  if (!rows.length) return <p className="py-4 text-center text-xs text-muted-foreground">Sem colaboradores ativos.</p>;
-  const max = Math.max(1, ...rows.map((r) => r.n));
-  return (
-    <div className="space-y-1.5">
-      {rows.map((r, i) => (
-        <div key={r.name} className="grid grid-cols-[7.5rem_minmax(0,1fr)_1.75rem] items-center gap-2 text-[11px]" title={`${r.name}: ${r.n}`}>
-          <span className="truncate">{r.name}</span>
-          <span className="h-1.5 overflow-hidden rounded-full bg-muted"><span className="ov-widen block h-full rounded-full bg-foreground" style={{ width: `${(r.n / max) * 100}%`, animationDelay: `${Math.min(i, 12) * 50}ms` }} /></span>
-          <span className="text-right tabular-nums text-muted-foreground">{r.n}</span>
-        </div>
-      ))}
-    </div>
   );
 }
 
