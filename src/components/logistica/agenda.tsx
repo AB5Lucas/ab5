@@ -79,7 +79,8 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
   useEffect(() => {
     if (!dashboardDate || !scroller.current) return;
     const node = scroller.current;
-    const observer = new ResizeObserver(() => setPx(node.clientHeight / (END - START)));
+    // No dashboard: cabe na altura do quadro, mas nunca menos de 1,1 px por minuto (66 px por hora); o resto rola.
+    const observer = new ResizeObserver(() => setPx(Math.max(1.1, node.clientHeight / (END - START))));
     observer.observe(node);
     return () => observer.disconnect();
   }, [dashboardDate]);
@@ -102,7 +103,7 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
   const today = todayISO();
   const [nowMin, setNowMin] = useState(() => { const d = new Date(Date.now() - 3 * 3600_000); return d.getUTCHours() * 60 + d.getUTCMinutes(); });
   useEffect(() => { const t = setInterval(() => { const d = new Date(Date.now() - 3 * 3600_000); setNowMin(d.getUTCHours() * 60 + d.getUTCMinutes()); }, 60_000); return () => clearInterval(t); }, []);
-  useEffect(() => { if (scroller.current) scroller.current.scrollTop = (6 * 60 - START) * px; }, []);
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = (6 * 60 - START) * px; }, [dashboardDate ? px : 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visible = (d: DemandRow) => show === "todos" || (show === "ab5" ? isOwn(d) : !isOwn(d));
   const colorOf = (d: DemandRow) => {
@@ -289,7 +290,7 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
                 ))}
               </div>
             )}
-            <div ref={scroller} className={cn("relative", dashboardDate ? "h-[calc(100%-2rem)] overflow-hidden" : "max-h-[66vh] overflow-y-auto")} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { setDrag(null); setSel(null); }}>
+            <div ref={scroller} className={cn("relative", dashboardDate ? "h-[calc(100%-2rem)] overflow-y-auto" : "max-h-[66vh] overflow-y-auto")} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { setDrag(null); setSel(null); }}>
               <div className="flex select-none" style={{ height: (END - START) * px }}>
                 <div className="relative w-16 shrink-0">
                   {hours.map((h) => <div key={h} className="absolute right-2 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h - START) * px }}>{h > START ? `${h / 60}h` : ""}</div>)}

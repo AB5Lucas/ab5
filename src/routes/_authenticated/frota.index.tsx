@@ -334,43 +334,56 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
   const outside = suggestions.filter((s) => s.week < calFrom || s.week > calTo).sort((a, b) => a.due.localeCompare(b.due));
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col" onClick={(e) => e.preventDefault()}>
-      <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(0,1.6fr)] gap-1 text-[10px] text-muted-foreground">
-        {WD.map((w, i) => <span key={i} className="text-center font-medium">{w}</span>)}
-        <span className="pl-1 font-medium">Sugestão de revisão</span>
-      </div>
-      <div className="mt-1 grid min-h-0 flex-1 auto-rows-fr gap-1">
-        {weeks.map((wk) => {
-          const sug = byWeek.get(wk[0]!) ?? [];
-          return (
-            <div key={wk[0]} className={cn("grid min-h-0 grid-cols-[repeat(7,minmax(0,1fr))_minmax(0,1.6fr)] gap-1 rounded-lg p-0.5 transition-colors",
-              sug.length && "bg-muted ring-1 ring-border")}>
-              {wk.map((dt) => {
-                const ev = maintDays.get(dt) ?? [];
-                const inMonth = dt.startsWith(ym);
-                const inRange = dt >= range.from && dt <= range.to;
-                return (
-                  <Button variant="ghost" key={dt} aria-label={`Selecionar dia ${brDay(dt)}`} aria-pressed={selected === dt} onClick={() => onSelect(dt)} title={ev.length ? ev.map((e) => `${e.plate} · ${e.kind === "rev" ? "Revisão" : "Manutenção"}`).join("\n") : brDay(dt)}
-                    className={cn("h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-foreground hover:bg-foreground/10", selected === dt && "ring-2 ring-foreground bg-foreground/10", inMonth ? "bg-muted/50" : "opacity-35",
-                      inRange && "outline outline-1 outline-border", dt === today && "bg-foreground/10")}>
-                    <span className={cn("text-[10px] tabular-nums", dt === today ? "font-bold" : "text-muted-foreground")}>{Number(dt.slice(8, 10))}</span>
-                    {ev.slice(0, 2).map((e, i) => (
-                      <span key={i} className={cn("truncate rounded px-1 text-[9px] font-semibold leading-tight", e.kind === "rev" ? "bg-foreground text-background" : "bg-foreground/20 text-foreground")}>{e.plate}</span>
-                    ))}
-                    {ev.length > 2 && <span className="text-[9px] text-muted-foreground">+{ev.length - 2}</span>}
-                  </Button>
-                );
-              })}
-              <div className="flex min-h-0 flex-col justify-center overflow-hidden pl-1 text-[10px]">
-                {sug.slice(0, 2).map((s) => (
-                  <span key={s.vehicleId} className="truncate" title={`${s.plate}: ${s.reason} (vencimento previsto ${brDay(s.due)})`}>
-                    <b>{s.plate}</b> <span className="text-muted-foreground">· {s.reason}</span>
-                  </span>
-                ))}
-                {sug.length > 2 && <span className="text-muted-foreground">+{sug.length - 2} veículos</span>}
-              </div>
-            </div>
-          );
-        })}
+      {/* Calendário à esquerda; sugestões à direita, separadas por uma linha (como o resumo de Manutenções e revisões do ano). */}
+      <div className="flex min-h-0 flex-1 gap-3">
+        <div className="flex min-h-0 min-w-0 flex-[7] flex-col">
+          <div className="grid grid-cols-7 gap-1 text-[10px] text-muted-foreground">
+            {WD.map((w, i) => <span key={i} className="text-center font-medium">{w}</span>)}
+          </div>
+          <div className="mt-1 grid min-h-0 flex-1 auto-rows-fr gap-1">
+            {weeks.map((wk) => {
+              const sug = byWeek.get(wk[0]!) ?? [];
+              return (
+                <div key={wk[0]} className={cn("grid min-h-0 grid-cols-7 gap-1 rounded-lg p-0.5 transition-colors", sug.length && "bg-muted ring-1 ring-border")}>
+                  {wk.map((dt) => {
+                    const ev = maintDays.get(dt) ?? [];
+                    const inMonth = dt.startsWith(ym);
+                    const inRange = dt >= range.from && dt <= range.to;
+                    return (
+                      <Button variant="ghost" key={dt} aria-label={`Selecionar dia ${brDay(dt)}`} aria-pressed={selected === dt} onClick={() => onSelect(dt)} title={ev.length ? ev.map((e) => `${e.plate} · ${e.kind === "rev" ? "Revisão" : "Manutenção"}`).join("\n") : brDay(dt)}
+                        className={cn("h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-foreground hover:bg-foreground/10", selected === dt && "ring-2 ring-foreground bg-foreground/10", inMonth ? "bg-muted/50" : "opacity-35",
+                          inRange && "outline outline-1 outline-border", dt === today && "bg-foreground/10")}>
+                        <span className={cn("text-[10px] tabular-nums", dt === today ? "font-bold" : "text-muted-foreground")}>{Number(dt.slice(8, 10))}</span>
+                        {ev.slice(0, 2).map((e, i) => (
+                          <span key={i} className={cn("truncate rounded px-1 text-[9px] font-semibold leading-tight", e.kind === "rev" ? "bg-foreground text-background" : "bg-foreground/20 text-foreground")}>{e.plate}</span>
+                        ))}
+                        {ev.length > 2 && <span className="text-[9px] text-muted-foreground">+{ev.length - 2}</span>}
+                      </Button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex min-h-0 min-w-0 flex-[1.6] flex-col border-l border-border pl-3">
+          <span className="text-[10px] font-medium text-muted-foreground">Sugestão de revisão</span>
+          <div className="mt-1 grid min-h-0 flex-1 auto-rows-fr gap-1">
+            {weeks.map((wk) => {
+              const sug = byWeek.get(wk[0]!) ?? [];
+              return (
+                <div key={wk[0]} className={cn("flex min-h-0 flex-col justify-center overflow-hidden rounded-lg px-1.5 text-[10px]", sug.length && "bg-muted ring-1 ring-border")}>
+                  {sug.slice(0, 2).map((s) => (
+                    <span key={s.vehicleId} className="truncate" title={`${s.plate}: ${s.reason} (vencimento previsto ${brDay(s.due)})`}>
+                      <b>{s.plate}</b> <span className="text-muted-foreground">· {s.reason}</span>
+                    </span>
+                  ))}
+                  {sug.length > 2 && <span className="text-muted-foreground">+{sug.length - 2} veículos</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1"><span className="rounded bg-foreground/20 px-1 font-semibold text-foreground">ABC</span> manutenção</span>
