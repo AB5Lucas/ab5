@@ -271,7 +271,7 @@ function Overview({ canCost }: { canCost: boolean }) {
             {annualQ.isPending ? <ResultChartSkeleton /> : <MaintenanceYear rows={annualQ.data ?? []} year={year} />}
           </ResultCard>
 
-          <OverviewCard title="Ranking dos motoristas — últimos 30 dias" to="/frota/notas" linkLabel="Abrir Abastecimento" hint="% das notas de abastecimento entregues (foto do cupom); os últimos 2 dias ainda estão no prazo" className="min-h-0 xl:col-start-4 xl:row-start-2 xl:row-span-2" bodyClassName="flex min-h-0 flex-col">
+          <OverviewCard title="Ranking dos motoristas — últimos 30 dias" to="/frota/notas" linkLabel="Abrir Abastecimento" hint="% das notas de abastecimento entregues (foto do cupom); os últimos 2 dias ainda estão no prazo" className="min-h-0 xl:col-start-2 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
             <div className="flex items-baseline gap-2">
               <Big value={rank.overall == null ? "—" : `${rank.overall}%`} />
               <span className="text-xs text-muted-foreground">das notas entregues</span>
@@ -292,7 +292,7 @@ function Overview({ canCost }: { canCost: boolean }) {
             </div>
           </OverviewCard>
 
-          <ResultCard title={`Manutenções e revisões — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} className="min-h-[22rem] xl:min-h-0 xl:col-start-1 xl:col-span-2 xl:row-start-3">
+          <ResultCard title={`Manutenções e revisões — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} className="min-h-[22rem] xl:min-h-0 xl:col-start-3 xl:col-span-2 xl:row-start-2 xl:row-span-2">
             <MaintCalendar ym={ym} calFrom={calFrom} calTo={calTo} range={R} today={today} maintDays={d.maintDays} suggestions={d.suggestions} selected={selectedDay} onSelect={setSelectedDay} />
           </ResultCard>
                 <ResultCard dark title={single ? `Orçado × gasto por veículo — ${when}` : `Orçado × gasto por dia — ${when}`} className="min-h-64 xl:min-h-0 xl:col-start-1 xl:col-span-2 xl:row-start-2">
@@ -304,7 +304,7 @@ function Overview({ canCost }: { canCost: boolean }) {
                     </div>
                   ) : <p className="text-sm text-background/60">Custos disponíveis para quem tem acesso à Visão Geral.</p>}
                 </ResultCard>
-                <ResultCard title={`Logística — ${brDay(selectedDay)}`} className="min-h-64 xl:min-h-0 xl:col-start-3 xl:row-start-2 xl:row-span-2">
+                <ResultCard title={`Logística — ${brDay(selectedDay)}`} className="min-h-64 xl:min-h-0 xl:col-start-1 xl:row-start-3">
                   <AgendaTab dashboardDate={selectedDay} />
                 </ResultCard>
         </div>
@@ -393,8 +393,8 @@ function MaintenanceYear({ rows, year }: { rows: { schedule_date: string; mainte
   const total = current?.total ?? rows.length;
   const revision = current?.revision ?? rows.filter((r) => r.maintenance_kind === "revisao").length;
   return <div className="flex h-full min-h-0 gap-3">
-    <div className="grid min-h-0 min-w-0 flex-1 grid-cols-12 gap-px">{months.map((m, ci) => <Button variant="ghost" key={m.label} onClick={() => setSelected(selected === ci ? null : ci)} title={`${m.label}: ${m.total - m.revision} manutenções · ${m.revision} revisões`} className={cn("flex h-full min-h-0 min-w-0 flex-col gap-1 rounded-sm p-0", selected === ci && "bg-muted")}>
-      <div className="grid min-h-0 w-full flex-1 grid-rows-6 gap-px">{Array.from({ length: 6 }, (_, i) => { const level = 5 - i, filled = Math.ceil(m.total / max * 6); return <span key={i} className={cn("ov-grow h-full w-full rounded-[4px]", level < filled ? "bg-foreground" : "border border-dashed border-border bg-muted/40")} />; })}</div>
+    <div className="grid min-h-0 min-w-0 flex-1 grid-cols-12 gap-1">{months.map((m, ci) => <Button variant="ghost" key={m.label} onClick={() => setSelected(selected === ci ? null : ci)} title={`${m.label}: ${m.total - m.revision} manutenções · ${m.revision} revisões`} className={cn("flex h-full min-h-0 min-w-0 flex-col gap-1 rounded-sm p-0", selected === ci && "bg-muted")}>
+      <div className="grid min-h-0 w-full flex-1 grid-rows-6 gap-1 px-0.5">{Array.from({ length: 6 }, (_, i) => { const level = 5 - i, filled = Math.ceil(m.total / max * 6); return <span key={i} className={cn("ov-grow h-full w-full rounded-[4px]", level < filled ? "bg-foreground" : "border border-dashed border-border bg-muted/40")} />; })}</div>
       <span className="text-center text-[9px] capitalize text-muted-foreground">{m.label.slice(0, 3)}</span>
     </Button>)}</div>
     <div className="flex w-28 shrink-0 flex-col gap-2 border-l border-border pl-3">
