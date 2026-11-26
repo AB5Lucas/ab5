@@ -5,9 +5,11 @@ type Vehicle = { id: string; plate: string; ownership: string | null; monthly_re
 export function fleetDashboardCosts(vehicles: Vehicle[], schedules: any[], expenses: any[], budgets: Map<string, number>, dates: string[], single: boolean) {
   const kmMonth = new Map<string, number>();
   const kmVehicle = new Map<string, number>();
+  const kmDay = new Map<string, number>();
   for (const s of schedules) {
     const m = String(s.schedule_date).slice(0, 7), km = dayKm(s);
     kmMonth.set(m, (kmMonth.get(m) ?? 0) + km);
+    kmDay.set(s.schedule_date, (kmDay.get(s.schedule_date) ?? 0) + km);
     const k = `${s.vehicle_id}|${m}`; kmVehicle.set(k, (kmVehicle.get(k) ?? 0) + km);
   }
   const byPlate = new Map(vehicles.map((v) => [normalizePlate(v.plate), v.id]));
@@ -22,5 +24,11 @@ export function fleetDashboardCosts(vehicles: Vehicle[], schedules: any[], expen
     const m = dt.slice(0, 7), allKm = kmMonth.get(m) ?? 0;
     return vehicles.map((v) => ({ label: v.plate, a: allKm ? (budgets.get(m) ?? 0) / daysInMonth(dt) * (kmVehicle.get(`${v.id}|${m}`) ?? 0) / allKm : 0, b: daily.get(dt)?.get(v.id) ?? 0 }));
   }
-  return dates.map((dt) => ({ label: `${dt.slice(8, 10)}/${dt.slice(5, 7)}`, a: (budgets.get(dt.slice(0, 7)) ?? 0) / daysInMonth(dt), b: [...(daily.get(dt)?.values() ?? [])].reduce((sum, v) => sum + v, 0) }));
+  // Orçado do dia = orçado do mês rateado pelo km rodado no dia (como a Visão Geral rateia entre veículos pelo km);
+  // mês sem km na Transporte: dividido igualmente pelos dias.
+  const budgetOn = (dt: string) => {
+    const m = dt.slice(0, 7), total = budgets.get(m) ?? 0, km = kmMonth.get(m) ?? 0;
+    return km > 0 ? total * (kmDay.get(dt) ?? 0) / km : total / daysInMonth(dt);
+  };
+  return dates.map((dt) => ({ label: `${dt.slice(8, 10)}/${dt.slice(5, 7)}`, a: budgetOn(dt), b: [...(daily.get(dt)?.values() ?? [])].reduce((sum, v) => sum + v, 0) }));
 }
