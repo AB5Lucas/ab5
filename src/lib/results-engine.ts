@@ -449,6 +449,9 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
     const seen = new Set<string>();
     const laborBy = new Map<string, { days: number; hours: number; cost: number }>();
     const laborHours = { normal: 0, extra: 0 };
+    // Mesmas horas, por mês (dashboard do Financeiro soma só os meses escolhidos).
+    const laborHoursYm = new Map<string, { normal: number; extra: number }>();
+    const addHoursYm = (date: string, normal: number, extra: number) => { const k = date.slice(0, 7); const h = laborHoursYm.get(k) ?? { normal: 0, extra: 0 }; h.normal += normal; h.extra += extra; laborHoursYm.set(k, h); };
     const addLabor = (id: string, hours: number, cost: number, frac = 1) => {
       const l = laborBy.get(id) ?? { days: 0, hours: 0, cost: 0 };
       l.days += frac;
@@ -508,6 +511,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       const normal = weekend === 0 || weekend === 6 || hol.has(date) ? 0 : Math.min(hours, DEFAULT_HOURS);
       laborHours.normal += normal * frac;
       laborHours.extra += (hours - normal) * frac;
+      addHoursYm(date, normal * frac, (hours - normal) * frac);
       addLabor(id, hours, cost, frac);
       bump(date.slice(0, 7), "labor", cost * frac);
     };
@@ -686,7 +690,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
         const travelOn = integrationTravelOn(travel, clientKm, (km) => (d.tbRules ?? []).some((x: any) => rIn(x, km)));
         const tb = p?.travel_bonus_enabled === false || blockedL || !travelOn ? 0
           : (d.tbRules ?? []).filter((x: any) => rIn(x, dist)).reduce((s: number, x: any) => s + Number(x.bonus_amount) * (x.calculation_type === "round_trip" ? 2 : 1), 0) * shareF;
-        if (mo) { laborHours.normal += hours * shareF; addLabor(id, hours * shareF, mo); bump(date.slice(0, 7), "labor", mo); }
+        if (mo) { laborHours.normal += hours * shareF; addHoursYm(date, hours * shareF, 0); addLabor(id, hours * shareF, mo); bump(date.slice(0, 7), "labor", mo); }
         if (vt) {
           const v = vtByDate.get(date) ?? { people: 0, cost: 0 };
           v.cost += vt;
@@ -952,7 +956,7 @@ export function buildBase(work: any, raw: any, fromMonth: string, untilMonth: st
       .sort((a, b) => b.cost - a.cost);
     transportRows.sort((a, b) => a.date.localeCompare(b.date));
     const billingCount = d.entries.filter((e: any) => e.category === "faturamento").length;
-    return { entries: d.entries as any[], missingRdo, supportNoActivity, rows, last, order, budget: budgetOut, budgetMarginPct: budgetMarginOut, tot, items, monthBars, first, lastDay, days, laborRows, laborHours, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount, billingMonths: d.entries.filter((e: any) => e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)) as string[] };
+    return { entries: d.entries as any[], missingRdo, supportNoActivity, rows, last, order, budget: budgetOut, budgetMarginPct: budgetMarginOut, tot, items, monthBars, first, lastDay, days, laborRows, laborHours, laborHoursYm, transportRows, vtRows, vtTotal, driverRows, driverTotal, travelRows, travelTotal, siblingCount: d.siblingCount, billingCount, billingMonths: d.entries.filter((e: any) => e.category === "faturamento").map((e: any) => e.entry_date.slice(0, 7)) as string[] };
 }
 
 export const BDI_RATE = 0.5885;

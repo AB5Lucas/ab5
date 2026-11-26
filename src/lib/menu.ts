@@ -106,6 +106,7 @@ const RAW_GROUPS: MenuGroup[] = [
   {
     label: "Financeiro",
     icon: Receipt,
+    overview: "/financeiro",
     items: [
       { title: "Fechamento", url: "/fechamentos/financeiro", icon: Calculator },
       { title: "Pedidos", url: "/fechamentos/suzano", icon: Receipt },

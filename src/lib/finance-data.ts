@@ -219,6 +219,8 @@ export async function loadFinanceRaws(batches: FinanceBatch[], shared: Shared, o
 export type FinanceLine = {
   work: any; billed: number; tax: number; mo: number; transport: number; materials: number;
   margin: number; progress: number; monthPct: number | null; total: { margin: number; pct: number | null }; full: any; raw: any;
+  /** Horas de MO nos meses escolhidos (normais = até 8 h em dia útil; extras = acima disso, sábado, domingo e feriado). */
+  hours: { normal: number; extra: number };
 };
 
 /** Linhas do Fechamento por cliente (mesma regra que estava na página). */
@@ -232,6 +234,8 @@ export function buildFinanceGroups(list: any[], rawByWork: Map<string, any>, yms
     if (!full) return;
     let mo = 0, transport = 0, materials = 0, compBilled = 0, billed = 0;
     for (const r of full.rows) if (sel.has(r.ym)) { mo += r.labor; transport += r.transport; }
+    const hours = { normal: 0, extra: 0 };
+    for (const [k, h] of (full.laborHoursYm ?? new Map()) as Map<string, { normal: number; extra: number }>) if (sel.has(k)) { hours.normal += h.normal; hours.extra += h.extra; }
     for (const e of raw.entries as any[]) {
       const v = Number(e.amount);
       // Valor faturado exibido pelo mês do lançamento; margem pela competência
@@ -253,7 +257,7 @@ export function buildFinanceGroups(list: any[], rawByWork: Map<string, any>, yms
     const upto = buildBase(w, raw, "", lastYm, { isAll: false, workIds: [w.id], holidays, allWorks, accumulated: true }) ?? full;
     // Margem total usa todo o histórico até o último mês; margem do período permanece inalterada.
     const total = totalMargin(w, upto);
-    g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: marginPercent(margin, compBilled), total, full, raw });
+    g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: marginPercent(margin, compBilled), total, full, raw, hours });
     by.set(key, g);
   });
   return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
