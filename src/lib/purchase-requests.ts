@@ -32,6 +32,7 @@ export const SC_STATUSES = [
   { value: "EM APROVAÇÃO", cls: "bg-amber-300 text-amber-950 dark:bg-amber-800/70 dark:text-amber-50" },
   { value: "RECUSADA", cls: "bg-zinc-900 text-white dark:bg-zinc-200 dark:text-zinc-900" },
   { value: "APROVADA", cls: "bg-emerald-100 text-emerald-950 dark:bg-emerald-900/50 dark:text-emerald-100" },
+  { value: "APROVADA PARCIALMENTE", cls: "bg-indigo-100 text-indigo-950 dark:bg-indigo-900/50 dark:text-indigo-100" },
   { value: "COMPRA PARCIAL", cls: "bg-lime-200 text-lime-950 dark:bg-lime-900/60 dark:text-lime-100" },
   { value: "COMPRA EFETIVADA", cls: "bg-green-600 text-white" },
   { value: "ALMOXARIFADO", cls: "bg-teal-600 text-white" },
@@ -64,7 +65,7 @@ export const statusClass = (s: string | null | undefined) => SC_STATUSES.find((x
 const STATUS_DOT: Record<string, string> = {
   "EM PREPARAÇÃO": "bg-zinc-400", "SOLICITAÇÃO ENVIADA": "bg-cyan-500", "SOLICITAÇÃO RECEBIDA": "bg-sky-500", "EM ANÁLISE": "bg-yellow-400",
   "SOLICITAÇÃO COM PENDÊNCIAS": "bg-red-500", COTAR: "bg-violet-500", "EM ANDAMENTO": "bg-blue-900", "APROVAÇÃO PENDENTE": "bg-orange-500", "EM APROVAÇÃO": "bg-amber-500",
-  RECUSADA: "bg-zinc-900 dark:bg-zinc-200", APROVADA: "bg-emerald-500", "COMPRA PARCIAL": "bg-lime-500", "COMPRA EFETIVADA": "bg-green-600",
+  RECUSADA: "bg-zinc-900 dark:bg-zinc-200", APROVADA: "bg-emerald-500", "APROVADA PARCIALMENTE": "bg-indigo-500", "COMPRA PARCIAL": "bg-lime-500", "COMPRA EFETIVADA": "bg-green-600",
   ALMOXARIFADO: "bg-teal-600", CANCELADA: "bg-zinc-900 dark:bg-zinc-200",
 };
 export const statusDot = (s: string | null | undefined) => STATUS_DOT[s ?? ""] ?? "bg-zinc-400";

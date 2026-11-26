@@ -15,7 +15,7 @@ import { recCols, useRecTotals } from "@/components/compras/rec-list";
 
 export const Route = createFileRoute("/_authenticated/compras/aprovacao-compra")({
   validateSearch: (s: Record<string, unknown>) => ({ sc: typeof s["sc"] === "string" ? s["sc"] : undefined }),
-  head: () => ({ meta: [{ title: "Aprovação de Compras | AB5 Hub" }, { name: "description", content: "Recomendações de compra enviadas pelo comprador para aprovação." }] }),
+  head: () => ({ meta: [{ title: "Aprovador | AB5 Hub" }, { name: "description", content: "Recomendações de compra enviadas pelo comprador para aprovação." }] }),
   component: Page,
 });
 
@@ -61,7 +61,7 @@ function Page() {
   const count = (v: View) => mine.filter(by[v]).length;
   return (
     <div className="space-y-4">
-      <PageHeader title="Aprovação" description="Recomendações de compra enviadas pelo comprador. Abra a SC, escolha Aprovado ou Recusado e envie de volta ao comprador." />
+      <PageHeader title="Aprovador" description="Recomendações de compra enviadas pelo comprador. Abra a SC, escolha Aprovado ou Recusado e envie de volta ao comprador." />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label className="block text-xs">Mostrar</Label>

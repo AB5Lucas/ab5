@@ -20,9 +20,10 @@ import { ScHeaderCard } from "@/components/compras/sc-header-card";
 import { Pill, todayISO, useClientsList, useScUsers } from "@/components/compras/sc-shared";
 import { QuoteMatchingDialog, QuotesAttachDialog, importRequesterQuotes, openQuoteFile, useRecData, type RecData } from "@/components/compras/quotes";
 import {
-  CRITERIA, RULE_LABEL, approvalRule, budgetSignal, nextOption, prevOption, recommendation, scBudget, type Criterion, type FaRule, type RecRow,
+  CRITERIA, RULE_LABEL, approvalRule, budgetSignal, itemsOverBudget, nextOption, prevOption, recommendation, scBudget, type Criterion, type FaRule, type RecRow,
+  faOutcome, type FaOutcome,
 } from "@/lib/purchase-quotes";
-import { brl, itemStatusClass, statusDot } from "@/lib/purchase-requests";
+import { brl, itemStatusClass, statusClass, statusDot } from "@/lib/purchase-requests";
 import { summarizeRecommendation } from "@/lib/purchase-quotes.functions";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +58,7 @@ export function faSide(uid: string | undefined, who: { isBuyer: boolean; isGesto
 /** Quem pode aprovar agora (igual a purchase_fa_can_decide no banco). */
 export function canDecide(r: RecData["req"], uid: string | undefined, who: { isBuyer: boolean; isGestor: boolean } = { isBuyer: false, isGestor: false }): boolean {
   if (!uid || r.fa_state !== "em_aprovacao") return false;
-  const rule = approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO());
+  const rule = approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO(), !!r.fa_over_items);
   if (uid === FA_DIRECTOR) return true;
   if (rule === "verba") return uid === FA_VITORIA;
   if (rule === "dupla") { const side = faSide(uid, who); return !!side && side !== r.fa_partial_side; }
@@ -67,7 +68,7 @@ export function canDecide(r: RecData["req"], uid: string | undefined, who: { isB
 type Col = ColumnDef<RecRow> & { cell: (r: RecRow) => ReactNode; className?: string; fixed?: boolean };
 
 /**
- * Tela da recomendação de uma SC (Comprador › Recomendação) e da aprovação (aba Aprovação, mode="aprovacao").
+ * Tela da recomendação de uma SC (Comprador › Recomendação) e da aprovação (aba Aprovador, mode="aprovacao").
  * Mesmo cabeçalho da SC; itens com a melhor escolha pelos critérios, botão para a próxima melhor e o resumo
  * (cotações analisadas, fornecedores e critérios).
  */
@@ -166,14 +167,31 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
     onSuccess: () => { toast.success("SC tirada da aprovação"); void invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
+  // Envio ao comprador pelo estado dos itens em aprovação (o que vale é o item, não só o dropdown Decisão).
+  const faItems = (data.data?.items ?? []).filter((i) => ["APROVAÇÃO PENDENTE", "APROVADO", "RECUSADO"].includes(i.status));
+  const faCount = {
+    approved: faItems.filter((i) => i.status === "APROVADO").length,
+    rejected: faItems.filter((i) => i.status === "RECUSADO").length,
+    pending: faItems.filter((i) => i.status === "APROVAÇÃO PENDENTE").length,
+  };
+  const outcome: FaOutcome | null = faOutcome(faCount.approved, faCount.rejected, faCount.pending)
+    ?? (faCount.pending > 0 && decision === "aprovado" ? (faCount.rejected > 0 ? "parcial" : "aprovada")
+      : faCount.pending > 0 && decision === "recusado" ? "recusada" : null);
+  const reasonNeeded = outcome === "recusada" && faItems.some((i) => {
+    const m = ((i.fa_item_reason as string | null) ?? "").trim();
+    return i.status !== "RECUSADO" || !m || m === "Recusado na decisão geral";
+  });
   const decide = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("purchase_fa_decide" as never, { _id: requestId, _approve: decision === "aprovado", _notes: decNotes } as never);
+      const { error } = await supabase.rpc("purchase_fa_decide" as never, { _id: requestId, _approve: outcome !== "recusada", _notes: decNotes } as never);
       if (error) throw error;
     },
     onSuccess: () => {
-      const partial = decision === "aprovado" && r?.fa_rule !== "verba" && approvalRule(Number(r?.fa_total ?? 0), r?.fa_budget == null ? null : Number(r.fa_budget), r?.due_date ?? null, todayISO()) === "dupla" && user?.id !== FA_DIRECTOR && !r?.fa_partial_side;
-      toast.success(partial ? "Sua aprovação foi registrada: falta a do outro lado (comprador ou gestor)" : decision === "aprovado" ? "Aprovada: voltou ao Comprador" : "Recusada: voltou ao Comprador");
+      const partial = outcome !== "recusada" && r?.fa_rule !== "verba" && approvalRule(Number(r?.fa_total ?? 0), r?.fa_budget == null ? null : Number(r.fa_budget), r?.due_date ?? null, todayISO(), !!r?.fa_over_items) === "dupla" && user?.id !== FA_DIRECTOR && !r?.fa_partial_side;
+      toast.success(partial ? "Sua aprovação foi registrada: falta a do outro lado (comprador ou gestor)"
+        : outcome === "aprovada" ? "Aprovada: todos os itens aprovados"
+        : outcome === "parcial" ? `Aprovada parcialmente: ${faCount.approved + faCount.pending} aprovados, ${faCount.rejected} recusados`
+        : "Recusada: todos os itens recusados");
       setDecision(""); setDecNotes(""); void invalidate(); if (!partial) onBack?.();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -334,8 +352,9 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   });
   const totalIdx = visible.findIndex((c) => c.key === "best_total");
   const rule = r.fa_state === "em_aprovacao"
-    ? approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO())
-    : approvalRule(rec.total, budget, r.due_date, todayISO());
+    ? approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO(), !!r.fa_over_items)
+    : approvalRule(rec.total, budget, r.due_date, todayISO(), itemsOverBudget(rec.rows));
+  const overCount = rec.rows.filter((x) => itemsOverBudget([x])).length;
   const applyCriteria = (n: Criterion[]) => {
     const before = criteria;
     setCriteria.mutate(n, { onSuccess: () => history.push({ label: `Critérios: ${n.map((k) => CRITERIA.find((c) => c.value === k)?.label).join(" + ")}`, undo: () => rpcCriteria(before), redo: () => rpcCriteria(n) }) });
@@ -359,11 +378,25 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
     return lines.filter(Boolean).join("\n");
   };
   // Aprovador: desfazer/refazer da escolha (Aprovado/Recusado) e da observação antes de enviar.
-  const changeDecision = (v: typeof decision) => {
+  // A decisão geral aplica o mesmo status a todos os itens em aprovação (purchase_fa_items_all); depois ainda dá para mudar item a item.
+  const rpcAll = async (status: string, reason: string) => {
+    const { error } = await supabase.rpc("purchase_fa_items_all" as never, { _id: requestId, _status: status, _reason: reason } as never);
+    if (error) { toast.error(error.message); throw error; }
+    await invalidate();
+  };
+  const changeDecision = async (v: typeof decision) => {
     const before = decision;
     if (before === v) return;
+    const snap = d.items.filter((i) => ["APROVAÇÃO PENDENTE", "APROVADO", "RECUSADO"].includes(i.status))
+      .map((i) => ({ id: i.id, status: i.status, reason: (i.fa_item_reason as string | null) ?? null }));
+    const apply = async () => { if (v) await rpcAll(v === "aprovado" ? "APROVADO" : "RECUSADO", v === "recusado" ? decNotes : ""); };
+    try { await apply(); } catch { return; }
     setDecision(v);
-    history.push({ label: `Decisão: ${v === "aprovado" ? "Aprovado" : v === "recusado" ? "Recusado" : "—"}`, undo: () => setDecision(before), redo: () => setDecision(v) });
+    history.push({
+      label: `Decisão: ${v === "aprovado" ? "Aprovado" : v === "recusado" ? "Recusado" : "—"}`,
+      undo: async () => { for (const it of snap) await rpcItem(it.id, it.status, it.reason); setDecision(before); },
+      redo: async () => { await apply(); setDecision(v); },
+    });
   };
 
   return (
@@ -415,7 +448,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
             </Select>
           </div>
           <div className="min-w-64 flex-1 space-y-1">
-            <Label htmlFor="fa-dec" className="block text-xs">{decision === "recusado" ? "Motivo da recusa (obrigatório)" : "Observação (opcional)"}</Label>
+            <Label htmlFor="fa-dec" className="block text-xs">{reasonNeeded ? "Motivo da recusa (obrigatório)" : outcome === "recusada" ? "Motivo da recusa (opcional: os itens já têm motivo)" : "Observação (opcional)"}</Label>
             <Textarea id="fa-dec" rows={1} className="min-h-9" value={decNotes} onChange={(e) => setDecNotes(e.target.value)}
               onFocus={() => { notesStart.current = decNotes; }}
               onBlur={() => {
@@ -424,9 +457,21 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
                 if (before !== after) history.push({ label: "Observação da decisão", undo: () => setDecNotes(before), redo: () => setDecNotes(after) });
               }} />
           </div>
-          <Button disabled={!decision || decide.isPending || (decision === "recusado" && !decNotes.trim())} onClick={() => decide.mutate()}>
-            <Send className="h-4 w-4" /> Enviar ao Comprador
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{faCount.approved} aprovados · {faCount.rejected} recusados · {faCount.pending} pendentes</span>
+              {outcome && (
+                <span className={cn("rounded px-2 py-0.5 text-[11px] font-semibold", statusClass(outcome === "aprovada" ? "APROVADA" : outcome === "parcial" ? "APROVADA PARCIALMENTE" : "RECUSADA"))}>
+                  {outcome === "aprovada" ? "APROVADA" : outcome === "parcial" ? "APROVADA PARCIALMENTE" : "RECUSADA"}
+                </span>
+              )}
+            </div>
+            <span title={!outcome ? "Decida todos os itens (ou escolha Aprovado/Recusado em Decisão)" : undefined}>
+              <Button disabled={!outcome || decide.isPending || (reasonNeeded && !decNotes.trim())} onClick={() => decide.mutate()}>
+                <Send className="h-4 w-4" /> Enviar ao Comprador
+              </Button>
+            </span>
+          </div>
         </div>
       )}
 
@@ -591,6 +636,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
             <span>Critérios: <b>{critLabel}</b></span>
             <span className="w-full text-xs text-muted-foreground">{RULE_LABEL[rule]}</span>
           </div>
+          {overCount > 0 && <p className="text-xs text-red-600 dark:text-red-400">{overCount} item(ns) acima da própria verba: a aprovação segue a regra de acima da verba</p>}
           {rec.covered < rec.rows.length && <p className="text-xs text-amber-600">{rec.rows.length - rec.covered} item(ns) sem cotação vão sem fornecedor.</p>}
           <div className="space-y-1">
             <Label htmlFor="fa-notes">Observações para o aprovador</Label>
@@ -622,10 +668,11 @@ function FaBanner({ r, userName, rule }: { r: RecData["req"]; userName: Map<stri
   }
   if (r.fa_state === "aprovada" || r.fa_state === "recusada") {
     const ok = r.fa_state === "aprovada";
+    const part = ok && r.status === "APROVADA PARCIALMENTE";
     return (
-      <div className={cn("rounded-md border p-3 text-sm", ok ? "border-emerald-500/40 bg-emerald-500/10" : "border-red-500/40 bg-red-500/10")}>
-        <b>{ok ? "Aprovada" : "Recusada"}</b>{r.fa_decided_by ? ` por ${userName.get(r.fa_decided_by) ?? "—"}` : ""} em {when(r.fa_decided_at)}
-        {ok ? " · comprar com os fornecedores escolhidos." : " · refaça a recomendação e envie de novo."}
+      <div className={cn("rounded-md border p-3 text-sm", part ? "border-indigo-500/40 bg-indigo-500/10" : ok ? "border-emerald-500/40 bg-emerald-500/10" : "border-red-500/40 bg-red-500/10")}>
+        <b>{part ? "Aprovada parcialmente" : ok ? "Aprovada" : "Recusada"}</b>{r.fa_decided_by ? ` por ${userName.get(r.fa_decided_by) ?? "—"}` : ""} em {when(r.fa_decided_at)}
+        {part ? " · comprar só os itens aprovados." : ok ? " · comprar com os fornecedores escolhidos." : " · refaça a recomendação e envie de novo."}
         {r.fa_decision_notes && <div className="mt-1 text-xs"><b>{ok ? "Observação" : "Motivo"}:</b> {r.fa_decision_notes}</div>}
         {r.fa_ack_needed && <div className="mt-1 text-xs text-orange-600">Aprovação dupla: pendente a ciência do Marcelo Barrella.</div>}
         {!r.fa_ack_needed && r.fa_ack_at && <div className="mt-1 text-xs text-muted-foreground">Ciência do Marcelo em {when(r.fa_ack_at)}.</div>}

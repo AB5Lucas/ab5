@@ -1317,6 +1317,20 @@
       "when": 1795603978083,
       "tag": "0200_purchase_sync_debug",
       "breakpoints": true
+    },
+    {
+      "idx": 188,
+      "version": "7",
+      "when": 1795713336242,
+      "tag": "0201_purchase_fa_all_items_item_budget",
+      "breakpoints": true
+    },
+    {
+      "idx": 189,
+      "version": "7",
+      "when": 1795713693790,
+      "tag": "0202_purchase_fa_partial_approval",
+      "breakpoints": true
     }
   ]
 }

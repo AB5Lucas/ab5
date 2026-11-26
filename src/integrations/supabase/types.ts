@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.17"
-  }
   public: {
     Tables: {
       access_group_pages: {
@@ -4745,6 +4740,7 @@ export type Database = {
           fa_decided_by: string | null
           fa_decision_notes: string | null
           fa_notes: string | null
+          fa_over_items: boolean
           fa_partial_at: string | null
           fa_partial_by: string | null
           fa_partial_side: string | null
@@ -4803,6 +4799,7 @@ export type Database = {
           fa_decided_by?: string | null
           fa_decision_notes?: string | null
           fa_notes?: string | null
+          fa_over_items?: boolean
           fa_partial_at?: string | null
           fa_partial_by?: string | null
           fa_partial_side?: string | null
@@ -4861,6 +4858,7 @@ export type Database = {
           fa_decided_by?: string | null
           fa_decision_notes?: string | null
           fa_notes?: string | null
+          fa_over_items?: boolean
           fa_partial_at?: string | null
           fa_partial_by?: string | null
           fa_partial_side?: string | null
@@ -7565,13 +7563,35 @@ export type Database = {
         Args: { _item: string; _reason: string; _status: string }
         Returns: undefined
       }
+      purchase_fa_items_all: {
+        Args: { _id: string; _reason: string; _status: string }
+        Returns: undefined
+      }
+      purchase_fa_items_over: {
+        Args: { _id: string; _snapshot: Json }
+        Returns: boolean
+      }
       purchase_fa_my_gestor_ids: { Args: never; Returns: string[] }
       purchase_fa_recall: { Args: { _id: string }; Returns: undefined }
       purchase_fa_restore_items: { Args: { _id: string }; Returns: undefined }
-      purchase_fa_rule_of: {
-        Args: { _budget: number; _due: string; _total: number }
+      purchase_fa_rule: {
+        Args: { _r: Database["public"]["Tables"]["purchase_requests"]["Row"] }
         Returns: string
       }
+      purchase_fa_rule_of:
+        | {
+            Args: { _budget: number; _due: string; _total: number }
+            Returns: string
+          }
+        | {
+            Args: {
+              _budget: number
+              _due: string
+              _over_items: boolean
+              _total: number
+            }
+            Returns: string
+          }
       purchase_fa_send: {
         Args: { _id: string; _notes: string; _snapshot: Json; _total: number }
         Returns: string
@@ -7947,3 +7967,4 @@ export const Constants = {
     },
   },
 } as const
+

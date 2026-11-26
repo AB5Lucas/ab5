@@ -151,18 +151,32 @@ export function budgetSignal(total: number | null | undefined, budget: number | 
 
 /** Regra da aprovação (igual a purchase_fa_rule_of no banco). */
 export type FaRule = "verba" | "dupla" | "diretor";
-export function approvalRule(total: number, budget: number | null, due: string | null, today: string): FaRule {
-  if (budget != null && total <= budget + 1e-9) return "verba";
+/** Resultado do envio ao comprador pelo estado dos itens em aprovação (null = ainda há pendentes sem decisão geral). */
+export type FaOutcome = "aprovada" | "parcial" | "recusada";
+export function faOutcome(approved: number, rejected: number, pending: number): FaOutcome | null {
+  if (pending > 0) return null;
+  if (approved > 0 && rejected > 0) return "parcial";
+  if (approved > 0) return "aprovada";
+  if (rejected > 0) return "recusada";
+  return null;
+}
+
+export function approvalRule(total: number, budget: number | null, due: string | null, today: string, overItems = false): FaRule {
+  if (!overItems && budget != null && total <= budget + 1e-9) return "verba";
   if (due) {
     const days = Math.round((Date.parse(`${due}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
     if (days <= 2) return "dupla";
   }
   return "diretor";
 }
+/** Algum item escolhido passa da própria verba (igual a purchase_fa_items_over no banco). */
+export function itemsOverBudget(rows: RecRow[]): boolean {
+  return rows.some((r) => r.chosen != null && Number(r.item.budget ?? 0) > 0 && Math.round(r.chosen.total * 100) > Math.round(Number(r.item.budget) * 100));
+}
 export const RULE_LABEL: Record<FaRule, string> = {
-  verba: "Dentro da verba: aprova a Vitória Brasilino ou o Marcelo Barrella",
-  dupla: "Compras acima da verba com prazo em até 2 dias: aprovação dupla (Comprador + Gestor; depois a ciência do Marcelo)",
-  diretor: "Acima da verba e prazo maior que 2 dias: só o Marcelo Barrella aprova",
+  verba: "Dentro da verba (total e todos os itens): aprova a Vitória Brasilino ou o Marcelo Barrella",
+  dupla: "Compras acima da verba (total ou algum item) com prazo em até 2 dias: aprovação dupla (Comprador + Gestor; depois a ciência do Marcelo)",
+  diretor: "Acima da verba (total ou algum item) e prazo maior que 2 dias: só o Marcelo Barrella aprova",
 };
 
 /** Semelhança simples de descrições (palavras em comum), para sugerir a ligação quando a IA não indicou. */
