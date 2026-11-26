@@ -292,12 +292,12 @@ function HubOverview() {
 
   return (
     <FitScreen>
-    // Altura fixa da tela (cabeçalho 3,5rem + margens 3rem): tudo cabe sem rolar; abaixo de lg volta à altura natural.
     <div className={cn("flex flex-col gap-3 transition-opacity duration-300 lg:h-full", periodQ.isPlaceholderData && "opacity-70")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h1 className="font-display text-xl font-semibold tracking-tight">Atividades</h1>
         </div>
+          <p className="hidden text-xs text-muted-foreground md:block">Clique em um quadro para abrir a página.</p>
         <div className="flex rounded-full border bg-muted/40 p-0.5 text-xs">
           {PERIODS.map((p) => (
             <button key={p.key} type="button" onClick={() => setPeriod(p.key)} onMouseEnter={() => prefetch(p.key)}
