@@ -66,6 +66,7 @@ const RAW_GROUPS: MenuGroup[] = [
   {
     label: "Funcionários",
     icon: Users,
+    overview: "/funcionarios",
     items: [
       { title: "Colaboradores", url: "/colaboradores", icon: Users },
       { title: "Ausências", url: "/ausencias", icon: UserX },
