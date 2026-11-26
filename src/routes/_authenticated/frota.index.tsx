@@ -69,7 +69,7 @@ type Suggestion = { vehicleId: string; plate: string; due: string; week: string;
 function Overview({ canCost }: { canCost: boolean }) {
   const today = todayIso();
   const [selectedDay, setSelectedDay] = useState(today);
-  const [period, setPeriod] = useState<Period>("hoje");
+  const [period, setPeriod] = useState<Period>("mes");
   const R = rangeOf(period, today);
   const single = R.from === R.to;
   // Calendário: o mês do início do período (semanas inteiras, seg–dom).
@@ -195,7 +195,8 @@ function Overview({ canCost }: { canCost: boolean }) {
   }, [vehiclesQ.data, schedQ.data, expQ.data, maintQ.data, R.from, R.to, barFrom, barTo, today, lastDay]);
 
   const comparison = useMemo(() => fleetDashboardCosts((vehiclesQ.data ?? []).filter((v) => v.status !== "inactive"), schedQ.data ?? [], expQ.data ?? [], budget.data ?? new Map(), daysBetween(R.from, R.to), single), [vehiclesQ.data, schedQ.data, expQ.data, budget.data, R.from, R.to, single]);
-  useEffect(() => { setSelectedDay(R.from); }, [R.from]);
+  // A Logística abre sempre no dia de hoje, qualquer que seja o filtro (clicar num dia do calendário troca).
+  useEffect(() => { setSelectedDay(today); }, [R.from, today]);
   const pLabel = period === "hoje" ? "hoje" : period === "amanha" ? "amanhã" : period === "semana" ? "esta semana" : "este mês";
   const when = single ? brDay(R.from) : `${brDay(R.from)} a ${brDay(R.to)}`;
   const loadingNew = schedQ.isPlaceholderData;
