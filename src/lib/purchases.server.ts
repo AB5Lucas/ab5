@@ -7,7 +7,15 @@ import { assetCategory, clientPurchaseExclusionReason, detectPurchaseAsset, effe
 import { purchaseMonthHours } from "./purchase-hours";
 
 type Credentials = { lovableKey: string; excelKey: string };
-const FOLDER = "Compras/RELATÓRIOS";
+/**
+ * Relatórios de Compras por centro de custo: Compras/04 COMPRAS/05 ANÁLISES E RELATÓRIOS/02 FECHAMENTOS/<ano>/<MM.ano>/
+ * (o arquivo do mês fica na pasta do mês ou na subpasta Serviços; as outras subpastas — Indústria, Mars, Yara… — são
+ * recortes por cliente e não são lidas, senão o mês teria dois relatórios). Antes era a pasta Compras/RELATÓRIOS.
+ */
+const FOLDER = "Compras/04 COMPRAS/05 ANÁLISES E RELATÓRIOS/02 FECHAMENTOS";
+const MONTH_SUBFOLDER = "serviços";
+/** Primeiro mês lido dos relatórios (o que veio antes ficou lançado à mão nos serviços; ler de novo duplicaria custos). */
+const PURCHASE_START = "2026-10";
 const enc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
 
 function monthRange(ym: string) {
@@ -168,20 +176,37 @@ export async function reprocessPurchases() {
 
 /** Lê todos os relatórios da pasta; para cada mês usa o arquivo com o período mais longo. */
 export async function executePurchaseSync(c: Credentials) {
-  const list = await graph(`${DRIVE}/root:/${enc(FOLDER)}:/children?$top=500`, c);
-  const best = new Map<string, { name: string; end: string }>();
-  for (const f of (list?.value ?? []) as { name: string; folder?: unknown }[]) {
-    if (f.folder) continue;
+  type Entry = { name: string; folder?: unknown };
+  const children = async (path: string): Promise<Entry[]> => {
+    try { return ((await graph(`${DRIVE}/root:/${enc(path)}:/children?$top=500`, c))?.value ?? []) as Entry[]; }
+    catch (e) { if ((e as Error).name === "MissingFile" || /não encontrado/.test((e as Error).message)) return []; throw e; }
+  };
+  // Ano atual e o anterior (em janeiro o fechamento de dezembro ainda é lido).
+  const year = new Date().getFullYear();
+  const best = new Map<string, { path: string; name: string; end: string }>();
+  const consider = (dir: string, f: Entry) => {
+    if (f.folder || !/\.xlsx?$/i.test(f.name)) return;
     const m = purchaseFileMonth(f.name);
-    if (!m) continue;
+    if (!m || m.ym < PURCHASE_START) return;
     const cur = best.get(m.ym);
-    if (!cur || m.end > cur.end) best.set(m.ym, { name: f.name, end: m.end });
+    // Período mais longo; empate: .xls (o relatório original do sistema) antes do .xlsx.
+    if (!cur || m.end > cur.end || (m.end === cur.end && /\.xls$/i.test(f.name) && !/\.xls$/i.test(cur.name))) best.set(m.ym, { path: `${dir}/${f.name}`, name: f.name, end: m.end });
+  };
+  for (const y of [year - 1, year].filter((y) => y >= Number(PURCHASE_START.slice(0, 4)))) {
+    for (const mf of await children(`${FOLDER}/${y}`)) {
+      if (!mf.folder || !/^\d{2}\.\d{4}$/.test(mf.name.trim())) continue;
+      const dir = `${FOLDER}/${y}/${mf.name}`;
+      for (const f of await children(dir)) {
+        if (f.folder && f.name.trim().toLowerCase() === MONTH_SUBFOLDER) for (const g of await children(`${dir}/${f.name}`)) consider(`${dir}/${f.name}`, g);
+        else consider(dir, f);
+      }
+    }
   }
   const refs = await loadRefs();
   const hoursCache = new Map<string, Map<string, number>>();
   const out: { ym: string; file: string; launched: number; pending: number }[] = [];
   for (const [ym, f] of [...best.entries()].sort()) {
-    const file = `${FOLDER}/${f.name}`;
+    const file = f.path;
     const buf = await graph(`${DRIVE}/root:/${enc(file)}:/content`, c, true);
     const wb = XLSX.read(new Uint8Array(buf), { cellDates: true });
     const sheetName = wb.SheetNames[0];
