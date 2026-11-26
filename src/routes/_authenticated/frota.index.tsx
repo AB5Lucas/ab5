@@ -233,11 +233,11 @@ function Overview({ canCost }: { canCost: boolean }) {
               <p className="text-xs text-muted-foreground">{d.km ? `${(d.cost.total / d.km).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} por km` : "sem km no período"}</p>
               <div className="mt-auto">
                 <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
-                  {COST_PARTS.map((p, i) => <span key={p.key} className={cn("ov-grow h-full", TONES[i])} style={{ width: `${(d.cost[p.key] / Math.max(1, d.cost.total)) * 100}%` }} />)}
+                  {COST_PARTS.map((p, i) => <span key={p.key} className={cn("ov-widen h-full", TONES[i])} style={{ width: `${(d.cost[p.key] / Math.max(1, d.cost.total)) * 100}%`, animationDelay: `${i * 140}ms` }} />)}
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                   {COST_PARTS.map((p, i) => (
-                    <span key={p.key} className="flex items-center gap-1.5 truncate"><span className={cn("h-2 w-2 shrink-0 rounded-sm", TONES[i])} />{p.label} <b className="tabular-nums">{brl(d.cost[p.key])}</b></span>
+                    <span key={p.key} className="flex items-center gap-1.5 truncate"><span className={cn("h-2 w-2 shrink-0 rounded-sm", TONES[i])} />{p.label} <b className="tabular-nums"><CountUp value={brl(d.cost[p.key])} /></b></span>
                   ))}
                 </div>
               </div>
@@ -258,7 +258,7 @@ function Overview({ canCost }: { canCost: boolean }) {
                     <Big value={d.counts.vencida + d.counts.perto} />
                     <p className="text-xs text-muted-foreground">vencidas ou perto</p>
                     {([["vencida", "Vencidas"], ["perto", "Perto"], ["em-dia", "Em dia"], ["sem-regra", "Sem regra"]] as const).map(([k, l], i) => (
-                      <div key={k} className="flex items-center gap-1.5"><span className={cn("h-2 w-2 rounded-sm", TONES[i])} /><span className="flex-1">{l}</span><b className="tabular-nums">{d.counts[k]}</b></div>
+                      <div key={k} className="flex items-center gap-1.5"><span className={cn("h-2 w-2 rounded-sm", TONES[i])} /><span className="flex-1">{l}</span><b className="tabular-nums"><CountUp value={d.counts[k]} /></b></div>
                     ))}
                   </div>
                   <Donut frac={withRule ? d.counts["em-dia"] / withRule : 0} center={withRule ? `${Math.round((d.counts["em-dia"] / withRule) * 100)}%` : "—"} sub="em dia" size="h-32 w-32" />
@@ -280,13 +280,13 @@ function Overview({ canCost }: { canCost: boolean }) {
               {rank.loading && <p className="text-xs text-muted-foreground">Carregando…</p>}
               {!rank.loading && !rank.ranking.length && <p className="text-xs text-muted-foreground">Sem abastecimentos no período.</p>}
               {rank.ranking.map((r, i) => (
-                <div key={r.key} className="grid grid-cols-[1rem_minmax(0,1fr)_2.2rem] items-center gap-2 text-[11px]" title={`${r.name}: ${r.delivered} entregues, ${r.pending} pendentes`}>
+                <div key={r.key} className="ov-fade grid grid-cols-[1rem_minmax(0,1fr)_2.2rem] items-center gap-2 text-[11px]" style={{ animationDelay: `${i * 70}ms` }} title={`${r.name}: ${r.delivered} entregues, ${r.pending} pendentes`}>
                   <span className="tabular-nums text-muted-foreground">{i + 1}º</span>
                   <span className="min-w-0">
                     <span className="block truncate">{r.name}</span>
-                    <span className="mt-0.5 block h-1.5 overflow-hidden rounded-full bg-muted"><span className="ov-grow block h-full rounded-full bg-foreground" style={{ width: `${r.score}%` }} /></span>
+                    <span className="mt-0.5 block h-1.5 overflow-hidden rounded-full bg-muted"><span className="ov-widen block h-full rounded-full bg-foreground" style={{ width: `${r.score}%`, animationDelay: `${150 + i * 70}ms` }} /></span>
                   </span>
-                  <span className="text-right font-semibold tabular-nums">{r.score}%</span>
+                  <span className="text-right font-semibold tabular-nums"><CountUp value={`${r.score}%`} /></span>
                 </div>
               ))}
             </div>
@@ -350,8 +350,8 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
                     const inMonth = dt.startsWith(ym);
                     const inRange = dt >= range.from && dt <= range.to;
                     return (
-                      <Button variant="ghost" key={dt} aria-label={`Selecionar dia ${brDay(dt)}`} aria-pressed={selected === dt} onClick={() => onSelect(dt)} title={ev.length ? ev.map((e) => `${e.plate} · ${e.kind === "rev" ? "Revisão" : "Manutenção"}`).join("\n") : brDay(dt)}
-                        className={cn("h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-foreground hover:bg-foreground/10", selected === dt && "ring-2 ring-foreground bg-foreground/10", inMonth ? (sug.length ? "bg-amber-500/20 hover:bg-amber-500/30 dark:bg-amber-400/20" : "bg-muted/50") : "opacity-35",
+                      <Button variant="ghost" key={dt} style={{ animationDelay: `${days.indexOf(dt) * 18}ms` }} aria-label={`Selecionar dia ${brDay(dt)}`} aria-pressed={selected === dt} onClick={() => onSelect(dt)} title={ev.length ? ev.map((e) => `${e.plate} · ${e.kind === "rev" ? "Revisão" : "Manutenção"}`).join("\n") : brDay(dt)}
+                        className={cn("tile-snap h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-foreground hover:bg-foreground/10", selected === dt && "ring-2 ring-foreground bg-foreground/10", inMonth ? "bg-muted/50" : "opacity-35",
                           inRange && "outline outline-1 outline-border", dt === today && "bg-foreground/10")}>
                         <span className={cn("text-[10px] tabular-nums", dt === today ? "font-bold" : "text-muted-foreground")}>{Number(dt.slice(8, 10))}</span>
                         {ev.slice(0, 2).map((e, i) => (
@@ -372,7 +372,7 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
             {weeks.map((wk) => {
               const sug = byWeek.get(wk[0]!) ?? [];
               return (
-                <div key={wk[0]} className="flex min-h-0 flex-col justify-center overflow-hidden px-1.5 text-[10px]">
+                <div key={wk[0]} className={cn("ov-fade flex min-h-0 flex-col justify-center overflow-hidden rounded-lg px-1.5 text-[10px]", sug.length && "bg-muted ring-1 ring-border")} style={{ animationDelay: `${300 + weeks.indexOf(wk) * 90}ms` }}>
                   {sug.slice(0, 2).map((s) => (
                     <span key={s.vehicleId} className="truncate" title={`${s.plate}: ${s.reason} (vencimento previsto ${brDay(s.due)})`}>
                       <b>{s.plate}</b> <span className="text-muted-foreground">· {s.reason}</span>
@@ -388,7 +388,7 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1"><span className="rounded bg-foreground/20 px-1 font-semibold text-foreground">ABC</span> manutenção</span>
         <span className="flex items-center gap-1"><span className="rounded bg-background px-1 font-semibold text-foreground">ABC</span> revisão</span>
-        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500/20 dark:bg-amber-400/20" /> dias da semana sugerida para marcar a revisão</span>
+        <span className="flex items-center gap-1"><span className="h-2.5 w-4 rounded-sm bg-muted ring-1 ring-border" /> semana sugerida para marcar a revisão para marcar a revisão</span>
         {outside.length > 0 && <span className="ml-auto truncate">Depois: {outside.slice(0, 3).map((s) => `${s.plate} (sem. ${brDay(s.week)})`).join(", ")}</span>}
       </div>
     </div>
@@ -407,7 +407,7 @@ function MaintenanceYear({ rows, year }: { rows: { schedule_date: string; mainte
   const revision = current?.revision ?? rows.filter((r) => r.maintenance_kind === "revisao").length;
   return <div className="flex h-full min-h-0 gap-3">
     <div className="grid min-h-0 min-w-0 flex-1 grid-cols-12 gap-1">{months.map((m, ci) => <Button variant="ghost" key={m.label} onClick={() => setSelected(selected === ci ? null : ci)} title={`${m.label}: ${m.total - m.revision} manutenções · ${m.revision} revisões`} className={cn("flex h-full min-h-0 min-w-0 flex-col gap-1 rounded-sm p-0", selected === ci && "bg-muted")}>
-      <div className="grid min-h-0 w-full flex-1 grid-rows-6 gap-1 px-0.5">{Array.from({ length: 6 }, (_, i) => { const level = 5 - i, filled = Math.ceil(m.total / max * 6); return <span key={i} className={cn("ov-grow h-full w-full rounded-[4px]", level < filled ? "bg-foreground" : "border border-dashed border-border bg-muted/40")} />; })}</div>
+      <div className="grid min-h-0 w-full flex-1 grid-rows-6 gap-1 px-0.5">{Array.from({ length: 6 }, (_, i) => { const level = 5 - i, filled = Math.ceil(m.total / max * 6); return <span key={i} className={cn("ov-grow h-full w-full rounded-[4px]", level < filled ? "bg-foreground" : "border border-dashed border-border bg-muted/40")} style={{ animationDelay: `${ci * 45 + level * 40}ms` }} />; })}</div>
       <span className="text-center text-[9px] capitalize text-muted-foreground">{m.label.slice(0, 3)}</span>
     </Button>)}</div>
     <div className="flex w-28 shrink-0 flex-col gap-2 border-l border-border pl-3">

@@ -103,7 +103,27 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
   const today = todayISO();
   const [nowMin, setNowMin] = useState(() => { const d = new Date(Date.now() - 3 * 3600_000); return d.getUTCHours() * 60 + d.getUTCMinutes(); });
   useEffect(() => { const t = setInterval(() => { const d = new Date(Date.now() - 3 * 3600_000); setNowMin(d.getUTCHours() * 60 + d.getUTCMinutes()); }, 60_000); return () => clearInterval(t); }, []);
-  useEffect(() => { if (scroller.current) scroller.current.scrollTop = (6 * 60 - START) * px; }, [dashboardDate ? px : 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!dashboardDate && scroller.current) scroller.current.scrollTop = (6 * 60 - START) * px; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Dashboard: abre no primeiro horário e desce devagar até o horário atual (uma hora antes, para ver o que vem).
+  const scrolledFor = useRef<string | null>(null);
+  useEffect(() => {
+    const node = scroller.current;
+    if (!dashboardDate || !node || px === PX) return;
+    const key = `${dashboardDate}|${Math.round(px * 100)}`;
+    if (scrolledFor.current === key) return;
+    scrolledFor.current = key;
+    node.scrollTop = 0;
+    const target = Math.max(0, Math.min(node.scrollHeight - node.clientHeight, (Math.max(START, nowMin - 60) - START) * px));
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { node.scrollTop = target; return; }
+    let raf = 0; const t0 = performance.now(), dur = 1400;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / dur), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+      node.scrollTop = target * e;
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    const start = window.setTimeout(() => { raf = requestAnimationFrame(step); }, 400);
+    return () => { window.clearTimeout(start); cancelAnimationFrame(raf); };
+  }, [dashboardDate, px]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visible = (d: DemandRow) => show === "todos" || (show === "ab5" ? isOwn(d) : !isOwn(d));
   const colorOf = (d: DemandRow) => {
@@ -265,8 +285,8 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
           <Button onClick={() => setEdit({ preset: { date: view === "dia" ? anchor : undefined } })}><Plus className="h-4 w-4" /> Novo evento</Button>
         </div>}
 
-        <div className={cn("overflow-x-auto rounded-md border border-border bg-card", dashboardDate && "min-h-0 flex-1")}>
-          <div className={dashboardDate ? "h-full" : undefined} style={{ minWidth: 64 + cols.length * 130 }}>
+        <div className={cn("rounded-md border border-border bg-card", dashboardDate ? "min-h-0 flex-1 overflow-hidden" : "overflow-x-auto")}>
+          <div className={dashboardDate ? "flex h-full flex-col" : undefined} style={{ minWidth: 64 + cols.length * 130 }}>
             {/* Cabeçalho das colunas + linha "dia inteiro" (sem horário). */}
             <div className="flex border-b border-border">
               <div className="w-16 shrink-0" />
@@ -290,7 +310,7 @@ export function AgendaTab({ dashboardDate }: { dashboardDate?: string } = {}) {
                 ))}
               </div>
             )}
-            <div ref={scroller} className={cn("relative", dashboardDate ? "h-[calc(100%-2rem)] overflow-y-auto" : "max-h-[66vh] overflow-y-auto")} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { setDrag(null); setSel(null); }}>
+            <div ref={scroller} className={cn("relative", dashboardDate ? "min-h-0 flex-1 overflow-y-auto" : "max-h-[66vh] overflow-y-auto")} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { setDrag(null); setSel(null); }}>
               <div className="flex select-none" style={{ height: (END - START) * px }}>
                 <div className="relative w-16 shrink-0">
                   {hours.map((h) => <div key={h} className="absolute right-2 -translate-y-1/2 text-[11px] text-muted-foreground" style={{ top: (h - START) * px }}>{h > START ? `${h / 60}h` : ""}</div>)}
