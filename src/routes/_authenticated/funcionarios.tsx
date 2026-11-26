@@ -325,10 +325,10 @@ function Overview() {
                 { label: "Sem ASO", n: d.aso.none, cls: "stroke-foreground/15", dot: "bg-foreground/15" },
               ];
               return (
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] items-center gap-3">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
                   <div className="space-y-1 text-[11px]">
                     {parts.map((x) => (
-                      <div key={x.label} className="flex items-center gap-1.5"><span className={cn("h-2 w-2 shrink-0 rounded-full", x.dot)} /><span className="text-muted-foreground">{x.label}</span><b className="ml-auto tabular-nums"><CountUp value={x.n} /></b></div>
+                      <div key={x.label} className="flex items-center gap-1.5"><span className={cn("h-2 w-2 shrink-0 rounded-full", x.dot)} /><span className="w-[3.9rem] text-muted-foreground">{x.label}</span><b className="tabular-nums"><CountUp value={x.n} /></b></div>
                     ))}
                   </div>
                   <AsoArc parts={parts} total={d.total} />
@@ -471,7 +471,7 @@ function AsoArc({ parts, total }: { parts: { label: string; n: number; cls: stri
   });
   const okPct = Math.round(((parts[0]?.n ?? 0) / tot) * 100);
   return (
-    <div className="relative mx-auto w-full max-w-[170px]">
+    <div className="relative mx-auto w-full max-w-[230px]">
       <svg viewBox="0 0 180 100" className="w-full overflow-visible">
         {Array.from({ length: 21 }, (_, k) => {
           const t = k / 20, major = k % 5 === 0;
