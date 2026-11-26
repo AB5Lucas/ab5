@@ -431,14 +431,14 @@ function FuelConsumption({ rows }: { rows: any[] }) {
   return (
     <div className="flex h-full min-h-0 gap-6">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="mb-2 grid grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_5rem] gap-4 border-b pb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"><span>Placa</span><span>Consumo no período</span><span className="text-right">Litros</span><span className="text-right">Média km/L</span></div>
+        <div className="mb-2 grid grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_5rem] gap-4 border-b pb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"><span>Placa</span><span>Consumo no período</span><span className="text-center">Litros</span><span className="text-right">Média km/L</span></div>
         <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-2">
           {vehicles.map((v, i) => (
             <div key={v.plate} className="ov-fade grid grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_5rem] items-center gap-4 text-xs" style={{ animationDelay: `${i * 50}ms` }}>
               <span className="font-medium tabular-nums">{v.plate}</span>
               <span className="h-1.5 overflow-hidden rounded-full bg-muted"><span className="ov-widen block h-full rounded-full bg-foreground/70" style={{ width: `${(v.liters / maxL) * 100}%`, animationDelay: `${i * 50}ms` }} /></span>
-              <span className="text-right tabular-nums">{n(v.liters)} L</span>
-              <span className="text-right font-semibold tabular-nums" title={v.kml == null ? "Precisa de 2 notas com km no período" : undefined}>{v.kml == null ? "—" : `${n(v.kml, 1)} km/L`}</span>
+              <span className="text-center tabular-nums">{n(v.liters)} l</span>
+              <span className="text-right font-semibold tabular-nums" title={v.kml == null ? "Precisa de 2 notas com km no período" : undefined}>{v.kml == null ? "—" : `${n(v.kml, 1)} km/l`}</span>
             </div>
           ))}
         </div>
