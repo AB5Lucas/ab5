@@ -44,14 +44,16 @@ export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")
 });
 
 type Item = Tables<"purchase_request_items">;
-type Draft = { id?: string; quantity: string; unit: string; description: string; budget: string; notes: string; work_id: string; cc: string; photo_path: string | null; quote_path: string | null; link: string };
+type Draft = { _k?: string; id?: string; quantity: string; unit: string; description: string; budget: string; notes: string; work_id: string; cc: string; photo_path: string | null; quote_path: string | null; link: string };
 const RATEIO = "__rateio__";
 const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(/\./g, "").replace(",", ".")));
+let draftSeq = 0;
+const newKey = () => `d${++draftSeq}`;
 const toDraft = (i: Item): Draft => ({
-  id: i.id, quantity: String(i.quantity).replace(".", ","), unit: i.unit, description: i.description, budget: i.budget == null ? "" : String(i.budget).replace(".", ","),
+  _k: newKey(), id: i.id, quantity: String(i.quantity).replace(".", ","), unit: i.unit, description: i.description, budget: i.budget == null ? "" : String(i.budget).replace(".", ","),
   notes: i.notes ?? "", work_id: i.work_id ?? RATEIO, cc: i.cc_code ?? "", photo_path: i.photo_path, quote_path: i.quote_path, link: i.link_url ?? "",
 });
-const emptyDraft = (): Draft => ({ quantity: "", unit: "UN", description: "", budget: "", notes: "", work_id: RATEIO, cc: "", photo_path: null, quote_path: null, link: "" });
+const emptyDraft = (): Draft => ({ _k: newKey(), quantity: "", unit: "UN", description: "", budget: "", notes: "", work_id: RATEIO, cc: "", photo_path: null, quote_path: null, link: "" });
 const isBlank = (x: Draft) => !x.id && !x.description.trim() && !x.quantity.trim() && !x.budget.trim() && !x.notes.trim() && !x.photo_path && !x.quote_path && !x.link;
 /** Estado em edição na página (desfazer/refazer): linhas de itens e verba total. */
 type Snap = { rows: Draft[]; total: string };
@@ -200,7 +202,8 @@ function Page() {
   const [decNotes, setDecNotes] = useState("");
   const decide = useMutation({
     mutationFn: async () => {
-      if (deciding && dirty) await saveItems(); // validador editou os itens: salva antes de validar
+      await settleAuto();
+      if (deciding) await saveItems(); // validador editou os itens: salva antes de validar
       const { error } = await supabase.rpc("purchase_request_decide", { _id: id, _approve: !!deciding, _notes: decNotes });
       if (error) throw error;
     },
@@ -214,6 +217,9 @@ function Page() {
   const remove = useScRemove(() => { const wasDraft = removing?.stage === "rascunho"; setRemoving(null); if (wasDraft) navigate({ to: "/compras/solicitacoes" }); });
   useEffect(() => {
     if (!items.data || !r) return;
+    // Com alterações ainda não gravadas (salvamento automático pendente), não troca o que está na tela.
+    if (dirtyRef.current && editable) return;
+    dbIds.current = new Set(items.data.map((i) => i.id));
     setRows(items.data.length ? items.data.map(toDraft) : editable ? [emptyDraft()] : []);
     setTotal(r.total_budget == null ? "" : String(r.total_budget).replace(".", ","));
     setDirty(false);
@@ -254,30 +260,114 @@ function Page() {
   }, [editable]);
   const itemsTotal = rows.reduce((s, x) => s + (num(x.budget) ?? 0), 0);
 
-  const saveItems = async () => {
-    const filled = rows.filter((x) => x.description.trim() || x.quantity.trim());
-    for (const [i, x] of filled.entries()) {
+  // Itens gravados no banco (para saber o que apagar sem depender da leitura, que fica velha entre salvamentos automáticos).
+  const dbIds = useRef<Set<string>>(new Set());
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+  /**
+   * Grava itens e verba total. Manual (Enviar/Validar): confere tudo e recusa item incompleto.
+   * Automático (enquanto digita, como o Office): grava só o que está completo e não mexe no item pela metade;
+   * devolve o id dos itens novos para a tela (pela chave _k da linha).
+   */
+  const saveItems = async (opt?: { auto?: boolean; snap?: Snap }) => {
+    const auto = !!opt?.auto;
+    const src = opt?.snap ?? snapRef.current;
+    const filled = src.rows.filter((x) => x.description.trim() || x.quantity.trim());
+    if (!auto) for (const [i, x] of filled.entries()) {
       if (!x.description.trim()) throw new Error(`Item ${i + 1}: escreva a descrição.`);
       if (!(num(x.quantity)! > 0)) throw new Error(`Item ${i + 1}: informe a quantidade.`);
     }
+    const complete = (x: Draft) => !!x.description.trim() && num(x.quantity)! > 0;
+    // Mantém no banco: itens preenchidos (e, no automático, os pela metade que já existiam).
     const keep = new Set(filled.filter((x) => x.id).map((x) => x.id!));
-    const remove = (items.data ?? []).filter((i) => !keep.has(i.id)).map((i) => i.id);
-    if (remove.length) { const { error } = await supabase.from("purchase_request_items").delete().in("id", remove); if (error) throw error; }
+    const remove = [...dbIds.current].filter((dbId) => !keep.has(dbId));
+    if (remove.length) {
+      const { error } = await supabase.from("purchase_request_items").delete().in("id", remove);
+      if (error) throw error;
+      for (const x of remove) dbIds.current.delete(x);
+    }
+    const inserted = new Map<string, string>();
     for (const [i, x] of filled.entries()) {
+      if (auto && !complete(x)) continue;
       const payload = {
         request_id: id, item_no: i + 1, quantity: num(x.quantity)!, unit: x.unit.trim() || "UN", description: x.description.trim(),
         budget: num(x.budget), notes: x.notes.trim() || null, work_id: x.work_id === RATEIO ? null : x.work_id, cc_code: x.cc.trim() || null, photo_path: x.photo_path, quote_path: x.quote_path, link_url: x.link.trim() || null,
       };
-      const { error } = x.id ? await supabase.from("purchase_request_items").update(payload).eq("id", x.id) : await supabase.from("purchase_request_items").insert(payload);
-      if (error) throw error;
+      if (x.id) {
+        const { error } = await supabase.from("purchase_request_items").update(payload).eq("id", x.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from("purchase_request_items").insert(payload).select("id").single();
+        if (error) throw error;
+        dbIds.current.add(data.id);
+        if (x._k) inserted.set(x._k, data.id);
+      }
     }
-    const { error } = await supabase.from("purchase_requests").update({ total_budget: num(total) }).eq("id", id);
+    const { error } = await supabase.from("purchase_requests").update({ total_budget: num(src.total) }).eq("id", id);
     if (error) throw error;
+    return inserted;
   };
+
+  // Salvamento automático: 1,2 s depois da última alteração, um de cada vez (o seguinte espera o anterior).
+  const [autoState, setAutoState] = useState<{ status: "idle" | "saving" | "saved" | "error"; at?: Date; msg?: string }>({ status: "idle" });
+  const autoRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; running: Promise<void> | null; again: boolean }>({ timer: null, running: null, again: false });
+  const runAuto = (): Promise<void> => {
+    const a = autoRef.current;
+    if (a.timer) { clearTimeout(a.timer); a.timer = null; }
+    if (a.running) { a.again = true; return a.running; }
+    const snap = snapRef.current;
+    setAutoState({ status: "saving" });
+    a.running = (async () => {
+      try {
+        const inserted = await saveItems({ auto: true, snap });
+        // Nada mudou na tela durante a gravação = tudo salvo (snapRef troca a cada alteração).
+        const unchanged = snapRef.current === snap;
+        if (inserted.size) {
+          const patched = { ...snapRef.current, rows: snapRef.current.rows.map((x) => (!x.id && x._k && inserted.has(x._k) ? { ...x, id: inserted.get(x._k)! } : x)) };
+          snapRef.current = patched;
+          setRows(patched.rows);
+        }
+        // Item pela metade (sem descrição ou quantidade) ainda não foi gravado: continua "não salvo".
+        const pending = snap.rows.some((x) => (x.description.trim() || x.quantity.trim()) && !(x.description.trim() && num(x.quantity)! > 0));
+        if (unchanged && !pending) setDirty(false);
+        setAutoState(pending ? { status: "idle" } : { status: "saved", at: new Date() });
+        qc.invalidateQueries({ queryKey: ["sc-requests"] });
+      } catch (e) {
+        setAutoState({ status: "error", msg: (e as Error).message });
+      } finally {
+        a.running = null;
+        if (a.again) { a.again = false; void runAuto(); }
+      }
+    })();
+    return a.running;
+  };
+  /** Espera o salvamento automático terminar (antes de Enviar/Validar gravarem do jeito completo). */
+  const settleAuto = async () => {
+    const a = autoRef.current;
+    if (a.timer) { clearTimeout(a.timer); a.timer = null; }
+    a.again = false;
+    while (a.running) await a.running;
+  };
+  useEffect(() => {
+    if (!editable || !dirty) return;
+    const a = autoRef.current;
+    if (a.timer) clearTimeout(a.timer);
+    a.timer = setTimeout(() => { a.timer = null; void runAuto(); }, 1200);
+  }, [rows, total, dirty, editable]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Saindo da página com alteração pendente: grava na hora; fechando a aba no meio da gravação, o navegador pergunta.
+  const flushRef = useRef(() => {});
+  flushRef.current = () => { if (dirtyRef.current && editable) void runAuto(); };
+  useEffect(() => () => flushRef.current(), []);
+  useEffect(() => {
+    const onLeave = (e: BeforeUnloadEvent) => { if (dirtyRef.current || autoRef.current.running) { flushRef.current(); e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
+  }, []);
   const refresh = () => { qc.invalidateQueries({ queryKey: ["sc-items", id] }); qc.invalidateQueries({ queryKey: ["sc-request", id] }); qc.invalidateQueries({ queryKey: ["sc-requests"] }); };
-  const save = useMutation({ mutationFn: saveItems, onSuccess: () => { toast.success("Itens salvos"); refresh(); }, onError: (e: Error) => toast.error(e.message) });
+  const save = useMutation({ mutationFn: async () => { await settleAuto(); await saveItems(); }, onSuccess: () => { toast.success("Itens salvos"); setDirty(false); dirtyRef.current = false; setAutoState({ status: "saved", at: new Date() }); refresh(); }, onError: (e: Error) => toast.error(e.message) });
   const send = useMutation({
     mutationFn: async () => {
+      await settleAuto();
       if (r!.system === "TOTVS" && !r!.photo_path) throw new Error(PRINT_REQUIRED);
       const filled = rows.filter((x) => x.description.trim() || x.quantity.trim());
       if (r!.system !== "TOTVS" && budgetMissing(r!.nature, num(total), filled.map((x) => num(x.budget)))) throw new Error("Informe a verba de cada item ou a verba total (só a natureza PROGRAMADA dispensa).");
@@ -424,7 +514,7 @@ function Page() {
           {canEdit && !editMode && <Button variant="outline" size="sm" onClick={() => setEditMode(true)}><Pencil className="h-4 w-4" /> Editar</Button>}
           {editable && <UndoRedoButtons undoLabels={history.undoLabels} redoLabels={history.redoLabels} onUndo={undo} onRedo={redo} />}
           {editable && <Button variant="outline" size="sm" onClick={() => setEditingHeader(true)}><Pencil className="h-4 w-4" /> Editar cabeçalho</Button>}
-          {editable && <Button variant="outline" size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}><Save className="h-4 w-4" /> Salvar itens</Button>}
+          {editable && <AutoSaveStatus state={autoState} dirty={dirty} onRetry={() => save.mutate()} />}
           {canSendDraft && <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}><Send className="h-4 w-4" /> Enviar</Button>}
           {isDraftOwner && <Button variant="ghost" size="sm" onClick={() => setRemoving(r)}><Trash2 className="h-4 w-4 text-destructive" /> Apagar</Button>}
           {isValidator && (
@@ -807,5 +897,24 @@ function EditHistory({ edits, userName }: { edits: { id: string; field: string; 
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** Situação do salvamento automático dos itens (como o Office): Salvando… / Salvo às hh:mm / erro com Tentar de novo. */
+function AutoSaveStatus({ state, dirty, onRetry }: { state: { status: "idle" | "saving" | "saved" | "error"; at?: Date; msg?: string }; dirty: boolean; onRetry: () => void }) {
+  const hm = (d?: Date) => (d ? d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "");
+  if (state.status === "error") {
+    return (
+      <span className="flex items-center gap-2 text-xs text-destructive" title={state.msg}>
+        Não salvo{state.msg ? `: ${state.msg}` : ""}
+        <Button variant="outline" size="sm" className="h-7" onClick={onRetry}><Save className="h-3.5 w-3.5" /> Tentar de novo</Button>
+      </span>
+    );
+  }
+  const text = state.status === "saving" ? "Salvando…" : dirty ? "Item incompleto ou alteração ainda não salva" : state.status === "saved" ? `Salvo às ${hm(state.at)}` : "Salvamento automático ligado";
+  return (
+    <span className="flex items-center gap-1.5 self-center text-xs text-muted-foreground" aria-live="polite">
+      {state.status === "saving" ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}{text}
+    </span>
   );
 }

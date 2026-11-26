@@ -292,7 +292,7 @@ function Overview() {
             </div>
           </OverviewCard>
 
-          <OverviewCard title="Contratações" to="/demandas/contratacoes" linkLabel="Abrir Contratações" hint="Vagas das solicitações de contratação (canceladas fora): atendidas e a atender" className="min-h-0" bodyClassName="flex min-h-0 flex-col justify-center">
+          <OverviewCard title="Contratações" to="/demandas/contratacoes" linkLabel="Abrir Contratações" hint="Vagas das solicitações de contratação (canceladas fora): atendidas e a atender" className="min-h-0" bodyClassName="flex min-h-0 flex-col justify-center -mt-9">
             {(() => {
               const tot = d.filled + d.vagas;
               return (
