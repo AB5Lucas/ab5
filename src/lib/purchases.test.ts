@@ -154,3 +154,16 @@ describe("Almoxarifado do cliente", () => {
     expect(a.parts).toEqual([{ work_id: "s1", amount: 459 }]);
   });
 });
+
+describe("parsePurchaseReport, linha do centro de custo", () => {
+  const head = [["Código", "Descrição", "Quantidade", "Valor Total"]];
+  it("aceita rótulo, código e nome na mesma célula", () => {
+    const r = parsePurchaseReport([...head, ["Centro Custo: 1001000 - ADM"], ["AA001", "X", 1, 10], ["Total C/C:", "", "", 10],
+      ["Centro Custo: 1001001 PINTURA PO"], ["AA002", "Y", 1, 5], ["Total C/C:", "", "", 5]]);
+    expect(r.map((l) => [l.cc, l.amount])).toEqual([["1001000", 10], ["1001001", 5]]);
+  });
+  it("item depois do total sem novo centro de custo não soma no anterior", () => {
+    expect(() => parsePurchaseReport([...head, ["Centro Custo:", "1001000"], ["AA001", "X", 1, 10], ["Total C/C:", "", "", 10], ["AA002", "Y", 1, 5]]))
+      .toThrow(/sem centro de custo reconhecido/);
+  });
+});

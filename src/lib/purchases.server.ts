@@ -280,7 +280,9 @@ export async function executePurchaseSync(c: Credentials, opts: { force?: boolea
       if (st === "launched") launched++; else pending++;
     }
     if (issues.length) {
-      const msg = `ABCOM003: ${issues.map((i) => i.message).join("; ")}. ${issues.length === 1 ? "Esse CC ficou" : "Esses CCs ficaram"} sem lançar; os demais foram importados.`;
+      const shown = issues.slice(0, 3).map((i) => i.message).join("; ");
+      const more = issues.length > 3 ? ` (e mais ${issues.length - 3})` : "";
+      const msg = `ABCOM003: ${shown}${more}. O que não conferiu ficou sem lançar; os demais CCs (${lines.length}) foram importados.`;
       out.push({ ym, file: f.name, launched, pending, error: msg });
       await log(ym, f, false, msg);
     } else {

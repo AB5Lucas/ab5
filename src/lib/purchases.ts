@@ -89,6 +89,7 @@ export function parsePurchaseReportChecked(rows: unknown[][], opts: { lenient?: 
   const value = (v: unknown) => num(typeof v === "string" ? v.replace(/R\$\s*/g, "").trim() : v);
   const map = new Map<string, CcLine>();
   let cur: CcLine | null = null;
+  let ccSeen = false;
   for (const [rowIndex, r] of rows.entries()) {
     const cells = r.map((c) => (typeof c === "string" ? c.trim() : c));
     const labels = cells.map(normalize);
@@ -103,16 +104,32 @@ export function parsePurchaseReportChecked(rows: unknown[][], opts: { lenient?: 
       if (!columns && !abcom) throw error("cabeçalho incompleto: faltam Código/Produto e Descrição");
       continue;
     }
-    const ccIdx = labels.findIndex((c) => c === "centrocusto" || c === "centrodecusto");
+    // Linha do centro de custo: o rótulo pode vir sozinho ("Centro Custo:" | "2118001" | "OBRA") ou junto com o
+    // código/nome na mesma célula ("Centro Custo: 1001001 - PINTURA PO"), conforme o relatório exportado.
+    const ccIdx = labels.findIndex((c) => /^(centrodecusto|centrocusto|ccusto)/.test(c) && !/^(centrodecusto|centrocusto)total/.test(c));
     if (ccIdx >= 0) {
-      const rest = cells.slice(ccIdx + 1).filter((c) => c !== "" && c != null);
-      const cc = String(rest[0] ?? "").replace(/\D/g, "");
+      const raw = String(cells[ccIdx] ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const inline = raw.replace(/^\s*(centro\s*(de\s*)?custo|c\.?\s*custo)\s*:?\s*/i, "");
+      const rest = [inline, ...cells.slice(ccIdx + 1).map((c) => String(c ?? "").trim())].filter((c) => c !== "");
+      const first = rest[0] ?? "";
+      const m = first.match(/^(\d{3,})\s*[-–:]?\s*(.*)$/);
+      const cc = m ? m[1]! : "";
       if (!cc) { cur = null; continue; }
-      cur = map.get(cc) ?? { cc, name: String(rest[1] ?? "").trim(), amount: 0, items: [] };
+      const name = (m?.[2] || rest[1] || "").trim();
+      cur = map.get(cc) ?? { cc, name, amount: 0, items: [] };
       map.set(cc, cur);
+      ccSeen = true;
       continue;
     }
-    if (!cur) continue;
+    if (!cur) {
+      // Item depois do "Total C/C" sem um novo "Centro Custo": nunca soma no CC anterior.
+      if (ccSeen && columns && /^[A-Z0-9]{3,}$/i.test(String(cells[columns.code] ?? "")) && numeric(cells[columns.total])) {
+        const detail = `item ${String(cells[columns.code])} na linha ${rowIndex + 1} sem centro de custo reconhecido`;
+        if (!opts.lenient) throw error(detail);
+        issues.push({ cc: "?", message: detail });
+      }
+      continue;
+    }
     if (labels.some((c) => c === "totalcc" || c === "totalcentrocusto")) {
       const subtotal = cells.filter(numeric);
       if (subtotal.length !== 1 || Math.abs(cur.amount - value(subtotal[0])) > 0.011) {
@@ -122,6 +139,7 @@ export function parsePurchaseReportChecked(rows: unknown[][], opts: { lenient?: 
         issues.push({ cc: cur.cc, message: detail });
         bad.add(cur.cc);
       }
+      cur = null;
       continue;
     }
     // O exportador ABCOM003 omite Código/Descrição e mescla cabeçalhos em
