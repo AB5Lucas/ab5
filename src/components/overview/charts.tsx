@@ -345,8 +345,9 @@ export function BilledVsCost({ data, format }: { data: { label: string; billed: 
 }
 
 /** Barra empilhada com legenda (composição de custos, situação do dia…). */
-export function StackBar({ parts, format }: { parts: { label: string; value: number; className: string }[]; format: (v: number) => string }) {
+export function StackBar({ parts, format, base }: { parts: { label: string; value: number; className: string }[]; format: (v: number) => string; base?: number }) {
   const total = parts.reduce((a, p) => a + p.value, 0) || 1;
+  const pctBase = base || total; // base = % sobre outro valor (ex.: faturado) só na legenda
   return (
     <div>
       <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
@@ -357,7 +358,7 @@ export function StackBar({ parts, format }: { parts: { label: string; value: num
           <div key={p.label} className="flex items-center gap-1.5">
             <span className={cn("h-2 w-2 rounded-full", p.className)} /><span className="text-muted-foreground">{p.label}</span>
             <span className="ml-auto tabular-nums">{format(p.value)}</span>
-            <span className="w-9 text-right tabular-nums text-muted-foreground">{Math.round((p.value / total) * 100)}%</span>
+            <span className="w-9 text-right tabular-nums text-muted-foreground">{Math.round((p.value / pctBase) * 100)}%</span>
           </div>
         ))}
       </div>

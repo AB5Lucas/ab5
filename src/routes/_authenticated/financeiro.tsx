@@ -148,13 +148,13 @@ function Overview() {
 
         {loading || !yms.length ? (yms.length ? <DashboardSkeleton /> : <p className="text-sm text-muted-foreground">Selecione ao menos um mês.</p>) : (
           <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
-            <OverviewCard title="Resultado do período" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Faturado, todas as despesas (imposto, MO, transporte, materiais) e a margem que sobra" className="min-h-0">
+            <OverviewCard title="Resultado do período" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Faturado, todas as despesas e a margem; os % são sobre o faturado" className="min-h-0">
               <div className="grid grid-cols-3 gap-2">
                 <div><p className="text-[11px] text-muted-foreground">Faturado</p><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.billed)} /></p></div>
                 <div><p className="text-[11px] text-muted-foreground">Despesas</p><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.spent)} /></p></div>
                 <div><p className="text-[11px] text-muted-foreground">Margem</p><p className={cn("font-display text-lg font-semibold tabular-nums", d.margin < 0 && "text-destructive")}><CountUp value={brlK(d.margin)} /></p></div>
               </div>
-              <div className="mt-3"><StackBar format={brlK} parts={[
+              <div className="mt-3"><StackBar format={brlK} base={d.billed} parts={[
                 { label: "Impostos", value: d.tax, className: "bg-foreground/25" },
                 { label: "Mão de obra", value: d.mo, className: "bg-foreground" },
                 { label: "Transporte", value: d.transport, className: "bg-foreground/60" },
