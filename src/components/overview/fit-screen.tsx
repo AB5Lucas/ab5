@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /** Tela de referência dos dashboards (área de conteúdo do monitor do Lucas). */
-const REF_W = 1480; // janela do navegador de referência
 const REF_H = 997;
 const CHROME_H = 104; // cabeçalho + margens (6,5rem), como antes
 
@@ -20,12 +19,12 @@ export function FitScreen({ children }: { children: ReactNode }) {
     const update = () => {
       if (window.innerWidth < 1024) return setFit(null);
       const availW = el.clientWidth;
-      const side = window.innerWidth - availW; // menu + margens laterais
-      const w = REF_W - side;
       const h = REF_H - CHROME_H;
       const availH = window.innerHeight - CHROME_H;
-      const scale = Math.max(0.4, Math.min(availW / w, availH / h));
-      setFit({ scale, w, h, ml: Math.max(0, availW - w * scale) / 2 });
+      // Altura manda (sem rolar); a largura sempre preenche a tela toda.
+      const scale = Math.max(0.5, Math.min(1.6, availH / h));
+      const w = availW / scale;
+      setFit({ scale, w, h, ml: 0 });
     };
     update();
     const ro = new ResizeObserver(update);
