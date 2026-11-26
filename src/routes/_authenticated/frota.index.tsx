@@ -351,7 +351,7 @@ function MaintCalendar({ ym, calFrom, calTo, range, today, maintDays, suggestion
                     const inRange = dt >= range.from && dt <= range.to;
                     return (
                       <Button variant="ghost" key={dt} style={{ animationDelay: `${days.indexOf(dt) * 18}ms` }} aria-label={`Selecionar dia ${brDay(dt)}`} aria-pressed={selected === dt} onClick={() => onSelect(dt)} title={ev.length ? ev.map((e) => `${e.plate} · ${e.kind === "rev" ? "Revisão" : "Manutenção"}`).join("\n") : brDay(dt)}
-                        className={cn("tile-snap h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-foreground hover:bg-foreground/10", selected === dt && "ring-2 ring-foreground bg-foreground/10", inMonth ? "bg-muted/50" : "opacity-35",
+                        className={cn("tile-snap h-full w-full min-w-0 items-stretch justify-start whitespace-normal flex min-h-0 flex-col gap-0.5 overflow-hidden rounded-md px-1 py-0.5 text-foreground hover:bg-foreground/10", selected === dt && "ring-2 ring-foreground bg-foreground/10", inMonth ? (sug.length ? "bg-foreground/[0.09] dark:bg-white/[0.11]" : "bg-muted/50") : "opacity-35",
                           inRange && "outline outline-1 outline-border", dt === today && "bg-foreground/10")}>
                         <span className={cn("text-[10px] tabular-nums", dt === today ? "font-bold" : "text-muted-foreground")}>{Number(dt.slice(8, 10))}</span>
                         {ev.slice(0, 2).map((e, i) => (
