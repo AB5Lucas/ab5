@@ -210,9 +210,6 @@ function ComprasPage() {
             <SelectContent><SelectItem value={ALL}>Todos</SelectItem>{months.map((m) => <SelectItem key={m} value={m}>{m.slice(5)}/{m.slice(0, 4)}</SelectItem>)}</SelectContent></Select></div>
         <div className="space-y-1"><Label>Início</Label><Input type="date" className="w-44" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
         <div className="space-y-1"><Label>Fim</Label><Input type="date" className="w-44" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-        <div className="space-y-1"><Label>Status</Label>
-          <Select value={status} onValueChange={setStatus}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value={ALL}>Todos</SelectItem><SelectItem value="launched">Lançados</SelectItem><SelectItem value="pending">Pendentes</SelectItem><SelectItem value="excluded">Excluídos</SelectItem></SelectContent></Select></div>
         <MultiFilter
           title="Categorias"
           mode="show"
@@ -223,6 +220,10 @@ function ComprasPage() {
           onChange={(vis) => setHiddenCats(new Set(PURCHASE_CATEGORIES.filter((c) => !vis.includes(c.key)).map((c) => c.key)))}
         />
         <div className="space-y-1"><Label>Busca</Label><Input className="w-64" placeholder="Item, código ou centro de custo" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        {/* Como no Faturamento: Todas / Lançadas / Pendentes. */}
+        <div className="flex gap-1">{([[ALL, "Todas"], ["launched", "Lançadas"], ["pending", "Pendentes"]] as const).map(([k, v]) => (
+          <Button key={k} size="sm" variant={status === k ? "default" : "outline"} onClick={() => setStatus(k)}>{v}</Button>
+        ))}</div>
       </div>
       <p className="text-sm text-muted-foreground">{items.length} itens · {brl(items.reduce((a, i) => a + i.amount, 0))}</p>
       <div className="rounded-lg border border-border">
