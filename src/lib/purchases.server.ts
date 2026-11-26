@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DRIVE, graph } from "./industry-sync.server";
-import { allocatePurchase, isIndustryClient, parsePurchaseReport, purchaseFileMonth, purchaseItemEntries, type CcItem, type PClient, type PWork } from "./purchases";
+import { STOCK_REASON, STOCK_WORK_NAME, allocatePurchase, isIndustryClient, parsePurchaseReport, purchaseFileMonth, purchaseItemEntries, type CcItem, type PClient, type PWork } from "./purchases";
 import { assetCategory, clientPurchaseExclusionReason, detectPurchaseAsset, effectivePurchaseCc, exclusionReason, installmentPlan, purchaseItemKeys, purchaseDecisionRequired, type AssetDecision, type ExclusionRule, type PurchaseItemState } from "./purchase-policy";
 import { purchaseMonthHours } from "./purchase-hours";
 
@@ -53,7 +53,7 @@ async function monthHours(ym: string) {
 async function loadRefs() {
   const [c, w, rules, redirects] = await Promise.all([
     supabaseAdmin.from("clients").select("id, name, cc_prefix, cc_alt_prefixes"),
-    supabaseAdmin.from("works").select("id, client_id, cc_suffix"),
+    supabaseAdmin.from("works").select("id, client_id, cc_suffix, is_stock"),
     supabaseAdmin.from("purchase_exclusion_rules").select("*"),
     supabaseAdmin.from("purchase_cc_redirects").select("*"),
   ]);
@@ -62,10 +62,38 @@ async function loadRefs() {
   if (rules.error) throw rules.error;
   if (redirects.error) throw redirects.error;
   const clients: PClient[] = (c.data ?? []).map((x) => ({ id: x.id, prefix: x.cc_prefix, altPrefixes: ((x as { cc_alt_prefixes?: string[] | null }).cc_alt_prefixes ?? []) }));
-  const works: PWork[] = (w.data ?? []).flatMap((x) => x.client_id ? [{ id: x.id, client_id: x.client_id, suffix: x.cc_suffix }] : []);
+  const works: PWork[] = (w.data ?? []).flatMap((x) => x.client_id ? [{ id: x.id, client_id: x.client_id, suffix: x.cc_suffix, stock: !!(x as { is_stock?: boolean }).is_stock }] : []);
   const industryClients = new Set((c.data ?? []).filter((x) => isIndustryClient(x.name)).map((x) => x.id));
   const industryWorkIds = new Set(works.filter((x) => industryClients.has(x.client_id)).map((x) => x.id));
   return { clients, works, clientNames: new Map((c.data ?? []).map((x) => [x.id, x.name])), industryWorkIds, rules: rules.data as ExclusionRule[], redirects: redirects.data };
+}
+
+/** Almoxarifado do cliente: serviço fictício (is_stock, inativo, fora da aba Serviços) que recebe as compras
+ * do cliente enquanto nenhum serviço dele tem movimentação no mês. */
+async function ensureStockWork(clientId: string, r: Awaited<ReturnType<typeof loadRefs>>) {
+  if (r.works.some((w) => w.client_id === clientId && w.stock)) return;
+  const { data: found } = await supabaseAdmin.from("works").select("id").eq("client_id", clientId).eq("is_stock" as never, true as never).limit(1).maybeSingle();
+  let id = (found as { id: string } | null)?.id;
+  if (!id) {
+    const { data, error } = await supabaseAdmin.from("works").insert({ name: STOCK_WORK_NAME, client_id: clientId, active: false, is_stock: true } as never).select("id").single();
+    if (error) throw error;
+    id = (data as { id: string }).id;
+  }
+  r.works.push({ id, client_id: clientId, suffix: null, stock: true });
+}
+
+/** Apaga os Almoxarifados que ficaram sem nenhum custo (o custo foi realocado para um serviço do cliente). */
+export async function cleanupStockWorks() {
+  const { data: stocks, error } = await supabaseAdmin.from("works").select("id").eq("is_stock" as never, true as never);
+  if (error) throw error;
+  let removed = 0;
+  for (const w of (stocks ?? []) as { id: string }[]) {
+    const { count } = await supabaseAdmin.from("work_entries").select("id", { count: "exact", head: true }).eq("work_id", w.id);
+    if (count) continue;
+    const { error: de } = await supabaseAdmin.from("works").delete().eq("id", w.id);
+    if (!de) removed++;
+  }
+  return removed;
 }
 
 /** Recalcula os lançamentos de uma linha (apaga e recria os gastos dela nos serviços). */
@@ -78,6 +106,14 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
   const cc = effectivePurchaseCc(line.cc_code, r.redirects, !!(line.target_client_id || line.target_work_id));
   let direction = { client_id: line.target_client_id, work_id: line.target_work_id };
   let alloc = allocatePurchase(cc, Number(line.amount), r.clients, r.works, hours, direction);
+  // Cliente sem serviço com movimentação: cria o Almoxarifado do cliente (serviço fictício) e lança nele.
+  if (alloc.status === "pending" && alloc.reason === STOCK_REASON) {
+    const clientId = direction.client_id ?? (r.clients.find((c) => c.prefix === cc.slice(0, 4)) ?? r.clients.find((c) => (c.altPrefixes ?? []).includes(cc.slice(0, 4))))?.id;
+    if (clientId) {
+      await ensureStockWork(clientId, r);
+      alloc = allocatePurchase(cc, Number(line.amount), r.clients, r.works, hours, direction);
+    }
+  }
   // Ficaria pendente sem decisão própria: reaproveita a última decisão manual do mesmo centro de custo.
   if (alloc.status === "pending" && !line.target_client_id && !line.target_work_id) {
     const { data: prev } = await supabaseAdmin.from("purchase_cc_lines").select("target_client_id, target_work_id")
@@ -171,6 +207,7 @@ export async function reprocessPurchases() {
   const { data, error } = await supabaseAdmin.from("purchase_cc_lines").select("id").order("ref_month");
   if (error) throw error;
   for (const line of data) await applyLine(line.id, refs, cache);
+  await cleanupStockWorks();
   return { processed: data.length };
 }
 
@@ -230,5 +267,6 @@ export async function executePurchaseSync(c: Credentials) {
     }
     out.push({ ym, file: f.name, launched, pending });
   }
+  await cleanupStockWorks(); // Almoxarifado que ficou sem custo (realocado para serviço do cliente) deixa de existir
   return out;
 }

@@ -3,7 +3,10 @@ export type CcItem = { code: string; desc: string; qty: number; amount: number; 
 export type CcLine = { cc: string; name: string; amount: number; items: CcItem[] };
 /** altPrefixes: outros prefixos de CC do mesmo cliente (clients.cc_alt_prefixes; ex.: 2111 GENERAL MILLS = Três Corações). */
 export type PClient = { id: string; prefix: string | null; altPrefixes?: string[] };
-export type PWork = { id: string; client_id: string; suffix: string | null };
+/** stock: serviço fictício "Almoxarifado" do cliente (works.is_stock). */
+export type PWork = { id: string; client_id: string; suffix: string | null; stock?: boolean };
+export const STOCK_REASON = "Nenhum serviço do cliente com movimentação no mês";
+export const STOCK_WORK_NAME = "Almoxarifado";
 export type Direction = { client_id?: string | null; work_id?: string | null };
 export type Allocation = { status: "launched" | "pending"; reason: string | null; parts: { work_id: string; amount: number }[] };
 
@@ -156,19 +159,26 @@ function split(total: number, ids: string[], hours: Map<string, number>) {
  * 1) Direcionamento manual para um serviço: valor total nele.
  * 2) Prefixo + sufixo cadastrados: rateio por horas entre os serviços com esse sufixo.
  * 3) Sem sufixo correspondente: serviços do cliente com movimentação no mês — 1 recebe o total, vários rateiam por horas.
- * 4) Sem cliente ou sem movimentação: pendente para direcionamento.
+ * 4) Cliente sem serviço com movimentação: vai para o Almoxarifado do cliente (serviço fictício, temporário);
+ *    sem Almoxarifado ainda, pendente com STOCK_REASON (o servidor cria o Almoxarifado e refaz).
+ * 5) Sem cliente: pendente para direcionamento.
  */
 export function allocatePurchase(cc: string, amount: number, clients: PClient[], works: PWork[], hours: Map<string, number>, dir?: Direction): Allocation {
   if (dir?.work_id) return { status: "launched", reason: null, parts: [{ work_id: dir.work_id, amount }] };
   const client = dir?.client_id ? clients.find((c) => c.id === dir.client_id) : clients.find((c) => c.prefix && c.prefix === cc.slice(0, 4)) ?? clients.find((c) => (c.altPrefixes ?? []).includes(cc.slice(0, 4)));
   if (!client) return { status: "pending", reason: "Nenhum cliente com este prefixo", parts: [] };
-  const own = works.filter((w) => w.client_id === client.id);
+  const all = works.filter((w) => w.client_id === client.id);
+  const stock = all.find((w) => w.stock);
+  const own = all.filter((w) => !w.stock);
   const suffix = cc.length > 4 ? cc.slice(4) : null;
   if (suffix && !dir?.client_id) {
     const match = own.filter((w) => w.suffix === suffix).map((w) => w.id);
     if (match.length) return { status: "launched", reason: null, parts: split(amount, match, hours) };
   }
   const moving = own.filter((w) => (hours.get(w.id) ?? 0) > 0).map((w) => w.id);
-  if (!moving.length) return { status: "pending", reason: "Nenhum serviço do cliente com movimentação no mês", parts: [] };
+  if (!moving.length) {
+    if (stock) return { status: "launched", reason: "Almoxarifado do cliente (nenhum serviço com movimentação no mês)", parts: [{ work_id: stock.id, amount }] };
+    return { status: "pending", reason: STOCK_REASON, parts: [] };
+  }
   return { status: "launched", reason: null, parts: split(amount, moving, hours) };
 }

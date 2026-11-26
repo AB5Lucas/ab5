@@ -1282,6 +1282,13 @@
       "when": 1795603855083,
       "tag": "0195_purchase_client_alt_prefixes",
       "breakpoints": true
+    },
+    {
+      "idx": 183,
+      "version": "7",
+      "when": 1795603856083,
+      "tag": "0196_works_stock",
+      "breakpoints": true
     }
   ]
 }

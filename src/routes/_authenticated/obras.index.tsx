@@ -148,7 +148,8 @@ function WorksPage() {
     queryKey: ["works", role, user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      const { data, error } = await supabase.from("works").select("*").order("name");
+      // O Almoxarifado do cliente (is_stock, fictício e temporário) não aparece na aba Serviços.
+      const { data, error } = await supabase.from("works").select("*").eq("is_stock", false).order("name");
       if (error) throw error;
       if (role === "coordenador" || role === "encarregado") {
         const { data: mine } = await supabase.from("foreman_works").select("work_id").eq("user_id", user!.id);

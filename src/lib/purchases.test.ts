@@ -135,3 +135,22 @@ describe("outros prefixos do cliente", () => {
     expect(a.parts[0]!.work_id).toBe("m");
   });
 });
+
+describe("Almoxarifado do cliente", () => {
+  const cs = [{ id: "ype", prefix: "2043" }];
+  it("sem serviço com movimentação e sem Almoxarifado: pendente para o servidor criar o Almoxarifado", () => {
+    const a = allocatePurchase("2043999", 459, cs, [], new Map());
+    expect(a.status).toBe("pending");
+    expect(a.reason).toBe("Nenhum serviço do cliente com movimentação no mês");
+  });
+  it("com o Almoxarifado criado: lança nele", () => {
+    const a = allocatePurchase("2043999", 459, cs, [{ id: "alm", client_id: "ype", suffix: null, stock: true }], new Map());
+    expect(a.status).toBe("launched");
+    expect(a.parts).toEqual([{ work_id: "alm", amount: 459 }]);
+  });
+  it("quando um serviço do cliente passa a ter movimentação, o custo vai para ele e sai do Almoxarifado", () => {
+    const ws = [{ id: "alm", client_id: "ype", suffix: null, stock: true }, { id: "s1", client_id: "ype", suffix: null }];
+    const a = allocatePurchase("2043999", 459, cs, ws, new Map([["s1", 8]]));
+    expect(a.parts).toEqual([{ work_id: "s1", amount: 459 }]);
+  });
+});

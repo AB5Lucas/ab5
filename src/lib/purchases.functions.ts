@@ -37,7 +37,10 @@ export const directPurchase = createServerFn({ method: "POST" }).middleware([req
     const up = await supabaseAdmin.from("purchase_cc_lines").update({ target_client_id: client, target_work_id: data.work_id, directed_by: context.userId }).eq("id", data.id);
     if (up.error) throw up.error;
     const { applyLine } = await import("./purchases.server");
-    return applyLine(data.id);
+    const res = await applyLine(data.id);
+    const { cleanupStockWorks } = await import("./purchases.server");
+    await cleanupStockWorks();
+    return res;
   });
 
 export const reprocessPurchasesNow = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
