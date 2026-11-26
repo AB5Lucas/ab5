@@ -237,7 +237,7 @@ function Overview() {
               <div className="min-h-0 flex-1 overflow-auto px-3 pb-2">
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
-                    <col /><col className="w-[9rem]" /><col className="w-[8.5rem]" /><col className="w-[8.5rem]" /><col className="w-[11rem]" /><col className="w-[9.5rem]" /><col className="w-[6.5rem]" /><col className="w-[8.5rem]" /><col className="w-[7.5rem]" />
+                    <col className="w-[22rem]" /><col /><col /><col /><col className="w-[12rem]" /><col /><col /><col /><col />
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-card text-[11px] uppercase tracking-wide text-muted-foreground">
                     <tr className="border-b">
@@ -298,20 +298,6 @@ function Overview() {
                       );
                     })}
                   </tbody>
-                  {shown.length > 0 && (
-                    <tfoot className="font-semibold">
-                      <tr>
-                        <td className="sticky bottom-0 border-t bg-card px-3 py-2">Total</td>
-                        <td className="sticky bottom-0 border-t bg-card px-3 text-right tabular-nums">{brl(d.billed)}</td>
-                        <td className="sticky bottom-0 border-t bg-card px-3"><OrderBar o={{ ordered: d.ordered, billed: d.billedToDate }} /></td>
-                        <td className="sticky bottom-0 border-t bg-card px-3 text-right tabular-nums">{brl(d.spent)}</td>
-                        <td className="sticky bottom-0 border-t bg-card px-3"><CostBar lines={d.lines} total={d.spent} /></td>
-                        <td className={cn("sticky bottom-0 border-t bg-card px-3 text-right tabular-nums", d.margin < 0 && "text-destructive")}>{brl(d.margin)}</td>
-                        <td className="sticky bottom-0 border-t bg-card px-3 text-center"><Chip pct={d.pct} margin={d.margin} /></td>
-                        <td className="sticky bottom-0 border-t bg-card" /><td className="sticky bottom-0 border-t bg-card" />
-                      </tr>
-                    </tfoot>
-                  )}
                 </table>
               </div>
             </div>
