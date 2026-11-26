@@ -48,10 +48,10 @@ function groupsOf(people: TeamPerson[], mode: Mode): Group[] {
   return list;
 }
 
-type Layout = { size: number; pos: Map<string, { x: number; y: number }>; heads: { key: string; label: string; n: number; x: number; y: number; w: number }[] };
+type Fit = { size: number; gap: number; cw: number; per: number; cols: number[] };
+type Layout = { size: number; pos: Map<string, { x: number; y: number }>; heads: { key: string; label: string; n: number; x: number; y: number; w: number }[]; pill: { id: string; x: number; y: number; w: number; h: number } | null };
 /** Maior círculo que cabe: grupos em blocos distribuídos em k colunas (o bloco vai para a coluna mais baixa). */
-function layoutOf(groups: Group[], W: number, H: number): Layout {
-  let best: Layout | null = null;
+function fitOf(groups: Group[], W: number, H: number): Fit | null {
   for (let size = 34; size >= 7; size--) {
     const gap = Math.max(2, Math.round(size * 0.2));
     for (let k = 1; k <= 4; k++) {
@@ -59,21 +59,67 @@ function layoutOf(groups: Group[], W: number, H: number): Layout {
       const per = Math.floor((cw + gap) / (size + gap));
       if (per < 1) continue;
       const colsH = Array(k).fill(0) as number[];
-      const pos = new Map<string, { x: number; y: number }>();
-      const heads: Layout["heads"] = [];
+      const cols: number[] = [];
       for (const g of groups) {
         const c = colsH.indexOf(Math.min(...colsH));
-        const x0 = c * (cw + COL_GAP), y0 = colsH[c]!;
-        heads.push({ key: g.key, label: g.label, n: g.ids.length, x: x0, y: y0, w: cw });
-        g.ids.forEach((id, i) => pos.set(id, { x: x0 + (i % per) * (size + gap), y: y0 + HEAD + Math.floor(i / per) * (size + gap) }));
-        colsH[c] = y0 + HEAD + Math.ceil(g.ids.length / per) * (size + gap) - gap + BLOCK_GAP;
+        cols.push(c);
+        colsH[c] = colsH[c]! + HEAD + Math.ceil(g.ids.length / per) * (size + gap) - gap + BLOCK_GAP;
       }
-      if (Math.max(...colsH) - BLOCK_GAP <= H) { best = { size, pos, heads }; break; }
+      if (Math.max(...colsH) - BLOCK_GAP <= H) return { size, gap, cw, per, cols };
     }
-    if (best) break;
   }
-  return best ?? { size: 7, pos: new Map(), heads: [] };
+  return null;
 }
+/** Largura (em casas) do balão aberto ao passar o mouse: cabe o nome e o local. */
+const PILL_PX = 150;
+/**
+ * Posições de cada círculo. Com alguém no mouse, ele ocupa várias casas (o balão): os seguintes do grupo andam para a
+ * frente e descem de linha; perto da borda direita o balão abre para a esquerda e quem estava ali vai para depois dele.
+ * Os blocos abaixo na mesma coluna descem junto.
+ */
+function placeOf(groups: Group[], f: Fit, hover: string | null): Layout {
+  const { size, gap, cw, per } = f;
+  const step = size + gap;
+  const cells = Math.max(2, Math.min(per, Math.ceil((PILL_PX + gap) / step)));
+  const colsH: number[] = [];
+  const pos = new Map<string, { x: number; y: number }>();
+  const heads: Layout["heads"] = [];
+  let pill: Layout["pill"] = null;
+  groups.forEach((g, gi) => {
+    const c = f.cols[gi]!;
+    const x0 = c * (cw + COL_GAP), y0 = colsH[c] ?? 0;
+    heads.push({ key: g.key, label: g.label, n: g.ids.length, x: x0, y: y0, w: cw });
+    const hi = hover && per > 1 ? g.ids.indexOf(hover) : -1;
+    // Casa de cada item: sem balão, a própria posição.
+    const cellOf = (j: number) => j;
+    let place = cellOf;
+    let pillCell = -1;
+    if (hi >= 0) {
+      const col = hi % per;
+      const s0 = col + cells <= per ? hi : hi - (col + cells - per);
+      pillCell = s0;
+      place = (j) => (j < s0 ? j : j < hi ? j + cells : j === hi ? s0 : j + cells - 1);
+    }
+    let used = g.ids.length;
+    g.ids.forEach((id, j) => {
+      const k = place(j);
+      pos.set(id, { x: x0 + (k % per) * step, y: y0 + HEAD + Math.floor(k / per) * step });
+      used = Math.max(used, k + 1);
+    });
+    if (hi >= 0) {
+      used = Math.max(used, pillCell + cells);
+      const ph = Math.max(size, 34);
+      const pp = pos.get(hover!)!;
+      pill = { id: hover!, x: pp.x, y: pp.y - (ph - size) / 2, w: cells * step - gap, h: ph };
+    }
+    colsH[c] = y0 + HEAD + Math.ceil(used / per) * step - gap + BLOCK_GAP;
+  });
+  return { size, pos, heads, pill };
+}
+
+/** Primeiro e segundo nome (pula de/da/do/dos/das/e). */
+const twoNames = (n: string) => n.trim().split(/\s+/).filter((w, i) => i === 0 || !/^(d[aeo]s?|e)$/i.test(w)).slice(0, 2)
+  .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
 
 export function TeamMosaic({ people, title }: { people: TeamPerson[]; title: string }) {
   const [mode, setMode] = useState<Mode>("status");
@@ -91,7 +137,8 @@ export function TeamMosaic({ people, title }: { people: TeamPerson[]; title: str
   // Entrada: um quadro com tudo no centro, depois os círculos se espalham.
   useEffect(() => { if (!box.w) return; const t = setTimeout(() => setReady(true), 60); return () => clearTimeout(t); }, [box.w]);
   const groups = useMemo(() => groupsOf(people, mode), [people, mode]);
-  const L = useMemo(() => (box.w && box.h ? layoutOf(groups, box.w, box.h) : null), [groups, box.w, box.h]);
+  const fit = useMemo(() => (box.w && box.h ? fitOf(groups, box.w, box.h) : null), [groups, box.w, box.h]);
+  const L = useMemo(() => (fit ? placeOf(groups, fit, hover) : null), [groups, fit, hover]);
   const groupOf = useMemo(() => { const m = new Map<string, string>(); for (const g of groups) for (const id of g.ids) m.set(id, g.key); return m; }, [groups]);
   const byId = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
   useEffect(() => setSel(null), [mode]);
@@ -125,19 +172,27 @@ export function TeamMosaic({ people, title }: { people: TeamPerson[]; title: str
         {L && people.map((p, i) => {
           const q = L.pos.get(p.id) ?? { x: box.w / 2, y: box.h / 2 };
           const m = STATUS_META[p.status];
-          const x = ready ? q.x : box.w / 2 - L.size / 2, y = ready ? q.y : box.h / 2 - L.size / 2;
+          const open = L.pill?.id === p.id ? L.pill : null;
+          const x = !ready ? box.w / 2 - L.size / 2 : open ? open.x : q.x;
+          const y = !ready ? box.h / 2 - L.size / 2 : open ? open.y : q.y;
           const dim = sel && groupOf.get(p.id) !== sel;
+          const where = p.status === "sem" ? "Sem escala" : p.status === "patio" ? "Pátio" : p.detail;
           return (
             <span key={p.id} onMouseEnter={() => setHover(p.id)}
-              className={cn("absolute left-0 top-0 flex items-center justify-center rounded-full font-semibold leading-none",
-                "transition-[transform,width,height,opacity] duration-[900ms] [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
-                m.dot, m.text, hover === p.id && "z-10")}
+              className={cn("absolute left-0 top-0 flex items-center overflow-hidden rounded-full font-semibold leading-none",
+                "transition-[transform,width,height,opacity,box-shadow] duration-[700ms] [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
+                m.dot, m.text, open ? "z-10 justify-start shadow-lg" : "justify-center", open && (p.status === "sem" || p.status === "ausente") && "bg-card")}
               style={{
-                width: L.size, height: L.size, fontSize: Math.max(7, L.size * 0.36),
-                transform: `translate(${x}px, ${y}px) scale(${!ready ? 0 : hover === p.id ? 1.35 : 1})`,
-                opacity: dim ? 0.15 : 1, transitionDelay: `${Math.min(i, 220) * (ready ? 2.5 : 0)}ms`,
+                width: open ? open.w : L.size, height: open ? open.h : L.size, fontSize: Math.max(7, L.size * 0.36),
+                transform: `translate(${x}px, ${y}px) scale(${ready ? 1 : 0})`,
+                opacity: dim ? 0.15 : 1, transitionDelay: open || hover ? "0ms" : `${Math.min(i, 220) * (ready ? 2.5 : 0)}ms`,
               }}>
-              {L.size >= 20 ? initials(p.name) : null}
+              {open ? (
+                <span className="ov-fade flex min-w-0 flex-col gap-0.5 px-3 text-left" style={{ animationDuration: "0.45s", animationDelay: "120ms" }}>
+                  <span className="truncate text-[11.5px] font-semibold leading-tight">{twoNames(p.name)}</span>
+                  <span className="truncate text-[10px] font-normal leading-tight opacity-75">{where}</span>
+                </span>
+              ) : L.size >= 20 ? initials(p.name) : null}
             </span>
           );
         })}
