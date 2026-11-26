@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, BadgeCheck, Check, ChevronsLeft, ChevronsRight, Columns3, Eye, FileText, Info, Link2, Loader2, Paperclip, Send, Sparkles, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,8 +27,6 @@ import { brl, itemStatusClass, statusClass, statusDot } from "@/lib/purchase-req
 import { summarizeRecommendation } from "@/lib/purchase-quotes.functions";
 import { cn } from "@/lib/utils";
 
-export const FA_DIRECTOR = "cfd87887-421e-48f6-871c-a229e8634700";
-export const FA_VITORIA = "01d11e92-6fa0-4a73-acd8-9561d98de54e";
 const RATEIO = "Rateio geral do cliente";
 
 /** Bolinha do indicador contra a verba (acima vermelho, igual laranja, abaixo verde). */
@@ -47,23 +45,21 @@ function budgetText(total: number | null | undefined, budget: number | null | un
   return { label: total == null ? "Sem cotação" : "Sem verba", cls: "text-muted-foreground" };
 }
 
-/** Quem pode aprovar agora (igual a purchase_fa_can_decide no banco). */
-/** Lado de quem aprova na aprovação dupla (igual a purchase_fa_side): gestor do cliente/validador, senão comprador. */
-export function faSide(uid: string | undefined, who: { isBuyer: boolean; isGestor: boolean }): "gestor" | "comprador" | null {
-  if (!uid) return null;
-  if (who.isGestor) return "gestor";
-  if (uid === FA_VITORIA || who.isBuyer) return "comprador";
-  return null;
+/** O que a pessoa pode fazer no Aprovador, pelas Alçadas (purchase_fa_my_perms no banco). */
+export type FaPerms = { exec: boolean; oper: boolean; shared: boolean; editor: boolean; decide: Set<string> };
+export function useFaPerms() {
+  const { user } = useCurrentUser();
+  return useQuery({
+    queryKey: ["fa-perms", user?.id], enabled: !!user?.id, staleTime: 30_000,
+    queryFn: async (): Promise<FaPerms> => {
+      const { data, error } = await supabase.rpc("purchase_fa_my_perms" as never);
+      if (error) throw error;
+      const d = (data ?? {}) as { exec?: boolean; oper?: boolean; shared?: boolean; editor?: boolean; decide?: string[] };
+      return { exec: !!d.exec, oper: !!d.oper, shared: !!d.shared, editor: !!d.editor, decide: new Set(d.decide ?? []) };
+    },
+  });
 }
-/** Quem pode aprovar agora (igual a purchase_fa_can_decide no banco). */
-export function canDecide(r: RecData["req"], uid: string | undefined, who: { isBuyer: boolean; isGestor: boolean } = { isBuyer: false, isGestor: false }): boolean {
-  if (!uid || r.fa_state !== "em_aprovacao") return false;
-  const rule = approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO(), !!r.fa_over_items);
-  if (uid === FA_DIRECTOR) return true;
-  if (rule === "verba") return uid === FA_VITORIA;
-  if (rule === "dupla") { const side = faSide(uid, who); return !!side && side !== r.fa_partial_side; }
-  return false;
-}
+const isProgrammed = (r: { nature?: string | null }) => (r.nature ?? "").toUpperCase() === "PROGRAMADA";
 
 type Col = ColumnDef<RecRow> & { cell: (r: RecRow) => ReactNode; className?: string; fixed?: boolean };
 
@@ -85,6 +81,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   const { user, isAdmin } = useCurrentUser();
   const { canAccess } = useAccess();
   const isBuyer = isAdmin || canAccess("/compras/comprador");
+  const perms = useFaPerms();
   const ownHistory = useActionHistory();
   const history = outerHistory ?? ownHistory;
   useUndoRedoKeys(ownHistory, !outerHistory);
@@ -106,6 +103,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   const [sort, setSort] = useState<ColumnSort>(null);
   const invalidate = () => Promise.all([
     qc.invalidateQueries({ queryKey: ["sc-rec", requestId] }), qc.invalidateQueries({ queryKey: ["sc-rec-all"] }), qc.invalidateQueries({ queryKey: ["sc-requests"] }),
+    qc.invalidateQueries({ queryKey: ["fa-perms"] }),
   ]);
 
   const d = data.data;
@@ -187,7 +185,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
       if (error) throw error;
     },
     onSuccess: () => {
-      const partial = outcome !== "recusada" && r?.fa_rule !== "verba" && approvalRule(Number(r?.fa_total ?? 0), r?.fa_budget == null ? null : Number(r.fa_budget), r?.due_date ?? null, todayISO(), !!r?.fa_over_items) === "dupla" && user?.id !== FA_DIRECTOR && !r?.fa_partial_side;
+      const partial = outcome !== "recusada" && r?.fa_rule !== "verba" && approvalRule(Number(r?.fa_total ?? 0), r?.fa_budget == null ? null : Number(r.fa_budget), r?.due_date ?? null, todayISO(), !!r?.fa_over_items, !!r && isProgrammed(r)) === "dupla" && !perms.data?.exec && !r?.fa_partial_side;
       toast.success(partial ? "Sua aprovação foi registrada: falta a do outro lado (comprador ou gestor)"
         : outcome === "aprovada" ? "Aprovada: todos os itens aprovados"
         : outcome === "parcial" ? `Aprovada parcialmente: ${faCount.approved + faCount.pending} aprovados, ${faCount.rejected} recusados`
@@ -253,8 +251,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   const supplierOf = (x: RecRow) => x.chosen?.quote.supplier ?? (x.chosen ? "Fornecedor sem nome" : "");
   const critLabel = criteria.map((c) => CRITERIA.find((k) => k.value === c)?.label ?? c).join(" + ");
 
-  const who = { isBuyer, isGestor };
-  const mayDecide = mode === "aprovacao" && canDecide(r, user?.id, who);
+  const mayDecide = mode === "aprovacao" && !!perms.data?.decide.has(r.id);
   const cols: Col[] = [
     { key: "item", label: "Item", values: (x) => [String(x.item.item_no)], sort: (x) => x.item.item_no, fixed: true, cell: (x) => x.item.item_no },
     { key: "qty", label: "Qtd", values: (x) => [String(x.item.quantity)], sort: (x) => Number(x.item.quantity), className: "tabular-nums", cell: (x) => x.item.quantity },
@@ -352,8 +349,8 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   });
   const totalIdx = visible.findIndex((c) => c.key === "best_total");
   const rule = r.fa_state === "em_aprovacao"
-    ? approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO(), !!r.fa_over_items)
-    : approvalRule(rec.total, budget, r.due_date, todayISO(), itemsOverBudget(rec.rows));
+    ? approvalRule(Number(r.fa_total ?? 0), r.fa_budget == null ? null : Number(r.fa_budget), r.due_date, todayISO(), !!r.fa_over_items, isProgrammed(r))
+    : approvalRule(rec.total, budget, r.due_date, todayISO(), itemsOverBudget(rec.rows), isProgrammed(r));
   const overCount = rec.rows.filter((x) => itemsOverBudget([x])).length;
   const applyCriteria = (n: Criterion[]) => {
     const before = criteria;
@@ -429,7 +426,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
           {mode === "comprador" && r.fa_state === "em_aprovacao" && (
             <Button variant="outline" size="sm" disabled={recall.isPending} onClick={() => recall.mutate()}><Undo2 className="h-4 w-4" /> Puxar da aprovação</Button>
           )}
-          {mode === "aprovacao" && r.fa_ack_needed && user?.id === FA_DIRECTOR && (
+          {mode === "aprovacao" && r.fa_ack_needed && !!perms.data?.exec && (
             <Button size="sm" disabled={ack.isPending} onClick={() => ack.mutate()}><BadgeCheck className="h-4 w-4" /> Dar ciência</Button>
           )}
         </div>
@@ -477,7 +474,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
 
       <FaBanner r={r} userName={userName} rule={rule} />
       {mode === "aprovacao" && partialWaiting && !mayDecide && (
-        <p className="rounded-md bg-muted p-2 text-xs">Aguardando a aprovação do {r.fa_partial_side === "gestor" ? "comprador" : "gestor"}.</p>
+        <p className="rounded-md bg-muted p-2 text-xs">Aguardando a aprovação do {r.fa_partial_side === "gestor" ? "nível Operacional" : "gestor da obra"}.</p>
       )}
       {!embedded && <ScHeaderCard r={r} clientName={clientName} />}
 
@@ -660,7 +657,7 @@ function FaBanner({ r, userName, rule }: { r: RecData["req"]; userName: Map<stri
         <b>Em aprovação</b> desde {when(r.fa_sent_at)}{r.fa_sent_by ? ` · enviada por ${userName.get(r.fa_sent_by) ?? "—"}` : ""} · total {brl(r.fa_total)} · verba {brl(r.fa_budget)}
         <div className="text-xs text-muted-foreground">{RULE_LABEL[rule]}</div>
         {r.fa_partial_side && (
-          <div className="mt-1 text-xs"><b>Aprovação dupla:</b> aprovada por {userName.get(r.fa_partial_by ?? "") ?? "—"} ({r.fa_partial_side}) em {when(r.fa_partial_at)} · falta o {r.fa_partial_side === "gestor" ? "comprador" : "gestor"}</div>
+          <div className="mt-1 text-xs"><b>Aprovação dupla:</b> aprovada por {userName.get(r.fa_partial_by ?? "") ?? "—"} ({r.fa_partial_side === "gestor" ? "gestor da obra" : "Operacional"}) em {when(r.fa_partial_at)} · falta o {r.fa_partial_side === "gestor" ? "nível Operacional" : "gestor da obra"}</div>
         )}
         {r.fa_notes && <div className="mt-1 text-xs"><b>Comprador:</b> {r.fa_notes}</div>}
       </div>
@@ -674,8 +671,8 @@ function FaBanner({ r, userName, rule }: { r: RecData["req"]; userName: Map<stri
         <b>{part ? "Aprovada parcialmente" : ok ? "Aprovada" : "Recusada"}</b>{r.fa_decided_by ? ` por ${userName.get(r.fa_decided_by) ?? "—"}` : ""} em {when(r.fa_decided_at)}
         {part ? " · comprar só os itens aprovados." : ok ? " · comprar com os fornecedores escolhidos." : " · refaça a recomendação e envie de novo."}
         {r.fa_decision_notes && <div className="mt-1 text-xs"><b>{ok ? "Observação" : "Motivo"}:</b> {r.fa_decision_notes}</div>}
-        {r.fa_ack_needed && <div className="mt-1 text-xs text-orange-600">Aprovação dupla: pendente a ciência do Marcelo Barrella.</div>}
-        {!r.fa_ack_needed && r.fa_ack_at && <div className="mt-1 text-xs text-muted-foreground">Ciência do Marcelo em {when(r.fa_ack_at)}.</div>}
+        {r.fa_ack_needed && <div className="mt-1 text-xs text-orange-600">Pendente a ciência do nível Executivo.</div>}
+        {!r.fa_ack_needed && r.fa_ack_at && <div className="mt-1 text-xs text-muted-foreground">Ciência do Executivo em {when(r.fa_ack_at)}.</div>}
       </div>
     );
   }

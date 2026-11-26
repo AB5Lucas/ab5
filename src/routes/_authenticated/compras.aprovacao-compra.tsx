@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScTable, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
-import { FA_DIRECTOR, FA_VITORIA, RecommendationView } from "@/components/compras/recommendation-view";
+import { RecommendationView, useFaPerms } from "@/components/compras/recommendation-view";
+import { AlcadasPanel } from "@/components/compras/alcadas";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { recCols, useRecTotals } from "@/components/compras/rec-list";
 
 export const Route = createFileRoute("/_authenticated/compras/aprovacao-compra")({
@@ -35,7 +37,9 @@ function Page() {
   const list = useScRequests("final-approval", (q) => q.not("fa_state", "is", null));
   const clients = useClientsList();
   const clientName = useMemo(() => new Map((clients.data ?? []).map((c) => [c.id, c.name])), [clients.data]);
-  const seesAll = uid === FA_DIRECTOR || role === "admin" || canAccess("/compras/comprador");
+  const perms = useFaPerms();
+  const seesAll = !!perms.data?.exec || role === "admin" || canAccess("/compras/comprador");
+  const [tab, setTab] = useState("aprovador");
   // Gestor (cadastro do cliente: gestor/substituto, ou o validador da SC): só as SCs dos clientes dele.
   const gestorIds = useQuery({
     queryKey: ["fa-gestor-ids", uid],
@@ -44,7 +48,7 @@ function Page() {
   });
   const mine = (list.data ?? []).filter((r) => {
     if (seesAll) return true;
-    if (uid === FA_VITORIA) return true;
+    if (perms.data?.oper || perms.data?.shared) return true;
     return gestorIds.data?.has(r.id) || r.fa_decided_by === uid || r.fa_partial_by === uid;
   });
   const by: Record<View, (r: ScRow) => boolean> = {
@@ -62,6 +66,12 @@ function Page() {
   return (
     <div className="space-y-4">
       <PageHeader title="Aprovador" description="Recomendações de compra enviadas pelo comprador. Abra a SC, escolha Aprovado ou Recusado e envie de volta ao comprador." />
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="aprovador">Aprovador</TabsTrigger>
+          <TabsTrigger value="alcadas">Alçadas</TabsTrigger>
+        </TabsList>
+        <TabsContent value="aprovador" className="mt-4 space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label className="block text-xs">Mostrar</Label>
@@ -69,14 +79,14 @@ function Page() {
             <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="pendentes">Em aprovação ({count("pendentes")})</SelectItem>
-              <SelectItem value="ciencia">Aguardando ciência do Marcelo ({count("ciencia")})</SelectItem>
+              <SelectItem value="ciencia">Aguardando ciência do Executivo ({count("ciencia")})</SelectItem>
               <SelectItem value="decididas">Aprovadas/recusadas ({count("decididas")})</SelectItem>
               <SelectItem value="todas">Todas ({count("todas")})</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <p className="text-xs text-muted-foreground">
-          Compras acima da verba com prazo em até 2 dias: aprovação dupla (Comprador + Gestor; depois a ciência do Marcelo)
+          Compras acima da verba com prazo em até 2 dias: aprovação dupla (Operacional + Gestor da obra; depois a ciência do Executivo)
         </p>
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
@@ -84,6 +94,9 @@ function Page() {
           <Button size="sm" variant="outline" onClick={() => open(r.id)}><Eye className="h-3.5 w-3.5" /> Abrir</Button>
         )} />
       )}
+        </TabsContent>
+        <TabsContent value="alcadas" className="mt-4"><AlcadasPanel /></TabsContent>
+      </Tabs>
     </div>
   );
 }

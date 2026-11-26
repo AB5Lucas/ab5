@@ -1331,6 +1331,13 @@
       "when": 1795713693790,
       "tag": "0202_purchase_fa_partial_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1795713753790,
+      "tag": "0203_purchase_alcadas",
+      "breakpoints": true
     }
   ]
 }

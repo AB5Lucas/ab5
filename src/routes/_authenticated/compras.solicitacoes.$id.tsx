@@ -30,7 +30,8 @@ import { ScImportButtons, type ScImportItem } from "@/components/compras/sc-impo
 import { PastePrint } from "@/components/compras/paste-print";
 import { useActionHistory, useUndoRedoKeys } from "@/hooks/use-action-history";
 import { QuotesAttachDialog } from "@/components/compras/quotes";
-import { RecommendationView, canDecide } from "@/components/compras/recommendation-view";
+import { ReturnScDialog } from "@/components/compras/return-dialog";
+import { RecommendationView, useFaPerms } from "@/components/compras/recommendation-view";
 
 export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")({
   head: () => ({ meta: [{ title: "Solicitação de Compra | AB5 Hub" }, { name: "description", content: "Itens da solicitação de compra (modelo FR-CPS-SC)." }] }),
@@ -153,6 +154,7 @@ function Page() {
   // Comprador: aba Recomendação de compras, cotações, edição do cabeçalho (com histórico) e desfazer/refazer.
   const [scTab, setScTab] = useState<"itens" | "recomendacao">(tabParam === "recomendacao" ? "recomendacao" : "itens");
   const [attachOpen, setAttachOpen] = useState(false);
+  const [returning, setReturning] = useState(false);
   const buyerHistory = useActionHistory();
   // Aprovador com a SC em aprovação: só a Recomendação de compras (com status por item e resumo da IA), sem a aba Solicitação.
   const faGestorIds = useQuery({
@@ -161,8 +163,8 @@ function Page() {
     queryFn: async () => new Set(((await supabase.rpc("purchase_fa_my_gestor_ids" as never)).data as unknown as string[] | null) ?? []),
   });
   const faIsGestor = !!faGestorIds.data?.has(id);
-  const approverView = !!r && r.fa_state === "em_aprovacao"
-    && canDecide(r as never, user?.id, { isBuyer: isAdmin || canAccess("/compras/comprador"), isGestor: faIsGestor });
+  const faPerms = useFaPerms();
+  const approverView = !!r && r.fa_state === "em_aprovacao" && !!faPerms.data?.decide.has(id);
   useUndoRedoKeys(buyerHistory, isBuyer && !editMode && !approverView);
   const buyerCanEdit = isBuyer && r?.fa_state !== "em_aprovacao";
   const headerEdits = useQuery({
@@ -521,6 +523,7 @@ function Page() {
         <div className="ml-auto flex gap-2">
           {isBuyer && <UndoRedoButtons undoLabels={buyerHistory.undoLabels} redoLabels={buyerHistory.redoLabels} onUndo={(n) => void buyerHistory.undo(n)} onRedo={(n) => void buyerHistory.redo(n)} />}
           {buyerCanEdit && <Button variant="outline" size="sm" onClick={() => setAttachOpen(true)}><Paperclip className="h-4 w-4" /> Cotações</Button>}
+          {buyerCanEdit && !approverView && <Button variant="outline" size="sm" title="Devolver ao validador ou ao solicitante" onClick={() => setReturning(true)}><Undo2 className="h-4 w-4" /> Devolver</Button>}
           {canEdit && !editMode && <Button variant="outline" size="sm" onClick={() => setEditMode(true)}><Pencil className="h-4 w-4" /> Editar</Button>}
           {editable && <UndoRedoButtons undoLabels={history.undoLabels} redoLabels={history.redoLabels} onUndo={undo} onRedo={redo} />}
           {editable && <Button variant="outline" size="sm" onClick={() => setEditingHeader(true)}><Pencil className="h-4 w-4" /> Editar cabeçalho</Button>}
@@ -769,6 +772,7 @@ function Page() {
 
       </>
       )}
+      <ReturnScDialog sc={returning && r ? { id: r.id, number: r.number } : null} onClose={() => setReturning(false)} onDone={() => navigate({ to: "/compras/comprador" })} />
       {attachOpen && <QuotesAttachDialog row={r} onClose={() => setAttachOpen(false)} onDone={() => { setScTab("recomendacao"); void qc.invalidateQueries({ queryKey: ["sc-rec", id] }); }} />}
 
       <Dialog open={deciding !== null} onOpenChange={(o) => { if (!o) { setDeciding(null); setDecNotes(""); } }}>

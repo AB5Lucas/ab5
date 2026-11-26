@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApproversPanel } from "@/components/compras/approvers";
+import { ReturnScDialog } from "@/components/compras/return-dialog";
 import { ScReportButton } from "@/components/compras/sc-report-dialog";
 import { Pill, ScTable, todayISO, StatusFilter, statusCounts, useClientsList, useScRequests, type ScRow } from "@/components/compras/sc-shared";
 import { SC_DONE_STATUSES, SC_STATUSES, statusClass } from "@/lib/purchase-requests";
@@ -38,16 +39,6 @@ function Page() {
   const [edit, setEdit] = useState<ScRow | null>(null);
   const [form, setForm] = useState({ status: "", notes: "", date: "" });
   const [returning, setReturning] = useState<ScRow | null>(null);
-  const [reason, setReason] = useState("");
-  const [target, setTarget] = useState<"validador" | "solicitante">("validador");
-  const giveBack = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc("purchase_request_return", { _id: returning!.id, _notes: reason, _target: target });
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success(target === "validador" ? "Devolvida ao validador" : "Devolvida ao solicitante"); setReturning(null); setReason(""); qc.invalidateQueries({ queryKey: ["sc-requests"] }); },
-    onError: (e: Error) => toast.error(e.message),
-  });
   // Cancelar a SC inteira (com motivo).
   const [cancelling, setCancelling] = useState<ScRow | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -83,7 +74,7 @@ function Page() {
         <TabsList>
           <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
           <TabsTrigger value="recomendacao">Recomendação</TabsTrigger>
-          <TabsTrigger value="aprovadores">Validadores</TabsTrigger>
+          <TabsTrigger value="aprovadores">Solicitantes</TabsTrigger>
         </TabsList>
         <TabsContent value="solicitacoes" className="mt-4 space-y-4">
           <div className="flex flex-wrap items-end gap-3">
@@ -105,7 +96,7 @@ function Page() {
             <ScTable rows={rows} clientName={clientName} actions={(r) => (
               <div className="flex gap-1">
                 <Button size="sm" variant="outline" onClick={() => { setEdit(r); setForm({ status: r.status, notes: r.buyer_notes ?? "", date: r.status_at }); }}><Pencil className="h-3.5 w-3.5" /> Status</Button>
-                <Button size="sm" variant="ghost" title="Devolver ao validador ou ao solicitante" onClick={() => { setReturning(r); setReason(""); setTarget("validador"); }}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
+                <Button size="sm" variant="ghost" title="Devolver ao validador ou ao solicitante" onClick={() => setReturning(r)}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>
                 {r.stage === "compras" && <Button size="sm" variant="ghost" className="text-destructive" title="Cancelar a SC inteira" onClick={() => { setCancelling(r); setCancelReason(""); }}><Ban className="h-3.5 w-3.5" /> Cancelar</Button>}
               </div>
             )} endActions={(r) => {
@@ -130,31 +121,7 @@ function Page() {
         <TabsContent value="aprovadores" className="mt-4"><ApproversPanel /></TabsContent>
       </Tabs>
       <QuotesAttachDialog row={attachRow} onClose={() => setAttachRow(null)} onDone={(id) => openRec(id)} />
-      <Dialog open={!!returning} onOpenChange={(o) => !o && setReturning(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Devolver a SC</DialogTitle>
-            <DialogDescription>{returning?.number}. Para quem ela volta?</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Devolver para">
-            {([["validador", "Validador", "Volta para a Validação: o validador revisa e valida de novo."], ["solicitante", "Solicitante", "Volta para rascunho: o solicitante edita e envia de novo."]] as const).map(([v, l, d]) => (
-              <button key={v} type="button" role="radio" aria-checked={target === v} onClick={() => setTarget(v)}
-                className={`rounded-md border p-3 text-left text-sm ${target === v ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}>
-                <div className="font-medium">{l}</div>
-                <div className="text-xs text-muted-foreground">{d}</div>
-              </button>
-            ))}
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="ret-notes">Motivo da devolução</Label>
-            <Textarea id="ret-notes" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReturning(null)}>Cancelar</Button>
-            <Button disabled={giveBack.isPending || !reason.trim()} onClick={() => giveBack.mutate()}>Devolver</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReturnScDialog sc={returning} onClose={() => setReturning(null)} />
       <Dialog open={!!cancelling} onOpenChange={(o) => !o && setCancelling(null)}>
         <DialogContent>
           <DialogHeader>
