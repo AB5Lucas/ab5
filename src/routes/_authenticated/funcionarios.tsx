@@ -8,6 +8,7 @@ import { useAccess } from "@/hooks/use-access";
 import { Big, Donut, HoverBars, OverviewCard } from "@/components/overview/charts";
 import { Pie3D } from "@/components/overview/pie-3d";
 import { CountUp } from "@/components/count-up";
+import { SummaryHead, SummaryPanel, SummaryRow } from "@/components/overview/patio-calendar";
 import { cn } from "@/lib/utils";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 import { DOC_WARN_DAYS } from "@/lib/doc-status";
@@ -25,6 +26,7 @@ const addDays = (iso: string, n: number) => isoOf(new Date(Date.parse(`${iso}T12
 const todayIso = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const brDay = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const daysBetween = (from: string, to: string) => { const out: string[] = []; for (let d = from; d <= to; d = addDays(d, 1)) out.push(d); return out; };
+const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const byName = (a: string, b: string) => a.localeCompare(b, "pt-BR");
 
 type Period = "hoje" | "amanha" | "semana" | "mes";
@@ -108,6 +110,13 @@ function Overview() {
       .gte("scheduled_date", R.from).lte("scheduled_date", R.to).neq("status", "cancelado").order("id").range(a, b)),
   });
 
+  // Treinamentos do mês inteiro (quadradinhos), independentemente do filtro.
+  const trQ = useQuery({
+    queryKey: ["overview", "func-tr", mFrom, mTo], staleTime: 60_000, placeholderData: keepPreviousData,
+    queryFn: async () => fetchAll<any>((a, b) => supabase.from("appointments").select("id, status, scheduled_date, collaborator_id, trainings(name)")
+      .eq("type", "treinamento").gte("scheduled_date", mFrom).lte("scheduled_date", mTo).neq("status", "cancelado").order("id").range(a, b)),
+  });
+
   const d = useMemo(() => {
     if (!cadQ.data || !absQ.data || !apQ.data || !docsQ.data) return null;
     const collabs = cadQ.data.collabs;
@@ -153,7 +162,8 @@ function Overview() {
     // Contratações em aberto.
     const open = cadQ.data.hiring.filter((h) => HIRING_OPEN.has(h.status));
     const vagas = open.reduce((a, h) => a + Math.max(0, (h.quantity ?? 1) - (h.filled ?? 0)), 0);
-    const closedPeriod = cadQ.data.hiring.filter((h) => h.status === "atendida").length;
+    const live = cadQ.data.hiring.filter((h) => h.status !== "cancelada");
+    const filled = live.reduce((a, h) => a + Math.min(h.quantity ?? 1, h.filled ?? 0), 0);
 
     // Vencimentos de ASO dos ativos (Consulta).
     const lastAso = new Map<string, any>();
@@ -173,7 +183,7 @@ function Overview() {
 
     return {
       total: active.length, contract, hired, notice: notice.map((c: any) => ({ name: c.full_name as string, end: c.notice_end as string | null })).sort((a: any, b: any) => byName(a.name, b.name)),
-      absParts, absAll, absSeries, absToday, apTypes, apTotal: ap.length, apDone, apLate, open, vagas, closedPeriod, aso, functions,
+      absParts, absAll, absSeries, absToday, apTypes, apTotal: ap.length, apDone, apLate, open, vagas, filled, aso, functions,
     };
   }, [cadQ.data, absQ.data, apQ.data, docsQ.data, R.from, R.to, today, mFrom, mTo, qFrom, qTo]);
 
@@ -198,7 +208,7 @@ function Overview() {
         </div>
       </div>
       {!d ? <DashboardSkeleton /> : (
-        <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
+        <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)_12rem]">
           <OverviewCard dark title="Colaboradores ativos" to="/colaboradores" linkLabel="Abrir Colaboradores" hint="Colaboradores ativos no cadastro, por tipo de contrato" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
             <div className="flex items-baseline justify-between gap-2">
               <Big dark value={d.total} />
@@ -235,17 +245,28 @@ function Overview() {
             </div>
           </OverviewCard>
 
-          <OverviewCard title="Contratações em aberto" to="/demandas/contratacoes" linkLabel="Abrir Contratações" hint="Solicitações de contratação abertas ou em andamento e vagas ainda não preenchidas" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
-            <div className="flex items-baseline gap-2"><Big value={d.vagas} /><span className="text-xs text-muted-foreground">{d.vagas === 1 ? "vaga" : "vagas"} · {d.open.length} {d.open.length === 1 ? "solicitação" : "solicitações"}</span></div>
-            <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-hidden text-[11px]">
-              {!d.open.length && <p className="py-3 text-center text-muted-foreground">Nenhuma em aberto · {d.closedPeriod} atendidas</p>}
-              {d.open.slice(0, 4).map((h: any, i: number) => (
-                <div key={h.id} className="ov-fade flex items-center justify-between gap-2 border-b border-border/60 pb-1 last:border-0" style={{ animationDelay: `${i * 70}ms` }}>
-                  <span className="min-w-0 truncate"><b>{h.position_name ?? "—"}</b><span className="text-muted-foreground"> · {h.clients?.name ?? "—"}</span></span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">{h.filled ?? 0}/{h.quantity ?? 1}</span>
+          <OverviewCard title="Contratações" to="/demandas/contratacoes" linkLabel="Abrir Contratações" hint="Vagas das solicitações de contratação (canceladas fora): atendidas e a atender" className="min-h-0">
+            {(() => {
+              const tot = d.filled + d.vagas;
+              return (
+                <div className="grid grid-cols-2 items-center gap-3">
+                  <div className="min-w-0 space-y-2">
+                    <div>
+                      <div className="font-display text-3xl font-semibold leading-none tabular-nums"><CountUp value={d.vagas} /></div>
+                      <p className="text-[11px] text-muted-foreground">a atender · {d.open.length} {d.open.length === 1 ? "solicitação" : "solicitações"}</p>
+                    </div>
+                    <div>
+                      <div className="font-display text-xl font-semibold leading-none tabular-nums"><CountUp value={d.filled} /></div>
+                      <p className="text-[11px] text-muted-foreground">atendidas</p>
+                    </div>
+                    <div className="flex flex-wrap gap-[3px]" aria-hidden="true">
+                      {Array.from({ length: Math.min(tot, 24) }, (_, i) => <span key={i} className={cn("tile-snap h-2 w-2 rounded-[2px]", i < Math.round((d.filled / Math.max(1, tot)) * Math.min(tot, 24)) ? "bg-foreground" : "border border-dashed border-border bg-muted/40")} style={{ animationDelay: `${i * 30}ms` }} />)}
+                    </div>
+                  </div>
+                  <Donut frac={tot ? d.filled / tot : 0} center={tot ? `${Math.round((d.filled / tot) * 100)}%` : "—"} sub="atendidas" size="h-36 w-36" />
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </OverviewCard>
 
           <OverviewCard title="ASO dos ativos" to="/consulta" linkLabel="Abrir Consulta" hint={`Situação do ASO de cada colaborador ativo hoje (vencendo = próximos ${DOC_WARN_DAYS} dias)`} className="min-h-0">
@@ -265,32 +286,25 @@ function Overview() {
             })()}
           </OverviewCard>
 
-          <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas diferentes com folga, férias, atestado ou falta no período (quadros da Programação + Ausências). Clique numa fatia para ver as pessoas." className="min-h-0" bodyClassName="flex min-h-0 flex-col">
-            <Pie3D total={d.absAll} totalLabel="pessoas ausentes" parts={d.absParts} unit={["pessoa", "pessoas"]} />
-          </OverviewCard>
-
-          <OverviewCard dark title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
-            <Big dark value={d.absToday} />
-            <p className="text-xs text-background/60">ausentes hoje · média {Math.round(d.absSeries.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.absSeries.filter((s) => s.value).length))} por dia</p>
-            <div className="mt-auto pt-2"><HoverBars dark data={d.absSeries} format={(v) => `${v} ausentes`} height="h-28" /></div>
-          </OverviewCard>
-
-          <OverviewCard title="Pessoas por função" to="/colaboradores" linkLabel="Abrir Colaboradores" hint="Colaboradores ativos por função (todos os níveis juntos)" className="min-h-0" bodyClassName="min-h-0 overflow-y-auto pr-1">
-            <FunctionBars rows={d.functions} />
-          </OverviewCard>
-
-          <OverviewCard title="Em aviso prévio" to="/colaboradores" linkLabel="Abrir Colaboradores" hint="Colaboradores ativos com aviso prévio no período e a data de fim" className="min-h-0" bodyClassName="flex min-h-0 flex-col">
-            <Big value={d.notice.length} />
-            <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1 text-xs">
-              {!d.notice.length && <p className="py-6 text-center text-muted-foreground">Ninguém em aviso prévio.</p>}
-              {d.notice.map((n: any, i: number) => (
-                <div key={n.name} className="ov-fade flex justify-between gap-2 border-b border-border/60 py-1.5 last:border-0" style={{ animationDelay: `${i * 50}ms` }}>
-                  <span className="truncate">{n.name}</span>
-                  <span className={cn("shrink-0 tabular-nums", n.end && n.end < today ? "font-medium" : "text-muted-foreground")}>{n.end ? `até ${brDay(n.end)}` : "—"}</span>
-                </div>
-              ))}
+          <OverviewCard title={`Treinamentos por dia — ${MONTHS[Number(ym.slice(5, 7)) - 1]}`} to="/documentos/agendamentos" linkLabel="Abrir Agendamentos"
+            hint="Pessoas em treinamento em cada dia do mês (realizados e agendados; cancelados fora). Clique num dia para ver só ele." className="min-h-0 pb-6 md:col-span-2 xl:col-span-3 xl:row-start-2" bodyClassName="min-h-0">
+            <div className="h-full min-h-0" onClick={(e) => e.preventDefault()}>
+              {trQ.data ? <TrainingTiles rows={trQ.data} from={mFrom} to={mTo} today={today} /> : null}
             </div>
           </OverviewCard>
+          <OverviewCard title="Pessoas por função" to="/colaboradores" linkLabel="Abrir Colaboradores" hint="Colaboradores ativos por função (todos os níveis juntos)" className="min-h-0 xl:col-start-4 xl:row-span-2 xl:row-start-2" bodyClassName="min-h-0 overflow-y-auto pr-1">
+            <FunctionBars rows={d.functions} />
+          </OverviewCard>
+          <OverviewCard title={`Ausências — ${pLabel}`} to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas diferentes com folga, férias, atestado ou falta no período (quadros da Programação + Ausências). Clique numa fatia para ver as pessoas." className="min-h-0 xl:col-start-1 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
+            <Pie3D total={d.absAll} totalLabel="pessoas ausentes" parts={d.absParts} unit={["pessoa", "pessoas"]} compact />
+          </OverviewCard>
+
+          <OverviewCard dark title="Ausentes por dia" to="/ausencias" linkLabel="Abrir Ausências" hint="Pessoas ausentes em cada dia do mês (folga, férias, atestado ou falta)" className="min-h-0 xl:col-span-2 xl:row-start-3" bodyClassName="flex min-h-0 flex-col">
+            <div className="flex items-baseline gap-2"><Big dark value={d.absToday} /><p className="text-xs text-background/60">ausentes hoje · média {Math.round(d.absSeries.filter((s) => s.value).reduce((a, s) => a + s.value, 0) / Math.max(1, d.absSeries.filter((s) => s.value).length))} por dia</p></div>
+            <div className="mt-auto pt-2"><HoverBars dark data={d.absSeries} format={(v) => `${v} ausentes`} height="h-14" /></div>
+          </OverviewCard>
+
+
         </div>
       )}
     </div>
@@ -310,6 +324,74 @@ function FunctionBars({ rows }: { rows: { name: string; n: number }[] }) {
           <span className="text-right tabular-nums text-muted-foreground">{r.n}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Treinamentos em quadradinhos, como o quadro de RDOs: cada coluna = dia do mês, cada quadradinho = pessoas em treinamento
+ * (escuro = realizado, médio = agendado, contorno vermelho suave = agendado em dia passado). Clicar num dia mostra o resumo dele.
+ */
+function TrainingTiles({ rows, from, to, today }: { rows: any[]; from: string; to: string; today: string }) {
+  const [sel, setSel] = useState<number | null>(null);
+  const days = daysBetween(from, to);
+  const cols = days.map((x) => {
+    const list = rows.filter((r) => r.scheduled_date === x);
+    const done = list.filter((r) => r.status === "realizado").length;
+    return { key: x, label: String(Number(x.slice(8, 10))), title: brDay(x), list, done, sched: list.length - done, late: x < today ? list.length - done : 0 };
+  });
+  const top = Math.max(1, ...cols.map((c) => c.list.length));
+  const ROWS_MAX = 8;
+  const per = Math.max(1, Math.ceil(top / ROWS_MAX));
+  const nRows = Math.max(4, Math.ceil(top / per));
+  const c0 = sel != null ? cols[sel] : undefined;
+  const list = c0 ? c0.list : rows;
+  const done = list.filter((r) => r.status === "realizado").length;
+  const sched = list.length - done;
+  const late = c0 ? c0.late : cols.reduce((a, c) => a + c.late, 0);
+  const pct = (v: number) => (list.length ? `${((v / list.length) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "—");
+  const byTraining = new Map<string, number>();
+  for (const r of list) { const n = r.trainings?.name ?? "—"; byTraining.set(n, (byTraining.get(n) ?? 0) + 1); }
+  const topTr = [...byTraining.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const step = cols.length > 16 ? 2 : 1;
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-4 md:flex-row">
+      <div className="h-full min-h-0 min-w-0 flex-1">
+        <div className="flex h-full items-end gap-[3px] overflow-hidden">
+          {cols.map((col, ci) => {
+            const f = Math.ceil(col.done / per), s = Math.ceil(col.sched / per);
+            return (
+              <button key={col.key} type="button" onClick={() => setSel(sel === ci ? null : ci)} title={`${col.title}: ${col.done} realizados, ${col.sched} agendados`}
+                className={cn("flex flex-1 flex-col items-stretch justify-end gap-[3px] rounded-md p-[2px] transition-colors", ci === sel && "bg-muted ring-1 ring-border", col.key === today && ci !== sel && "ring-1 ring-foreground/30")}>
+                {Array.from({ length: nRows }, (_, r) => {
+                  const fromBottom = nRows - 1 - r;
+                  const cls = fromBottom < f ? "bg-foreground"
+                    : fromBottom < f + s ? (col.late ? "bg-foreground/45 ring-1 ring-destructive/50" : "bg-foreground/45")
+                    : "border border-dashed border-border bg-muted/40";
+                  return <span key={r} className={cn("ov-grow aspect-square max-h-6 w-full rounded-[4px]", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
+                })}
+                <span className="mt-1 shrink-0 text-center text-[10px] tabular-nums text-muted-foreground">{ci % step === 0 || ci === sel ? col.label : "\u00a0"}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <SummaryPanel>
+        <SummaryHead label={c0 ? c0.title : "Resumo do mês"} value={list.length} sub={`treinamentos · ${new Set(list.map((r) => r.collaborator_id)).size} pessoas`} />
+        <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+          <div className="h-full bg-foreground transition-[width] duration-700" style={{ width: list.length ? `${(done / list.length) * 100}%` : 0 }} />
+          <div className="h-full bg-foreground/45 transition-[width] duration-700" style={{ width: list.length ? `${(sched / list.length) * 100}%` : 0 }} />
+        </div>
+        <div className="space-y-0.5">
+          <SummaryRow dot="bg-foreground" label="Realizados" value={done} sub={pct(done)} />
+          <SummaryRow dot="bg-foreground/45" label="Agendados" value={sched} sub={pct(sched)} />
+          {late > 0 && <SummaryRow dot="bg-foreground/45 ring-1 ring-destructive/50" label="Atrasados" value={late} sub={pct(late)} />}
+        </div>
+        <div className="space-y-0.5 text-[11px]">
+          {topTr.map(([n, v]) => <div key={n} className="flex justify-between gap-2"><span className="truncate text-muted-foreground">{n}</span><b className="tabular-nums">{v}</b></div>)}
+        </div>
+        <p className="mt-auto text-[10px] leading-relaxed text-muted-foreground">{c0 ? "Clique de novo para ver o mês" : "Clique num dia para ver só ele"}<br />1 quadradinho = {per} {per === 1 ? "pessoa" : "pessoas"}</p>
+      </SummaryPanel>
     </div>
   );
 }

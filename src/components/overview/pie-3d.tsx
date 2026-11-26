@@ -22,12 +22,14 @@ const toneFill = (tone: number, side = false) =>
  * Clicar numa fatia: a pizza encolhe para o canto, as outras fatias somem e a lista entra; clicar de novo na fatia
  * (pizza pequena) faz o caminho inverso.
  */
-export function Pie3D({ total, totalLabel, parts, unit = ["pessoa", "pessoas"], badge }: {
+export function Pie3D({ total, totalLabel, parts, unit = ["pessoa", "pessoas"], badge, compact }: {
   total: number; totalLabel: string; parts: PiePart[];
   /** Singular e plural do que está na lista. */
   unit?: [string, string];
   /** Texto do círculo de cada linha (padrão: iniciais). */
   badge?: (name: string) => string;
+  /** Sem altura mínima (quadro baixo). */
+  compact?: boolean;
 }) {
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function Pie3D({ total, totalLabel, parts, unit = ["pessoa", "pessoas"], 
   });
   const stop = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); };
   return (
-    <div className="relative min-h-[14rem] flex-1 overflow-hidden" onClick={stop}>
+    <div className={cn("relative flex-1 overflow-hidden", compact ? "min-h-[10rem]" : "min-h-[14rem]")} onClick={stop}>
       {/* Pizza: no centro com a legenda; com fatia escolhida, encolhe para o canto de cima. */}
       <div className={cn("absolute flex items-center gap-4 transition-all duration-700 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
         "left-0 top-0", cur ? "h-16 w-16" : "h-full w-full")}>
