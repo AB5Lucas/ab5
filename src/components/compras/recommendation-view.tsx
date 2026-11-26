@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, BadgeCheck, Check, ChevronsLeft, ChevronsRight, Columns3, Eye, FileText, Info, Link2, Paperclip, Send, Undo2 } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Check, ChevronsLeft, ChevronsRight, Columns3, Eye, FileText, Info, Link2, Loader2, Paperclip, Send, Sparkles, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
@@ -22,7 +22,8 @@ import { QuoteMatchingDialog, QuotesAttachDialog, importRequesterQuotes, openQuo
 import {
   CRITERIA, RULE_LABEL, approvalRule, budgetSignal, nextOption, prevOption, recommendation, scBudget, type Criterion, type FaRule, type RecRow,
 } from "@/lib/purchase-quotes";
-import { brl, statusDot } from "@/lib/purchase-requests";
+import { brl, itemStatusClass, statusDot } from "@/lib/purchase-requests";
+import { summarizeRecommendation } from "@/lib/purchase-quotes.functions";
 import { cn } from "@/lib/utils";
 
 export const FA_DIRECTOR = "cfd87887-421e-48f6-871c-a229e8634700";
@@ -191,6 +192,27 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   // Observação da decisão (início da digitação), para o desfazer. Fica antes dos retornos: hooks sempre na mesma ordem.
   const notesStart = useRef<string | null>(null);
   const [confirmValor, setConfirmValor] = useState<Criterion[] | null>(null);
+  // Aprovação item a item: recusa pede motivo; resumo geral pela IA.
+  const [refuse, setRefuse] = useState<{ id: string; no: number; desc: string; before: string; beforeReason: string | null } | null>(null);
+  const [refuseReason, setRefuseReason] = useState("");
+  const [aiText, setAiText] = useState<string | null>(null);
+  const rpcItem = async (item: string, status: string, reason: string | null) => {
+    const { error } = await supabase.rpc("purchase_fa_item_decide" as never, { _item: item, _status: status, _reason: reason ?? "" } as never);
+    if (error) { toast.error(error.message); throw error; }
+    await invalidate();
+  };
+  const itemDecide = useMutation({
+    mutationFn: async (v: { item: string; no: number; status: string; reason: string | null; before: string; beforeReason: string | null }) => { await rpcItem(v.item, v.status, v.reason); return v; },
+    onSuccess: (v) => {
+      setRefuse(null); setRefuseReason("");
+      history.push({ label: `Item ${v.no}: ${v.status === "APROVADO" ? "Aprovado" : "Recusado"}`, undo: () => rpcItem(v.item, v.before, v.beforeReason), redo: () => rpcItem(v.item, v.status, v.reason) });
+    },
+  });
+  const aiSummary = useMutation({
+    mutationFn: async (context: string) => (await summarizeRecommendation({ data: { requestId, context } })).summary,
+    onSuccess: (t) => setAiText(t || "A IA não devolveu texto."),
+    onError: (e: Error) => { setAiText(null); toast.error(e.message); },
+  });
   useEffect(() => {
     if (imported.current || mode !== "comprador" || !d || d.req.stage !== "compras" || d.req.fa_state === "em_aprovacao" || !isBuyer) return;
     imported.current = true;
@@ -213,6 +235,8 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   const supplierOf = (x: RecRow) => x.chosen?.quote.supplier ?? (x.chosen ? "Fornecedor sem nome" : "");
   const critLabel = criteria.map((c) => CRITERIA.find((k) => k.value === c)?.label ?? c).join(" + ");
 
+  const who = { isBuyer, isGestor };
+  const mayDecide = mode === "aprovacao" && canDecide(r, user?.id, who);
   const cols: Col[] = [
     { key: "item", label: "Item", values: (x) => [String(x.item.item_no)], sort: (x) => x.item.item_no, fixed: true, cell: (x) => x.item.item_no },
     { key: "qty", label: "Qtd", values: (x) => [String(x.item.quantity)], sort: (x) => Number(x.item.quantity), className: "tabular-nums", cell: (x) => x.item.quantity },
@@ -259,6 +283,39 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
           </div>
         );
       } },
+    { key: "status", label: "Status", values: (x) => [full(x).status], fixed: mode === "aprovacao", className: "whitespace-nowrap",
+      cell: (x) => {
+        const it = full(x);
+        const inFa = ["APROVAÇÃO PENDENTE", "APROVADO", "RECUSADO"].includes(it.status);
+        const reason = it.status === "RECUSADO" ? it.fa_item_reason : null;
+        if (mayDecide && inFa) {
+          return (
+            <div className="space-y-0.5">
+              <Select value={it.status === "APROVAÇÃO PENDENTE" ? "" : it.status} disabled={itemDecide.isPending}
+                onValueChange={(v) => {
+                  if (v === it.status) return;
+                  if (v === "RECUSADO") { setRefuseReason(""); setRefuse({ id: it.id, no: it.item_no, desc: it.description, before: it.status, beforeReason: it.fa_item_reason ?? null }); return; }
+                  itemDecide.mutate({ item: it.id, no: it.item_no, status: v, reason: null, before: it.status, beforeReason: it.fa_item_reason ?? null });
+                }}>
+                <SelectTrigger className={cn("h-7 w-44 rounded-md border-0 px-2 text-[11px]", itemStatusClass(it.status))}>
+                  <SelectValue placeholder="APROVAÇÃO PENDENTE" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="APROVADO"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Aprovado</span></SelectItem>
+                  <SelectItem value="RECUSADO"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-red-500" /> Recusado</span></SelectItem>
+                </SelectContent>
+              </Select>
+              {reason && <div className="max-w-44 truncate text-[11px] text-muted-foreground" title={reason}>Motivo: {reason}</div>}
+            </div>
+          );
+        }
+        return (
+          <div className="space-y-0.5">
+            <Pill className={itemStatusClass(it.status)} title={reason ? `Motivo: ${reason}` : undefined}>{it.status}</Pill>
+            {reason && <div className="max-w-44 truncate text-[11px] text-muted-foreground" title={reason}>Motivo: {reason}</div>}
+          </div>
+        );
+      } },
     { key: "budget", label: "Verba (R$)", values: (x) => [brl(x.item.budget)], sort: (x) => x.item.budget, className: "whitespace-nowrap tabular-nums", cell: (x) => brl(x.item.budget) },
     { key: "budget_state", label: "Situação da verba", values: (x) => [budgetText(x.chosen?.total, x.item.budget).label], className: "whitespace-nowrap",
       cell: (x) => { const t = budgetText(x.chosen?.total, x.item.budget); return <span className={cn("text-xs font-medium", t.cls)}>{t.label}</span>; } },
@@ -283,9 +340,24 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
     const before = criteria;
     setCriteria.mutate(n, { onSuccess: () => history.push({ label: `Critérios: ${n.map((k) => CRITERIA.find((c) => c.value === k)?.label).join(" + ")}`, undo: () => rpcCriteria(before), redo: () => rpcCriteria(n) }) });
   };
-  const who = { isBuyer, isGestor };
-  const mayDecide = mode === "aprovacao" && canDecide(r, user?.id, who);
   const partialWaiting = r.fa_state === "em_aprovacao" && !!r.fa_partial_side;
+  // Retrato da SC para o resumo da IA (geral).
+  const aiContext = () => {
+    const rr = r as RecData["req"] & { justification?: string | null; nature?: string | null; priority?: string | null; category?: string | null };
+    const lines = [
+      `SC ${r.number} · cliente ${clientName.get(r.client_id ?? "") ?? "—"} · categoria ${rr.category ?? "—"} · natureza ${rr.nature ?? "—"} · prioridade ${rr.priority ?? "—"} · prazo de entrega ${r.due_date ?? "—"}`,
+      `Justificativa: ${rr.justification ?? "—"}`,
+      `Critérios da escolha: ${critLabel}`,
+      `Total recomendado: ${brl(r.fa_state === "em_aprovacao" ? Number(r.fa_total ?? rec.total) : rec.total)} · verba da SC: ${brl(budget)} · ${budgetSignal(rec.total, budget).label}`,
+      `Regra de aprovação: ${RULE_LABEL[rule] ?? rule}`,
+      r.fa_notes ? `Observação do comprador: ${r.fa_notes}` : "",
+      `Cotações analisadas: ${readQuotes.length}`,
+      ...readQuotes.map((q) => `- Cotação ${q.supplier ?? "sem nome"}${q.source === "solicitante" ? " (do solicitante)" : ""}: total ${brl(q.total)}, pagamento ${q.payment_terms ?? (q.payment_days != null ? `${q.payment_days} dias` : "?")}, entrega ${q.delivery_days != null ? `${q.delivery_days} dias` : "?"}, frete ${brl(q.freight)}`),
+      "Itens:",
+      ...rec.rows.map((x) => `- ${x.item.item_no}. ${x.item.quantity} ${x.item.unit} ${x.item.description} · verba ${brl(x.item.budget)} · ${x.chosen ? `escolhido ${supplierOf(x)} ${brl(x.chosen.unitPrice)} un. = ${brl(x.chosen.total)}${x.manual ? ` (troca manual: ${x.index + 1}ª opção)` : ""}` : "sem cotação"} · ${x.options.length} opções · status ${full(x).status}${full(x).fa_item_reason ? ` (motivo: ${full(x).fa_item_reason})` : ""}`),
+    ];
+    return lines.filter(Boolean).join("\n");
+  };
   // Aprovador: desfazer/refazer da escolha (Aprovado/Recusado) e da observação antes de enviar.
   const changeDecision = (v: typeof decision) => {
     const before = decision;
@@ -310,6 +382,13 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
           )}
           {!outerHistory && (mode === "aprovacao" ? mayDecide : editable) && (
             <UndoRedoButtons undoLabels={history.undoLabels} redoLabels={history.redoLabels} onUndo={(n) => void history.undo(n)} onRedo={(n) => void history.redo(n)} />
+          )}
+          {mode === "aprovacao" && (
+            <Button variant="outline" size="sm" disabled={aiSummary.isPending} title="Resumo geral da SC feito pela IA"
+              className="border-violet-400/50 text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
+              onClick={() => aiSummary.mutate(aiContext())}>
+              {aiSummary.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Resumo IA ✨
+            </Button>
           )}
           {editable && <Button variant="outline" size="sm" onClick={() => setAttach(true)}><Paperclip className="h-4 w-4" /> Cotações</Button>}
           {editable && readQuotes.length > 0 && <Button variant="outline" size="sm" onClick={() => setMatching(true)}><Link2 className="h-4 w-4" /> Vincular itens</Button>}
@@ -438,6 +517,42 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmValor(null)}>Manter o Valor</Button>
             <Button variant="destructive" onClick={() => { const n = confirmValor!; setConfirmValor(null); applyCriteria(n); }}>Desativar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!refuse} onOpenChange={(o) => { if (!o) setRefuse(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recusar o item {refuse?.no}</DialogTitle>
+            <DialogDescription>{refuse?.desc}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <Label htmlFor="fa-item-reason" className="block">Justificativa da recusa <span className="text-destructive">*</span></Label>
+            <Textarea id="fa-item-reason" rows={3} autoFocus value={refuseReason} onChange={(e) => setRefuseReason(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefuse(null)}>Cancelar</Button>
+            <Button variant="destructive" disabled={!refuseReason.trim() || itemDecide.isPending}
+              onClick={() => refuse && itemDecide.mutate({ item: refuse.id, no: refuse.no, status: "RECUSADO", reason: refuseReason.trim(), before: refuse.before, beforeReason: refuse.beforeReason })}>
+              Recusar item
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={aiText != null} onOpenChange={(o) => { if (!o) setAiText(null); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-violet-500" /> Resumo da IA · {r.number}</DialogTitle>
+            <DialogDescription>Resumo geral da solicitação e da recomendação. Confira os valores na tabela antes de decidir.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm leading-relaxed">{aiText}</div>
+          <DialogFooter>
+            <Button variant="outline" disabled={aiSummary.isPending} onClick={() => aiSummary.mutate(aiContext())}>
+              {aiSummary.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Gerar de novo
+            </Button>
+            <Button onClick={() => setAiText(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -17,6 +17,7 @@ import type { ScRow } from "@/components/compras/sc-shared";
 export type RecItem = {
   id: string; item_no: number; quantity: number; unit: string; description: string; budget: number | null; notes: string | null;
   work_id: string | null; cc_code: string | null; rec_quote_item_id: string | null; status: string; quote_path: string | null; link_url: string | null;
+  fa_item_reason?: string | null; fa_item_by?: string | null; fa_item_at?: string | null;
 };
 export type RecData = {
   req: ScRow; items: RecItem[]; quotes: QuoteLite[]; qItems: QuoteItemLite[];
@@ -31,7 +32,7 @@ export function useRecData(id: string | null) {
     queryFn: async (): Promise<RecData | null> => {
       const [r, it, q] = await Promise.all([
         supabase.from("purchase_requests").select("*").eq("id", id!).maybeSingle(),
-        supabase.from("purchase_request_items").select("id, item_no, quantity, unit, description, budget, notes, work_id, cc_code, rec_quote_item_id, status, quote_path, link_url").eq("request_id", id!).order("item_no"),
+        supabase.from("purchase_request_items").select("id, item_no, quantity, unit, description, budget, notes, work_id, cc_code, rec_quote_item_id, status, quote_path, link_url, fa_item_reason, fa_item_by, fa_item_at").eq("request_id", id!).order("item_no"),
         supabase.from("purchase_quotes").select("*").eq("request_id", id!).order("created_at"),
       ]);
       if (r.error) throw r.error;

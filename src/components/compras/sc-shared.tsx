@@ -48,7 +48,7 @@ export function useScRequests(key: string, filter: (q: any) => any) {
   });
 }
 
-export function Pill({ children, className, title }: { children: ReactNode; className?: string; title?: string }) {
+export function Pill({ children, className, title }: { children: ReactNode; className?: string; title?: string | undefined }) {
   return <span title={title} className={cn("inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium", className)}>{children}</span>;
 }
 

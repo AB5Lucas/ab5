@@ -129,3 +129,35 @@ export const readPurchaseQuote = createServerFn({ method: "POST" })
     return { ok: rows.length > 0, error: rows.length ? null : "Nenhum item encontrado na cotação", items: rows.length, supplier: r.supplier };
     }
   });
+
+/**
+ * Resumo geral da recomendação para o aprovador (botão "Resumo IA ✨"): a tela monta o retrato (itens, escolhas,
+ * cotações, verba, regra e observações) e a IA devolve um resumo curto em português, do conjunto, não item a item.
+ * Só lê; a RLS confere que o usuário enxerga a SC.
+ */
+export const summarizeRecommendation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { requestId: string; context: string }) => {
+    if (!d?.requestId || typeof d.requestId !== "string" || typeof d.context !== "string") throw new Error("Dados inválidos");
+    return { requestId: d.requestId, context: d.context.slice(0, 40000) };
+  })
+  .handler(async ({ data, context }) => {
+    const { data: r, error } = await context.supabase.from("purchase_requests").select("id").eq("id", data.requestId).maybeSingle();
+    if (error) throw error;
+    if (!r) throw new Error("SC não encontrada ou sem acesso");
+    const key = process.env["LOVABLE_API_KEY"];
+    if (!key) throw new Error("IA não configurada (LOVABLE_API_KEY)");
+    const prompt = `Você ajuda o aprovador de compras de uma empresa de manutenção industrial. Abaixo estão os dados de uma solicitação de compra (SC) com a recomendação do comprador.
+Escreva em português do Brasil um RESUMO GERAL para decidir a aprovação (não descreva item por item):
+- 1 frase com o que está sendo comprado e para quê (cliente/justificativa);
+- valor total recomendado x verba (diga se está acima, no limite ou dentro e a diferença em R$);
+- fornecedores escolhidos (quantos, os principais e quanto cada um concentra), condições de pagamento e prazos de entrega;
+- quantas cotações foram analisadas e se a escolha seguiu a melhor opção pelos critérios (cite trocas manuais do comprador, se houver);
+- pontos de atenção (itens sem cotação, acima da verba, prazo apertado, fornecedor único, frete) e a regra de aprovação.
+Seja objetivo: no máximo 8 linhas curtas em tópicos com "•", valores em R$ no formato brasileiro, sem inventar dados.
+
+DADOS:
+${data.context}`;
+    const text = await askAi(key, [{ type: "text", text: prompt }]);
+    return { summary: text.trim() };
+  });

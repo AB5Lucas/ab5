@@ -30,7 +30,7 @@ import { ScImportButtons, type ScImportItem } from "@/components/compras/sc-impo
 import { PastePrint } from "@/components/compras/paste-print";
 import { useActionHistory, useUndoRedoKeys } from "@/hooks/use-action-history";
 import { QuotesAttachDialog } from "@/components/compras/quotes";
-import { RecommendationView } from "@/components/compras/recommendation-view";
+import { RecommendationView, canDecide } from "@/components/compras/recommendation-view";
 
 export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")({
   head: () => ({ meta: [{ title: "Solicitação de Compra | AB5 Hub" }, { name: "description", content: "Itens da solicitação de compra (modelo FR-CPS-SC)." }] }),
@@ -154,7 +154,16 @@ function Page() {
   const [scTab, setScTab] = useState<"itens" | "recomendacao">(tabParam === "recomendacao" ? "recomendacao" : "itens");
   const [attachOpen, setAttachOpen] = useState(false);
   const buyerHistory = useActionHistory();
-  useUndoRedoKeys(buyerHistory, isBuyer && !editMode);
+  // Aprovador com a SC em aprovação: só a Recomendação de compras (com status por item e resumo da IA), sem a aba Solicitação.
+  const faGestorIds = useQuery({
+    queryKey: ["fa-gestor-ids", user?.id],
+    enabled: !!user?.id && r?.fa_state === "em_aprovacao",
+    queryFn: async () => new Set(((await supabase.rpc("purchase_fa_my_gestor_ids" as never)).data as unknown as string[] | null) ?? []),
+  });
+  const faIsGestor = !!faGestorIds.data?.has(id);
+  const approverView = !!r && r.fa_state === "em_aprovacao"
+    && canDecide(r as never, user?.id, { isBuyer: isAdmin || canAccess("/compras/comprador"), isGestor: faIsGestor });
+  useUndoRedoKeys(buyerHistory, isBuyer && !editMode && !approverView);
   const buyerCanEdit = isBuyer && r?.fa_state !== "em_aprovacao";
   const headerEdits = useQuery({
     queryKey: ["sc-header-edits", id],
@@ -575,7 +584,7 @@ function Page() {
         {r.buyer_notes && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Comprador:</b> {r.buyer_notes}</p>}
       </div>
 
-      {isBuyer && (
+      {isBuyer && !approverView && (
         <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-sm text-muted-foreground" role="tablist">
           {([["itens", "Solicitação"], ["recomendacao", "Recomendação de compras"]] as const).map(([v, l]) => (
             <button key={v} type="button" role="tab" aria-selected={scTab === v} onClick={() => setScTab(v)}
@@ -583,7 +592,9 @@ function Page() {
           ))}
         </div>
       )}
-      {isBuyer && scTab === "recomendacao" ? (
+      {approverView ? (
+        <RecommendationView requestId={id} mode="aprovacao" embedded isGestor={faIsGestor} />
+      ) : isBuyer && scTab === "recomendacao" ? (
         <RecommendationView requestId={id} mode="comprador" embedded history={buyerHistory} />
       ) : (
       <>

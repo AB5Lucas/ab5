@@ -4529,6 +4529,10 @@ export type Database = {
           cc_code: string | null
           created_at: string
           description: string
+          fa_item_at: string | null
+          fa_item_by: string | null
+          fa_item_reason: string | null
+          fa_prev_status: string | null
           id: string
           item_no: number
           link_url: string | null
@@ -4550,6 +4554,10 @@ export type Database = {
           cc_code?: string | null
           created_at?: string
           description: string
+          fa_item_at?: string | null
+          fa_item_by?: string | null
+          fa_item_reason?: string | null
+          fa_prev_status?: string | null
           id?: string
           item_no: number
           link_url?: string | null
@@ -4571,6 +4579,10 @@ export type Database = {
           cc_code?: string | null
           created_at?: string
           description?: string
+          fa_item_at?: string | null
+          fa_item_by?: string | null
+          fa_item_reason?: string | null
+          fa_prev_status?: string | null
           id?: string
           item_no?: number
           link_url?: string | null
