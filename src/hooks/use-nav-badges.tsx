@@ -28,6 +28,7 @@ function useBadgeData() {
     scApproval: canAccess("/compras/aprovacao"),
     scOpen: canAccess("/compras/solicitacoes") || canAccess("/compras/comprador"),
     scBuyer: canAccess("/compras/comprador"),
+    faApproval: canAccess("/compras/aprovacao-compra"),
     users: canAccess("/admin/usuarios"),
   };
   return useQuery({
@@ -93,8 +94,25 @@ function useBadgeData() {
       })();
       const buyRows = isBuyer ? scOpenRows.filter((r: any) => r.stage === "compras") : [];
       const scBuy = { count: buyRows.length, late: late(buyRows) };
+      // Aprovador: SCs que a pessoa pode aprovar agora (pelas Alçadas) + ciências pendentes (nível Executivo).
+      const faApproval = can.faApproval && uid ? await (async () => {
+        const { data } = await supabase.rpc("purchase_fa_my_perms" as never);
+        const p = (data ?? {}) as { exec?: boolean; decide?: string[] };
+        const ids = p.decide ?? [];
+        let ack = 0, urgent = 0;
+        if (p.exec) {
+          const { count } = await supabase.from("purchase_requests").select("id", { count: "exact", head: true }).eq("fa_ack_needed", true);
+          ack = count ?? 0;
+        }
+        if (ids.length) {
+          const { data: rs } = await supabase.from("purchase_requests").select("due_date").in("id", ids);
+          const lim = addDays(today, 2);
+          urgent = (rs ?? []).filter((r: any) => r.due_date && r.due_date <= lim).length;
+        }
+        return { count: ids.length, ack, urgent };
+      })() : null;
       const onboarding = { expired: released.filter((r: any) => r.next_check_date < today).length, expiring: released.filter((r: any) => r.next_check_date === today).length };
-      return { onboarding, pendingUsers: pendingUsers.length, scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
+      return { faApproval, onboarding, pendingUsers: pendingUsers.length, scApproval, scOpen, scBuy, scBuyer: can.scBuyer, fleetSaldo, conference, byKind, expired, expiring, purchases, orders, billing: billingInd + billingSrv, billingInd, billingSrv };
     },
   });
 }
@@ -157,6 +175,11 @@ export function useMenuBadges() {
     if (d.scApproval?.count) out["/compras/aprovacao"] = {
       count: d.scApproval.count, tone: d.scApproval.urgent ? "red" : "orange",
       detail: `${d.scApproval.count} solicitação(ões) de compra para validar${d.scApproval.urgent ? ` · ${d.scApproval.urgent} com prazo em até 5 dias` : ""}`,
+    };
+    if (d.faApproval && d.faApproval.count + d.faApproval.ack > 0) out["/compras/aprovacao-compra"] = {
+      count: d.faApproval.count + d.faApproval.ack, tone: d.faApproval.urgent ? "red" : "orange",
+      detail: [d.faApproval.count ? `${d.faApproval.count} SC(s) para aprovar${d.faApproval.urgent ? ` · ${d.faApproval.urgent} com prazo em até 2 dias` : ""}` : "",
+        d.faApproval.ack ? `${d.faApproval.ack} aprovada(s) aguardando sua ciência` : ""].filter(Boolean).join(" · "),
     };
     if (d.pendingUsers) out["/admin/usuarios"] = { count: d.pendingUsers, tone: "red", detail: `${d.pendingUsers} usuário(s) novo(s) aguardando liberação de acesso` };
     if (d.scOpen?.count) out["/compras/solicitacoes"] = {
