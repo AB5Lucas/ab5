@@ -212,22 +212,22 @@ export async function reprocessPurchases() {
 }
 
 /** Lê todos os relatórios da pasta; para cada mês usa o arquivo com o período mais longo. */
-export async function executePurchaseSync(c: Credentials) {
-  type Entry = { name: string; folder?: unknown };
+export async function executePurchaseSync(c: Credentials, opts: { force?: boolean } = {}) {
+  type Entry = { name: string; folder?: unknown; eTag?: string; size?: number };
   const children = async (path: string): Promise<Entry[]> => {
     try { return ((await graph(`${DRIVE}/root:/${enc(path)}:/children?$top=500`, c))?.value ?? []) as Entry[]; }
     catch (e) { if ((e as Error).name === "MissingFile" || /não encontrado/.test((e as Error).message)) return []; throw e; }
   };
   // Ano atual e o anterior (em janeiro o fechamento de dezembro ainda é lido).
   const year = new Date().getFullYear();
-  const best = new Map<string, { path: string; name: string; end: string }>();
+  const best = new Map<string, { path: string; name: string; end: string; etag: string | null; size: number | null }>();
   const consider = (dir: string, f: Entry) => {
     if (f.folder || !/\.xlsx?$/i.test(f.name)) return;
     const m = purchaseFileMonth(f.name);
     if (!m || m.ym < PURCHASE_START) return;
     const cur = best.get(m.ym);
     // Período mais longo; empate: .xls (o relatório original do sistema) antes do .xlsx.
-    if (!cur || m.end > cur.end || (m.end === cur.end && /\.xls$/i.test(f.name) && !/\.xls$/i.test(cur.name))) best.set(m.ym, { path: `${dir}/${f.name}`, name: f.name, end: m.end });
+    if (!cur || m.end > cur.end || (m.end === cur.end && /\.xls$/i.test(f.name) && !/\.xls$/i.test(cur.name))) best.set(m.ym, { path: `${dir}/${f.name}`, name: f.name, end: m.end, etag: f.eTag ?? null, size: f.size ?? null });
   };
   for (const y of [year - 1, year].filter((y) => y >= Number(PURCHASE_START.slice(0, 4)))) {
     for (const mf of await children(`${FOLDER}/${y}`)) {
@@ -241,8 +241,21 @@ export async function executePurchaseSync(c: Credentials) {
   }
   const refs = await loadRefs();
   const hoursCache = new Map<string, Map<string, number>>();
-  const out: { ym: string; file: string; launched: number; pending: number }[] = [];
-  for (const [ym, f] of [...best.entries()].sort()) {
+  const out: { ym: string; file: string; launched: number; pending: number; skipped?: boolean; error?: string }[] = [];
+  // Arquivo igual ao já lido (mesmo caminho e eTag/tamanho) não é lido de novo; o mês mais novo vem primeiro,
+  // e o erro de um mês fica registrado em purchase_sync_files sem impedir os outros.
+  const { data: seen } = await supabaseAdmin.from("purchase_sync_files" as never).select("ym, file_path, etag, size, ok");
+  const prev = new Map(((seen ?? []) as { ym: string; file_path: string; etag: string | null; size: number | null; ok: boolean }[]).map((x) => [x.ym, x]));
+  const log = async (ym: string, f: { path: string; etag: string | null; size: number | null }, ok: boolean, message: string | null) => {
+    await supabaseAdmin.from("purchase_sync_files" as never).upsert({ ym, file_path: f.path, etag: f.etag, size: f.size, synced_at: new Date().toISOString(), ok, message } as never, { onConflict: "ym" });
+  };
+  for (const [ym, f] of [...best.entries()].sort().reverse()) {
+    const p0 = prev.get(ym);
+    if (!opts.force && p0?.ok && p0.file_path === f.path && ((f.etag && p0.etag === f.etag) || (!f.etag && f.size != null && p0.size === f.size))) {
+      out.push({ ym, file: f.name, launched: 0, pending: 0, skipped: true });
+      continue;
+    }
+    try {
     const file = f.path;
     const buf = await graph(`${DRIVE}/root:/${enc(file)}:/content`, c, true);
     const wb = XLSX.read(new Uint8Array(buf), { cellDates: true });
@@ -266,6 +279,13 @@ export async function executePurchaseSync(c: Credentials) {
       if (st === "launched") launched++; else pending++;
     }
     out.push({ ym, file: f.name, launched, pending });
+    await log(ym, f, true, null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`Compras ${ym} (${f.path}): ${msg}`);
+      await log(ym, f, false, msg);
+      out.push({ ym, file: f.name, launched: 0, pending: 0, error: msg });
+    }
   }
   await cleanupStockWorks(); // Almoxarifado que ficou sem custo (realocado para serviço do cliente) deixa de existir
   return out;

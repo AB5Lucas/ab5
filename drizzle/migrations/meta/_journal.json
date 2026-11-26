@@ -1289,6 +1289,13 @@
       "when": 1795603856083,
       "tag": "0196_works_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 184,
+      "version": "7",
+      "when": 1795603857083,
+      "tag": "0197_purchase_sync_files",
+      "breakpoints": true
     }
   ]
 }
