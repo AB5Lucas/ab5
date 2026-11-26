@@ -6274,6 +6274,9 @@ export type Database = {
           base_km: number | null
           interval_km: number | null
           interval_months: number | null
+          km_reading: number | null
+          km_reading_date: string | null
+          next_items: Json
           notes: string | null
           updated_at: string
           vehicle_id: string
@@ -6283,6 +6286,9 @@ export type Database = {
           base_km?: number | null
           interval_km?: number | null
           interval_months?: number | null
+          km_reading?: number | null
+          km_reading_date?: string | null
+          next_items?: Json
           notes?: string | null
           updated_at?: string
           vehicle_id: string
@@ -6292,6 +6298,9 @@ export type Database = {
           base_km?: number | null
           interval_km?: number | null
           interval_months?: number | null
+          km_reading?: number | null
+          km_reading_date?: string | null
+          next_items?: Json
           notes?: string | null
           updated_at?: string
           vehicle_id?: string

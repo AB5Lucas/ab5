@@ -14,13 +14,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchAll } from "@/lib/fetch-all";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { closestPlate, isoDay, maintenanceState, type MaintenanceState } from "@/lib/fleet-notes";
+import { closestPlate, currentKm, isoDay, maintenanceState, type MaintenanceState, type NextService } from "@/lib/fleet-notes";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Vehicle = { id: string; plate: string; model: string | null; ownership: string; status: string | null };
 type Plan = Tables<"vehicle_maintenance_plans">;
 type Rec = Tables<"vehicle_maintenance_records">;
-type Row = Vehicle & { plan: Plan | null; records: Rec[]; km: number | null; kmDate: string | null; state: MaintenanceState };
+type Row = Vehicle & { plan: Plan | null; records: Rec[]; km: number | null; kmDate: string | null; kmSource: "nota" | "manual" | null; state: MaintenanceState };
+const planItems = (p: Plan | null) => ((p?.next_items as unknown as NextService[] | null) ?? []).filter((i) => i && i.service);
 type StatusFilter = "all" | MaintenanceState["status"];
 
 const km = (v: number | null) => (v == null ? "—" : `${Math.round(v).toLocaleString("pt-BR")} km`);
@@ -65,9 +66,10 @@ export function FleetServicePage() {
       const plan = (plans.data ?? []).find((p) => p.vehicle_id === v.id) ?? null;
       const recs = (records.data ?? []).filter((r) => r.vehicle_id === v.id);
       const prev = recs.find((r) => r.kind === "preventiva");
-      const reading = lastKm.get(normalizePlate(v.plate));
-      const state = maintenanceState(plan, prev ? { km: prev.km, date: prev.service_date } : null, reading?.km ?? null, today);
-      return { ...v, plan, records: recs, km: reading?.km ?? null, kmDate: reading?.date ?? null, state };
+      const planX = plan ? { ...plan, next_items: (plan.next_items as unknown as NextService[] | null) ?? [] } : null;
+      const reading = currentKm(planX, lastKm.get(normalizePlate(v.plate)) ?? null);
+      const state = maintenanceState(planX, prev ? { km: prev.km, date: prev.service_date } : null, reading?.km ?? null, today);
+      return { ...v, plan, records: recs, km: reading?.km ?? null, kmDate: reading?.date ?? null, kmSource: reading?.source ?? null, state };
     }).sort((a, b) => ORDER[a.state.status] - ORDER[b.state.status] || a.plate.localeCompare(b.plate));
   }, [vehicles.data, plans.data, records.data, readings.data, today]);
 
@@ -149,8 +151,12 @@ export function FleetServicePage() {
                   <TableCell>{r.ownership === "alugado" ? "Alugado" : "Próprio"}</TableCell>
                   <TableCell>{rule || <span className="text-muted-foreground">—</span>}</TableCell>
                   <TableCell>{s.lastKm != null || s.lastDate ? `${km(s.lastKm)} · ${brDate(s.lastDate)}` : "—"}</TableCell>
-                  <TableCell>{km(r.km)}{r.kmDate && <span className="block text-xs text-muted-foreground">nota de {brDate(r.kmDate)}</span>}</TableCell>
-                  <TableCell>{[s.nextKm != null ? km(s.nextKm) : null, s.nextDate ? brDate(s.nextDate) : null].filter(Boolean).join(" ou ") || "—"}{left && <span className="block text-xs text-muted-foreground">{left}</span>}</TableCell>
+                  <TableCell>{km(r.km)}{r.kmDate && <span className="block text-xs text-muted-foreground">{r.kmSource === "manual" ? "informado em" : "nota de"} {brDate(r.kmDate)}</span>}</TableCell>
+                  <TableCell>
+                    {[s.nextKm != null ? km(s.nextKm) : null, s.nextDate ? brDate(s.nextDate) : null].filter(Boolean).join(" ou ") || "—"}
+                    {left && <span className="block text-xs text-muted-foreground">{left}</span>}
+                    {planItems(r.plan).map((i) => <span key={`${i.service}-${i.km}`} className="block text-xs">{i.service} · {km(i.km)}</span>)}
+                  </TableCell>
                   <TableCell><Badge className={STATUS[s.status].cls}>{STATUS[s.status].label}</Badge></TableCell>
                   <TableCell className="whitespace-nowrap text-right">
                     <Button variant="ghost" size="sm" title="Regra de revisão" onClick={() => setPlanFor(r)}><Settings2 className="h-4 w-4" /></Button>
@@ -174,22 +180,29 @@ export function FleetServicePage() {
 function PlanDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
   const qc = useQueryClient();
   const [f, setF] = useState({ km: "", months: "", baseKm: "", baseDate: "", notes: "" });
+  const [items, setItems] = useState<{ service: string; km: string }[]>([]);
+  const [reading, setReading] = useState({ km: "", date: "" });
   useEffect(() => {
     if (!row) return;
     const p = row.plan;
+    setItems(planItems(p).map((i) => ({ service: i.service, km: String(i.km) })));
+    setReading({ km: p?.km_reading != null ? String(p.km_reading) : "", date: p?.km_reading_date ?? "" });
     setF({
-      km: p?.interval_km != null ? String(p.interval_km) : row.ownership === "alugado" ? "" : "10000",
-      months: p?.interval_months != null ? String(p.interval_months) : row.ownership === "alugado" ? "" : "6",
+      km: p?.interval_km != null ? String(p.interval_km) : p ? "" : row.ownership === "alugado" ? "" : "10000",
+      months: p?.interval_months != null ? String(p.interval_months) : p ? "" : row.ownership === "alugado" ? "" : "6",
       baseKm: p?.base_km != null ? String(p.base_km) : "", baseDate: p?.base_date ?? "", notes: p?.notes ?? "",
     });
   }, [row?.id]);
   const save = useMutation({
     mutationFn: async () => {
-      const vals = { interval_km: toNum(f.km), interval_months: toNum(f.months), base_km: toNum(f.baseKm) };
+      const vals = { interval_km: toNum(f.km), interval_months: toNum(f.months), base_km: toNum(f.baseKm), reading: toNum(reading.km) };
       if (Object.values(vals).some((v) => Number.isNaN(v))) throw new Error("Use só números.");
+      const next = items.filter((i) => i.service.trim() || i.km.trim()).map((i) => ({ service: i.service.trim() || "Revisão", km: toNum(i.km) }));
+      if (next.some((i) => i.km == null || Number.isNaN(i.km))) throw new Error("Informe o km de cada próximo serviço.");
       const { error } = await supabase.from("vehicle_maintenance_plans").upsert({
         vehicle_id: row!.id, interval_km: vals.interval_km == null ? null : Math.round(vals.interval_km), interval_months: vals.interval_months == null ? null : Math.round(vals.interval_months),
         base_km: vals.base_km, base_date: f.baseDate || null, notes: f.notes.trim() || null, updated_at: new Date().toISOString(),
+        next_items: next.map((i) => ({ service: i.service, km: Math.round(i.km as number) })), km_reading: vals.reading, km_reading_date: vals.reading != null ? reading.date || new Date().toISOString().slice(0, 10) : null,
       });
       if (error) throw error;
     },
@@ -211,6 +224,22 @@ function PlanDialog({ row, onClose }: { row: Row | null; onClose: () => void }) 
           <div className="space-y-1"><Label htmlFor="pl-bd">Data da última revisão</Label><Input id="pl-bd" type="date" value={f.baseDate} onChange={(e) => setF({ ...f, baseDate: e.target.value })} /></div>
         </div>
         <p className="text-xs text-muted-foreground">Km e data da última revisão só valem até a primeira revisão registrada no sistema.</p>
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <Label className="block">Próximos serviços (o primeiro que vencer conta como a próxima revisão)</Label>
+          {items.map((it, i) => (
+            <div key={i} className="flex gap-2">
+              <Input placeholder="Serviço (ex.: Troca de óleo e filtros)" value={it.service} onChange={(e) => setItems(items.map((x, k) => (k === i ? { ...x, service: e.target.value } : x)))} />
+              <Input className="w-32" inputMode="numeric" placeholder="Km" value={it.km} onChange={(e) => setItems(items.map((x, k) => (k === i ? { ...x, km: e.target.value } : x)))} />
+              <Button variant="ghost" size="icon" aria-label="Tirar serviço" onClick={() => setItems(items.filter((_, k) => k !== i))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => setItems([...items, { service: "", km: "" }])}>+ Próximo serviço</Button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1"><Label htmlFor="pl-rk">Km atual informado</Label><Input id="pl-rk" inputMode="numeric" value={reading.km} onChange={(e) => setReading({ ...reading, km: e.target.value })} /></div>
+          <div className="space-y-1"><Label htmlFor="pl-rd">Em</Label><Input id="pl-rd" type="date" value={reading.date} onChange={(e) => setReading({ ...reading, date: e.target.value })} /></div>
+        </div>
+        <p className="text-xs text-muted-foreground">Vale o km mais novo entre o informado aqui e o da última nota do posto.</p>
         <div className="space-y-1"><Label htmlFor="pl-n">Observações</Label><Textarea id="pl-n" rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>

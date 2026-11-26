@@ -502,7 +502,23 @@ export function driverRanking(notes: RankingNote[], schedules: RankingSchedule[]
 }
 
 // ---------- Manutenção ----------
-export type MaintenancePlan = { interval_km: number | null; interval_months: number | null; base_km: number | null; base_date: string | null };
+/** Próximos serviços informados à mão (ex.: "Troca de óleo e filtros" aos 414.700 km). */
+export type NextService = { service: string; km: number };
+export type MaintenancePlan = {
+  interval_km: number | null; interval_months: number | null; base_km: number | null; base_date: string | null;
+  next_items?: NextService[] | null; km_reading?: number | null; km_reading_date?: string | null;
+};
+/** Km atual: a leitura mais nova entre a última nota do posto e a informada à mão no cadastro da regra. */
+export function currentKm(plan: Pick<MaintenancePlan, "km_reading" | "km_reading_date"> | null, note: { km: number; date: string | null } | null): { km: number; date: string | null; source: "nota" | "manual" } | null {
+  const manual = plan?.km_reading != null ? { km: Number(plan.km_reading), date: plan.km_reading_date ?? null, source: "manual" as const } : null;
+  const fromNote = note ? { ...note, source: "nota" as const } : null;
+  if (!manual) return fromNote;
+  if (!fromNote) return manual;
+  return (fromNote.date ?? "") > (manual.date ?? "") ? fromNote : manual;
+}
+/** Próximo serviço informado que ainda vale (o de menor km). */
+export const nextService = (plan: Pick<MaintenancePlan, "next_items"> | null) =>
+  [...(plan?.next_items ?? [])].filter((i) => i && Number(i.km) > 0).sort((a, b) => Number(a.km) - Number(b.km))[0] ?? null;
 export type MaintenanceState = { lastKm: number | null; lastDate: string | null; nextKm: number | null; nextDate: string | null; kmLeft: number | null; daysLeft: number | null; status: "sem-regra" | "em-dia" | "perto" | "vencida" };
 const addMonthsDay = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCMonth(x.getUTCMonth() + n); return x.toISOString().slice(0, 10); };
 
@@ -511,13 +527,18 @@ export function maintenanceState(plan: MaintenancePlan | null, last: { km: numbe
   const lastKm = last?.km ?? plan?.base_km ?? null;
   const lastDate = last?.date ?? plan?.base_date ?? null;
   const ik = plan?.interval_km || null, im = plan?.interval_months || null;
-  const nextKm = ik && lastKm != null ? lastKm + ik : null;
+  // Próximo serviço informado à mão (km) vale junto com a regra: o que vier primeiro.
+  // (um serviço já feito — preventiva registrada com km igual ou maior — sai da conta)
+  const manualNext = nextService(plan ? { next_items: (plan.next_items ?? []).filter((i) => last?.km == null || Number(i.km) > last.km) } : null);
+  const ruleKm = ik && lastKm != null ? lastKm + ik : null;
+  const nextKm = [ruleKm, manualNext ? Number(manualNext.km) : null].filter((x): x is number => x != null).sort((a, b) => a - b)[0] ?? null;
   const nextDate = im && lastDate ? addMonthsDay(lastDate, im) : null;
   const kmLeft = nextKm != null && currentKm != null ? Math.round(nextKm - currentKm) : null;
   const daysLeft = nextDate ? Math.round((Date.parse(`${nextDate}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000) : null;
-  if (!ik && !im) return { lastKm, lastDate, nextKm, nextDate, kmLeft, daysLeft, status: "sem-regra" };
+  if (!ik && !im && !manualNext) return { lastKm, lastDate, nextKm, nextDate, kmLeft, daysLeft, status: "sem-regra" };
   const over = (kmLeft != null && kmLeft <= 0) || (daysLeft != null && daysLeft <= 0);
-  const near = (kmLeft != null && ik != null && kmLeft <= ik * 0.1) || (daysLeft != null && daysLeft <= 30);
+  // "Perto": 10% do intervalo de km (sem intervalo, 1.000 km) ou 30 dias.
+  const near = (kmLeft != null && kmLeft <= (ik ? ik * 0.1 : 1000)) || (daysLeft != null && daysLeft <= 30);
   return { lastKm, lastDate, nextKm, nextDate, kmLeft, daysLeft, status: over ? "vencida" : near ? "perto" : "em-dia" };
 }
 

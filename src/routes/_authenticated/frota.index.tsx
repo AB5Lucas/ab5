@@ -10,7 +10,7 @@ import { Big, Donut, HoverBars, LineArea, OverviewCard } from "@/components/over
 import { CountUp } from "@/components/count-up";
 import { useDriverRanking } from "@/components/frota/ranking";
 import { dayKm, dayToll, normalizePlate } from "@/lib/fleet-costs";
-import { closestPlate, isoDay, maintenanceState, type MaintenanceState } from "@/lib/fleet-notes";
+import { closestPlate, currentKm, isoDay, maintenanceState, nextService, type MaintenanceState, type NextService } from "@/lib/fleet-notes";
 import { AgendaTab } from "@/components/logistica/agenda";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -161,7 +161,9 @@ function Overview({ canCost }: { canCost: boolean }) {
       const prev = (maintQ.data.recs as any[]).find((r) => r.vehicle_id === v.id && r.kind === "preventiva");
       const rs = reads.get(normalizePlate(v.plate)) ?? [];
       const cur = rs[0] ?? null;
-      const state = maintenanceState(plan, prev ? { km: prev.km, date: prev.service_date } : null, cur?.km ?? null, today);
+      const planX = plan ? { ...plan, next_items: (plan.next_items as NextService[] | null) ?? [] } : null;
+      const now = currentKm(planX, cur ? { km: cur.km, date: cur.day } : null);
+      const state = maintenanceState(planX, prev ? { km: prev.km, date: prev.service_date } : null, now?.km ?? null, today);
       states.push({ v, state });
       if (state.status === "sem-regra") continue;
       // km médio por dia entre a leitura mais nova e a mais antiga (até 120 dias).
@@ -173,8 +175,9 @@ function Overview({ canCost }: { canCost: boolean }) {
       if (!due) continue;
       // Sugere marcar na semana anterior ao vencimento (nunca antes desta semana).
       const week = [monday(addDays(due, -7)), monday(today)].sort().at(-1)!;
-      const reason = state.status === "vencida" ? "revisão vencida"
-        : state.kmLeft != null && byKm === due ? `faltam ${state.kmLeft.toLocaleString("pt-BR")} km` : `vence em ${brDay(due)}`;
+      const svc = nextService(planX)?.service;
+      const reason = [svc, state.status === "vencida" ? "vencida"
+        : state.kmLeft != null && byKm === due ? `faltam ${state.kmLeft.toLocaleString("pt-BR")} km` : `vence em ${brDay(due)}`].filter(Boolean).join(" · ");
       suggestions.push({ vehicleId: v.id, plate: v.plate, due, week, reason, overdue: state.status === "vencida" });
     }
     const counts = { vencida: 0, perto: 0, "em-dia": 0, "sem-regra": 0 } as Record<MaintenanceState["status"], number>;
