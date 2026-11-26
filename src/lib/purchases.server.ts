@@ -183,7 +183,7 @@ export async function applyLine(lineId: string, refs?: Awaited<ReturnType<typeof
         const resolved = controlled ? await assetAllocation(part.month, part.amount, itemDirection, itemCc) : { allocation: alloc, hours };
         if (!resolved.allocation.parts.length) { pendingReason = resolved.allocation.reason; break; }
         const portion: CcItem = { ...item, amount: part.amount, date: controlled ? null : item.date ?? null };
-        const rows = purchaseItemEntries([portion], part.amount, resolved.allocation, resolved.hours, r.industryWorkIds, monthRange(part.month).to);
+        const rows = purchaseItemEntries([portion], part.amount, resolved.allocation, resolved.hours, r.industryWorkIds, monthRange(part.month).from);
         planned.push(...rows.map((row) => ({ ...row, category: decision ? (decision.category === "transporte" ? "terceiros" : decision.category === "mo" ? "mao_obra" : decision.category) as typeof row.category : row.category, description: plan.length > 1 ? `${row.description} · Parcela ${partIndex + 1}/${plan.length}` : row.description, purchase_item_key: key, competence_month: part.month })));
       }
       if (pendingReason || !planned.length) Object.assign(state, { status: "pending", reason: pendingReason ?? "Sem destino", pending: item.amount });
