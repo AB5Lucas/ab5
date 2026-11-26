@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /** Tela de referência dos dashboards (área de conteúdo do monitor do Lucas). */
-const DESIGN_W = 1360;
-const DESIGN_H = 890;
+const REF_W = 1480; // janela do navegador de referência
+const REF_H = 997;
+const CHROME_H = 104; // cabeçalho + margens (6,5rem), como antes
 
 /**
  * Mostra o dashboard sempre com o mesmo desenho da tela de referência,
@@ -11,17 +12,20 @@ const DESIGN_H = 890;
  */
 export function FitScreen({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState<number | null>(null);
+  const [fit, setFit] = useState<{ scale: number; w: number; h: number; ml: number } | null>(null);
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const update = () => {
-      if (window.innerWidth < 1024) return setScale(null);
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      const availH = window.innerHeight - top - 12;
+      if (window.innerWidth < 1024) return setFit(null);
       const availW = el.clientWidth;
-      setScale(Math.max(0.4, Math.min(availW / DESIGN_W, availH / DESIGN_H)));
+      const side = window.innerWidth - availW; // menu + margens laterais
+      const w = REF_W - side;
+      const h = REF_H - CHROME_H;
+      const availH = window.innerHeight - CHROME_H;
+      const scale = Math.max(0.4, Math.min(availW / w, availH / h));
+      setFit({ scale, w, h, ml: Math.max(0, availW - w * scale) / 2 });
     };
     update();
     const ro = new ResizeObserver(update);
@@ -31,9 +35,9 @@ export function FitScreen({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <div ref={ref} className="w-full" style={scale ? { height: DESIGN_H * scale } : undefined}>
-      {scale ? (
-        <div style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "top left", marginLeft: Math.max(0, (ref.current?.clientWidth ?? 0) - DESIGN_W * scale) / 2 }}>
+    <div ref={ref} className="w-full" style={fit ? { height: fit.h * fit.scale } : undefined}>
+      {fit ? (
+        <div style={{ width: fit.w, height: fit.h, transform: fit.scale === 1 ? undefined : `scale(${fit.scale})`, transformOrigin: "top left", marginLeft: fit.ml }}>
           {children}
         </div>
       ) : children}
