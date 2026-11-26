@@ -1,4 +1,4 @@
-import { Fragment, Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Fragment, Suspense, lazy, useEffect, useId, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAccess } from "@/hooks/use-access";
 import { useWorkScope } from "@/hooks/use-work-scope";
 import { FitScreen } from "@/components/overview/fit-screen";
-import { Donut, MarginGauge, OverviewCard, StackBar } from "@/components/overview/charts";
+import { Donut, OverviewCard, StackBar } from "@/components/overview/charts";
 import { CountUp } from "@/components/count-up";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 import { MultiFilter } from "@/components/multi-filter";
@@ -57,8 +57,9 @@ function Overview() {
   const now = new Date();
   const [year, setYear] = useState(String(now.getFullYear()));
   const [months, setMonths] = useState<number[]>([now.getMonth() + 1]);
-  const [detail, setDetail] = useState<FinanceLine | null>(null);
-  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [detail, setDetail] = useState<{ line: FinanceLine; client: boolean } | null>(null);
+  // Clientes recolhidos (padrão: todos abertos).
+  const [closed, setClosed] = useState<Set<string>>(new Set());
   // Mesma lista de clientes ocultos do Fechamento (salva no navegador).
   const [hidden, setHidden] = useState<string[]>([]);
   useEffect(() => { try { setHidden(JSON.parse(localStorage.getItem("fin-hidden-clients") ?? "[]")); } catch { /* ignore */ } }, []);
@@ -148,18 +149,32 @@ function Overview() {
 
         {loading || !yms.length ? (yms.length ? <DashboardSkeleton /> : <p className="text-sm text-muted-foreground">Selecione ao menos um mês.</p>) : (
           <div className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
-            <OverviewCard title="Resultado do período" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Faturado, todas as despesas e a margem; os % são sobre o faturado" className="min-h-0">
-              <div className="grid grid-cols-3 gap-2">
-                <div><p className="text-[11px] text-muted-foreground">Faturado</p><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.billed)} /></p></div>
-                <div><p className="text-[11px] text-muted-foreground">Despesas</p><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.spent)} /></p></div>
-                <div><p className="text-[11px] text-muted-foreground">Margem</p><p className={cn("font-display text-lg font-semibold tabular-nums", d.margin < 0 && "text-destructive")}><CountUp value={brlK(d.margin)} /></p></div>
+            <OverviewCard dark title="Resultado do período" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Faturado, todas as despesas e a margem; os % são sobre o faturado" className="min-h-0">
+              <div className="invert-scope">
+                <div className="grid grid-cols-3 gap-2">
+                  <div><p className="text-[11px] text-muted-foreground">Faturado</p><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.billed)} /></p></div>
+                  <div><p className="text-[11px] text-muted-foreground">Despesas</p><p className="font-display text-lg font-semibold tabular-nums"><CountUp value={brlK(d.spent)} /></p></div>
+                  <div><p className="text-[11px] text-muted-foreground">Margem</p><p className={cn("font-display text-lg font-semibold tabular-nums", d.margin < 0 && "text-destructive")}><CountUp value={brlK(d.margin)} /></p></div>
+                </div>
+                <div className="mt-3"><StackBar format={brlK} base={d.billed} parts={[
+                  { label: "Impostos", value: d.tax, className: "bg-foreground/25" },
+                  { label: "Mão de obra", value: d.mo, className: "bg-foreground" },
+                  { label: "Transporte", value: d.transport, className: "bg-foreground/60" },
+                  { label: "Materiais", value: d.materials, className: "bg-foreground/40" },
+                ]} /></div>
               </div>
-              <div className="mt-3"><StackBar format={brlK} base={d.billed} parts={[
-                { label: "Impostos", value: d.tax, className: "bg-foreground/25" },
-                { label: "Mão de obra", value: d.mo, className: "bg-foreground" },
-                { label: "Transporte", value: d.transport, className: "bg-foreground/60" },
-                { label: "Materiais", value: d.materials, className: "bg-foreground/40" },
-              ]} /></div>
+            </OverviewCard>
+
+            <OverviewCard title="Margem de contribuição" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint={`Margem ÷ faturado por competência; meta ${MARGIN_GOAL}%. A seta enche até a margem (escala 0–50%).`} className="min-h-0" bodyClassName="flex min-h-0">
+              <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+                <div className="space-y-1.5 self-center">
+                  <p className={cn("font-display text-3xl font-semibold tabular-nums", (d.pct ?? 0) < 0 && "text-destructive")}>{d.pct == null ? "—" : <CountUp value={`${d.pct.toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`} />}</p>
+                  <p className="text-[11px] text-muted-foreground">{(d.pct ?? -1) >= MARGIN_GOAL ? "acima" : "abaixo"} da meta de {MARGIN_GOAL}%</p>
+                  <p className="text-sm font-medium tabular-nums">{brlK(d.margin)}</p>
+                  <p className="text-[11px] text-muted-foreground">{d.below} de {d.lines.length} serviços abaixo da meta</p>
+                </div>
+                <StepArrow pct={d.pct} goal={MARGIN_GOAL} />
+              </div>
             </OverviewCard>
 
             <OverviewCard title="Pedidos faturados" to="/fechamentos/suzano" linkLabel="Abrir Pedidos" hint="Pedidos dos serviços exibidos com data até o fim do período × o que já foi faturado neles até essa data" className="min-h-0" bodyClassName="flex items-center">
@@ -173,10 +188,6 @@ function Overview() {
                 </div>
                 <Donut frac={d.ordered ? d.billedToDate / d.ordered : 0} center={d.ordered ? `${Math.round((d.billedToDate / d.ordered) * 100)}%` : "—"} sub="faturado" size="h-32 w-32" />
               </div>
-            </OverviewCard>
-
-            <OverviewCard dark title="Margem de contribuição" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint={`Margem ÷ faturado por competência; meta ${MARGIN_GOAL}%`} className="min-h-0" bodyClassName="flex flex-col justify-end">
-              <MarginGauge pct={d.pct} goal={MARGIN_GOAL} label={brlK(d.margin)} sub={`${d.below} de ${d.lines.length} serviços abaixo da meta`} />
             </OverviewCard>
 
             <OverviewCard title="Horas normais × extras" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Horas de MO dos serviços exibidos: normais = até 8 h em dia útil; extras = acima disso, sábado, domingo e feriado" className="min-h-0">
@@ -196,54 +207,65 @@ function Overview() {
               </div>
             </OverviewCard>
 
-            {/* Resumo das obras: como o Fechamento, mas por cliente com subtotal e recolhível, margem em chip e barras. */}
+            {/* Resumo das obras: colunas com largura fixa, números alinhados à direita, cliente com subtotal (sempre aberto). */}
             <div className="ov-card flex min-h-0 flex-col rounded-2xl border bg-card md:col-span-2 xl:col-span-4">
-              <div className="flex items-center justify-between px-4 pt-3 text-xs">
+              <div className="flex items-center justify-between px-5 pt-3 text-xs">
                 <p className="font-medium text-muted-foreground">Resumo das obras · {shown.length} clientes · {d.lines.length} serviços</p>
-                <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setOpen(open.size ? new Set() : new Set(shown.map((g) => g.key)))}>{open.size ? "Recolher todos" : "Abrir todos"}</button>
+                <p className="text-muted-foreground">Clique no cliente para o resultado geral, no serviço para o detalhe</p>
               </div>
-              <div className="min-h-0 flex-1 overflow-auto px-2 pb-2">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-card text-[11px] text-muted-foreground">
+              <div className="min-h-0 flex-1 overflow-auto px-3 pb-2">
+                <table className="w-full table-fixed text-sm">
+                  <colgroup>
+                    <col /><col className="w-[9.5rem]" /><col className="w-[9.5rem]" /><col className="w-[11rem]" /><col className="w-[9.5rem]" /><col className="w-[6.5rem]" /><col className="w-[9rem]" /><col className="w-[10rem]" />
+                  </colgroup>
+                  <thead className="sticky top-0 z-10 bg-card text-[11px] uppercase tracking-wide text-muted-foreground">
                     <tr className="border-b">
-                      <th className="px-2 py-2 text-left font-medium">Cliente / serviço</th>
-                      <th className="px-2 text-right font-medium">Faturado</th>
-                      <th className="px-2 text-left font-medium">Despesas (imposto · MO · transporte · materiais)</th>
-                      <th className="px-2 text-right font-medium">Margem</th>
-                      <th className="px-2 text-right font-medium">Margem %</th>
-                      <th className="px-2 text-left font-medium">Andamento</th>
-                      <th className="px-2 text-right font-medium">Margem total</th>
+                      <th className="px-3 py-2 text-left font-medium">Cliente / serviço</th>
+                      <th className="px-3 text-right font-medium">Faturado</th>
+                      <th className="px-3 text-right font-medium">Despesas</th>
+                      <th className="px-3 text-left font-medium">Composição</th>
+                      <th className="px-3 text-right font-medium">Margem</th>
+                      <th className="px-3 text-center font-medium">Margem %</th>
+                      <th className="px-3 text-left font-medium">Andamento</th>
+                      <th className="px-3 text-right font-medium">Margem acumulada</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {!shown.length && <tr><td colSpan={7} className="px-2 py-4 text-muted-foreground">Nenhuma movimentação no período.</td></tr>}
+                    {!shown.length && <tr><td colSpan={8} className="px-3 py-4 text-muted-foreground">Nenhuma movimentação no período.</td></tr>}
                     {[...shown].sort((a, b) => b.lines.reduce((x, l) => x + l.billed, 0) - a.lines.reduce((x, l) => x + l.billed, 0)).map((g) => {
                       const gb = g.lines.reduce((a, l) => a + l.billed, 0), gm = g.lines.reduce((a, l) => a + l.margin, 0), gc = g.lines.reduce((a, l) => a + cost(l), 0);
                       const gComp = g.lines.reduce((a, l) => a + (l.monthPct != null && l.margin ? l.margin / (l.monthPct / 100) : 0), 0);
-                      const isOpen = open.has(g.key);
+                      const isOpen = !closed.has(g.key);
+                      const tog = () => setClosed((s) => { const n = new Set(s); n.has(g.key) ? n.delete(g.key) : n.add(g.key); return n; });
                       return (
                         <Fragment key={g.key}>
-                          <tr className="cursor-pointer border-b hover:bg-muted/40" onClick={() => setOpen((s) => { const n = new Set(s); n.has(g.key) ? n.delete(g.key) : n.add(g.key); return n; })}>
-                            <td className="px-2 py-2 font-medium"><span className="flex items-center gap-1.5"><ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !isOpen && "-rotate-90")} />{g.name}<span className="text-[11px] font-normal text-muted-foreground">· {g.lines.length}</span></span></td>
-                            <td className="px-2 text-right tabular-nums">
-                              <div className="font-medium">{brl(gb)}</div>
-                              <div className="ml-auto mt-0.5 h-1 w-24 overflow-hidden rounded-full bg-muted"><div className="ov-widen h-full bg-foreground" style={{ width: `${(gb / maxBilled) * 100}%` }} /></div>
+                          <tr className="cursor-pointer border-t bg-muted/40 hover:bg-muted/70" onClick={() => setDetail({ line: g.lines[0]!, client: true })}>
+                            <td className="px-3 py-2">
+                              <span className="flex items-center gap-1.5">
+                                <button type="button" aria-label={isOpen ? "Recolher" : "Abrir"} onClick={(e) => { e.stopPropagation(); tog(); }} className="rounded p-0.5 text-muted-foreground/60 hover:text-foreground">
+                                  <ChevronDown className={cn("h-3 w-3 transition-transform", !isOpen && "-rotate-90")} />
+                                </button>
+                                <span className="truncate font-display font-semibold uppercase tracking-wide">{g.name}</span>
+                                <span className="text-[11px] text-muted-foreground">{g.lines.length} {g.lines.length === 1 ? "serviço" : "serviços"}</span>
+                              </span>
                             </td>
-                            <td className="px-2"><CostBar lines={g.lines} total={gc} /></td>
-                            <td className={cn("px-2 text-right font-medium tabular-nums", gm < 0 && "text-destructive")}>{brl(gm)}</td>
-                            <td className="px-2 text-right"><Chip pct={marginPercent(gm, gComp)} margin={gm} /></td>
-                            <td />
-                            <td />
+                            <td className="px-3 text-right font-semibold tabular-nums">{brl(gb)}</td>
+                            <td className="px-3 text-right tabular-nums text-muted-foreground">{brl(gc)}</td>
+                            <td className="px-3"><CostBar lines={g.lines} total={gc} /></td>
+                            <td className={cn("px-3 text-right font-semibold tabular-nums", gm < 0 && "text-destructive")}>{brl(gm)}</td>
+                            <td className="px-3 text-center"><Chip pct={marginPercent(gm, gComp)} margin={gm} /></td>
+                            <td /><td />
                           </tr>
                           {isOpen && g.lines.map((l) => (
-                            <tr key={l.work.id} className="cursor-pointer border-b border-border/50 text-[13px] hover:bg-muted/30" onClick={() => setDetail(l)}>
-                              <td className="py-1.5 pl-8 pr-2 underline-offset-2 hover:underline">{l.work.name}</td>
-                              <td className="px-2 text-right tabular-nums">{brl(l.billed)}</td>
-                              <td className="px-2"><CostBar lines={[l]} total={cost(l)} /></td>
-                              <td className={cn("px-2 text-right tabular-nums", l.margin < 0 && "text-destructive")}>{brl(l.margin)}</td>
-                              <td className="px-2 text-right"><Chip pct={l.monthPct} margin={l.margin} /></td>
-                              <td className="px-2"><div className="flex items-center gap-1.5"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"><div className="h-full bg-foreground/70" style={{ width: `${Math.min(100, Math.max(0, l.progress))}%` }} /></div><span className="text-[11px] tabular-nums text-muted-foreground">{Math.round(l.progress)}%</span></div></td>
-                              <td className="px-2 text-right text-[12px]"><MarginPercent value={l.total.pct} margin={l.total.margin} /> <span className="text-muted-foreground">({brlK(l.total.margin)})</span></td>
+                            <tr key={l.work.id} className="cursor-pointer border-t border-border/40 text-[13px] hover:bg-muted/30" onClick={() => setDetail({ line: l, client: false })}>
+                              <td className="truncate py-1.5 pl-9 pr-3 text-muted-foreground hover:text-foreground" title={l.work.name}>{l.work.name}</td>
+                              <td className="px-3 text-right tabular-nums">{brl(l.billed)}</td>
+                              <td className="px-3 text-right tabular-nums text-muted-foreground">{brl(cost(l))}</td>
+                              <td className="px-3"><CostBar lines={[l]} total={cost(l)} /></td>
+                              <td className={cn("px-3 text-right tabular-nums", l.margin < 0 && "text-destructive")}>{brl(l.margin)}</td>
+                              <td className="px-3 text-center"><Chip pct={l.monthPct} margin={l.margin} /></td>
+                              <td className="px-3"><div className="flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full bg-foreground/70" style={{ width: `${Math.min(100, Math.max(0, l.progress))}%` }} /></div><span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">{Math.round(l.progress)}%</span></div></td>
+                              <td className="px-3 text-right text-[12px] tabular-nums"><span className={cn(l.total.margin < 0 && "text-destructive")}>{brlK(l.total.margin)}</span> <span className="text-muted-foreground">· <MarginPercent value={l.total.pct} margin={l.total.margin} /></span></td>
                             </tr>
                           ))}
                         </Fragment>
@@ -252,13 +274,14 @@ function Overview() {
                   </tbody>
                   {shown.length > 0 && (
                     <tfoot className="font-semibold">
-                      <tr className="border-t">
-                        <td className="sticky bottom-0 bg-card px-2 py-2">Total</td>
-                        <td className="sticky bottom-0 bg-card px-2 text-right tabular-nums">{brl(d.billed)}</td>
-                        <td className="sticky bottom-0 bg-card px-2 tabular-nums text-muted-foreground">{brl(d.spent)}</td>
-                        <td className={cn("px-2 text-right tabular-nums", d.margin < 0 && "text-destructive")}>{brl(d.margin)}</td>
-                        <td className="sticky bottom-0 bg-card px-2 text-right"><Chip pct={d.pct} margin={d.margin} /></td>
-                        <td className="sticky bottom-0 bg-card" /><td className="sticky bottom-0 bg-card" />
+                      <tr>
+                        <td className="sticky bottom-0 border-t bg-card px-3 py-2">Total</td>
+                        <td className="sticky bottom-0 border-t bg-card px-3 text-right tabular-nums">{brl(d.billed)}</td>
+                        <td className="sticky bottom-0 border-t bg-card px-3 text-right tabular-nums">{brl(d.spent)}</td>
+                        <td className="sticky bottom-0 border-t bg-card px-3"><CostBar lines={d.lines} total={d.spent} /></td>
+                        <td className={cn("sticky bottom-0 border-t bg-card px-3 text-right tabular-nums", d.margin < 0 && "text-destructive")}>{brl(d.margin)}</td>
+                        <td className="sticky bottom-0 border-t bg-card px-3 text-center"><Chip pct={d.pct} margin={d.margin} /></td>
+                        <td className="sticky bottom-0 border-t bg-card" /><td className="sticky bottom-0 border-t bg-card" />
                       </tr>
                     </tfoot>
                   )}
@@ -270,8 +293,8 @@ function Overview() {
       </div>
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="h-[96vh] w-[98vw] max-w-[98vw] overflow-y-auto">
-          <DialogHeader><DialogTitle>{detail?.work.clients?.name ?? detail?.work.client} — {detail?.work.name}</DialogTitle></DialogHeader>
-          {detail && <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Carregando...</div>}><ResultadoPage key={`${detail.work.id}:${yms.join(",")}`} initialWorkId={detail.work.id} initialMonths={yms} /></Suspense>}
+          <DialogHeader><DialogTitle>{detail?.line.work.clients?.name ?? detail?.line.work.client}{detail && !detail.client ? ` — ${detail.line.work.name}` : " — Geral"}</DialogTitle></DialogHeader>
+          {detail && <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Carregando...</div>}><ResultadoPage key={`${detail.client ? "c" : "w"}:${detail.line.work.id}:${yms.join(",")}`} initialWorkId={detail.line.work.id} initialClientAll={detail.client} initialMonths={yms} /></Suspense>}
         </DialogContent>
       </Dialog>
     </FitScreen>
@@ -295,8 +318,28 @@ function CostBar({ lines, total }: { lines: FinanceLine[]; total: number }) {
   ] as const;
   return (
     <div className="flex items-center gap-2" title={p.map(([n, v]) => `${n}: ${brl(v)}`).join("\n")}>
-      <div className="flex h-1.5 w-40 overflow-hidden rounded-full bg-muted">{p.map(([n, v, c]) => <div key={n} className={cn("h-full", c)} style={{ width: `${total ? (v / total) * 100 : 0}%` }} />)}</div>
-      <span className="text-[12px] tabular-nums text-muted-foreground">{brl(total)}</span>
+      <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">{p.map(([n, v, c]) => <div key={n} className={cn("h-full", c)} style={{ width: `${total ? (v / total) * 100 : 0}%` }} />)}</div>
     </div>
+  );
+}
+
+/** Seta "stonks" subindo em degraus; o preenchimento sobe até a margem (escala 0–50%), com traço na meta. */
+function StepArrow({ pct, goal, max = 50 }: { pct: number | null; goal: number; max?: number }) {
+  const id = useId().replace(/:/g, "");
+  const f = Math.max(0, Math.min(1, (pct ?? 0) / max));
+  // Degraus de baixo-esquerda até a ponta em cima-direita.
+  const path = "M4 116 L4 98 L24 98 L24 78 L44 78 L44 58 L64 58 L64 38 L74 38 L74 26 L62 26 L84 4 L106 26 L94 26 L94 38 L94 116 Z";
+  const top = 4, bottom = 116, h = bottom - top;
+  const y = bottom - f * h, gy = bottom - Math.min(1, goal / max) * h;
+  return (
+    <svg viewBox="0 0 112 120" className="h-[9.5rem] w-auto overflow-visible">
+      <defs><clipPath id={`a${id}`}><path d={path} /></clipPath></defs>
+      <path d={path} className="fill-muted stroke-border" strokeWidth="1" />
+      <g clipPath={`url(#a${id})`}>
+        <rect x="0" width="112" y={y} height={bottom - y} className={cn("ov-rise", (pct ?? 0) < 0 ? "fill-destructive/70" : "fill-foreground")} style={{ transformOrigin: "50% 100%" }} />
+      </g>
+      <line x1="0" x2="112" y1={gy} y2={gy} className="stroke-foreground/60" strokeWidth="1" strokeDasharray="3 2" />
+      <text x="110" y={gy - 2} textAnchor="end" className="fill-muted-foreground text-[7px]">meta {goal}%</text>
+    </svg>
   );
 }

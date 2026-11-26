@@ -65,7 +65,7 @@ const num = (s: string) => {
 const fmtDate = (iso: string) => iso.split("-").reverse().join("/");
 
 
-export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWorkId?: string; initialMonths?: string[] } = {}) {
+export function ResultadoPage({ initialWorkId, initialMonths = [], initialClientAll }: { initialWorkId?: string; initialMonths?: string[]; /** abre o Geral do cliente desse serviço */ initialClientAll?: boolean } = {}) {
   const { canWrite, role, user } = useCurrentUser();
   const qc = useQueryClient();
   const [workId, setWorkId] = useState<string>("");
@@ -618,7 +618,8 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     const w0 = works.data.find((x: any) => x.id === initialWorkId) as any;
     if (!w0) return;
     setClientKey(groupKey(w0));
-    selectWork(initialWorkId);
+    if (initialClientAll) setWorkId(ALL);
+    else selectWork(initialWorkId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialWorkId, works.data]);
 

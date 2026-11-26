@@ -406,3 +406,8 @@
   --border: color-mix(in oklab, var(--paper) 20%, var(--ink));
   color: var(--foreground);
 }
+
+/* Preenchimento da seta da margem (dashboard do Financeiro) sobe de baixo. */
+@keyframes ov-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.ov-rise { transform-box: fill-box; animation: ov-rise 1.1s cubic-bezier(0.32, 0.72, 0, 1) both; }
+@media (prefers-reduced-motion: reduce) { .ov-rise { animation: none; } }
