@@ -85,18 +85,18 @@ function Overview() {
   const end = yms.length ? monthEnd(yms[yms.length - 1]!) : `${year}-12-31`;
 
   // Mesmas consultas (e chaves) do Fechamento: os números são idênticos e o cache é compartilhado.
-  const works = useQuery({ queryKey: ["fin-works"], queryFn: async () => (await supabase.from("works").select("*, clients(name)").order("name")).data ?? [] });
+  const works = useQuery({ queryKey: ["fin-works"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("works").select("*, clients(name)").order("name")).data ?? [] });
   const holidays = useQuery({ queryKey: ["holidays-dates"], queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string) });
   // O ano inteiro é lido uma vez; trocar meses ou clientes só refaz a conta na tela (instantâneo).
   const yStart = `${year}-01-01`, yEnd = `${year}-12-31`;
-  const active = useQuery({ queryKey: ["fin-active", yStart, yEnd], placeholderData: keepPreviousData, queryFn: () => loadFinanceActive(yStart, yEnd) });
+  const active = useQuery({ queryKey: ["fin-active", yStart, yEnd], staleTime: 10 * 60_000, placeholderData: keepPreviousData, queryFn: () => loadFinanceActive(yStart, yEnd) });
   const scope = useWorkScope();
   const list = useMemo(() => financeList(works.data ?? [], active.data, yStart, yEnd).filter((w: any) => scope.allowWork(w)), [works.data, active.data, yStart, yEnd, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
-  const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 60_000, queryFn: loadResultShared });
+  const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 10 * 60_000, queryFn: loadResultShared });
   const batches = useMemo(() => financeBatches(list), [list]);
   const batchKey = useMemo(() => batches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [batches]);
   const raws = useQuery({
-    queryKey: ["fin-client-raw", batchKey, yEnd], staleTime: 60_000, placeholderData: keepPreviousData,
+    queryKey: ["fin-client-raw", batchKey, yEnd], staleTime: 10 * 60_000, placeholderData: keepPreviousData,
     enabled: !!shared.data && !!active.data,
     queryFn: () => loadFinanceRaws(batches, shared.data!, { until: yEnd }),
   });
@@ -153,7 +153,7 @@ function Overview() {
         </div>
 
         {loading || !yms.length ? (yms.length ? <DashboardSkeleton /> : <p className="text-sm text-muted-foreground">Selecione ao menos um mês.</p>) : (
-          <div key={`${year}|${yms.join(",")}|${hidden.join(",")}`} className="grid gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4 xl:grid-rows-[13.25rem_minmax(0,1fr)]">
+          <div key={`${year}|${yms.join(",")}|${hidden.join(",")}`} className="grid gap-3 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-[13.25rem_minmax(0,1fr)]">
             <OverviewCard dark title="Resultado do período" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Faturado, todas as despesas e a margem; os % são sobre o faturado" className="min-h-0">
               <div className="invert-scope">
                 <div className="grid grid-cols-3 gap-2">
@@ -223,7 +223,7 @@ function Overview() {
             </OverviewCard>
 
             {/* Resumo das obras: colunas com largura fixa, números alinhados à direita, cliente com subtotal (sempre aberto). */}
-            <div className="ov-card flex min-h-0 flex-col rounded-2xl border bg-card md:col-span-2 xl:col-span-4">
+            <div className="ov-card flex min-h-0 flex-col rounded-2xl border bg-card md:col-span-2 lg:col-span-4">
               <div className="flex items-center justify-between px-5 pt-3 text-xs">
                 <p className="font-medium text-muted-foreground">Resumo das obras · {shown.length} clientes · {d.lines.length} serviços</p>
                 <p className="text-muted-foreground">Clique no cliente para o resultado geral, no serviço para o detalhe</p>
