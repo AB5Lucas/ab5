@@ -122,7 +122,7 @@ const twoNames = (n: string) => n.trim().split(/\s+/).filter((w, i) => i === 0 |
   .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
 
 export function TeamMosaic({ people, title, dark }: { people: TeamPerson[]; title: string; dark?: boolean }) {
-  const [mode, setMode] = useState<Mode>("place");
+  const [mode, setMode] = useState<Mode>("fn");
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   // Troca de balão só depois que o mouse para um instante sobre outro círculo (e só por movimento real do mouse):
