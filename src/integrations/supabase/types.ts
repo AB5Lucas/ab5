@@ -1066,6 +1066,435 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_klaus_split_20261126_alloc: {
+        Row: {
+          collaborator_id: string | null
+          confirmation_status:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          driver: boolean | null
+          has_pending_requirement: boolean | null
+          id: string | null
+          notes: string | null
+          overnight: boolean | null
+          position_id: string | null
+          schedule_id: string | null
+          service_assigned: boolean | null
+          sort_order: number | null
+          source: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override: boolean | null
+          updated_at: string | null
+          vehicle_id: string | null
+          vt_override: boolean | null
+          work_id: string | null
+        }
+        Insert: {
+          collaborator_id?: string | null
+          confirmation_status?:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          driver?: boolean | null
+          has_pending_requirement?: boolean | null
+          id?: string | null
+          notes?: string | null
+          overnight?: boolean | null
+          position_id?: string | null
+          schedule_id?: string | null
+          service_assigned?: boolean | null
+          sort_order?: number | null
+          source?: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override?: boolean | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          vt_override?: boolean | null
+          work_id?: string | null
+        }
+        Update: {
+          collaborator_id?: string | null
+          confirmation_status?:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          driver?: boolean | null
+          has_pending_requirement?: boolean | null
+          id?: string | null
+          notes?: string | null
+          overnight?: boolean | null
+          position_id?: string | null
+          schedule_id?: string | null
+          service_assigned?: boolean | null
+          sort_order?: number | null
+          source?: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override?: boolean | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          vt_override?: boolean | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_klaus_split_20261126_rdo_wf: {
+        Row: {
+          allocation_id: string | null
+          break_minutes: number | null
+          classified_at: string | null
+          classified_by: string | null
+          collaborator_id: string | null
+          created_at: string | null
+          entry_time: string | null
+          exit_time: string | null
+          final_classification: string | null
+          id: string | null
+          occurrence_status: string | null
+          planned: boolean | null
+          position_id: string | null
+          present: boolean | null
+          rdo_id: string | null
+          report_date: string | null
+          reported_note: string | null
+          reported_reason: string | null
+          updated_at: string | null
+          work_id: string | null
+          worked_hours: number | null
+        }
+        Insert: {
+          allocation_id?: string | null
+          break_minutes?: number | null
+          classified_at?: string | null
+          classified_by?: string | null
+          collaborator_id?: string | null
+          created_at?: string | null
+          entry_time?: string | null
+          exit_time?: string | null
+          final_classification?: string | null
+          id?: string | null
+          occurrence_status?: string | null
+          planned?: boolean | null
+          position_id?: string | null
+          present?: boolean | null
+          rdo_id?: string | null
+          report_date?: string | null
+          reported_note?: string | null
+          reported_reason?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+          worked_hours?: number | null
+        }
+        Update: {
+          allocation_id?: string | null
+          break_minutes?: number | null
+          classified_at?: string | null
+          classified_by?: string | null
+          collaborator_id?: string | null
+          created_at?: string | null
+          entry_time?: string | null
+          exit_time?: string | null
+          final_classification?: string | null
+          id?: string | null
+          occurrence_status?: string | null
+          planned?: boolean | null
+          position_id?: string | null
+          present?: boolean | null
+          rdo_id?: string | null
+          report_date?: string | null
+          reported_note?: string | null
+          reported_reason?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+          worked_hours?: number | null
+        }
+        Relationships: []
+      }
+      backup_klaus_split_20261126_rdos: {
+        Row: {
+          activities: string | null
+          client_id: string | null
+          created_at: string | null
+          finalized_at: string | null
+          id: string | null
+          notes: string | null
+          number: number | null
+          report_date: string | null
+          responsible_name: string | null
+          schedule_id: string | null
+          shift: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+          work_id: string | null
+        }
+        Insert: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string | null
+          notes?: string | null
+          number?: number | null
+          report_date?: string | null
+          responsible_name?: string | null
+          schedule_id?: string | null
+          shift?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string | null
+          notes?: string | null
+          number?: number | null
+          report_date?: string | null
+          responsible_name?: string | null
+          schedule_id?: string | null
+          shift?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_klaus_split_20261126_vs: {
+        Row: {
+          adm_place: string | null
+          client_id: string | null
+          created_at: string | null
+          driver_bonus: boolean | null
+          driver_id: string | null
+          driver_toggle: boolean | null
+          external_place: string | null
+          extra_client_ids: string[] | null
+          extra_driver_ids: string[] | null
+          extra_driver_toggles: boolean[] | null
+          extra_km: number | null
+          extra_places: string[] | null
+          extra_requester_ids: string[] | null
+          extra_work_ids: string[] | null
+          id: string | null
+          is_external: boolean | null
+          is_maintenance: boolean | null
+          is_suzano_local: boolean | null
+          km: number | null
+          maintenance_kind: string | null
+          notes: string | null
+          place_toll: number | null
+          requester_id: string | null
+          schedule_date: string | null
+          trips: number | null
+          updated_at: string | null
+          vehicle_id: string | null
+          work_id: string | null
+        }
+        Insert: {
+          adm_place?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          driver_bonus?: boolean | null
+          driver_id?: string | null
+          driver_toggle?: boolean | null
+          external_place?: string | null
+          extra_client_ids?: string[] | null
+          extra_driver_ids?: string[] | null
+          extra_driver_toggles?: boolean[] | null
+          extra_km?: number | null
+          extra_places?: string[] | null
+          extra_requester_ids?: string[] | null
+          extra_work_ids?: string[] | null
+          id?: string | null
+          is_external?: boolean | null
+          is_maintenance?: boolean | null
+          is_suzano_local?: boolean | null
+          km?: number | null
+          maintenance_kind?: string | null
+          notes?: string | null
+          place_toll?: number | null
+          requester_id?: string | null
+          schedule_date?: string | null
+          trips?: number | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          adm_place?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          driver_bonus?: boolean | null
+          driver_id?: string | null
+          driver_toggle?: boolean | null
+          external_place?: string | null
+          extra_client_ids?: string[] | null
+          extra_driver_ids?: string[] | null
+          extra_driver_toggles?: boolean[] | null
+          extra_km?: number | null
+          extra_places?: string[] | null
+          extra_requester_ids?: string[] | null
+          extra_work_ids?: string[] | null
+          id?: string | null
+          is_external?: boolean | null
+          is_maintenance?: boolean | null
+          is_suzano_local?: boolean | null
+          km?: number | null
+          maintenance_kind?: string | null
+          notes?: string | null
+          place_toll?: number | null
+          requester_id?: string | null
+          schedule_date?: string | null
+          trips?: number | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_klaus_split_20261126_works: {
+        Row: {
+          active: boolean | null
+          address: string | null
+          budget_cost: number | null
+          budget_items: Json | null
+          cc_suffix: string | null
+          city: string | null
+          client: string | null
+          client_id: string | null
+          code: string | null
+          contract_enabled: boolean | null
+          contract_months: number | null
+          created_at: string | null
+          distance_km: number | null
+          entry_time: string | null
+          estimated_travel_time: number | null
+          exit_time: string | null
+          exit_time_weekend: string | null
+          expected_end_date: string | null
+          hh_enabled: boolean | null
+          hh_rates: Json | null
+          id: string | null
+          is_stock: boolean | null
+          latitude: number | null
+          longitude: number | null
+          monthly_enabled: boolean | null
+          name: string | null
+          neighborhood: string | null
+          night_shift: boolean | null
+          notes: string | null
+          number: string | null
+          order_number: string | null
+          order_value: number | null
+          orders: Json | null
+          quote_number: string | null
+          rdo_general: boolean | null
+          rental_enabled: boolean | null
+          start_date: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["work_status"] | null
+          supervisor_id: string | null
+          updated_at: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          address?: string | null
+          budget_cost?: number | null
+          budget_items?: Json | null
+          cc_suffix?: string | null
+          city?: string | null
+          client?: string | null
+          client_id?: string | null
+          code?: string | null
+          contract_enabled?: boolean | null
+          contract_months?: number | null
+          created_at?: string | null
+          distance_km?: number | null
+          entry_time?: string | null
+          estimated_travel_time?: number | null
+          exit_time?: string | null
+          exit_time_weekend?: string | null
+          expected_end_date?: string | null
+          hh_enabled?: boolean | null
+          hh_rates?: Json | null
+          id?: string | null
+          is_stock?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          monthly_enabled?: boolean | null
+          name?: string | null
+          neighborhood?: string | null
+          night_shift?: boolean | null
+          notes?: string | null
+          number?: string | null
+          order_number?: string | null
+          order_value?: number | null
+          orders?: Json | null
+          quote_number?: string | null
+          rdo_general?: boolean | null
+          rental_enabled?: boolean | null
+          start_date?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["work_status"] | null
+          supervisor_id?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          address?: string | null
+          budget_cost?: number | null
+          budget_items?: Json | null
+          cc_suffix?: string | null
+          city?: string | null
+          client?: string | null
+          client_id?: string | null
+          code?: string | null
+          contract_enabled?: boolean | null
+          contract_months?: number | null
+          created_at?: string | null
+          distance_km?: number | null
+          entry_time?: string | null
+          estimated_travel_time?: number | null
+          exit_time?: string | null
+          exit_time_weekend?: string | null
+          expected_end_date?: string | null
+          hh_enabled?: boolean | null
+          hh_rates?: Json | null
+          id?: string | null
+          is_stock?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          monthly_enabled?: boolean | null
+          name?: string | null
+          neighborhood?: string | null
+          night_shift?: boolean | null
+          notes?: string | null
+          number?: string | null
+          order_number?: string | null
+          order_value?: number | null
+          orders?: Json | null
+          quote_number?: string | null
+          rdo_general?: boolean | null
+          rental_enabled?: boolean | null
+          start_date?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["work_status"] | null
+          supervisor_id?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
       backup_work_entries_20261126: {
         Row: {
           amount: number | null
@@ -2518,6 +2947,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      finance_history: {
+        Row: {
+          andaimes: number
+          client: string
+          fat: number
+          ferr: number
+          id: number
+          mat: number
+          mo: number
+          obra: string | null
+          pedido: string | null
+          sheet_client: string | null
+          transp: number
+          ym: string
+        }
+        Insert: {
+          andaimes?: number
+          client: string
+          fat?: number
+          ferr?: number
+          id?: number
+          mat?: number
+          mo?: number
+          obra?: string | null
+          pedido?: string | null
+          sheet_client?: string | null
+          transp?: number
+          ym: string
+        }
+        Update: {
+          andaimes?: number
+          client?: string
+          fat?: number
+          ferr?: number
+          id?: number
+          mat?: number
+          mo?: number
+          obra?: string | null
+          pedido?: string | null
+          sheet_client?: string | null
+          transp?: number
+          ym?: string
+        }
+        Relationships: []
       }
       fleet_budget_cache: {
         Row: {
