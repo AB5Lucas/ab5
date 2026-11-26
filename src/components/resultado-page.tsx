@@ -15,8 +15,7 @@ import { resplitClient, splitDesc } from "@/lib/resplit";
 import { Switch } from "@/components/ui/switch";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { workedHours, positionLabel } from "@/lib/rdo";
-import { ResultCard, ResultChartSkeleton, ResultDashboardSkeleton } from "@/components/result-dashboard-shell";
-import { ResultProgressGauge } from "@/components/result-progress-gauge";
+import ab5Logo from "@/assets/ab5-logo.png.asset.json";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Trash2, Plus, Pencil, Check, X, CalendarDays, Download, Repeat2 } from "lucide-react";
@@ -89,27 +88,8 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   const periodStart = range?.from ?? "1900-01-01";
   const periodEnd = range?.to ?? "9999-12-31";
   const share = (ym: string) => monthShare(ym, fromDate, toDate);
-
-  const works = useQuery({
-    queryKey: ["works-result", role, user?.id, "client-scope"],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("works").select("*, clients(name)").order("name");
-      if (error) throw error;
-      // Coordenadores herdam todos os serviços dos clientes atribuídos, inclusive novos.
-      if (role === "coordenador" || role === "encarregado") {
-        if (!user?.id) return [];
-        const { data: mine, error: scopeError } = await supabase.from("foreman_works").select("work_id, works(client_id)").eq("user_id", user.id);
-        if (scopeError) throw scopeError;
-        return resultWorksForRole(data, role, mine ?? []);
-      }
-      return data;
-    },
-  });
-  const initialVisibleIds = useMemo(() => new Set((works.data ?? []).map((w) => w.id)), [works.data]);
   const activeIds = useQuery({
     queryKey: ["works-active-period", periodStart, periodEnd],
-    placeholderData: (previous) => previous ?? initialVisibleIds,
     enabled: hasPeriod,
     queryFn: async () => {
       const scheds = await fetchAll<any>((a, b) =>
@@ -132,6 +112,22 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
     },
   });
 
+  const works = useQuery({
+    queryKey: ["works-result", role, user?.id, "client-scope"],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("works").select("*, clients(name)").order("name");
+      if (error) throw error;
+      // Coordenadores herdam todos os serviços dos clientes atribuídos, inclusive novos.
+      if (role === "coordenador" || role === "encarregado") {
+        if (!user?.id) return [];
+        const { data: mine, error: scopeError } = await supabase.from("foreman_works").select("work_id, works(client_id)").eq("user_id", user.id);
+        if (scopeError) throw scopeError;
+        return resultWorksForRole(data, role, mine ?? []);
+      }
+      return data;
+    },
+  });
   // Com período: enquanto carrega, não mostra nada (evita listar todas as obras por engano)
   const visibleWorks = useMemo(
     () => (hasPeriod ? (activeIds.data ? (works.data ?? []).filter((w) => activeIds.data!.has(w.id)) : []) : works.data ?? []),
@@ -764,8 +760,7 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
   const w = work as any;
 
   return (
-    <div className="result-page space-y-3">
-      <h1 className="font-display text-xl font-semibold">Resultados</h1>
+    <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         {(() => {
           const keyOf = groupKey;
@@ -854,42 +849,41 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
         )}
       </div>
 
-      {(works.isLoading || (hasPeriod && activeIds.isLoading) || (work && !data.data && data.isPending)) ? <ResultDashboardSkeleton /> : !work ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">Selecione um serviço para ver o relatório financeiro.</div>
-      ) : (
-        <div className="result-dashboard space-y-3" aria-busy={data.isFetching || activeIds.isPlaceholderData}>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{calc?.first ? fmtDate(calc.first) : "—"} — {calc?.lastDay ? fmtDate(calc.lastDay) : "—"} · <CountUp value={calc?.days ?? 0} /> dias</span>
-            <span>{data.isFetching || activeIds.isPlaceholderData ? "Atualizando…" : `Atualização ${fmtDate(new Date().toISOString().slice(0, 10))}`}</span>
+      {!work && <p className="text-sm text-muted-foreground">Selecione um serviço para ver o relatório financeiro.</p>}
+
+      {work && (
+        <div className="rounded-lg border bg-card px-8 py-6 shadow-sm">
+          {/* Cabeçalho */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 border-b pb-4">
+            <div className="grid grid-cols-[auto_auto_auto_auto] gap-x-6 gap-y-1 text-sm justify-self-start">
+              <span className="text-muted-foreground">Primeiro Dia:</span>
+              <span className="font-semibold">{calc?.first ? fmtDate(calc.first) : "—"}</span>
+              <span className="text-muted-foreground">Dias Totais</span>
+              <span />
+              <span className="text-muted-foreground">Último Dia:</span>
+              <span className="font-semibold">{calc?.lastDay ? fmtDate(calc.lastDay) : "—"}</span>
+              <span className="font-semibold">{calc?.days ?? 0}</span>
+              <span />
+            </div>
+            <h1 className="text-center text-3xl font-bold italic tracking-wide">RELATÓRIO FINANCEIRO DE OBRAS</h1>
+            <div className="flex items-center gap-4 justify-self-end">
+              <img src={ab5Logo.url} alt="AB5" className="h-14 w-14 object-contain" />
+              <div className="text-sm">
+                <p className="text-muted-foreground">Atualização</p>
+                <p className="font-semibold">{fmtDate(new Date().toISOString().slice(0, 10))}</p>
+              </div>
+            </div>
           </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-            <ResultCard title="Valor do pedido" {...(canEdit ? { onEdit: () => open("orcamento") } : {})}>
-              <p className="font-display text-3xl font-semibold tabular-nums"><CountUp value={brl(shownOrder)} /></p>
-              <p className="mt-2 text-xs text-background/70">{w.clients?.name ?? w.client ?? "—"}</p>
-              <p className="mt-1 line-clamp-2 text-sm">{w.name}</p>
-            </ResultCard>
-            <ResultCard title="Valor faturado">
-              <p className="font-display text-3xl font-semibold tabular-nums"><CountUp value={brl(billed)} /></p>
-              <div className="mt-4 flex justify-between gap-2 text-xs text-muted-foreground"><span>Faturado do pedido</span><CountUp value={shownOrder ? `${Math.round((billed / shownOrder) * 100)}%` : "—"} /></div>
-              <progress aria-label="Faturado do pedido" className="result-progress mt-2 h-2 w-full" max={100} value={shownOrder ? Math.max(0, Math.min(100, billed / shownOrder * 100)) : 0} />
-              <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs"><span className="text-muted-foreground">Saldo a faturar</span><CountUp value={brl(shownOrder - billed)} /></div>
-            </ResultCard>
-            <ResultCard title="Horas normais × HE">
-  {(() => { const normal = calc?.laborHours?.normal ?? 0, extra = calc?.laborHours?.extra ?? 0, total = normal + extra;
-    return <div className="flex h-full flex-col justify-center gap-4">
-      <p className="font-display text-3xl font-semibold tabular-nums"><CountUp value={total} /> <span className="text-sm text-muted-foreground">horas</span></p>
-      <div className="flex h-5 overflow-hidden rounded bg-muted" role="img" aria-label={`${normal.toLocaleString("pt-BR")} horas normais e ${extra.toLocaleString("pt-BR")} horas extras`}><span className="ov-widen h-full bg-foreground" style={{ width: `${total ? normal / total * 100 : 0}%` }} /><span className="ov-widen h-full bg-foreground/35" style={{ width: `${total ? extra / total * 100 : 0}%` }} /></div>
-      <div className="grid grid-cols-2 gap-4 text-xs"><div><p className="text-muted-foreground">Horas normais</p><p className="mt-1 font-display text-2xl font-semibold"><CountUp value={normal} /> h</p></div><div><p className="text-muted-foreground">Horas extras</p><p className="mt-1 font-display text-2xl font-semibold"><CountUp value={extra} /> h</p></div></div>
-    </div>; })()}
-</ResultCard>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-            <ResultCard dark className="result-client-dark" title="Dados do cliente" {...(canEdit ? { onEdit: () => open("cliente") } : {})}>
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-xs">
+
+          {/* Linha 1 */}
+          <div className="grid gap-6 border-b py-5 xl:grid-cols-[1fr_2fr_1fr]">
+            <div className={`p-3 ${clickable}`} onClick={() => open("cliente")} title={canEdit ? "Clique para editar" : undefined}>
+              <SectionTitle>Dados do Cliente</SectionTitle>
+              <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
                 <Lbl>Cliente</Lbl>
-                <span className="text-base font-semibold">{w.clients?.name ?? w.client ?? "—"}</span>
+                <span className="text-lg font-bold">{w.client ?? "—"}</span>
                 <Lbl>Obra</Lbl>
-                <span className="text-xs break-words">{w.name}</span>
+                <span className="text-xs uppercase">{w.name}</span>
                 <Lbl>Nº Pedido</Lbl>
                 <span>
                   {(() => {
@@ -918,47 +912,103 @@ export function ResultadoPage({ initialWorkId, initialMonths = [] }: { initialWo
                 <Lbl>Saldo a Faturar</Lbl>
                 <span>{brl(shownOrder - billed)}</span>
               </div>
+              <div className="mt-6 text-center">
+                <SectionTitle>Valor do Pedido</SectionTitle>
+                <p className="mt-2 text-xl font-bold"><CountUp value={brl(shownOrder)} /></p>
+              </div>
+            </div>
 
-            </ResultCard>
-            <ResultCard title="Andamento mensal">
-              <div className="h-64 min-w-0">{calc && calc.monthBars.length > 0 ? <Suspense fallback={<ResultChartSkeleton />}><MonthBarsChart data={calc.monthBars} /></Suspense> : <p className="pt-10 text-center text-sm text-muted-foreground">Sem custos lançados.</p>}</div>
-            </ResultCard>
-            <ResultCard title="Conclusão da obra" {...(canEdit ? { onEdit: () => open("andamento") } : {})}>
-              <ResultProgressGauge value={monthlyInfo || (isAll && (() => { const g = (works.data ?? []).filter((x: any) => workIds.includes(x.id)); return g.length > 0 && g.every((x: any) => x.monthly_enabled); })()) ? 100 : last?.progress ?? 0} />
-            </ResultCard>
+            <div>
+              <SectionTitle>Andamento Mensal</SectionTitle>
+              <div className="mt-2 h-64">
+                {calc && calc.monthBars.length > 0 ? (
+                  <Suspense fallback={null}><MonthBarsChart data={calc.monthBars} /></Suspense>
+                ) : (
+                  <p className="pt-10 text-center text-sm text-muted-foreground">Sem custos lançados.</p>
+                )}
+              </div>
+            </div>
+
+            <div className={`p-3 ${clickable}`} onClick={() => open("andamento")} title={canEdit ? "Clique para lançar o andamento" : undefined}>
+              <SectionTitle>Conclusão da Obra</SectionTitle>
+              <Gauge value={monthlyInfo || (isAll && (() => { const g = (works.data ?? []).filter((x: any) => workIds.includes(x.id)); return g.length > 0 && g.every((x: any) => x.monthly_enabled); })()) ? 100 : last?.progress ?? 0} />
+            </div>
           </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-            <ResultCard title="Custos realizados" {...(canEdit ? { onEdit: () => openEntries("lancamentos") } : {})}>
-  <p className="mb-3 font-display text-3xl font-semibold tabular-nums"><CountUp value={brl(totReal)} /></p>
-  <div className="h-44 min-w-0">{barItems.length ? <Suspense fallback={<ResultChartSkeleton />}><ItemBarsChart data={barItems} /></Suspense> : <p className="pt-10 text-center text-sm text-muted-foreground">Sem orçamento por item.</p>}</div>
-  <div className="mt-3 space-y-1">{scaledItems.map((i) => <div key={i.key} className="flex items-center justify-between gap-3 text-xs"><span className="text-muted-foreground">{relabel(i.key, i.label)}</span><Button variant="ghost" className="h-auto p-0 text-xs" onClick={() => setDetail(i.key)} title="Ver detalhes">{brl(i.real)}</Button></div>)}</div>
-</ResultCard>
-            <ResultCard title="Custos orçados" {...(canEdit ? { onEdit: () => open("orcamento") } : {})}>
-  <p className="mb-4 font-display text-3xl font-semibold tabular-nums"><CountUp value={brl(totBudget)} /></p>
-  <div className="overflow-x-auto"><table className="w-full text-xs sm:text-sm"><thead><tr className="border-b text-xs text-muted-foreground"><th className="pb-2 text-left font-normal">Tipo de custo</th><th className="pb-2 text-right font-normal">Orçado</th><th className="pb-2 text-right font-normal">Utilizado</th></tr></thead>
-  <tbody>{scaledItems.map((i) => <tr key={i.key}><td className="py-2">{relabel(i.key, i.label)}</td><td className="text-right">{brl(i.budget)}</td><td className="text-right">{Math.round(i.used)}%</td></tr>)}<tr className="border-t font-semibold"><td className="pt-3">Total</td><td className="pt-3 text-right">{brl(totBudget)}</td><td className="pt-3 text-right">{totBudget ? Math.round(totReal / totBudget * 100) : 0}%</td></tr></tbody></table></div>
-</ResultCard>
-            <ResultCard title="Margem de contribuição">
-              <div className="grid grid-cols-[1fr_auto_1fr] text-center">
-                <p className="border-b pb-1 text-sm text-muted-foreground">Orçado</p>
+
+          {/* Linha 2 */}
+          <div className="grid gap-6 pt-5 xl:grid-cols-[1fr_2fr_1fr]">
+            <div className="h-64">
+              {barItems.length ? (
+                <Suspense fallback={null}><ItemBarsChart data={barItems} /></Suspense>
+              ) : (
+                <p className="pt-10 text-center text-sm text-muted-foreground">Sem orçamento por item.</p>
+              )}
+            </div>
+
+            <div className={`p-3 ${clickable}`} onClick={() => open("orcamento")} title={canEdit ? "Clique para editar o orçado" : undefined}>
+              <SectionTitle>Custos Orçados x Realizado</SectionTitle>
+              <table className="mx-auto mt-4 w-full max-w-2xl text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground italic">
+                    <th className="py-1 text-left font-normal">Tipo de Custo</th>
+                    <th className="text-right font-normal">Custo Orçado</th>
+                    <th className="text-right font-normal">Custo Realizado</th>
+                    <th className="text-right font-normal">% Utilizado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scaledItems.map((i) => (
+                    <tr key={i.key}>
+                      <td className="py-1 pl-3">{relabel(i.key, i.label)}</td>
+                      <td className="text-right">{brl(i.budget)}</td>
+                      <td className="text-right">
+                        <button
+                          type="button"
+                          className="text-primary underline-offset-2 hover:underline"
+                          title="Ver detalhes"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetail(i.key);
+                          }}
+                        >
+                          {brl(i.real)}
+                        </button>
+                      </td>
+                      <td className={`text-right ${i.used > 100 ? "text-destructive" : ""}`}>{Math.round(i.used)}%</td>
+                    </tr>
+                  ))}
+                  <tr className="font-bold italic">
+                    <td className="py-1">Total</td>
+                    <td className="text-right">{brl(totBudget)}</td>
+                    <td className="text-right">{brl(totReal)}</td>
+                    <td className="text-right">{totBudget ? Math.round((totReal / totBudget) * 100) : 0}%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-3">
+              <SectionTitle>Margem de Contribuição</SectionTitle>
+              <div className="mt-4 grid grid-cols-[1fr_auto_1fr] text-center">
+                <p className="border-b pb-1 text-sm italic text-muted-foreground">Orçado</p>
                 <p className="border-b pb-1" />
-                <p className="border-b pb-1 text-sm text-muted-foreground">Realizado</p>
-                <p className="pt-2 text-sm">{brl(fixedBudget.margin)}</p>
+                <p className="border-b pb-1 text-sm italic text-muted-foreground">Realizado</p>
+                <p className="pt-6 text-sm">{brl(fixedBudget.margin)}</p>
                 <div className="row-span-2 mx-4 w-px bg-border" />
-                <p className={`pt-2 text-sm ${fixedReal.margin < 0 ? "text-foreground" : ""}`}>{brl(fixedReal.margin)}</p>
-                <p className="pt-2 text-lg"><CountUp value={pct(fixedBudget.pct)} /></p>
-                <p className="pt-2 text-lg"><MarginPercent value={fixedReal.pct} margin={fixedReal.margin} /></p>
+                <p className={`pt-6 text-sm ${fixedReal.margin < 0 ? "text-destructive" : ""}`}>{brl(fixedReal.margin)}</p>
+                <p className="pt-4 text-lg"><CountUp value={pct(fixedBudget.pct)} /></p>
+                <p className="pt-4 text-lg"><MarginPercent value={fixedReal.pct} margin={fixedReal.margin} /></p>
               </div>
               {monthlyInfo && hasPeriod && (
                 <div className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-center">
                   <SectionTitle>Margem Mensal</SectionTitle>
-                  <div className={`flex items-baseline justify-center gap-4 pt-2 ${realMargin < 0 ? "text-foreground" : ""}`}>
+                  <div className={`flex items-baseline justify-center gap-4 pt-2 ${realMargin < 0 ? "text-destructive" : ""}`}>
                     <span className="text-sm">{brl(realMargin)}</span>
                     <span className="text-lg"><MarginPercent value={last?.marginPct ?? null} margin={realMargin} /></span>
                   </div>
                 </div>
               )}
-            </ResultCard>
+            </div>
           </div>
         </div>
       )}
@@ -1451,6 +1501,36 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
     <div className="space-y-1">
       <Label>{label}</Label>
       <Input value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+/** Velocímetro semicircular com faixas e ponteiro. */
+function Gauge({ value }: { value: number }) {
+  const v = Math.max(0, Math.min(100, value));
+  const cx = 120, cy = 120, R = 100, r = 70;
+  const pt = (p: number, rad: number) => {
+    const a = Math.PI * (1 - p / 100);
+    return [cx + rad * Math.cos(a), cy - rad * Math.sin(a)];
+  };
+  const seg = (a: number, b: number) => {
+    const [x1, y1] = pt(a, R), [x2, y2] = pt(b, R), [x3, y3] = pt(b, r), [x4, y4] = pt(a, r);
+    return `M${x1},${y1} A${R},${R} 0 0 1 ${x2},${y2} L${x3},${y3} A${r},${r} 0 0 0 ${x4},${y4} Z`;
+  };
+  const bands = [0, 20, 40, 60, 80, 100];
+  const [nx, ny] = pt(v, R - 4);
+  const [bx1, by1] = pt(v + 50, 5);
+  const [bx2, by2] = pt(v - 50, 5);
+  return (
+    <div className="mt-2 flex flex-col items-center">
+      <svg viewBox="0 0 240 135" className="w-full max-w-xs">
+        {bands.slice(0, -1).map((b, i) => (
+          <path key={b} d={seg(b, bands[i + 1]!)} fill="var(--chart-blue)" fillOpacity={0.15 + i * 0.2} />
+        ))}
+        <polygon points={`${nx},${ny} ${bx1},${by1} ${bx2},${by2}`} fill="var(--muted-foreground)" />
+        <circle cx={cx} cy={cy} r={5} fill="var(--muted-foreground)" />
+      </svg>
+      <p className="text-2xl font-bold"><CountUp value={pct(v)} /></p>
     </div>
   );
 }

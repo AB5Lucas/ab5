@@ -49,7 +49,7 @@ function AuthenticatedLayout() {
   const { profile, role, isForeman } = useCurrentUser();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const dashboardPending = useRouterState({ select: (r) => r.status === "pending" && r.location.pathname !== r.resolvedLocation?.pathname && ["/planejamento", "/funcionarios", "/atividades", "/frota", "/frota/", "/obras/resultado"].includes(r.location.pathname) });
+  const dashboardPending = useRouterState({ select: (r) => r.status === "pending" && r.location.pathname !== r.resolvedLocation?.pathname && ["/planejamento", "/funcionarios", "/atividades", "/frota", "/frota/"].includes(r.location.pathname) });
   const queryClient = useQueryClient();
   const { canAccess, loading: accessLoading } = useAccess();
   const pageUrl = menuUrlFor(pathname);
