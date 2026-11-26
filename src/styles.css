@@ -414,3 +414,8 @@
 @keyframes ov-draw { from { stroke-dashoffset: 300; } to { stroke-dashoffset: 0; } }
 .ov-draw { stroke-dasharray: 300; animation: ov-draw 1.4s cubic-bezier(0.32, 0.72, 0, 1) 0.3s both; }
 @media (prefers-reduced-motion: reduce) { .ov-draw { animation: none; } }
+/* Materiais na composição das despesas: hachurado, para diferenciar dos cinzas. */
+.cost-hatch { background-image: repeating-linear-gradient(45deg, var(--color-foreground) 0 1.5px, transparent 1.5px 3.5px); background-color: color-mix(in oklab, var(--color-foreground) 12%, transparent); }
+@keyframes gauge-needle { from { transform: rotate(-90deg); } }
+.gauge-needle { animation: gauge-needle 1.2s cubic-bezier(0.32, 0.72, 0, 1) both; }
+@media (prefers-reduced-motion: reduce) { .gauge-needle { animation: none; } }

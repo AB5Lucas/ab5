@@ -41,6 +41,21 @@ const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 const brlK = (v: number) => Math.abs(v) >= 1e6 ? `R$ ${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mi` : Math.abs(v) >= 1e4 ? `R$ ${(v / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil` : brl(v);
 const hrs = (v: number) => `${Math.round(v).toLocaleString("pt-BR")} h`;
 const cost = (l: FinanceLine) => l.tax + l.mo + l.transport + l.materials;
+/** Pedidos do serviço com data até `end` (sem data = sempre) e quanto deles já foi faturado até essa data. */
+function orderOf(l: FinanceLine, end: string) {
+  const os = Array.isArray(l.work.orders) ? (l.work.orders as { value?: unknown; date?: unknown }[]) : [];
+  const o = os.length ? os.reduce((a, x) => a + (!x?.date || String(x.date).slice(0, 10) <= end ? Number(x?.value) || 0 : 0), 0) : Number(l.work.order_value ?? 0);
+  if (o <= 0) return { ordered: 0, billed: 0 };
+  const b = (l.raw.entries as any[]).reduce((a, e) => a + (e.category === "faturamento" && String(e.entry_date).slice(0, 10) <= end ? Number(e.amount) || 0 : 0), 0);
+  return { ordered: o, billed: Math.min(o, b) };
+}
+const ordersOf = (ls: FinanceLine[], end: string) => ls.reduce((a, l) => { const o = orderOf(l, end); return { ordered: a.ordered + o.ordered, billed: a.billed + o.billed }; }, { ordered: 0, billed: 0 });
+const COST_PARTS = [
+  { key: "tax", label: "Impostos", cls: "bg-foreground/15" },
+  { key: "mo", label: "Mão de obra", cls: "bg-foreground" },
+  { key: "transport", label: "Transporte", cls: "bg-foreground/50" },
+  { key: "materials", label: "Materiais", cls: "cost-hatch" },
+] as const;
 
 /** Dashboard do Financeiro (26/11): para apresentar à diretoria. Acesso = quem abre o Fechamento. */
 function FinanceiroOverview() {
@@ -71,16 +86,18 @@ function Overview() {
   // Mesmas consultas (e chaves) do Fechamento: os números são idênticos e o cache é compartilhado.
   const works = useQuery({ queryKey: ["fin-works"], queryFn: async () => (await supabase.from("works").select("*, clients(name)").order("name")).data ?? [] });
   const holidays = useQuery({ queryKey: ["holidays-dates"], queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string) });
-  const active = useQuery({ queryKey: ["fin-active", start, end], placeholderData: keepPreviousData, queryFn: () => loadFinanceActive(start, end) });
+  // O ano inteiro é lido uma vez; trocar meses ou clientes só refaz a conta na tela (instantâneo).
+  const yStart = `${year}-01-01`, yEnd = `${year}-12-31`;
+  const active = useQuery({ queryKey: ["fin-active", yStart, yEnd], placeholderData: keepPreviousData, queryFn: () => loadFinanceActive(yStart, yEnd) });
   const scope = useWorkScope();
-  const list = useMemo(() => financeList(works.data ?? [], active.data, start, end).filter((w: any) => scope.allowWork(w)), [works.data, active.data, start, end, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
+  const list = useMemo(() => financeList(works.data ?? [], active.data, yStart, yEnd).filter((w: any) => scope.allowWork(w)), [works.data, active.data, yStart, yEnd, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
   const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 60_000, queryFn: loadResultShared });
   const batches = useMemo(() => financeBatches(list), [list]);
   const batchKey = useMemo(() => batches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [batches]);
   const raws = useQuery({
-    queryKey: ["fin-client-raw", batchKey, end], staleTime: 60_000, placeholderData: keepPreviousData,
+    queryKey: ["fin-client-raw", batchKey, yEnd], staleTime: 60_000, placeholderData: keepPreviousData,
     enabled: !!shared.data && !!active.data,
-    queryFn: () => loadFinanceRaws(batches, shared.data!, { until: end }),
+    queryFn: () => loadFinanceRaws(batches, shared.data!, { until: yEnd }),
   });
   const groups = useMemo(() => buildFinanceGroups(list, raws.data ?? EMPTY, yms, year, holidays.data ?? [], works.data ?? []), [list, raws.data, yms, year, holidays.data, works.data]);
   const shown = useMemo(() => groups.filter((g) => !hidden.includes(g.key)), [groups, hidden]);
@@ -91,13 +108,7 @@ function Overview() {
     const billed = s((l) => l.billed), tax = s((l) => l.tax), mo = s((l) => l.mo), transport = s((l) => l.transport), materials = s((l) => l.materials), margin = s((l) => l.margin);
     // Pedidos até o fim do período (sem data = sempre) × faturado até essa data, por serviço exibido.
     let ordered = 0, billedToDate = 0;
-    for (const l of lines) {
-      const os = Array.isArray(l.work.orders) ? (l.work.orders as { value?: unknown; date?: unknown }[]) : [];
-      const o = os.length ? os.reduce((a, x) => a + (!x?.date || String(x.date).slice(0, 10) <= end ? Number(x?.value) || 0 : 0), 0) : Number(l.work.order_value ?? 0);
-      if (o <= 0) continue;
-      const b = (l.raw.entries as any[]).reduce((a, e) => a + (e.category === "faturamento" && String(e.entry_date).slice(0, 10) <= end ? Number(e.amount) || 0 : 0), 0);
-      ordered += o; billedToDate += Math.min(o, b);
-    }
+    for (const l of lines) { const o = orderOf(l, end); ordered += o.ordered; billedToDate += o.billed; }
     const hN = s((l) => l.hours.normal), hE = s((l) => l.hours.extra);
     const heByClient = shown.map((g) => ({ name: g.name, n: g.lines.reduce((a, l) => a + l.hours.normal, 0), e: g.lines.reduce((a, l) => a + l.hours.extra, 0) }))
       .filter((x) => x.e > 0).sort((a, b) => b.e - a.e).slice(0, 3);
@@ -165,15 +176,15 @@ function Overview() {
               </div>
             </OverviewCard>
 
-            <OverviewCard title="Margem de contribuição" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint={`Margem ÷ faturado por competência; meta ${MARGIN_GOAL}%. A seta enche até a margem (escala 0–50%).`} className="min-h-0" bodyClassName="flex min-h-0">
-              <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                <div className="space-y-1.5 self-center">
-                  <p className={cn("font-display text-3xl font-semibold tabular-nums", (d.pct ?? 0) < 0 && "text-destructive")}>{d.pct == null ? "—" : <CountUp value={`${d.pct.toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`} />}</p>
-                  <p className="text-[11px] text-muted-foreground">{(d.pct ?? -1) >= MARGIN_GOAL ? "acima" : "abaixo"} da meta de {MARGIN_GOAL}%</p>
-                  <p className="text-sm font-medium tabular-nums">{brlK(d.margin)}</p>
-                  <p className="text-[11px] text-muted-foreground">{d.below} de {d.lines.length} serviços abaixo da meta</p>
+            <OverviewCard dark title="Margem de contribuição" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint={`Margem ÷ faturado por competência; meta ${MARGIN_GOAL}%`} className="min-h-0" bodyClassName="flex min-h-0">
+              <div className="invert-scope grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-4">
+                <BandGauge pct={d.pct} />
+                <div className="min-w-0 space-y-2">
+                  <div><p className={cn("font-display text-3xl font-semibold leading-none tabular-nums", (d.pct ?? 0) < 0 && "text-destructive")}>{d.pct == null ? "—" : <CountUp value={`${d.pct.toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`} />}</p><p className="mt-1 text-sm font-semibold tabular-nums">{brlK(d.margin)}</p><p className="text-[10px] text-muted-foreground">{d.below} de {d.lines.length} abaixo da meta</p></div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[9.5px] text-muted-foreground">
+                    {GAUGE_BANDS.map((x) => <div key={x.label} className="flex items-center gap-1.5"><span className={cn("h-1.5 w-4 rounded-full", x.cls)} />{x.label}</div>)}
+                  </div>
                 </div>
-                <StepArrow pct={d.pct} goal={MARGIN_GOAL} />
               </div>
             </OverviewCard>
 
@@ -191,7 +202,7 @@ function Overview() {
             </OverviewCard>
 
             <OverviewCard title="Horas normais × extras" to="/fechamentos/financeiro" linkLabel="Abrir Fechamento" hint="Horas de MO dos serviços exibidos: normais = até 8 h em dia útil; extras = acima disso, sábado, domingo e feriado" className="min-h-0">
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div>
                   <div className="flex items-end justify-between">
                     <div><p className="font-display text-2xl font-semibold tabular-nums"><CountUp value={d.hN + d.hE ? `${Math.round((d.hE / (d.hN + d.hE)) * 100)}%` : "—"} /></p><p className="text-[11px] text-muted-foreground">das horas são extras</p></div>
@@ -202,15 +213,17 @@ function Overview() {
                   </div>
                   <HourBar n={d.hN} e={d.hE} className="mt-2 h-2.5" />
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Clientes com mais hora extra</p>
-                  {d.heByClient.map((c, i) => (
-                    <div key={c.name} className="grid grid-cols-[6.5rem_minmax(0,1fr)_3.2rem] items-center gap-2 text-[11px]">
-                      <span className="truncate">{c.name}</span>
-                      <HourBar n={c.n} e={c.e} className="h-1.5" delay={i * 90} />
-                      <span className="text-right tabular-nums text-muted-foreground">{hrs(c.e)}</span>
-                    </div>
-                  ))}
+                <div>
+                  <p className="mb-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">Clientes com mais hora extra</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {d.heByClient.map((c, i) => (
+                      <div key={c.name} className="min-w-0 rounded-lg bg-muted/50 px-2 py-1.5" title={`${c.name}: ${hrs(c.e)} extras de ${hrs(c.n + c.e)}`}>
+                        <p className="truncate text-[10px] font-medium">{c.name}</p>
+                        <p className="font-display text-sm font-semibold tabular-nums">{hrs(c.e)} <span className="text-[9px] font-normal text-muted-foreground">{Math.round((c.e / Math.max(1, c.n + c.e)) * 100)}%</span></p>
+                        <HourBar n={c.n} e={c.e} className="mt-1 h-1" delay={i * 90} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </OverviewCard>
@@ -224,22 +237,25 @@ function Overview() {
               <div className="min-h-0 flex-1 overflow-auto px-3 pb-2">
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
-                    <col /><col className="w-[9.5rem]" /><col className="w-[9.5rem]" /><col className="w-[11rem]" /><col className="w-[9.5rem]" /><col className="w-[6.5rem]" /><col className="w-[9rem]" /><col className="w-[10rem]" />
+                    <col /><col className="w-[9rem]" /><col className="w-[8.5rem]" /><col className="w-[8.5rem]" /><col className="w-[11rem]" /><col className="w-[9.5rem]" /><col className="w-[6.5rem]" /><col className="w-[8.5rem]" /><col className="w-[7.5rem]" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-card text-[11px] uppercase tracking-wide text-muted-foreground">
                     <tr className="border-b">
                       <th className="px-3 py-2 text-left font-medium">Cliente / serviço</th>
                       <th className="px-3 text-right font-medium">Faturado</th>
+                      <th className="px-3 text-left font-medium" title="Quanto dos pedidos (até o fim do período) já foi faturado">Pedido faturado</th>
                       <th className="px-3 text-right font-medium">Despesas</th>
-                      <th className="px-3 text-left font-medium">Composição</th>
+                      <th className="px-3 text-left font-medium normal-case tracking-normal">
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px]">{COST_PARTS.map((x) => <span key={x.key} className="flex items-center gap-1"><span className={cn("h-2 w-2 rounded-[2px]", x.cls)} />{x.label}</span>)}</div>
+                      </th>
                       <th className="px-3 text-right font-medium">Margem</th>
                       <th className="px-3 text-center font-medium">Margem %</th>
                       <th className="px-3 text-left font-medium">Andamento</th>
-                      <th className="px-3 text-right font-medium">Margem acumulada</th>
+                      <th className="px-3 text-right font-medium" title="Margem desde o início do serviço até o último mês escolhido">Margem acum.</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {!shown.length && <tr><td colSpan={8} className="px-3 py-4 text-muted-foreground">Nenhuma movimentação no período.</td></tr>}
+                    {!shown.length && <tr><td colSpan={9} className="px-3 py-4 text-muted-foreground">Nenhuma movimentação no período.</td></tr>}
                     {[...shown].sort((a, b) => b.lines.reduce((x, l) => x + l.billed, 0) - a.lines.reduce((x, l) => x + l.billed, 0)).map((g) => {
                       const gb = g.lines.reduce((a, l) => a + l.billed, 0), gm = g.lines.reduce((a, l) => a + l.margin, 0), gc = g.lines.reduce((a, l) => a + cost(l), 0);
                       const gComp = g.lines.reduce((a, l) => a + (l.monthPct != null && l.margin ? l.margin / (l.monthPct / 100) : 0), 0);
@@ -258,6 +274,7 @@ function Overview() {
                               </span>
                             </td>
                             <td className="px-3 text-right font-semibold tabular-nums">{brl(gb)}</td>
+                            <td className="px-3"><OrderBar o={ordersOf(g.lines, end)} /></td>
                             <td className="px-3 text-right tabular-nums text-muted-foreground">{brl(gc)}</td>
                             <td className="px-3"><CostBar lines={g.lines} total={gc} /></td>
                             <td className={cn("px-3 text-right font-semibold tabular-nums", gm < 0 && "text-destructive")}>{brl(gm)}</td>
@@ -268,12 +285,13 @@ function Overview() {
                             <tr key={l.work.id} className="cursor-pointer border-t border-border/40 text-[13px] hover:bg-muted/30" onClick={() => setDetail({ line: l, client: false })}>
                               <td className="truncate py-1.5 pl-9 pr-3 text-muted-foreground hover:text-foreground" title={l.work.name}>{l.work.name}</td>
                               <td className="px-3 text-right tabular-nums">{brl(l.billed)}</td>
+                              <td className="px-3"><OrderBar o={orderOf(l, end)} /></td>
                               <td className="px-3 text-right tabular-nums text-muted-foreground">{brl(cost(l))}</td>
                               <td className="px-3"><CostBar lines={[l]} total={cost(l)} /></td>
                               <td className={cn("px-3 text-right tabular-nums", l.margin < 0 && "text-destructive")}>{brl(l.margin)}</td>
                               <td className="px-3 text-center"><Chip pct={l.monthPct} margin={l.margin} /></td>
                               <td className="px-3"><div className="flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full bg-foreground/70" style={{ width: `${Math.min(100, Math.max(0, l.progress))}%` }} /></div><span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">{Math.round(l.progress)}%</span></div></td>
-                              <td className="px-3 text-right text-[12px] tabular-nums"><span className={cn(l.total.margin < 0 && "text-destructive")}>{brlK(l.total.margin)}</span> <span className="text-muted-foreground">· <MarginPercent value={l.total.pct} margin={l.total.margin} /></span></td>
+                              <td className="px-3 text-right text-[12px] tabular-nums" title={`Margem acumulada: ${brl(l.total.margin)}`}><MarginPercent value={l.total.pct} margin={l.total.margin} /></td>
                             </tr>
                           ))}
                         </Fragment>
@@ -285,6 +303,7 @@ function Overview() {
                       <tr>
                         <td className="sticky bottom-0 border-t bg-card px-3 py-2">Total</td>
                         <td className="sticky bottom-0 border-t bg-card px-3 text-right tabular-nums">{brl(d.billed)}</td>
+                        <td className="sticky bottom-0 border-t bg-card px-3"><OrderBar o={{ ordered: d.ordered, billed: d.billedToDate }} /></td>
                         <td className="sticky bottom-0 border-t bg-card px-3 text-right tabular-nums">{brl(d.spent)}</td>
                         <td className="sticky bottom-0 border-t bg-card px-3"><CostBar lines={d.lines} total={d.spent} /></td>
                         <td className={cn("sticky bottom-0 border-t bg-card px-3 text-right tabular-nums", d.margin < 0 && "text-destructive")}>{brl(d.margin)}</td>
@@ -318,15 +337,10 @@ function Chip({ pct, margin }: { pct: number | null; margin: number }) {
 
 /** Barra empilhada das despesas da linha (valor total ao lado; cada parte no mouse). */
 function CostBar({ lines, total }: { lines: FinanceLine[]; total: number }) {
-  const p = [
-    ["Impostos", lines.reduce((a, l) => a + l.tax, 0), "bg-foreground/25"],
-    ["Mão de obra", lines.reduce((a, l) => a + l.mo, 0), "bg-foreground"],
-    ["Transporte", lines.reduce((a, l) => a + l.transport, 0), "bg-foreground/60"],
-    ["Materiais", lines.reduce((a, l) => a + l.materials, 0), "bg-foreground/40"],
-  ] as const;
+  const p = COST_PARTS.map((x) => [x.label, lines.reduce((a, l) => a + l[x.key], 0), x.cls] as const);
   return (
     <div className="flex items-center gap-2" title={p.map(([n, v]) => `${n}: ${brl(v)}`).join("\n")}>
-      <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">{p.map(([n, v, c]) => <div key={n} className={cn("h-full", c)} style={{ width: `${total ? (v / total) * 100 : 0}%` }} />)}</div>
+      <div className="flex h-2 w-full gap-px overflow-hidden rounded-full bg-muted">{p.map(([n, v, c]) => <div key={n} className={cn("h-full", c)} style={{ width: `${total ? (v / total) * 100 : 0}%` }} />)}</div>
     </div>
   );
 }
@@ -342,33 +356,44 @@ function HourBar({ n, e, className, delay = 0 }: { n: number; e: number; classNa
   );
 }
 
-/** Gráfico de colunas subindo com a seta em zigue-zague por cima; as colunas enchem até a margem (escala 0–50%), traço na meta. */
-function StepArrow({ pct, goal, max = 50 }: { pct: number | null; goal: number; max?: number }) {
-  const f = Math.max(0, Math.min(1, (pct ?? 0) / max));
-  const bars = [30, 48, 40, 66, 86]; // alturas (de 0 a 100) das colunas
-  const base = 112, top = 22, h = base - top;
-  const fillTo = base - f * h, gy = base - Math.min(1, goal / max) * h;
-  const x = (i: number) => 8 + i * 21;
-  const pts = bars.map((b, i) => [x(i) + 7, base - (b / 100) * h - 10] as const);
-  const [lx, ly] = pts[pts.length - 1]!;
-  const neg = (pct ?? 0) < 0;
+/** Andamento do pedido: barra do quanto já foi faturado (sem pedido = —). */
+function OrderBar({ o }: { o: { ordered: number; billed: number } }) {
+  if (!o.ordered) return <span className="text-[11px] text-muted-foreground">sem pedido</span>;
+  const f = o.billed / o.ordered;
   return (
-    <svg viewBox="0 0 120 120" className="h-[9.5rem] w-auto overflow-visible">
-      <line x1="2" x2="118" y1={base} y2={base} className="stroke-border" strokeWidth="1" />
-      {bars.map((b, i) => {
-        const y = base - (b / 100) * h;
-        const fy = Math.max(y, fillTo);
-        return (
-          <g key={i}>
-            <rect x={x(i)} y={y} width="14" height={base - y} rx="2" className="fill-muted stroke-border" strokeWidth="0.6" />
-            {fy < base && <rect x={x(i)} y={fy} width="14" height={base - fy} rx="2" className={cn("ov-rise", neg ? "fill-destructive/70" : "fill-foreground")} style={{ animationDelay: `${i * 90}ms` }} />}
-          </g>
-        );
-      })}
-      <polyline points={pts.map((p) => p.join(",")).join(" ")} fill="none" className="ov-draw stroke-foreground" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
-      <polygon points={`${lx + 9},${ly - 13} ${lx - 4},${ly - 10} ${lx + 5},${ly + 1}`} className="fill-foreground" />
-      <line x1="0" x2="120" y1={gy} y2={gy} className="stroke-foreground/60" strokeWidth="1" strokeDasharray="3 2" />
-      <text x="118" y={gy + 8} textAnchor="end" className="fill-muted-foreground text-[7px]">meta {goal}%</text>
-    </svg>
+    <div className="flex items-center gap-2" title={`${brl(o.billed)} faturados de ${brl(o.ordered)} em pedidos`}>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full bg-foreground/70" style={{ width: `${Math.min(100, f * 100)}%` }} /></div>
+      <span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">{Math.round(f * 100)}%</span>
+    </div>
+  );
+}
+
+/** Faixas do medidor da margem (tons de cinza, da pior para a melhor). */
+const GAUGE_MAX = 50;
+const GAUGE_BANDS = [
+  { from: 0, to: 10, label: "Crítica · < 10%", cls: "bg-foreground/20", stroke: "stroke-foreground/20" },
+  { from: 10, to: MARGIN_GOAL, label: `Abaixo · 10–${MARGIN_GOAL}%`, cls: "bg-foreground/45", stroke: "stroke-foreground/45" },
+  { from: MARGIN_GOAL, to: 35, label: `Na meta · ${MARGIN_GOAL}–35%`, cls: "bg-foreground/75", stroke: "stroke-foreground/75" },
+  { from: 35, to: GAUGE_MAX, label: "Ótima · > 35%", cls: "bg-foreground", stroke: "stroke-foreground" },
+];
+/** Medidor de ponteiro moderno (gauge do Excel repaginado): faixas arredondadas com respiro, agulha fina e valor no centro. */
+function BandGauge({ pct }: { pct: number | null }) {
+  const cx = 80, cy = 78, r = 60;
+  const pt = (v: number, rr: number) => { const a = Math.PI * (1 - Math.max(0, Math.min(GAUGE_MAX, v)) / GAUGE_MAX); return [cx + rr * Math.cos(a), cy - rr * Math.sin(a)] as const; };
+  const arc = (a: number, b: number) => { const [x1, y1] = pt(a, r), [x2, y2] = pt(b, r); return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`; };
+  const v = pct ?? 0;
+  const ang = -90 + (Math.max(0, Math.min(GAUGE_MAX, v)) / GAUGE_MAX) * 180;
+  return (
+    <div className="relative">
+      <svg viewBox="0 0 160 92" className="h-[8.75rem] w-auto overflow-visible">
+        {GAUGE_BANDS.map((b) => <path key={b.label} d={arc(b.from + 1.6, b.to - 1.6)} fill="none" strokeWidth="11" strokeLinecap="round" className={b.stroke} />)}
+        {Array.from({ length: 26 }, (_, i) => i * 2).map((t) => { const [x1, y1] = pt(t, r - 11), [x2, y2] = pt(t, r - (t % 10 ? 14 : 17)); return <line key={t} x1={x1} y1={y1} x2={x2} y2={y2} className="stroke-foreground/30" strokeWidth={t % 10 ? 0.6 : 1} />; })}
+        {[0, 10, MARGIN_GOAL, 35, GAUGE_MAX].map((t) => { const [x, y] = pt(t, r + 12); return <text key={t} x={x} y={y + 2} textAnchor="middle" className="fill-muted-foreground text-[6.5px]">{t}%</text>; })}
+        <g className="gauge-needle" style={{ transform: `rotate(${ang}deg)`, transformOrigin: `${cx}px ${cy}px` }}>
+          <line x1={cx} y1={cy} x2={cx} y2={cy - r + 6} className="stroke-foreground" strokeWidth="2" strokeLinecap="round" />
+        </g>
+        <circle cx={cx} cy={cy} r="5.5" className="fill-background stroke-foreground" strokeWidth="2" />
+      </svg>
+    </div>
   );
 }
