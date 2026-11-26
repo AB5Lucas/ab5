@@ -1,11 +1,11 @@
 import { FitScreen } from "@/components/overview/fit-screen";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetch-all";
 import { useAccess } from "@/hooks/use-access";
-import { Big, Donut, Gauge, LineArea, OverviewCard } from "@/components/overview/charts";
+import { Big, Donut, LineArea, OverviewCard } from "@/components/overview/charts";
 import { Pie3D } from "@/components/overview/pie-3d";
 import { CountUp } from "@/components/count-up";
 import { TeamMosaic, type TeamPerson, type TeamStatus } from "@/components/overview/team-mosaic";
@@ -316,18 +316,22 @@ function Overview() {
             })()}
           </OverviewCard>
 
-          <OverviewCard title="ASO dos ativos" to="/consulta" linkLabel="Abrir Consulta" hint={`Situação do ASO de cada colaborador ativo hoje (vencendo = próximos ${DOC_WARN_DAYS} dias)`} className="min-h-0">
+          <OverviewCard title="ASO dos ativos" to="/consulta" linkLabel="Abrir Consulta" hint={`Situação do ASO de cada colaborador ativo hoje (vencendo = próximos ${DOC_WARN_DAYS} dias)`} className="min-h-0" bodyClassName="flex min-h-0 flex-col justify-center">
             {(() => {
-              const tot = Math.max(1, d.total);
-              const rows: [string, number][] = [["Em dia", d.aso.ok], ["Vencendo", d.aso.soon], ["Vencidos", d.aso.late], ["Sem ASO", d.aso.none]];
+              const parts = [
+                { label: "Em dia", n: d.aso.ok, cls: "stroke-foreground", dot: "bg-foreground" },
+                { label: "Vencendo", n: d.aso.soon, cls: "stroke-foreground/55", dot: "bg-foreground/55" },
+                { label: "Vencidos", n: d.aso.late, cls: "stroke-destructive/70", dot: "bg-destructive/70" },
+                { label: "Sem ASO", n: d.aso.none, cls: "stroke-foreground/15", dot: "bg-foreground/15" },
+              ];
               return (
-                <div className="grid grid-cols-2 items-center gap-3">
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] items-center gap-3">
                   <div className="space-y-1 text-[11px]">
-                    {rows.map(([l, n]) => (
-                      <div key={l} className="flex justify-between gap-2"><span className={cn(l === "Em dia" ? "text-muted-foreground" : "font-medium")}>{l}</span><b className="tabular-nums"><CountUp value={n} /></b></div>
+                    {parts.map((x) => (
+                      <div key={x.label} className="flex items-center gap-1.5"><span className={cn("h-2 w-2 shrink-0 rounded-full", x.dot)} /><span className="text-muted-foreground">{x.label}</span><b className="ml-auto tabular-nums"><CountUp value={x.n} /></b></div>
                     ))}
                   </div>
-                  <Gauge pct={(d.aso.ok / tot) * 100} label="em dia" sub={`${d.aso.ok} de ${d.total} ativos`} />
+                  <AsoArc parts={parts} total={d.total} />
                 </div>
               );
             })()}
@@ -376,9 +380,19 @@ function TrainingTiles({ rows, from, to, today, dark }: { rows: any[]; from: str
     return { key: x, label: String(Number(x.slice(8, 10))), title: brDay(x), list, done, sched: list.length - done, late: x < today ? list.length - done : 0 };
   });
   const top = Math.max(1, ...cols.map((c) => c.list.length));
-  const ROWS_MAX = 8;
-  const per = Math.max(1, Math.ceil(top / ROWS_MAX));
-  const nRows = Math.max(4, Math.ceil(top / per));
+  // Como o quadro de RDOs: os quadradinhos tracejados vão até o topo; o nº de linhas sai da altura do quadro.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [gbox, setGbox] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = gridRef.current; if (!el) return;
+    const ro = new ResizeObserver(([e]) => setGbox({ w: e!.contentRect.width, h: e!.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const colW = gbox.w ? (gbox.w - 3 * (cols.length - 1)) / cols.length : 20;
+  const cell = Math.min(24, Math.max(6, colW - 4));
+  const nRows = gbox.h ? Math.max(3, Math.floor((gbox.h - 24) / (cell + 3))) : 8;
+  const per = Math.max(1, Math.ceil(top / nRows));
   const c0 = sel != null ? cols[sel] : undefined;
   const list = c0 ? c0.list : rows;
   const done = list.filter((r) => r.status === "realizado").length;
@@ -392,7 +406,7 @@ function TrainingTiles({ rows, from, to, today, dark }: { rows: any[]; from: str
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 md:flex-row">
       <div className="h-full min-h-0 min-w-0 flex-1">
-        <div className="flex h-full items-end gap-[3px] overflow-hidden">
+        <div ref={gridRef} className="flex h-full items-end gap-[3px] overflow-hidden">
           {cols.map((col, ci) => {
             const f = Math.ceil(col.done / per), s = Math.ceil(col.sched / per);
             return (
@@ -403,7 +417,7 @@ function TrainingTiles({ rows, from, to, today, dark }: { rows: any[]; from: str
                   const cls = fromBottom < f ? K.done
                     : fromBottom < f + s ? cn(K.sched, col.late && "ring-1 ring-destructive/60")
                     : K.empty;
-                  return <span key={r} className={cn("ov-grow aspect-square max-h-6 w-full rounded-[4px]", cls)} style={{ animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
+                  return <span key={r} className={cn("ov-grow w-full shrink-0 rounded-[4px]", cls)} style={{ height: cell, animationDelay: `${ci * 25 + fromBottom * 15}ms` }} />;
                 })}
                 <span className={cn("mt-1 shrink-0 text-center text-[10px] tabular-nums", K.mut)}>{ci % step === 0 || ci === sel ? col.label : "\u00a0"}</span>
               </button>
@@ -435,6 +449,48 @@ function TrainingTiles({ rows, from, to, today, dark }: { rows: any[]; from: str
           {topTr.map(([n, v]) => <div key={n} className="flex justify-between gap-2"><span className={cn("truncate", K.mut)}>{n}</span><b className="tabular-nums">{v}</b></div>)}
         </div>
         <p className={cn("mt-auto text-[10px] leading-relaxed", K.mut)}>{c0 ? "Clique de novo para ver o mês" : "Clique num dia para ver só ele"}<br />1 quadradinho = {per} {per === 1 ? "pessoa" : "pessoas"}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Meia-lua do ASO: arco dividido pelas situações (em dia, vencendo, vencidos, sem ASO), régua tracejada por fora
+ * (traço a cada 5%, maior a cada 25%) e arco pontilhado por dentro; os trechos se desenham em sequência ao entrar.
+ */
+function AsoArc({ parts, total }: { parts: { label: string; n: number; cls: string }[]; total: number }) {
+  const R = 60, CX = 90, CY = 88;
+  const pt = (r: number, t: number) => { const a = Math.PI * (1 - t); return [CX + r * Math.cos(a), CY - r * Math.sin(a)] as const; };
+  const arc = (r: number, t0: number, t1: number) => { const [x0, y0] = pt(r, t0), [x1, y1] = pt(r, t1); return `M ${x0} ${y0} A ${r} ${r} 0 0 1 ${x1} ${y1}`; };
+  const tot = Math.max(1, total);
+  let acc = 0;
+  const segs = parts.filter((p) => p.n > 0).map((p, i) => {
+    const t0 = acc / tot; acc += p.n; const t1 = acc / tot;
+    const g = 0.006;
+    return { ...p, i, d: arc(R, Math.min(t0 + g, t1), Math.max(t0, t1 - g)), len: Math.PI * R * Math.max(0, t1 - t0 - 2 * g) };
+  });
+  const okPct = Math.round(((parts[0]?.n ?? 0) / tot) * 100);
+  return (
+    <div className="relative mx-auto w-full max-w-[170px]">
+      <svg viewBox="0 0 180 100" className="w-full overflow-visible">
+        {Array.from({ length: 21 }, (_, k) => {
+          const t = k / 20, major = k % 5 === 0;
+          const [x0, y0] = pt(R + 10, t), [x1, y1] = pt(R + (major ? 17 : 14), t);
+          return <line key={k} x1={x0} y1={y0} x2={x1} y2={y1} strokeWidth={major ? 1.4 : 0.9} strokeLinecap="round" className={cn("ov-fade", major ? "stroke-foreground/50" : "stroke-foreground/25")} style={{ animationDelay: `${k * 25}ms` }} />;
+        })}
+        <path d={arc(R + 10, 0, 1)} fill="none" className="stroke-foreground/15" strokeWidth="0.8" strokeDasharray="1.5 2.5" />
+        <path d={arc(R, 0, 1)} fill="none" strokeWidth="11" className="stroke-muted" />
+        {segs.map((sg) => (
+          <path key={sg.label} d={sg.d} fill="none" strokeWidth="11" className={cn("ov-gauge", sg.cls)}
+            style={{ strokeDasharray: `${sg.len} 400`, ["--ov-off" as string]: 0, strokeDashoffset: 0, animationDelay: `${150 + sg.i * 220}ms` }} />
+        ))}
+        <path d={arc(R - 12, 0, 1)} fill="none" className="stroke-foreground/25" strokeWidth="0.8" strokeDasharray="0.5 3" strokeLinecap="round" />
+        <text x={CX - R - 4} y={CY + 10} textAnchor="middle" className="fill-muted-foreground text-[7px]">0%</text>
+        <text x={CX + R + 4} y={CY + 10} textAnchor="middle" className="fill-muted-foreground text-[7px]">100%</text>
+      </svg>
+      <div className="absolute inset-x-0 bottom-0 text-center">
+        <p className="font-display text-2xl font-semibold leading-none tabular-nums"><CountUp value={`${okPct}%`} /></p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">em dia · {parts[0]?.n ?? 0} de {total}</p>
       </div>
     </div>
   );
