@@ -36,6 +36,15 @@ export function BudgetDot({ total, budget }: { total: number | null | undefined;
   return <span className={cn("inline-block h-2.5 w-2.5 shrink-0 rounded-full align-middle", s.cls)} title={`${s.label} (${brl(budget)})`} aria-label={s.label} />;
 }
 
+/** Texto da situação do item em relação à verba (coluna entre Verba e Observações). */
+function budgetText(total: number | null | undefined, budget: number | null | undefined) {
+  const s = budgetSignal(total, budget);
+  if (s.tone === "acima") return { label: "Acima da verba", cls: "text-red-600 dark:text-red-400" };
+  if (s.tone === "igual") return { label: "No limite da verba", cls: "text-orange-600 dark:text-orange-400" };
+  if (s.tone === "abaixo") return { label: "Dentro da verba", cls: "text-emerald-600 dark:text-emerald-400" };
+  return { label: total == null ? "Sem cotação" : "Sem verba", cls: "text-muted-foreground" };
+}
+
 /** Quem pode aprovar agora (igual a purchase_fa_can_decide no banco). */
 /** Lado de quem aprova na aprovação dupla (igual a purchase_fa_side): gestor do cliente/validador, senão comprador. */
 export function faSide(uid: string | undefined, who: { isBuyer: boolean; isGestor: boolean }): "gestor" | "comprador" | null {
@@ -251,6 +260,8 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
         );
       } },
     { key: "budget", label: "Verba (R$)", values: (x) => [brl(x.item.budget)], sort: (x) => x.item.budget, className: "whitespace-nowrap tabular-nums", cell: (x) => brl(x.item.budget) },
+    { key: "budget_state", label: "Situação da verba", values: (x) => [budgetText(x.chosen?.total, x.item.budget).label], className: "whitespace-nowrap",
+      cell: (x) => { const t = budgetText(x.chosen?.total, x.item.budget); return <span className={cn("text-xs font-medium", t.cls)}>{t.label}</span>; } },
     { key: "notes", label: "Observações", values: (x) => [full(x).notes ?? ""], className: "max-w-48 truncate", cell: (x) => full(x).notes ?? "—" },
     { key: "work", label: "Centro de custo", values: (x) => [full(x).work_id ? workName.get(full(x).work_id!) ?? "—" : RATEIO], className: "max-w-48 truncate",
       cell: (x) => (full(x).work_id ? workName.get(full(x).work_id!) ?? "—" : RATEIO) },
