@@ -10,6 +10,7 @@ import { Donut, OverviewCard, StackBar } from "@/components/overview/charts";
 import { CountUp } from "@/components/count-up";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 import { MultiFilter } from "@/components/multi-filter";
+import { FinanceMonthPicker } from "@/components/finance-month-picker";
 import { MarginPercent } from "@/components/margin-percent";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -118,7 +119,6 @@ function Overview() {
     return { lines, billed, tax, mo, transport, materials, margin, spent: tax + mo + transport + materials, ordered, billedToDate, open: ordered - billedToDate, hN, hE, heByClient, pct, below };
   }, [shown, end]);
 
-  const toggle = (m: number) => setMonths((x) => (x.includes(m) ? x.filter((y) => y !== m) : [...x, m]));
   const years = Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - 3 + i));
   const loading = !scope.ready || works.isLoading || active.isLoading || shared.isLoading || (list.length > 0 && !raws.data);
   const stale = raws.isPlaceholderData || active.isPlaceholderData;
@@ -143,15 +143,7 @@ function Overview() {
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium">Meses</p>
-              <div className="flex rounded-full border bg-muted/40 p-0.5 text-xs">
-                {MONTHS.map((m, i) => (
-                  <button key={m} type="button" onClick={() => toggle(i + 1)}
-                    className={cn("px-2.5 py-1 transition-all duration-300", months.includes(i + 1)
-                      ? cn("bg-foreground text-background", !months.includes(i) && "rounded-l-full", !months.includes(i + 2) && "rounded-r-full")
-                      : "rounded-full text-muted-foreground hover:text-foreground")}>{m}</button>
-                ))}
-                <button type="button" onClick={() => setMonths(months.length === 12 ? [] : MONTHS.map((_, i) => i + 1))} className="rounded-full px-2.5 py-1 text-muted-foreground hover:text-foreground">{months.length === 12 ? "Limpar" : "Ano todo"}</button>
-              </div>
+              <FinanceMonthPicker value={months} onChange={setMonths} />
             </div>
             <MultiFilter title="Clientes" mode="show" hint="Marque os clientes considerados nos quadros e na tabela."
               options={groups.map((g) => ({ value: g.key, label: g.name }))}
