@@ -167,3 +167,12 @@ describe("parsePurchaseReport, linha do centro de custo", () => {
       .toThrow(/sem centro de custo reconhecido/);
   });
 });
+
+describe("parsePurchaseReport, CC sem rótulo", () => {
+  it("linha só com código de 7 dígitos e nome abre o centro de custo", () => {
+    const rows = [["(ABCOM003)"], ["Centro Custo:", "1001000", "ADM"], ["", "Quantidade", "", "Vlr. Total"],
+      ["AA001", "X", 1, 10], ["Total C/C:", 10], [1001001, "PINTURA PO"], ["AA002", "Y", 2, 5], ["Total C/C:", 5]];
+    const r = parsePurchaseReport(rows);
+    expect(r.map((l) => [l.cc, l.name, l.amount])).toEqual([["1001000", "ADM", 10], ["1001001", "PINTURA PO", 5]]);
+  });
+});

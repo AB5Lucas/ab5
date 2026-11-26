@@ -121,6 +121,19 @@ export function parsePurchaseReportChecked(rows: unknown[][], opts: { lenient?: 
       ccSeen = true;
       continue;
     }
+    // ABCOM003 de alguns meses traz a linha do CC sem o rótulo: só o código (7 dígitos) e o nome.
+    if (abcom && anchors) {
+      const occ = cells.filter((c) => c !== "" && c != null);
+      const m = occ.length >= 1 && occ.length <= 3 ? String(occ[0]).trim().match(/^(\d{7})(?:\s*[-–:]\s*|\s+)?(.*)$/) : null;
+      if (m && occ.slice(1).every((c) => typeof c === "string" && !numeric(c))) {
+        const cc = m[1]!;
+        const name = (m[2] || String(occ[1] ?? "")).trim();
+        cur = map.get(cc) ?? { cc, name, amount: 0, items: [] };
+        map.set(cc, cur);
+        ccSeen = true;
+        continue;
+      }
+    }
     if (!cur) {
       // Item depois do "Total C/C" sem um novo "Centro Custo": nunca soma no CC anterior.
       if (ccSeen && columns && /^[A-Z0-9]{3,}$/i.test(String(cells[columns.code] ?? "")) && numeric(cells[columns.total])) {
