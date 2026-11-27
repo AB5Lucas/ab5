@@ -301,7 +301,7 @@ function WorksPage() {
             />
           </div>
         </div>
-        <MultiFilter title="Clientes" mode="show" hint="Marque os clientes exibidos" options={(clients.data ?? []).map((c) => ({ value: c.id, label: c.name }))}
+        <MultiFilter title="Clientes" mode="show" hint="Marque os clientes exibidos" options={(clients.data ?? []).filter((c) => editing || role === "coordenador" || isAdmin || c.name.trim().toUpperCase() !== "MARS MM").map((c) => ({ value: c.id, label: c.name }))}
           values={clientShown ?? (clients.data ?? []).map((c) => c.id)}
           onChange={(v) => setClientShown(v.length === (clients.data ?? []).length ? null : v)} />
         <div className="space-y-1">
