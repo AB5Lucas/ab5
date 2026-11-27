@@ -5,7 +5,6 @@ import { TrainingsPage } from "@/components/controles/treinamentos";
 import { AsosPage } from "@/components/controles/asos";
 import { EpiSheetsPage } from "@/components/controles/fichas-epi";
 import { NewClientDocsPage } from "@/components/controles/novos-clientes";
-import { ClientReleasePage } from "@/components/controles/liberacao-cliente";
 import { useControlBadges } from "@/hooks/use-nav-badges";
 
 export const Route = createFileRoute("/_authenticated/agendamentos")({
@@ -36,7 +35,6 @@ const CTRL_TABS = [
   { v: "integracoes", l: "Integrações" },
   { v: "treinamentos", l: "Treinamentos" },
   { v: "novos-clientes", l: "Novos Clientes" },
-  { v: "liberacao", l: "Liberação por cliente" },
   { v: "epi", l: "Fichas de EPI" },
 ] as const;
 type CtrlTab = (typeof CTRL_TABS)[number]["v"];
@@ -66,7 +64,6 @@ function ControlsPage() {
       <SubTabsContent value="integracoes" className="mt-4"><IntegrationsPage /></SubTabsContent>
       <SubTabsContent value="treinamentos" className="mt-4"><TrainingsPage /></SubTabsContent>
       <SubTabsContent value="novos-clientes" className="mt-4"><NewClientDocsPage /></SubTabsContent>
-      <SubTabsContent value="liberacao" className="mt-4"><ClientReleasePage /></SubTabsContent>
       <SubTabsContent value="epi" className="mt-4"><EpiSheetsPage /></SubTabsContent>
     </SubTabs>
   );
