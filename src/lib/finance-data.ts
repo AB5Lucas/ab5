@@ -223,42 +223,94 @@ export type FinanceLine = {
   hours: { normal: number; extra: number };
 };
 
+// Cálculo pesado (buildBase) guardado por serviço: o "full" não depende dos meses escolhidos e o
+// acumulado só do último mês; trocar o filtro reaproveita o que já foi calculado.
+const baseCache = new WeakMap<object, { holidays: string[]; allWorks: any[]; full: any; upto: Map<string, any> }>();
+function cachedBase(w: any, raw: any, holidays: string[], allWorks: any[]) {
+  let c = baseCache.get(raw);
+  if (!c || c.holidays !== holidays || c.allWorks !== allWorks) {
+    c = { holidays, allWorks, full: buildBase(w, raw, "", "", { isAll: false, workIds: [w.id], holidays, allWorks }), upto: new Map() };
+    baseCache.set(raw, c);
+  }
+  return c;
+}
+
+function financeLineOf(w: any, raw: any, sel: Set<string>, lastYm: string, holidays: string[], allWorks: any[]): FinanceLine | null {
+  const c = cachedBase(w, raw, holidays, allWorks);
+  const full = c.full;
+  if (!full) return null;
+  let mo = 0, transport = 0, materials = 0, compBilled = 0, billed = 0;
+  for (const r of full.rows) if (sel.has(r.ym)) { mo += r.labor; transport += r.transport; }
+  const hours = { normal: 0, extra: 0 };
+  for (const [k, h] of (full.laborHoursYm ?? new Map()) as Map<string, { normal: number; extra: number }>) if (sel.has(k)) { hours.normal += h.normal; hours.extra += h.extra; }
+  for (const e of raw.entries as any[]) {
+    const v = Number(e.amount);
+    // Valor faturado exibido pelo mês do lançamento; margem pela competência
+    if (e.category === "faturamento" && sel.has(String(e.doc_date ?? e.entry_date).slice(0, 7))) billed += v;
+    if (!sel.has(e.entry_date.slice(0, 7))) continue;
+    if (e.category === "faturamento") compBilled += v;
+    else if (e.category === "mao_obra") mo += v;
+    else if (e.category === "terceiros") transport += v;
+    else if (["materiais", "ferramentas", "andaimes"].includes(e.category)) materials += v;
+  }
+  const tax = billed * FIN_TAX;
+  const margin = compBilled * (1 - FIN_TAX) - mo - transport - materials;
+  const hasOrder = (Array.isArray(w.orders) ? w.orders : []).some((o: any) => o?.date && sel.has(String(o.date).slice(0, 7)));
+  if (!billed && !compBilled && !mo && !transport && !materials && !hasOrder) return null;
+  const progress = progressUntil(w, full, lastYm);
+  let upto = c.upto.get(lastYm);
+  if (upto === undefined) {
+    upto = buildBase(w, raw, "", lastYm, { isAll: false, workIds: [w.id], holidays, allWorks, accumulated: true }) ?? full;
+    c.upto.set(lastYm, upto);
+  }
+  // Margem total usa todo o histórico até o último mês; margem do período permanece inalterada.
+  const total = totalMargin(w, upto);
+  return { work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: marginPercent(margin, compBilled), total, full, raw, hours };
+}
+
+type FinanceGroup = { key: string; name: string; lines: FinanceLine[] };
+function groupLines(pairs: [any, FinanceLine][]): FinanceGroup[] {
+  const by = new Map<string, FinanceGroup>();
+  for (const [w, line] of pairs) {
+    const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
+    const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] };
+    g.lines.push(line);
+    by.set(key, g);
+  }
+  return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
+
 /** Linhas do Fechamento por cliente (mesma regra que estava na página). */
 export function buildFinanceGroups(list: any[], rawByWork: Map<string, any>, yms: string[], year: string, holidays: string[], allWorks: any[]) {
   const sel = new Set(yms);
-  const by = new Map<string, { key: string; name: string; lines: FinanceLine[] }>();
-  list.forEach((w: any) => {
+  const lastYm = yms[yms.length - 1] ?? `${year}-12`;
+  const pairs: [any, FinanceLine][] = [];
+  for (const w of list) {
     const raw = rawByWork.get(w.id);
-    if (!raw) return;
-    const full = buildBase(w, raw, "", "", { isAll: false, workIds: [w.id], holidays, allWorks });
-    if (!full) return;
-    let mo = 0, transport = 0, materials = 0, compBilled = 0, billed = 0;
-    for (const r of full.rows) if (sel.has(r.ym)) { mo += r.labor; transport += r.transport; }
-    const hours = { normal: 0, extra: 0 };
-    for (const [k, h] of (full.laborHoursYm ?? new Map()) as Map<string, { normal: number; extra: number }>) if (sel.has(k)) { hours.normal += h.normal; hours.extra += h.extra; }
-    for (const e of raw.entries as any[]) {
-      const v = Number(e.amount);
-      // Valor faturado exibido pelo mês do lançamento; margem pela competência
-      if (e.category === "faturamento" && sel.has(String(e.doc_date ?? e.entry_date).slice(0, 7))) billed += v;
-      if (!sel.has(e.entry_date.slice(0, 7))) continue;
-      if (e.category === "faturamento") compBilled += v;
-      else if (e.category === "mao_obra") mo += v;
-      else if (e.category === "terceiros") transport += v;
-      else if (["materiais", "ferramentas", "andaimes"].includes(e.category)) materials += v;
+    if (!raw) continue;
+    const line = financeLineOf(w, raw, sel, lastYm, holidays, allWorks);
+    if (line) pairs.push([w, line]);
+  }
+  return groupLines(pairs);
+}
+
+/** Mesmo resultado de buildFinanceGroups, mas em pedaços de ~12 ms, devolvendo a vez ao navegador
+ *  entre eles para a tela (e o menu) nunca travarem. Retorna null se cancelado. */
+export async function buildFinanceGroupsAsync(list: any[], rawByWork: Map<string, any>, yms: string[], year: string, holidays: string[], allWorks: any[], isCancelled: () => boolean) {
+  const sel = new Set(yms);
+  const lastYm = yms[yms.length - 1] ?? `${year}-12`;
+  const pairs: [any, FinanceLine][] = [];
+  let t0 = performance.now();
+  for (const w of list) {
+    if (performance.now() - t0 > 12) {
+      await new Promise((r) => setTimeout(r, 0));
+      if (isCancelled()) return null;
+      t0 = performance.now();
     }
-    const tax = billed * FIN_TAX;
-    const margin = compBilled * (1 - FIN_TAX) - mo - transport - materials;
-    const hasOrder = (Array.isArray(w.orders) ? w.orders : []).some((o: any) => o?.date && sel.has(String(o.date).slice(0, 7)));
-    if (!billed && !compBilled && !mo && !transport && !materials && !hasOrder) return;
-    const lastYm = yms[yms.length - 1] ?? `${year}-12`;
-    const progress = progressUntil(w, full, lastYm);
-    const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
-    const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as FinanceLine[] };
-    const upto = buildBase(w, raw, "", lastYm, { isAll: false, workIds: [w.id], holidays, allWorks, accumulated: true }) ?? full;
-    // Margem total usa todo o histórico até o último mês; margem do período permanece inalterada.
-    const total = totalMargin(w, upto);
-    g.lines.push({ work: w, billed, tax, mo, transport, materials, margin, progress, monthPct: marginPercent(margin, compBilled), total, full, raw, hours });
-    by.set(key, g);
-  });
-  return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    const raw = rawByWork.get(w.id);
+    if (!raw) continue;
+    const line = financeLineOf(w, raw, sel, lastYm, holidays, allWorks);
+    if (line) pairs.push([w, line]);
+  }
+  return groupLines(pairs);
 }

@@ -15,7 +15,7 @@ import { MarginPercent } from "@/components/margin-percent";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { loadResultShared, monthEnd } from "@/lib/results-engine";
-import { buildFinanceGroups, financeBatches, financeList, loadFinanceActive, loadFinanceRaws, type FinanceLine } from "@/lib/finance-data";
+import { buildFinanceGroupsAsync, financeBatches, financeList, loadFinanceActive, loadFinanceRaws, type FinanceLine } from "@/lib/finance-data";
 import { MARGIN_GOAL } from "@/lib/director-overview";
 import { marginPercent } from "@/lib/result-labor";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,8 @@ export const Route = createFileRoute("/_authenticated/financeiro")({
 
 const ResultadoPage = lazy(() => import("@/components/resultado-page").then((m) => ({ default: m.ResultadoPage })));
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const EMPTY = new Map<string, any>();
+const NO_DATES: string[] = [];
+const NO_WORKS: any[] = [];
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const brlK = (v: number) => Math.abs(v) >= 1e6 ? `R$ ${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mi` : Math.abs(v) >= 1e4 ? `R$ ${(v / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil` : brl(v);
 const hrs = (v: number) => `${Math.round(v).toLocaleString("pt-BR")} h`;
@@ -101,7 +102,18 @@ function Overview() {
     enabled: !!shared.data && !!active.data && !active.isPlaceholderData && !works.isPlaceholderData,
     queryFn: () => loadFinanceRaws(batches, shared.data!, { until: yEnd }),
   });
-  const groups = useMemo(() => buildFinanceGroups(list, raws.data ?? EMPTY, yms, year, holidays.data ?? [], works.data ?? []), [list, raws.data, yms, year, holidays.data, works.data]);
+  // Conta feita em pedaços (sem travar a tela); mantém o resultado anterior enquanto refaz.
+  const [groups, setGroups] = useState<NonNullable<Awaited<ReturnType<typeof buildFinanceGroupsAsync>>>>([]);
+  const [computing, setComputing] = useState(false);
+  useEffect(() => {
+    if (!raws.data) return;
+    let cancelled = false;
+    setComputing(true);
+    void buildFinanceGroupsAsync(list, raws.data, yms, year, holidays.data ?? NO_DATES, works.data ?? NO_WORKS, () => cancelled).then((g) => {
+      if (!cancelled && g) { setGroups(g); setComputing(false); }
+    });
+    return () => { cancelled = true; };
+  }, [list, raws.data, yms, year, holidays.data, works.data]);
   const shown = useMemo(() => groups.filter((g) => !hidden.includes(g.key)), [groups, hidden]);
 
   const d = useMemo(() => {
@@ -121,8 +133,8 @@ function Overview() {
   }, [shown, end]);
 
   const years = Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - 3 + i));
-  const loading = !scope.ready || !works.data || !active.data || (list.length > 0 && !raws.data);
-  const stale = raws.isPlaceholderData || active.isPlaceholderData;
+  const loading = !scope.ready || !works.data || !active.data || (list.length > 0 && (!raws.data || (computing && !groups.length)));
+  const stale = raws.isPlaceholderData || active.isPlaceholderData || computing;
   const when = !yms.length ? "Selecione ao menos um mês" : yms.length === 1 ? `${MONTHS[months[0]! - 1]}/${year}` : `${yms.length} meses de ${year}`;
   const maxBilled = Math.max(1, ...shown.map((g) => g.lines.reduce((a, l) => a + l.billed, 0)));
 

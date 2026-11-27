@@ -36,7 +36,6 @@ export function DashboardWarmup() {
       { path: "/funcionarios", ok: anyOf("/funcionarios") },
       { path: "/atividades", ok: role === "admin" || role === "coordenador" },
       { path: "/frota", ok: anyOf("/frota") },
-      { path: "/financeiro", ok: canAccess("/fechamentos/financeiro") },
     ].filter((x) => x.ok).map((x) => x.path);
     if (!list.length) return;
     let cancelled = false;
