@@ -42,37 +42,17 @@ export function useUserAccess(userId?: string | null) {
   });
 }
 
-/** Páginas do grupo de acesso da pessoa (users_profiles.access_group_id → access_group_pages). */
-export function useUserGroupAccess(userId?: string | null) {
-  return useQuery({
-    queryKey: ["group-access", userId],
-    staleTime: 5 * 60_000,
-    enabled: !!userId,
-    queryFn: async () => {
-      const { data: me, error } = await supabase.from("users_profiles").select("access_group_id").eq("id", userId!).maybeSingle();
-      if (error) throw error;
-      if (!me?.access_group_id) return [];
-      const { data, error: e2 } = await supabase.from("access_group_pages").select("path, allowed").eq("group_id", me.access_group_id);
-      if (e2) throw e2;
-      return data ?? [];
-    },
-  });
-}
-
-/** Acesso a uma página: exceção da pessoa > grupo de acesso > perfil (antigo) > padrão. Mesma ordem de can_access_page. */
+/** Acesso a uma página: acesso individual da pessoa > perfil (antigo) > padrão. Mesma ordem de can_access_page. */
 export function useAccess() {
   const { role, loading, user } = useCurrentUser();
   const q = useRoleAccess();
   const u = useUserAccess(user?.id);
-  const g = useUserGroupAccess(user?.id);
   const canAccess = (url: string) => {
     if (role === "admin" && url === "/admin/acessos") return true;
     const ex = (u.data ?? []).find((r) => r.path === url);
     if (ex) return ex.allowed;
-    const gp = (g.data ?? []).find((r) => r.path === url);
-    if (gp) return gp.allowed;
     const row = (q.data ?? []).find((r) => r.role === role && r.path === url);
     return row ? row.allowed : defaultAllowed(role, url);
   };
-  return { canAccess, loading: loading || q.isLoading || (!!user?.id && (u.isLoading || g.isLoading)) };
+  return { canAccess, loading: loading || q.isLoading || (!!user?.id && u.isLoading) };
 }

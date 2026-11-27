@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Trash2, KeyRound } from "lucide-react";
+import { Trash2, KeyRound, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -195,6 +195,11 @@ function UsersPage() {
                     </Select>
                   ) : (
                     <Badge variant="secondary">{ROLE_LABEL[u.role]}</Badge>
+                  )}
+                  {isAdmin && u.role !== "admin" && (
+                    <Button asChild variant="ghost" size="sm" className="ml-1" title="Escolher as páginas que a pessoa acessa">
+                      <Link to="/admin/acessos" search={{ user: u.id }}><ShieldCheck className="h-4 w-4" /> Páginas</Link>
+                    </Button>
                   )}
                   {isAdmin && (u.role === "encarregado" || u.role === "coordenador" || u.role === "cliente") && <ForemanWorksButton userId={u.id} name={u.full_name || u.email} perWork={u.role === "cliente"} />}
                 </TableCell>

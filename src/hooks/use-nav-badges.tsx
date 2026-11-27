@@ -82,15 +82,10 @@ function useBadgeData() {
       const mineRows = scOpenRows.filter((r: any) => r.requester_id === uid);
       const scOpen = { count: mineRows.length, late: late(mineRows) };
       // Comprador: só para quem compra (grupo Compras ou acesso liberado na pessoa), não para quem só enxerga a página (admin/diretoria).
+      // Comprador: só quem está no bloco Comprador das Alçadas (não quem só enxerga a página).
       const isBuyer = can.scBuyer && !!uid && await (async () => {
-        const [{ data: exc }, { data: me }] = await Promise.all([
-          supabase.from("user_page_access").select("allowed").eq("user_id", uid).eq("path", "/compras/comprador").maybeSingle(),
-          supabase.from("users_profiles").select("access_group_id").eq("id", uid).maybeSingle(),
-        ]);
-        if (exc) return !!exc.allowed;
-        if (!me?.access_group_id) return false;
-        const { data: g } = await supabase.from("access_groups").select("name").eq("id", me.access_group_id).maybeSingle();
-        return /^compras$/i.test((g?.name ?? "").trim());
+        const { data } = await supabase.from("purchase_alcadas").select("user_id").eq("user_id", uid).eq("alcada", "comprador").maybeSingle();
+        return !!data;
       })();
       const buyRows = isBuyer ? scOpenRows.filter((r: any) => r.stage === "compras") : [];
       const scBuy = { count: buyRows.length, late: late(buyRows) };
@@ -245,12 +240,15 @@ export function useWorkflowBadges() {
       const { data: auth } = await supabase.auth.getSession();
       const uid = auth.session?.user?.id;
       if (!uid) return { andaimes: 0, hiring: 0 };
-      // Aviso de Contratações só para o grupo RH / Pessoal e o Marcelo Barrella (pedido do usuário).
-      const { data: me } = can.hiring
-        ? await supabase.from("users_profiles").select("full_name, access_groups(name)").eq("id", uid).maybeSingle()
-        : { data: null };
+      // Aviso de Contratações só para quem tem a marcação individual (antes grupo RH) e o Marcelo Barrella.
+      const [{ data: me }, { data: flag }] = can.hiring
+        ? await Promise.all([
+            supabase.from("users_profiles").select("full_name").eq("id", uid).maybeSingle(),
+            supabase.from("user_page_access").select("allowed").eq("user_id", uid).eq("path", "@aviso-contratacoes").maybeSingle(),
+          ])
+        : [{ data: null }, { data: null }];
       const plain = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-      const hiringWatcher = /\bRH\b/.test(plain((me as any)?.access_groups?.name)) || /MARCELO BARRELLA/.test(plain((me as any)?.full_name));
+      const hiringWatcher = !!flag?.allowed || /MARCELO BARRELLA/.test(plain((me as any)?.full_name));
       const { flowPendingFor } = await import("@/lib/andaimes");
       const [flowRoles, reqs, hires] = await Promise.all([
         can.andaimes ? supabase.from("andam_flow_roles").select("key, user_id").then((r) => r.data ?? []) : Promise.resolve([]),

@@ -226,25 +226,22 @@ function toForm(c: Collaborator): FormState {
 const nn = (v: string) => (v.trim() === "" ? null : v.trim());
 const ref = (v: string) => (v === NONE ? null : v);
 
-const SALARY_GROUPS = ["diretoria / administrador", "rh / pessoal"];
 /** Pessoas que editam colaboradores sem ver o salário (o salário continua borrado e não é gravado por elas): Yasmin Corrêa. */
 const EDIT_WITHOUT_SALARY = ["e0dd725d-5e41-405a-95e7-e38c891bedec"];
 
 function CollaboratorsPage() {
   const { canWrite: canWriteRole, role, user } = useCurrentUser();
-  // Valor hora/salário: só administrador e os grupos Diretoria / Administrador e RH / Pessoal veem; para os demais o campo fica borrado e não é gravado.
+  // Valor hora/salário: só administrador e quem tem a marcação individual "Ver salário" (Acessos) veem.
   const myGroup = useQuery({
-    queryKey: ["my-access-group-name", user?.id],
+    queryKey: ["my-salary-flag", user?.id],
     enabled: !!user?.id,
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data: me } = await supabase.from("users_profiles").select("access_group_id").eq("id", user!.id).maybeSingle();
-      if (!me?.access_group_id) return "";
-      const { data: g } = await supabase.from("access_groups").select("name").eq("id", me.access_group_id).maybeSingle();
-      return g?.name ?? "";
+      const { data } = await supabase.from("user_page_access").select("allowed").eq("user_id", user!.id).eq("path", "@salario").maybeSingle();
+      return !!data?.allowed;
     },
   });
-  const canSeeSalary = role === "admin" || SALARY_GROUPS.includes((myGroup.data ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
+  const canSeeSalary = role === "admin" || !!myGroup.data;
   // Editar/incluir/importar/excluir só quem pode ver o salário; os demais só consultam (sem o salário).
   const canWrite = canWriteRole && (canSeeSalary || EDIT_WITHOUT_SALARY.includes(user?.id ?? ""));
   const queryClient = useQueryClient();
