@@ -1003,6 +1003,213 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_bandej_20261127_alloc: {
+        Row: {
+          collaborator_id: string | null
+          confirmation_status:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          driver: boolean | null
+          has_pending_requirement: boolean | null
+          id: string | null
+          notes: string | null
+          overnight: boolean | null
+          position_id: string | null
+          schedule_id: string | null
+          service_assigned: boolean | null
+          sort_order: number | null
+          source: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override: boolean | null
+          updated_at: string | null
+          vehicle_id: string | null
+          vt_override: boolean | null
+          work_id: string | null
+        }
+        Insert: {
+          collaborator_id?: string | null
+          confirmation_status?:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          driver?: boolean | null
+          has_pending_requirement?: boolean | null
+          id?: string | null
+          notes?: string | null
+          overnight?: boolean | null
+          position_id?: string | null
+          schedule_id?: string | null
+          service_assigned?: boolean | null
+          sort_order?: number | null
+          source?: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override?: boolean | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          vt_override?: boolean | null
+          work_id?: string | null
+        }
+        Update: {
+          collaborator_id?: string | null
+          confirmation_status?:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          driver?: boolean | null
+          has_pending_requirement?: boolean | null
+          id?: string | null
+          notes?: string | null
+          overnight?: boolean | null
+          position_id?: string | null
+          schedule_id?: string | null
+          service_assigned?: boolean | null
+          sort_order?: number | null
+          source?: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override?: boolean | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          vt_override?: boolean | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_bandej_20261127_entries: {
+        Row: {
+          amount: number | null
+          category: string | null
+          competence_month: string | null
+          created_at: string | null
+          description: string | null
+          entry_date: string | null
+          id: string | null
+          industry_invoice_id: string | null
+          industry_order_id: string | null
+          industry_part: string | null
+          industry_part_ref: string | null
+          purchase_cc_id: string | null
+          purchase_item_key: string | null
+          recurrence_id: string | null
+          recurrence_month: string | null
+          split_group: string | null
+          split_note: string | null
+          split_total: number | null
+          sync_cancelled: boolean | null
+          sync_note_id: string | null
+          sync_split_note_id: string | null
+          updated_at: string | null
+          work_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          category?: string | null
+          competence_month?: string | null
+          created_at?: string | null
+          description?: string | null
+          entry_date?: string | null
+          id?: string | null
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
+          purchase_cc_id?: string | null
+          purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
+          sync_cancelled?: boolean | null
+          sync_note_id?: string | null
+          sync_split_note_id?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          category?: string | null
+          competence_month?: string | null
+          created_at?: string | null
+          description?: string | null
+          entry_date?: string | null
+          id?: string | null
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
+          purchase_cc_id?: string | null
+          purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
+          sync_cancelled?: boolean | null
+          sync_note_id?: string | null
+          sync_split_note_id?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_bandej_20261127_rdos: {
+        Row: {
+          activities: string | null
+          client_id: string | null
+          created_at: string | null
+          finalized_at: string | null
+          id: string | null
+          notes: string | null
+          number: number | null
+          report_date: string | null
+          responsible_name: string | null
+          schedule_id: string | null
+          shift: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+          work_id: string | null
+        }
+        Insert: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string | null
+          notes?: string | null
+          number?: number | null
+          report_date?: string | null
+          responsible_name?: string | null
+          schedule_id?: string | null
+          shift?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string | null
+          notes?: string | null
+          number?: number | null
+          report_date?: string | null
+          responsible_name?: string | null
+          schedule_id?: string | null
+          shift?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
       backup_industry_orders_20261110: {
         Row: {
           aliases: string[] | null
