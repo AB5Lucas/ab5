@@ -93,7 +93,7 @@ function Overview() {
   const yStart = `${year}-01-01`, yEnd = `${year}-12-31`;
   const active = useQuery({ queryKey: ["fin-active", yStart, yEnd], staleTime: 10 * 60_000, placeholderData: (prev) => prev, queryFn: () => loadFinanceActive(yStart, yEnd) });
   const scope = useWorkScope();
-  const list = useMemo(() => financeList(works.data ?? [], active.data, yStart, yEnd).filter((w: any) => scope.allowWork(w)), [works.data, active.data, yStart, yEnd, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
+  const list = useMemo(() => financeList(works.data ?? [], active.data, yStart, yEnd).filter((w: any) => scope.allowLinkedWork(w)), [works.data, active.data, yStart, yEnd, scope.allowLinkedWork]); // eslint-disable-line react-hooks/exhaustive-deps
   const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 10 * 60_000, queryFn: loadResultShared });
   const batches = useMemo(() => financeBatches(list), [list]);
   const batchKey = useMemo(() => batches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [batches]);

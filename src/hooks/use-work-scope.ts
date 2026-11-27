@@ -28,5 +28,7 @@ export function useWorkScope() {
     !scoped || (!!w && (workIds.has(w.id) || (byClient && !!w.client_id && clientIds.has(w.client_id))));
   const allowClient = (clientId: string | null | undefined) =>
     !scoped || (!!clientId && (clientIds.has(clientId)));
-  return { scoped, ready: !loading && (!scoped || !q.isLoading), allowWork, allowClient, workIds, clientIds };
+  /** Só as obras vinculadas à pessoa (sem estender ao cliente inteiro). Usado no dashboard Financeiro. */
+  const allowLinkedWork = (w: { id: string } | null | undefined) => !scoped || (!!w && workIds.has(w.id));
+  return { scoped, allowLinkedWork, ready: !loading && (!scoped || !q.isLoading), allowWork, allowClient, workIds, clientIds };
 }

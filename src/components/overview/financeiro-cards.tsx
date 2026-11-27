@@ -27,7 +27,7 @@ export function MarginCard({ period }: { period: { from: string; unit: "day" | "
   const holidays = useQuery({ queryKey: ["holidays-dates"], queryFn: async () => ((await supabase.from("holidays").select("date")).data ?? []).map((h) => h.date as string) });
   const fActive = useQuery({ queryKey: ["fin-active", finStart, finEnd], placeholderData: keepPreviousData, queryFn: () => loadFinanceActive(finStart, finEnd) });
   const shared = useQuery({ queryKey: ["fin-shared"], staleTime: 60_000, queryFn: loadResultShared });
-  const fList = useMemo(() => financeList(fWorks.data ?? [], fActive.data, finStart, finEnd).filter((w: any) => scope.allowWork(w)), [fWorks.data, fActive.data, finStart, finEnd, scope.allowWork]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fList = useMemo(() => financeList(fWorks.data ?? [], fActive.data, finStart, finEnd).filter((w: any) => scope.allowLinkedWork(w)), [fWorks.data, fActive.data, finStart, finEnd, scope.allowLinkedWork]); // eslint-disable-line react-hooks/exhaustive-deps
   const batches = useMemo(() => financeBatches(fList), [fList]);
   const batchKey = useMemo(() => batches.map((b) => `${b.key}:${b.ids.join(",")}`).sort().join("|"), [batches]);
   const raws = useQuery({
