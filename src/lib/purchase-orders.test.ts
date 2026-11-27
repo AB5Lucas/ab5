@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { fileMatchesOrder, purchaseOrdersFolder } from "./purchase-orders";
+import { canEditPurchaseOrder, fileMatchesOrder, purchaseOrdersFolder } from "./purchase-orders";
+
+describe("edição do pedido de compras", () => {
+  it("permite corrigir um pedido já salvo mesmo sem status APROVADO", () => {
+    expect(canEditPurchaseOrder("COMPRADO", "35828")).toBe(true);
+    expect(canEditPurchaseOrder("COMPRA PARCIAL", "35828; 35829")).toBe(true);
+  });
+  it("exige aprovação para incluir o primeiro pedido", () => {
+    expect(canEditPurchaseOrder("APROVADO", null)).toBe(true);
+    expect(canEditPurchaseOrder("SOLICITAÇÃO ENVIADA", null)).toBe(false);
+    expect(canEditPurchaseOrder("COMPRADO", "")).toBe(false);
+    expect(canEditPurchaseOrder("COMPRADO", "   ")).toBe(false);
+  });
+});
 
 describe("pedido de compras na pasta", () => {
   it("pasta do ano", () => expect(purchaseOrdersFolder(2026)).toBe("Compras/04 COMPRAS/02 PEDIDOS DE COMPRAS/2026"));

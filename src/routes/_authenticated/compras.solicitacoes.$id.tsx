@@ -4,7 +4,7 @@ import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { fetchPurchaseOrderPdf, linkPurchaseOrderFile } from "@/lib/purchase-orders.functions";
-import { orderFilePaths, splitOrders } from "@/lib/purchase-orders";
+import { canEditPurchaseOrder, orderFilePaths, splitOrders } from "@/lib/purchase-orders";
 import { toast } from "sonner";
 import { ArrowLeft, Ban, Link2, Camera, Check, Download, Eye, History, RefreshCw, Undo2, FileText, Image as ImageIcon, Paperclip, Pencil, Plus, Save, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,7 +36,7 @@ const SC_FROM = ["solicitacoes", "validacao", "comprador", "aprovador"] as const
 type ScFrom = (typeof SC_FROM)[number];
 
 export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")({
-  head: () => ({ meta: [{ title: "Solicitação de Compra | AB5 Hub" }, { name: "description", content: "Itens da solicitação de compra (modelo FR-CPS-SC)." }] }),
+  head: () => ({ meta: [{ title: "Solicitação de Compra | AB5 Hub" }, { name: "description", content: "Itens da solicitação de compra (modelo FR-CPS-SC)." }, { property: "og:title", content: "Solicitação de Compra | AB5 Hub" }, { property: "og:description", content: "Consulta e acompanhamento dos itens da solicitação de compra." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   // Aberta pelo número = só visualizar; ?edit=1 (lápis em Ações) abre já em edição.
   // ?tab=recomendacao abre direto na Recomendação de compras (comprador).
   // ?from= tela de origem, que decide as abas em qualquer status: solicitacoes/validacao = só Solicitação;
@@ -715,9 +715,9 @@ function Page() {
                   </TableCell>
                   <TableCell>
                     {isBuyer && saved ? (
-                      // Pedido de compras só com o item APROVADO (antes da aprovação não se lança pedido).
+                      // A aprovação libera o primeiro pedido; um pedido já salvo continua editável.
                       <Input className="h-8" value={orders[saved.id] ?? saved.order_number ?? ""} onChange={(e) => setOrders((o) => ({ ...o, [saved.id]: e.target.value }))}
-                        disabled={saved.status !== "APROVADO"} title={saved.status !== "APROVADO" ? "O pedido de compras só pode ser lançado com o item APROVADO" : undefined}
+                        disabled={!canEditPurchaseOrder(saved.status, saved.order_number)} title={!canEditPurchaseOrder(saved.status, saved.order_number) ? "O primeiro pedido de compras só pode ser lançado com o item APROVADO" : undefined}
                         onBlur={() => { const v = orders[saved.id]; if (v !== undefined && v !== (saved.order_number ?? "")) setItem.mutate({ item: saved.id, status: saved.status, order: v }); }} />
                     ) : saved?.order_number ?? "—"}
                     {saved && (saved.order_file_path || (isBuyer && saved.order_number)) && (
