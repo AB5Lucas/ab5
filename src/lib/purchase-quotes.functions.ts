@@ -122,7 +122,7 @@ export const readPurchaseQuote = createServerFn({ method: "POST" })
     }
     const up = await sb.from("purchase_quotes").update({
       supplier: r.supplier, supplier_doc: r.supplier_doc, quote_number: r.quote_number, quote_date: r.quote_date, payment_terms: r.payment_terms,
-      payment_days: r.payment_days, delivery_days: r.delivery_days, freight: r.freight, total: r.total,
+      payment_days: r.payment_days, delivery_days: r.delivery_days, freight: r.freight, total: r.total, min_order: r.min_order,
       read_status: rows.length ? "lido" : "erro", read_error: rows.length ? null : "Nenhum item encontrado na cotação", matched: false,
     }).eq("id", q.id);
     if (up.error) throw up.error;

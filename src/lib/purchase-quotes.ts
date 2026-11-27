@@ -16,6 +16,8 @@ export const CRITERIA: { value: Criterion; label: string; hint: string }[] = [
 export type QuoteLite = {
   id: string; supplier: string | null; file_path: string; file_name: string | null; source: string;
   payment_terms: string | null; payment_days: number | null; delivery_days: number | null; freight: number | null; total: number | null;
+  /** Faturamento mínimo do fornecedor (R$); null = não lido nem digitado, 0 = sem mínimo. */
+  min_order?: number | null;
   read_status: string; read_error: string | null; quote_number: string | null; matched: boolean;
 };
 export type QuoteItemLite = {
@@ -195,10 +197,23 @@ export function bestScItem(desc: string, items: { id: string; description: strin
   return best;
 }
 
+/** Total da compra por cotação = soma do valor total dos itens escolhidos nela (Recomendação). */
+export function purchaseTotalsByQuote(rows: { chosen?: { quote: { id: string }; total: number } | null }[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of rows) if (r.chosen) m.set(r.chosen.quote.id, (m.get(r.chosen.quote.id) ?? 0) + r.chosen.total);
+  return m;
+}
+/** Bolinha do fornecedor (só indicativo): verde = compra ≥ faturamento mínimo, vermelho = abaixo; sem mínimo/sem compra = nada. */
+export function minOrderState(purchase: number, minOrder: number | null | undefined): "ok" | "below" | null {
+  if (minOrder == null || purchase <= 0) return null;
+  return purchase + 0.005 >= Number(minOrder) ? "ok" : "below";
+}
+
 /** Leitura da IA → campos da cotação (aceita o JSON dentro de ```json```). */
 export type QuoteReading = {
   supplier: string | null; supplier_doc: string | null; quote_number: string | null; quote_date: string | null;
   payment_terms: string | null; payment_days: number | null; delivery_days: number | null; freight: number | null; total: number | null;
+  min_order: number | null;
   items: { description: string; quantity: number | null; unit: string | null; unit_price: number | null; total: number | null; sc_item: number | null }[];
 };
 const money = (v: unknown): number | null => {
@@ -223,7 +238,7 @@ export function parseQuoteReading(text: string): QuoteReading {
     payment_terms: str(o.condicao_pagamento),
     // Sem condição escrita, 0 dia é o "não sei" da leitura (vira campo para o comprador digitar), não "à vista".
     payment_days: str(o.condicao_pagamento) ? int(o.prazo_pagamento_dias) : (int(o.prazo_pagamento_dias) || null), delivery_days: int(o.prazo_entrega_dias),
-    freight: money(o.frete), total: money(o.total),
+    freight: money(o.frete), total: money(o.total), min_order: money(o.faturamento_minimo),
     items: (Array.isArray(o.itens) ? o.itens : []).map((i: any) => ({
       description: str(i?.descricao) ?? "", quantity: money(i?.quantidade), unit: str(i?.unidade), unit_price: money(i?.valor_unitario),
       total: money(i?.valor_total), sc_item: int(i?.item_sc),
@@ -239,6 +254,7 @@ Leia a cotação e devolva SOMENTE um JSON, sem texto em volta, no formato:
 {"fornecedor": "razão social ou nome do fornecedor", "cnpj": "CNPJ", "numero": "número da cotação/orçamento", "data": "AAAA-MM-DD",
  "condicao_pagamento": "como está escrito (ex.: 28/35/42 DDL, à vista)", "prazo_pagamento_dias": prazo MÉDIO de pagamento em dias (à vista/antecipado = 0; 28/35/42 = 35),
  "prazo_entrega_dias": prazo de entrega em dias (imediato/pronta entrega = 0), "frete": valor do frete em reais (0 se CIF/incluso), "total": valor total da cotação,
+ "faturamento_minimo": valor do faturamento/pedido mínimo em reais (0 se escrito que não há mínimo; null se não estiver escrito),
  "itens": [{"descricao": "descrição do item na cotação", "quantidade": número, "unidade": "unidade como na cotação", "valor_unitario": número, "valor_total": número,
             "item_sc": número do item da solicitação que este item atende, ou null se não atende nenhum}]}
 Regras: valores como número (ex.: 1434.98); use null no que não estiver escrito ou estiver ilegível; não invente itens nem valores.`;

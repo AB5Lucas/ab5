@@ -5297,6 +5297,7 @@ export type Database = {
       }
       purchase_quotes: {
         Row: {
+          min_order: number | null
           created_at: string
           created_by: string | null
           delivery_days: number | null
@@ -5319,6 +5320,7 @@ export type Database = {
           total: number | null
         }
         Insert: {
+          min_order?: number | null
           created_at?: string
           created_by?: string | null
           delivery_days?: number | null
@@ -5341,6 +5343,7 @@ export type Database = {
           total?: number | null
         }
         Update: {
+          min_order?: number | null
           created_at?: string
           created_by?: string | null
           delivery_days?: number | null

@@ -259,7 +259,7 @@ export function QuotesAttachDialog({ row, onClose, onDone }: { row: ScRow | null
 
 type Edit = { request_item_id: string | null; conv_factor: string; conv_type: string; discarded: boolean; price: string };
 /** Dados da cotação que a leitura não achou e o comprador digita (fornecedor, prazos em dias). */
-type QEdit = { supplier: string; payment: string; delivery: string };
+type QEdit = { supplier: string; payment: string; delivery: string; minOrder: string };
 const numIn = (v: string) => { const t = v.trim(); if (!t) return null; const x = Number(t.replace(/\./g, "").replace(",", ".")); return Number.isFinite(x) ? x : NaN; };
 const DISCARD = "__descartar__"; // valor interno do item descartado (o botão é a lixeira)
 const NONE = "__nenhum__";
@@ -280,8 +280,8 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
   // Faltou na leitura: preço do item, fornecedor, prazo de pagamento ou de entrega → campo para digitar (obrigatório para seguir).
   const noPrice = (l: QuoteItemLite) => quoteUnitPrice(l) == null;
   const [qEdits, setQEdits] = useState<Record<string, QEdit>>(() =>
-    Object.fromEntries(readQuotes.map((q) => [q.id, { supplier: "", payment: "", delivery: "" }])));
-  const qMiss = (q: QuoteLite) => ({ supplier: !q.supplier?.trim(), payment: q.payment_days == null || (q.payment_days === 0 && !q.payment_terms?.trim()), delivery: q.delivery_days == null });
+    Object.fromEntries(readQuotes.map((q) => [q.id, { supplier: "", payment: "", delivery: "", minOrder: "" }])));
+  const qMiss = (q: QuoteLite) => ({ supplier: !q.supplier?.trim(), payment: q.payment_days == null || (q.payment_days === 0 && !q.payment_terms?.trim()), delivery: q.delivery_days == null, minOrder: q.min_order == null });
   const setQ = (id: string, p: Partial<QEdit>) => setQEdits((e) => ({ ...e, [id]: { ...e[id]!, ...p } }));
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -324,6 +324,7 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
       if (m.supplier && !e.supplier.trim()) out.push(`fornecedor de ${q.file_name ?? "cotação"}`);
       if (m.payment && !okNum(e.payment, 0)) out.push(`prazo de pagamento de ${who}`);
       if (m.delivery && !okNum(e.delivery, 0)) out.push(`prazo de entrega de ${who}`);
+      if (m.minOrder && !okNum(e.minOrder, 0)) out.push(`faturamento mínimo de ${who} (0 = sem mínimo)`);
     }
     return [...new Set(out)];
   })();
@@ -335,6 +336,7 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
       if (m.supplier && e.supplier.trim()) patch["supplier"] = e.supplier.trim();
       if (m.payment && okNum(e.payment, 0)) { patch["payment_days"] = Math.round(numIn(e.payment)!); if (!qById.get(id)!.payment_terms?.trim()) patch["payment_terms"] = `${Math.round(numIn(e.payment)!)} dias (digitado)`; }
       if (m.delivery && okNum(e.delivery, 0)) patch["delivery_days"] = Math.round(numIn(e.delivery)!);
+      if (m.minOrder && okNum(e.minOrder, 0)) patch["min_order"] = Math.round(numIn(e.minOrder)! * 100) / 100;
       if (Object.keys(patch).length) { const { error } = await supabase.from("purchase_quotes").update(patch as never).eq("id", id); if (error) throw error; }
     }
   };
@@ -422,6 +424,7 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
                 <TableHead className="text-right">Vlr. unit.</TableHead>
                 <TableHead title="Prazo de pagamento (dias)">Pagto.</TableHead>
                 <TableHead title="Prazo de entrega (dias)">Entrega</TableHead>
+                <TableHead title="Faturamento mínimo do fornecedor (R$; 0 = sem mínimo)">Fat. mínimo</TableHead>
                 <TableHead className="w-24">Fator Conv.</TableHead>
                 <TableHead className="w-36">Tipo de Conv</TableHead>
                 {cur && <TableHead className="text-right">Preço na un. da SC</TableHead>}
@@ -430,7 +433,7 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!shown.length && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">{cur ? "Nenhum item das cotações ligado a este item." : "Todos os itens das cotações estão vinculados ou descartados."}</TableCell></TableRow>}
+              {!shown.length && <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground">{cur ? "Nenhum item das cotações ligado a este item." : "Todos os itens das cotações estão vinculados ou descartados."}</TableCell></TableRow>}
               {shown.map((l) => {
                 const e = ed(l.id);
                 const typed = numIn(e.price);
@@ -460,6 +463,9 @@ export function QuoteMatchingDialog({ data, onClose, onFinish }: { data: RecData
                     <TableCell>{(() => { const q = qById.get(l.quote_id)!; return qMiss(q).delivery ? (
                       <Input className={`h-7 w-16 text-xs ${okNum(qEdits[q.id]!.delivery, 0) ? "" : "border-destructive"}`} inputMode="numeric" placeholder="dias" value={qEdits[q.id]!.delivery} onChange={(ev) => setQ(q.id, { delivery: ev.target.value })} aria-label="Prazo de entrega (dias)" title="Prazo de entrega em dias" />
                     ) : `${q.delivery_days} d`; })()}</TableCell>
+                    <TableCell>{(() => { const q = qById.get(l.quote_id)!; return qMiss(q).minOrder ? (
+                      <Input className={`h-7 w-24 text-xs ${okNum(qEdits[q.id]!.minOrder, 0) ? "" : "border-destructive"}`} inputMode="decimal" placeholder="R$ (0 = sem)" value={qEdits[q.id]!.minOrder} onChange={(ev) => setQ(q.id, { minOrder: ev.target.value })} aria-label="Faturamento mínimo (R$)" title="A leitura não achou o faturamento mínimo: digite o valor (0 = sem mínimo)" />
+                    ) : Number(q.min_order) > 0 ? brl(q.min_order) : "sem mínimo"; })()}</TableCell>
                     <TableCell><Input className="h-7 w-20 text-xs" inputMode="decimal" value={e.conv_factor} onChange={(ev) => set(l.id, { conv_factor: ev.target.value })} aria-label="Fator de conversão" /></TableCell>
                     <TableCell>
                       <Select value={e.conv_type} onValueChange={(v) => set(l.id, { conv_type: v })}>

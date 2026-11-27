@@ -9,7 +9,7 @@ import { RailMenu } from "@/components/nav/rail-menu";
 import { MenuSearch } from "@/components/nav/menu-search";
 import { NotificationsBell } from "@/components/nav/notifications-bell";
 import { useMenuStyle } from "@/components/nav/menu-prefs";
-import { ThemeToggle } from "@/components/nav/theme-toggle";
+import { ReloadButton, ThemeToggle } from "@/components/nav/theme-toggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -110,6 +110,7 @@ function AuthenticatedLayout() {
               </Link>
             )}
             <div className="ml-auto flex items-center gap-3">
+              <ReloadButton />
               <ThemeToggle />
               <NotificationsBell showMenuAlerts />
               <Badge variant="secondary" className="hidden sm:inline-flex">

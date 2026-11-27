@@ -1373,6 +1373,13 @@
       "when": 1795784063727,
       "tag": "0195_lock_backup_klaus_costs",
       "breakpoints": true
+    },
+    {
+      "idx": 196,
+      "version": "7",
+      "when": 1795784123727,
+      "tag": "0207_purchase_quote_min_order",
+      "breakpoints": true
     }
   ]
 }

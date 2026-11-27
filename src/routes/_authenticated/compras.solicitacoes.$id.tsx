@@ -715,7 +715,9 @@ function Page() {
                   </TableCell>
                   <TableCell>
                     {isBuyer && saved ? (
+                      // Pedido de compras só com o item APROVADO (antes da aprovação não se lança pedido).
                       <Input className="h-8" value={orders[saved.id] ?? saved.order_number ?? ""} onChange={(e) => setOrders((o) => ({ ...o, [saved.id]: e.target.value }))}
+                        disabled={saved.status !== "APROVADO"} title={saved.status !== "APROVADO" ? "O pedido de compras só pode ser lançado com o item APROVADO" : undefined}
                         onBlur={() => { const v = orders[saved.id]; if (v !== undefined && v !== (saved.order_number ?? "")) setItem.mutate({ item: saved.id, status: saved.status, order: v }); }} />
                     ) : saved?.order_number ?? "—"}
                     {saved && (saved.order_file_path || (isBuyer && saved.order_number)) && (

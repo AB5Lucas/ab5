@@ -21,8 +21,7 @@ import { Pill, todayISO, useClientsList, useScUsers } from "@/components/compras
 import { QuoteMatchingDialog, QuotesAttachDialog, importRequesterQuotes, openQuoteFile, useRecData, type RecData } from "@/components/compras/quotes";
 import {
   CRITERIA, RULE_LABEL, approvalRule, budgetSignal, itemsOverBudget, nextOption, prevOption, recommendation, scBudget, type Criterion, type FaRule, type RecRow,
-  faOutcome, type FaOutcome,
-} from "@/lib/purchase-quotes";
+  faOutcome, type FaOutcome, minOrderState, purchaseTotalsByQuote } from "@/lib/purchase-quotes";
 import { brl, itemStatusClass, statusClass, statusDot } from "@/lib/purchase-requests";
 import { summarizeRecommendation } from "@/lib/purchase-quotes.functions";
 import { cn } from "@/lib/utils";
@@ -543,7 +542,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
         </Table>
       </div>
 
-      {readQuotes.length > 0 && <QuotesTable data={d} />}
+      {readQuotes.length > 0 && <QuotesTable data={d} purchase={purchaseTotalsByQuote(rec?.rows ?? [])} />}
 
       {attach && <QuotesAttachDialog row={r} onClose={() => setAttach(false)} onDone={() => void invalidate()} />}
       {matching && <QuoteMatchingDialog data={d} onClose={() => setMatching(false)} onFinish={() => { setMatching(false); void invalidate(); }} />}
@@ -712,7 +711,7 @@ function ItemSummary({ row, quotesRead, criteria }: { row: RecRow; quotesRead: n
 }
 
 /** Cotações lidas da SC (fornecedor, condições e arquivo). */
-function QuotesTable({ data }: { data: RecData }) {
+function QuotesTable({ data, purchase }: { data: RecData; purchase: Map<string, number> }) {
   const read = data.quotes.filter((q) => q.read_status === "lido");
   return (
     <div className="panel overflow-x-auto">
@@ -720,19 +719,26 @@ function QuotesTable({ data }: { data: RecData }) {
       <Table className="text-xs">
         <TableHeader>
           <TableRow>
-            {["Fornecedor", "Nº", "Pagamento", "Prazo pagto.", "Entrega", "Frete", "Total da cotação", "Itens", "Arquivo"].map((h) => <th key={h} className="p-2 text-left font-medium text-muted-foreground">{h}</th>)}
+            {["Fornecedor", "Nº", "Pagamento", "Prazo pagto.", "Entrega", "Frete", "Total da cotação", "Total da compra", "Faturamento mínimo", "Itens", "Arquivo"].map((h) => <th key={h} className="p-2 text-left font-medium text-muted-foreground">{h}</th>)}
           </TableRow>
         </TableHeader>
         <TableBody>
           {read.map((q) => (
             <TableRow key={q.id}>
-              <TableCell className="font-medium">{q.supplier ?? "—"}{q.source === "solicitante" && <span className="ml-1 text-muted-foreground">(solicitante)</span>}</TableCell>
+              <TableCell className="font-medium">{(() => {
+                // Bolinha só indicativa: compra dos itens escolhidos × faturamento mínimo do fornecedor.
+                const st = minOrderState(purchase.get(q.id) ?? 0, q.min_order);
+                return st ? <span className={cn("mr-1.5 inline-block h-2 w-2 rounded-full align-middle", st === "ok" ? "bg-emerald-500" : "bg-red-500")}
+                  title={st === "ok" ? "Compra atinge o faturamento mínimo" : `Compra abaixo do faturamento mínimo (${brl(q.min_order)})`} /> : null;
+              })()}{q.supplier ?? "—"}{q.source === "solicitante" && <span className="ml-1 text-muted-foreground">(solicitante)</span>}</TableCell>
               <TableCell>{q.quote_number ?? "—"}</TableCell>
               <TableCell>{q.payment_terms ?? "—"}</TableCell>
               <TableCell>{q.payment_days != null ? `${q.payment_days} d` : "—"}</TableCell>
               <TableCell>{q.delivery_days != null ? `${q.delivery_days} d` : "—"}</TableCell>
               <TableCell className="tabular-nums">{brl(q.freight)}</TableCell>
               <TableCell className="tabular-nums">{brl(q.total)}</TableCell>
+              <TableCell className="tabular-nums font-medium">{purchase.get(q.id) ? brl(purchase.get(q.id)) : "—"}</TableCell>
+              <TableCell className="tabular-nums">{q.min_order == null ? "—" : Number(q.min_order) > 0 ? brl(q.min_order) : "sem mínimo"}</TableCell>
               <TableCell>{data.qItems.filter((x) => x.quote_id === q.id && !x.discarded && x.request_item_id).length} de {data.qItems.filter((x) => x.quote_id === q.id).length}</TableCell>
               <TableCell>
                 <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => void openQuoteFile(q.file_path)}>

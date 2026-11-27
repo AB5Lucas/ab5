@@ -1,6 +1,6 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { flushSync } from "react-dom";
-import { Moon, Sun } from "lucide-react";
+import { Moon, RefreshCw, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const KEY = "theme";
@@ -43,6 +43,17 @@ export function ThemeToggle() {
     <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={toggle}
       title={dark ? "Usar modo claro" : "Usar modo escuro"} aria-label={dark ? "Usar modo claro" : "Usar modo escuro"}>
       {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </Button>
+  );
+}
+
+/** Botão ao lado do modo noturno: recarrega o sistema inteiro (página nova, dados e código mais recentes). */
+export function ReloadButton() {
+  const [spin, setSpin] = useState(false);
+  return (
+    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" title="Recarregar o sistema" aria-label="Recarregar o sistema"
+      onClick={() => { setSpin(true); window.location.reload(); }}>
+      <RefreshCw className={`h-4 w-4 ${spin ? "animate-spin" : ""}`} />
     </Button>
   );
 }
