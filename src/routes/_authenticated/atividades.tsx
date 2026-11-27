@@ -143,9 +143,11 @@ function HubOverview() {
   const clientsQ = useQuery({ queryKey: ["overview", "clients"], staleTime: STATIC, queryFn: async () => (await supabase.from("clients").select("id, name").eq("active", true)).data ?? [] });
   const mapQ = useQuery({ queryKey: ["clients-map"], staleTime: 10 * 60_000, queryFn: async () => (await supabase.from("clients").select("id, name, city, lat, lon").not("lat", "is", null)).data ?? [] });
 
-  const d = useMemo(() => {
+  // Cliente escolhido no mapa: todos os quadros passam a contar só ele (o mapa continua com todos).
+  const [selClient, setSelClient] = useState<string | null>(null);
+  const build = (sel: string | null) => {
     if (!q.data || !scope.ready) return null;
-    const works = q.data.works.filter((w) => scope.allowWork(w));
+    const works = q.data.works.filter((w) => scope.allowWork(w) && (!sel || w.client_id === sel));
     const workBy = new Map(works.map((w) => [w.id, w]));
     const billing = q.data.billing.filter((e) => workBy.has(e.work_id));
     const keyOf = (iso: string) => (P.unit === "day" ? iso.slice(0, 10) : iso.slice(0, 7));
@@ -158,8 +160,9 @@ function HubOverview() {
     // Meses até HIST_END vêm só do histórico (os lançamentos manuais desses meses repetiriam a planilha).
     const clientIdByName = new Map((clientsQ.data ?? []).map((c: any) => [normName(c.name), c.id as string]));
     const hist = (histQ.data ?? []).filter((h) => {
-      if (!scope.scoped) return true;
+      if (!scope.scoped && !sel) return true;
       const id = clientIdByName.get(normName(h.client));
+      if (sel) return id === sel;
       return !!id && scope.allowClient(id);
     });
     for (const h of hist) {
@@ -232,7 +235,7 @@ function HubOverview() {
     const rdoDay = new Map<string, Map<string, boolean>>(); // dia → cliente → finalizado?
     for (const r of q.data.rdos) { const dt0 = String(r.report_date).slice(0, 10); if (r.work_id && workBy.has(r.work_id) && dt0 >= P.from && dt0 <= P.to) servedWorks.add(r.work_id); }
     for (const r of q.data.rdos) {
-      const c = clientOf(r.work_id) ?? (r.client_id && scope.allowClient(r.client_id) ? (r.client_id as string) : null);
+      const c = clientOf(r.work_id) ?? (r.client_id && scope.allowClient(r.client_id) && (!sel || r.client_id === sel) ? (r.client_id as string) : null);
       if (!c) continue;
       const dt = String(r.report_date).slice(0, 10);
       if (dt >= P.from && dt <= P.to) activeIds.add(c);
@@ -280,7 +283,7 @@ function HubOverview() {
     for (const e of q.data.costs ?? []) { if (!workBy.has(e.work_id) || String(e.entry_date).slice(0, 7) <= HIST_END) continue; for (const [k, f] of spread(String(e.entry_date).slice(0, 10))) costBy.set(k, costBy.get(k)! + (Number(e.amount) || 0) * f); }
     // Transporte próprio: km rodado × R$ 1,35 (principal = km × 2 × viagens; extras = extra_km); manutenção não conta.
     const expBy = new Map<string, { mo: number; tr: number; mat: number }>(P.buckets.map((b) => [b, { mo: 0, tr: 0, mat: 0 }]));
-    for (const [dt, km] of q.data.km) { const k = keyOf(dt.slice(0, 10)); if (costBy.has(k)) { costBy.set(k, costBy.get(k)! + km * KM_RATE); expBy.get(k)!.tr += km * KM_RATE; } }
+    if (!sel) for (const [dt, km] of q.data.km) { const k = keyOf(dt.slice(0, 10)); if (costBy.has(k)) { costBy.set(k, costBy.get(k)! + km * KM_RATE); expBy.get(k)!.tr += km * KM_RATE; } }
     for (const h of hist) {
       if (h.ym > HIST_END || P.unit === "day") continue;
       const x = expBy.get(h.ym); if (!x) continue;
@@ -310,13 +313,18 @@ function HubOverview() {
       activeCount: active.length, clientCount: new Set(active.map((w) => w.client_id)).size,
       statusBars: [["Planejados", "planned"], ["Ativos", "active"], ["Pausados", "paused"], ["Concluídos", "completed"]].map(([l, s]) => ({ label: l!, value: works.filter((w) => w.status === s).length })),
     };
-  }, [worksQ.data, billingQ.data, peopleQ.data, holQ.data, periodQ.data, histQ.data, clientsQ.data, scope.ready, P]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
+  const deps = [worksQ.data, billingQ.data, peopleQ.data, holQ.data, periodQ.data, histQ.data, clientsQ.data, scope.ready, P];
+  const dAll = useMemo(() => build(null), deps); // eslint-disable-line react-hooks/exhaustive-deps
+  const dSel = useMemo(() => (selClient ? build(selClient) : null), [...deps, selClient]); // eslint-disable-line react-hooks/exhaustive-deps
+  const d = selClient && dSel ? dSel : dAll;
+  const selName = selClient ? (mapQ.data ?? []).find((c: any) => c.id === selClient)?.name ?? null : null;
 
   // Mapa: clientes com endereço localizado (sem os internos da sede), marcador do tamanho do faturado no período.
   const mapClients = useMemo(() => (mapQ.data ?? [])
     .filter((c: any) => scope.ready && scope.allowClient(c.id) && !isInternalClient(c.name ?? ""))
-    .map((c: any) => ({ id: c.id, name: c.name, city: c.city, lat: Number(c.lat), lon: Number(c.lon), billed: d?.byClientId.get(c.id) ?? 0, active: d?.activeIds.has(c.id) ?? false })),
-  [mapQ.data, scope.ready, d]); // eslint-disable-line react-hooks/exhaustive-deps
+    .map((c: any) => ({ id: c.id, name: c.name, city: c.city, lat: Number(c.lat), lon: Number(c.lon), billed: dAll?.byClientId.get(c.id) ?? 0, active: dAll?.activeIds.has(c.id) ?? false })),
+  [mapQ.data, scope.ready, dAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const can = (u: string) => canAccess(u);
   const delta = (a: number, b: number) => (b > 0 ? ((a - b) / b) * 100 : null);
@@ -328,7 +336,9 @@ function HubOverview() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h1 className="font-display text-xl font-semibold tracking-tight">Atividades</h1>
-          <p className="hidden text-xs text-muted-foreground md:block">Clique em um quadro para abrir a página.</p>
+          {selName
+            ? <span className="rounded-full bg-foreground px-2.5 py-0.5 text-xs text-background">Só {selName}</span>
+            : <p className="hidden text-xs text-muted-foreground md:block">Clique em um quadro para abrir a página.</p>}
         </div>
         <div className="flex rounded-full border bg-muted/40 p-0.5 text-xs">
           {PERIODS.map((p) => (
@@ -377,7 +387,7 @@ function HubOverview() {
             {can("/obras/resultado") && (
               <OverviewCard title={`Clientes atendidos — ${pLabel}`} to="/clientes" linkLabel="Ver Clientes" hint="Clientes com equipe escalada, RDO ou faturamento no período, em relação a todos os clientes ativos do cadastro (sem ADM, Comercial, Pátio e Indústria)">
                 {(() => {
-                  const all = (clientsQ.data ?? []).filter((c: any) => scope.allowClient(c.id) && !isInternalClient(c.name ?? ""));
+                  const all = (clientsQ.data ?? []).filter((c: any) => scope.allowClient(c.id) && !isInternalClient(c.name ?? "") && (!selClient || c.id === selClient));
                   const served = all.filter((c: any) => d.activeIds.has(c.id)).length;
                   const total = all.length;
                   return (
@@ -415,7 +425,7 @@ function HubOverview() {
                 {mapClients.length > 0 ? (
                   <div className="min-h-0 flex-1" onClick={(e) => e.preventDefault()}>
                     <Suspense fallback={<div className="h-[340px] w-full animate-pulse rounded-xl bg-background/10 lg:h-full" />}>
-                      <ClientsMap fill clients={mapClients} className="h-[340px] w-full rounded-xl lg:h-full" />
+                      <ClientsMap fill onSelect={setSelClient} clients={mapClients} className="h-[340px] w-full rounded-xl lg:h-full" />
                     </Suspense>
                   </div>
                 ) : <p className="py-8 text-center text-xs text-background/70">Nenhum cliente com endereço localizado.</p>}

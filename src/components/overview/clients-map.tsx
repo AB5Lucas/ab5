@@ -22,7 +22,7 @@ function useInvertedTheme() {
   return dark ? "light-inverse" : "dark";
 }
 
-export function ClientsMap({ clients, className, fill }: { clients: MapClient[]; className?: string; fill?: boolean }) {
+export function ClientsMap({ clients, className, fill, onSelect }: { clients: MapClient[]; className?: string; fill?: boolean; onSelect?: (id: string | null) => void }) {
   const [region, setRegion] = useState<string>("SP");
   const [all, setAll] = useState(false);
   const themeCls = useInvertedTheme();
@@ -30,6 +30,7 @@ export function ClientsMap({ clients, className, fill }: { clients: MapClient[];
   const list = region !== "BR" ? base.filter((c) => inState(region, c.lon, c.lat)) : base;
   const [focus, setFocus] = useState<{ lon: number; lat: number; n: number; uf?: string | null } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => { onSelect?.(selected); }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
   // Contador que nunca repete (o mapa usa n para saber se aquele foco já foi animado).
   const focusSeq = useRef(0);
   const pick = (c: MapClient) => {
