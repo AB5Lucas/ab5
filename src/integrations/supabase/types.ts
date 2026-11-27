@@ -1066,6 +1066,84 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_klaus_costs_20261127: {
+        Row: {
+          amount: number | null
+          category: string | null
+          competence_month: string | null
+          created_at: string | null
+          description: string | null
+          entry_date: string | null
+          id: string | null
+          industry_invoice_id: string | null
+          industry_order_id: string | null
+          industry_part: string | null
+          industry_part_ref: string | null
+          purchase_cc_id: string | null
+          purchase_item_key: string | null
+          recurrence_id: string | null
+          recurrence_month: string | null
+          split_group: string | null
+          split_note: string | null
+          split_total: number | null
+          sync_cancelled: boolean | null
+          sync_note_id: string | null
+          sync_split_note_id: string | null
+          updated_at: string | null
+          work_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          category?: string | null
+          competence_month?: string | null
+          created_at?: string | null
+          description?: string | null
+          entry_date?: string | null
+          id?: string | null
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
+          purchase_cc_id?: string | null
+          purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
+          sync_cancelled?: boolean | null
+          sync_note_id?: string | null
+          sync_split_note_id?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          category?: string | null
+          competence_month?: string | null
+          created_at?: string | null
+          description?: string | null
+          entry_date?: string | null
+          id?: string | null
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
+          purchase_cc_id?: string | null
+          purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
+          sync_cancelled?: boolean | null
+          sync_note_id?: string | null
+          sync_split_note_id?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
       backup_klaus_split_20261126_alloc: {
         Row: {
           collaborator_id: string | null
