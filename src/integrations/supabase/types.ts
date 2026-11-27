@@ -1780,6 +1780,831 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_mars_conc_20261127_alloc: {
+        Row: {
+          collaborator_id: string | null
+          confirmation_status:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          driver: boolean | null
+          has_pending_requirement: boolean | null
+          id: string | null
+          notes: string | null
+          overnight: boolean | null
+          position_id: string | null
+          schedule_id: string | null
+          service_assigned: boolean | null
+          sort_order: number | null
+          source: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override: boolean | null
+          updated_at: string | null
+          vehicle_id: string | null
+          vt_override: boolean | null
+          work_id: string | null
+        }
+        Insert: {
+          collaborator_id?: string | null
+          confirmation_status?:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          driver?: boolean | null
+          has_pending_requirement?: boolean | null
+          id?: string | null
+          notes?: string | null
+          overnight?: boolean | null
+          position_id?: string | null
+          schedule_id?: string | null
+          service_assigned?: boolean | null
+          sort_order?: number | null
+          source?: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override?: boolean | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          vt_override?: boolean | null
+          work_id?: string | null
+        }
+        Update: {
+          collaborator_id?: string | null
+          confirmation_status?:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          driver?: boolean | null
+          has_pending_requirement?: boolean | null
+          id?: string | null
+          notes?: string | null
+          overnight?: boolean | null
+          position_id?: string | null
+          schedule_id?: string | null
+          service_assigned?: boolean | null
+          sort_order?: number | null
+          source?: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override?: boolean | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          vt_override?: boolean | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_mars_conc_20261127_entries: {
+        Row: {
+          amount: number | null
+          category: string | null
+          competence_month: string | null
+          created_at: string | null
+          description: string | null
+          entry_date: string | null
+          id: string | null
+          industry_invoice_id: string | null
+          industry_order_id: string | null
+          industry_part: string | null
+          industry_part_ref: string | null
+          purchase_cc_id: string | null
+          purchase_item_key: string | null
+          recurrence_id: string | null
+          recurrence_month: string | null
+          split_group: string | null
+          split_note: string | null
+          split_total: number | null
+          sync_cancelled: boolean | null
+          sync_note_id: string | null
+          sync_split_note_id: string | null
+          updated_at: string | null
+          work_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          category?: string | null
+          competence_month?: string | null
+          created_at?: string | null
+          description?: string | null
+          entry_date?: string | null
+          id?: string | null
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
+          purchase_cc_id?: string | null
+          purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
+          sync_cancelled?: boolean | null
+          sync_note_id?: string | null
+          sync_split_note_id?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          category?: string | null
+          competence_month?: string | null
+          created_at?: string | null
+          description?: string | null
+          entry_date?: string | null
+          id?: string | null
+          industry_invoice_id?: string | null
+          industry_order_id?: string | null
+          industry_part?: string | null
+          industry_part_ref?: string | null
+          purchase_cc_id?: string | null
+          purchase_item_key?: string | null
+          recurrence_id?: string | null
+          recurrence_month?: string | null
+          split_group?: string | null
+          split_note?: string | null
+          split_total?: number | null
+          sync_cancelled?: boolean | null
+          sync_note_id?: string | null
+          sync_split_note_id?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_mars_conc_20261127_notes: {
+        Row: {
+          amount: number | null
+          cancelled: boolean | null
+          cancelled_at: string | null
+          client_name: string | null
+          decision: Json | null
+          difference_cents: number | null
+          entry_id: string | null
+          expected_cents: number | null
+          id: string | null
+          invoice_number: string | null
+          issued_at: string | null
+          last_attempt_at: string | null
+          method: string | null
+          order_number: string | null
+          original: Json | null
+          quote_number: string | null
+          reason: string | null
+          run_id: string | null
+          source_key: string | null
+          status: string | null
+          tolerance_cents: number | null
+          work_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          cancelled?: boolean | null
+          cancelled_at?: string | null
+          client_name?: string | null
+          decision?: Json | null
+          difference_cents?: number | null
+          entry_id?: string | null
+          expected_cents?: number | null
+          id?: string | null
+          invoice_number?: string | null
+          issued_at?: string | null
+          last_attempt_at?: string | null
+          method?: string | null
+          order_number?: string | null
+          original?: Json | null
+          quote_number?: string | null
+          reason?: string | null
+          run_id?: string | null
+          source_key?: string | null
+          status?: string | null
+          tolerance_cents?: number | null
+          work_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          cancelled?: boolean | null
+          cancelled_at?: string | null
+          client_name?: string | null
+          decision?: Json | null
+          difference_cents?: number | null
+          entry_id?: string | null
+          expected_cents?: number | null
+          id?: string | null
+          invoice_number?: string | null
+          issued_at?: string | null
+          last_attempt_at?: string | null
+          method?: string | null
+          order_number?: string | null
+          original?: Json | null
+          quote_number?: string | null
+          reason?: string | null
+          run_id?: string | null
+          source_key?: string | null
+          status?: string | null
+          tolerance_cents?: number | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_mars_conc_20261127_rdo_wf: {
+        Row: {
+          allocation_id: string | null
+          break_minutes: number | null
+          classified_at: string | null
+          classified_by: string | null
+          collaborator_id: string | null
+          created_at: string | null
+          entry_time: string | null
+          exit_time: string | null
+          final_classification: string | null
+          id: string | null
+          occurrence_status: string | null
+          planned: boolean | null
+          position_id: string | null
+          present: boolean | null
+          rdo_id: string | null
+          report_date: string | null
+          reported_note: string | null
+          reported_reason: string | null
+          updated_at: string | null
+          work_id: string | null
+          worked_hours: number | null
+        }
+        Insert: {
+          allocation_id?: string | null
+          break_minutes?: number | null
+          classified_at?: string | null
+          classified_by?: string | null
+          collaborator_id?: string | null
+          created_at?: string | null
+          entry_time?: string | null
+          exit_time?: string | null
+          final_classification?: string | null
+          id?: string | null
+          occurrence_status?: string | null
+          planned?: boolean | null
+          position_id?: string | null
+          present?: boolean | null
+          rdo_id?: string | null
+          report_date?: string | null
+          reported_note?: string | null
+          reported_reason?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+          worked_hours?: number | null
+        }
+        Update: {
+          allocation_id?: string | null
+          break_minutes?: number | null
+          classified_at?: string | null
+          classified_by?: string | null
+          collaborator_id?: string | null
+          created_at?: string | null
+          entry_time?: string | null
+          exit_time?: string | null
+          final_classification?: string | null
+          id?: string | null
+          occurrence_status?: string | null
+          planned?: boolean | null
+          position_id?: string | null
+          present?: boolean | null
+          rdo_id?: string | null
+          report_date?: string | null
+          reported_note?: string | null
+          reported_reason?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+          worked_hours?: number | null
+        }
+        Relationships: []
+      }
+      backup_mars_conc_20261127_rdos: {
+        Row: {
+          activities: string | null
+          client_id: string | null
+          created_at: string | null
+          finalized_at: string | null
+          id: string | null
+          notes: string | null
+          number: number | null
+          report_date: string | null
+          responsible_name: string | null
+          schedule_id: string | null
+          shift: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+          work_id: string | null
+        }
+        Insert: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string | null
+          notes?: string | null
+          number?: number | null
+          report_date?: string | null
+          responsible_name?: string | null
+          schedule_id?: string | null
+          shift?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string | null
+          notes?: string | null
+          number?: number | null
+          report_date?: string | null
+          responsible_name?: string | null
+          schedule_id?: string | null
+          shift?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_mars_conc_20261127_works: {
+        Row: {
+          active: boolean | null
+          address: string | null
+          budget_cost: number | null
+          budget_items: Json | null
+          cc_suffix: string | null
+          city: string | null
+          client: string | null
+          client_id: string | null
+          code: string | null
+          contract_enabled: boolean | null
+          contract_months: number | null
+          created_at: string | null
+          distance_km: number | null
+          entry_time: string | null
+          estimated_travel_time: number | null
+          exit_time: string | null
+          exit_time_weekend: string | null
+          expected_end_date: string | null
+          hh_enabled: boolean | null
+          hh_rates: Json | null
+          id: string | null
+          is_stock: boolean | null
+          latitude: number | null
+          longitude: number | null
+          monthly_enabled: boolean | null
+          name: string | null
+          neighborhood: string | null
+          night_shift: boolean | null
+          notes: string | null
+          number: string | null
+          order_number: string | null
+          order_value: number | null
+          orders: Json | null
+          quote_number: string | null
+          rdo_general: boolean | null
+          rental_enabled: boolean | null
+          start_date: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["work_status"] | null
+          supervisor_id: string | null
+          updated_at: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          address?: string | null
+          budget_cost?: number | null
+          budget_items?: Json | null
+          cc_suffix?: string | null
+          city?: string | null
+          client?: string | null
+          client_id?: string | null
+          code?: string | null
+          contract_enabled?: boolean | null
+          contract_months?: number | null
+          created_at?: string | null
+          distance_km?: number | null
+          entry_time?: string | null
+          estimated_travel_time?: number | null
+          exit_time?: string | null
+          exit_time_weekend?: string | null
+          expected_end_date?: string | null
+          hh_enabled?: boolean | null
+          hh_rates?: Json | null
+          id?: string | null
+          is_stock?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          monthly_enabled?: boolean | null
+          name?: string | null
+          neighborhood?: string | null
+          night_shift?: boolean | null
+          notes?: string | null
+          number?: string | null
+          order_number?: string | null
+          order_value?: number | null
+          orders?: Json | null
+          quote_number?: string | null
+          rdo_general?: boolean | null
+          rental_enabled?: boolean | null
+          start_date?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["work_status"] | null
+          supervisor_id?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          address?: string | null
+          budget_cost?: number | null
+          budget_items?: Json | null
+          cc_suffix?: string | null
+          city?: string | null
+          client?: string | null
+          client_id?: string | null
+          code?: string | null
+          contract_enabled?: boolean | null
+          contract_months?: number | null
+          created_at?: string | null
+          distance_km?: number | null
+          entry_time?: string | null
+          estimated_travel_time?: number | null
+          exit_time?: string | null
+          exit_time_weekend?: string | null
+          expected_end_date?: string | null
+          hh_enabled?: boolean | null
+          hh_rates?: Json | null
+          id?: string | null
+          is_stock?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          monthly_enabled?: boolean | null
+          name?: string | null
+          neighborhood?: string | null
+          night_shift?: boolean | null
+          notes?: string | null
+          number?: string | null
+          order_number?: string | null
+          order_value?: number | null
+          orders?: Json | null
+          quote_number?: string | null
+          rdo_general?: boolean | null
+          rental_enabled?: boolean | null
+          start_date?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["work_status"] | null
+          supervisor_id?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
+      backup_mars_conc2_20261127_alloc: {
+        Row: {
+          collaborator_id: string | null
+          confirmation_status:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          driver: boolean | null
+          has_pending_requirement: boolean | null
+          id: string | null
+          notes: string | null
+          overnight: boolean | null
+          position_id: string | null
+          schedule_id: string | null
+          service_assigned: boolean | null
+          sort_order: number | null
+          source: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override: boolean | null
+          updated_at: string | null
+          vehicle_id: string | null
+          vt_override: boolean | null
+          work_id: string | null
+        }
+        Insert: {
+          collaborator_id?: string | null
+          confirmation_status?:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          driver?: boolean | null
+          has_pending_requirement?: boolean | null
+          id?: string | null
+          notes?: string | null
+          overnight?: boolean | null
+          position_id?: string | null
+          schedule_id?: string | null
+          service_assigned?: boolean | null
+          sort_order?: number | null
+          source?: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override?: boolean | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          vt_override?: boolean | null
+          work_id?: string | null
+        }
+        Update: {
+          collaborator_id?: string | null
+          confirmation_status?:
+            | Database["public"]["Enums"]["confirmation_status"]
+            | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          driver?: boolean | null
+          has_pending_requirement?: boolean | null
+          id?: string | null
+          notes?: string | null
+          overnight?: boolean | null
+          position_id?: string | null
+          schedule_id?: string | null
+          service_assigned?: boolean | null
+          sort_order?: number | null
+          source?: Database["public"]["Enums"]["allocation_source"] | null
+          travel_bonus_override?: boolean | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+          vt_override?: boolean | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_mars_conc2_20261127_rdo_wf: {
+        Row: {
+          allocation_id: string | null
+          break_minutes: number | null
+          classified_at: string | null
+          classified_by: string | null
+          collaborator_id: string | null
+          created_at: string | null
+          entry_time: string | null
+          exit_time: string | null
+          final_classification: string | null
+          id: string | null
+          occurrence_status: string | null
+          planned: boolean | null
+          position_id: string | null
+          present: boolean | null
+          rdo_id: string | null
+          report_date: string | null
+          reported_note: string | null
+          reported_reason: string | null
+          updated_at: string | null
+          work_id: string | null
+          worked_hours: number | null
+        }
+        Insert: {
+          allocation_id?: string | null
+          break_minutes?: number | null
+          classified_at?: string | null
+          classified_by?: string | null
+          collaborator_id?: string | null
+          created_at?: string | null
+          entry_time?: string | null
+          exit_time?: string | null
+          final_classification?: string | null
+          id?: string | null
+          occurrence_status?: string | null
+          planned?: boolean | null
+          position_id?: string | null
+          present?: boolean | null
+          rdo_id?: string | null
+          report_date?: string | null
+          reported_note?: string | null
+          reported_reason?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+          worked_hours?: number | null
+        }
+        Update: {
+          allocation_id?: string | null
+          break_minutes?: number | null
+          classified_at?: string | null
+          classified_by?: string | null
+          collaborator_id?: string | null
+          created_at?: string | null
+          entry_time?: string | null
+          exit_time?: string | null
+          final_classification?: string | null
+          id?: string | null
+          occurrence_status?: string | null
+          planned?: boolean | null
+          position_id?: string | null
+          present?: boolean | null
+          rdo_id?: string | null
+          report_date?: string | null
+          reported_note?: string | null
+          reported_reason?: string | null
+          updated_at?: string | null
+          work_id?: string | null
+          worked_hours?: number | null
+        }
+        Relationships: []
+      }
+      backup_mars_conc2_20261127_rdos: {
+        Row: {
+          activities: string | null
+          client_id: string | null
+          created_at: string | null
+          finalized_at: string | null
+          id: string | null
+          notes: string | null
+          number: number | null
+          report_date: string | null
+          responsible_name: string | null
+          schedule_id: string | null
+          shift: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+          work_id: string | null
+        }
+        Insert: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string | null
+          notes?: string | null
+          number?: number | null
+          report_date?: string | null
+          responsible_name?: string | null
+          schedule_id?: string | null
+          shift?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Update: {
+          activities?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string | null
+          notes?: string | null
+          number?: number | null
+          report_date?: string | null
+          responsible_name?: string | null
+          schedule_id?: string | null
+          shift?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_mars_conc2_20261127_works: {
+        Row: {
+          active: boolean | null
+          address: string | null
+          budget_cost: number | null
+          budget_items: Json | null
+          cc_suffix: string | null
+          city: string | null
+          client: string | null
+          client_id: string | null
+          code: string | null
+          contract_enabled: boolean | null
+          contract_months: number | null
+          created_at: string | null
+          distance_km: number | null
+          entry_time: string | null
+          estimated_travel_time: number | null
+          exit_time: string | null
+          exit_time_weekend: string | null
+          expected_end_date: string | null
+          hh_enabled: boolean | null
+          hh_rates: Json | null
+          id: string | null
+          is_stock: boolean | null
+          latitude: number | null
+          longitude: number | null
+          monthly_enabled: boolean | null
+          name: string | null
+          neighborhood: string | null
+          night_shift: boolean | null
+          notes: string | null
+          number: string | null
+          order_number: string | null
+          order_value: number | null
+          orders: Json | null
+          quote_number: string | null
+          rdo_general: boolean | null
+          rental_enabled: boolean | null
+          start_date: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["work_status"] | null
+          supervisor_id: string | null
+          updated_at: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          address?: string | null
+          budget_cost?: number | null
+          budget_items?: Json | null
+          cc_suffix?: string | null
+          city?: string | null
+          client?: string | null
+          client_id?: string | null
+          code?: string | null
+          contract_enabled?: boolean | null
+          contract_months?: number | null
+          created_at?: string | null
+          distance_km?: number | null
+          entry_time?: string | null
+          estimated_travel_time?: number | null
+          exit_time?: string | null
+          exit_time_weekend?: string | null
+          expected_end_date?: string | null
+          hh_enabled?: boolean | null
+          hh_rates?: Json | null
+          id?: string | null
+          is_stock?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          monthly_enabled?: boolean | null
+          name?: string | null
+          neighborhood?: string | null
+          night_shift?: boolean | null
+          notes?: string | null
+          number?: string | null
+          order_number?: string | null
+          order_value?: number | null
+          orders?: Json | null
+          quote_number?: string | null
+          rdo_general?: boolean | null
+          rental_enabled?: boolean | null
+          start_date?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["work_status"] | null
+          supervisor_id?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          address?: string | null
+          budget_cost?: number | null
+          budget_items?: Json | null
+          cc_suffix?: string | null
+          city?: string | null
+          client?: string | null
+          client_id?: string | null
+          code?: string | null
+          contract_enabled?: boolean | null
+          contract_months?: number | null
+          created_at?: string | null
+          distance_km?: number | null
+          entry_time?: string | null
+          estimated_travel_time?: number | null
+          exit_time?: string | null
+          exit_time_weekend?: string | null
+          expected_end_date?: string | null
+          hh_enabled?: boolean | null
+          hh_rates?: Json | null
+          id?: string | null
+          is_stock?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          monthly_enabled?: boolean | null
+          name?: string | null
+          neighborhood?: string | null
+          night_shift?: boolean | null
+          notes?: string | null
+          number?: string | null
+          order_number?: string | null
+          order_value?: number | null
+          orders?: Json | null
+          quote_number?: string | null
+          rdo_general?: boolean | null
+          rental_enabled?: boolean | null
+          start_date?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["work_status"] | null
+          supervisor_id?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
       backup_work_entries_20261126: {
         Row: {
           amount: number | null
@@ -8109,6 +8934,10 @@ export type Database = {
       }
       billing_purge_cross_duplicates: { Args: never; Returns: Json }
       billing_quote_key: { Args: { v: string }; Returns: string }
+      billing_sem_nf_supersede: {
+        Args: { p_note: string; p_run: string }
+        Returns: boolean
+      }
       billing_sync_import_external: {
         Args: { p_notes: Json; p_run: string }
         Returns: Json
