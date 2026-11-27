@@ -4,9 +4,9 @@ export const purchaseOrdersFolder = (year: number | string) => `Compras/04 COMPR
 /** Só os dígitos do nº do pedido digitado (ex.: "PC 012345" → "012345"). */
 export const orderDigits = (s: string | null | undefined) => String(s ?? "").replace(/\D/g, "");
 
-/** A saved order can be corrected after the item's status moves past approval. */
+/** Pedido de compras do item: o primeiro só com o item COMPRADO; um pedido já salvo pode ser corrigido em qualquer status. */
 export const canEditPurchaseOrder = (status: string, savedOrder: string | null | undefined): boolean =>
-  status === "APROVADO" || Boolean(savedOrder?.trim());
+  status === "COMPRADO" || Boolean(savedOrder?.trim());
 
 /** O arquivo é do pedido quando o nome traz o número inteiro, sem outros dígitos colados (12345 ≠ 123456). */
 export function fileMatchesOrder(fileName: string, order: string) {

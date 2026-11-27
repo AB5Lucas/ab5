@@ -10,6 +10,7 @@ import { ArrowLeft, Ban, Link2, Camera, Check, Download, Eye, History, RefreshCw
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
+import { applyColumnFilters, FilterHead, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -203,6 +204,28 @@ function Page() {
   };
 
   const [rows, setRows] = useState<Draft[]>([]);
+  // Filtro por coluna (como no Excel) na tabela de itens da aba Solicitação.
+  const [itemFilters, setItemFilters] = useState<ColumnFilters>({});
+  const [itemSort, setItemSort] = useState<ColumnSort>(null);
+  // Status que o Comprador pode escolher: sem APROVADO e RECUSADO (decisão do Aprovador); o atual sempre aparece.
+  const buyerStatusOptions = (cur: string) => SC_ITEM_STATUSES.filter((s) => (s !== "APROVADO" && s !== "RECUSADO") || s === cur);
+  type IRow = { x: Draft; i: number };
+  const savedStatus = (x: Draft) => (x.id ? (items.data ?? []).find((it) => it.id === x.id) : undefined);
+  const itemCols: ColumnDef<IRow>[] = [
+    { key: "item", label: "Item", values: ({ i }) => [String(i + 1)], sort: ({ i }) => i },
+    { key: "qty", label: "Qtd", values: ({ x }) => [String(x.quantity ?? "")], sort: ({ x }) => num(x.quantity) },
+    { key: "unit", label: "Un. medida", values: ({ x }) => [x.unit ?? ""] },
+    { key: "desc", label: "Descrição", values: ({ x }) => [x.description ?? ""] },
+    { key: "budget", label: "Verba (R$)", values: ({ x }) => [num(x.budget) != null ? brl(num(x.budget)) : ""], sort: ({ x }) => num(x.budget) },
+    { key: "notes", label: "Observações", values: ({ x }) => [x.notes ?? ""] },
+    { key: "work", label: "Centro de custo", values: ({ x }) => [x.work_id === RATEIO ? "Rateio geral" : workName.get(x.work_id) ?? ""] },
+    { key: "cc", label: "CC", values: ({ x }) => [x.cc || ccOf(x.work_id)] },
+    { key: "photo", label: "Foto", values: ({ x }) => [x.photo_path ? "Com foto" : "Sem foto"] },
+    { key: "status", label: "Status", values: ({ x }) => [savedStatus(x)?.status ?? ""] },
+    { key: "order", label: "Pedido de compras AB5", values: ({ x }) => [savedStatus(x)?.order_number ?? ""] },
+  ];
+  const indexedRows: IRow[] = rows.map((x, i) => ({ x, i }));
+  const shownRows = applyColumnFilters(indexedRows, itemCols, itemFilters, itemSort);
   const [total, setTotal] = useState("");
   // Desfazer/refazer (Ctrl+Z / Ctrl+Y): só o rascunho em edição na tela; nada vai ao banco até Salvar itens.
   const history = useEditHistory<Snap>(500);
@@ -621,23 +644,14 @@ function Page() {
         <Table className="text-sm">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10">Item</TableHead>
-              <TableHead className="w-20">Qtd</TableHead>
-              <TableHead className="min-w-24">Un. medida</TableHead>
-              <TableHead className="min-w-72">Descrição</TableHead>
-              <TableHead className="min-w-36">Verba (R$)</TableHead>
-              <TableHead className="min-w-40">Observações</TableHead>
-              <TableHead className="min-w-48">Centro de custo</TableHead>
-              <TableHead className="w-28">CC</TableHead>
-              <TableHead className="w-16">Foto</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="min-w-32">Pedido de compras AB5</TableHead>
+              {itemCols.map((c) => <FilterHead key={c.key} column={c} rows={rowsForColumn(indexedRows, itemCols, itemFilters, c.key)} filters={itemFilters} setFilters={setItemFilters} sort={itemSort} setSort={setItemSort} />)}
               {editable && <TableHead className="w-8" />}
             </TableRow>
           </TableHeader>
           <TableBody>
             {!rows.length && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Nenhum item.</TableCell></TableRow>}
-            {rows.map((x, i) => {
+            {rows.length > 0 && !shownRows.length && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Nenhum item com esses filtros.</TableCell></TableRow>}
+            {shownRows.map(({ x, i }) => {
               const saved = x.id ? (items.data ?? []).find((it) => it.id === x.id) : undefined;
               return (
                 <TableRow key={x.id ?? `new-${i}`}>
@@ -697,7 +711,10 @@ function Page() {
                       <div className="space-y-1">
                         <Select value={saved.status} onValueChange={(v) => setItem.mutate({ item: saved.id, status: v, order: orders[saved.id] ?? saved.order_number ?? "" })}>
                           <SelectTrigger className={`h-8 w-44 ${itemStatusClass(saved.status)}`}><SelectValue /></SelectTrigger>
-                          <SelectContent>{SC_ITEM_STATUSES.map((s) => <SelectItem key={s} value={s}><Pill className={itemStatusClass(s)}>{s}</Pill></SelectItem>)}</SelectContent>
+                          <SelectContent>{buyerStatusOptions(saved.status).map((s) => (
+                            // APROVADO/RECUSADO vêm só do Aprovador (aparecem apenas como o status atual); COMPRADO só a partir de APROVADO.
+                            <SelectItem key={s} value={s} disabled={s !== saved.status && s === "COMPRADO" && saved.status !== "APROVADO"}>
+                              <Pill className={itemStatusClass(s)}>{s}</Pill></SelectItem>))}</SelectContent>
                         </Select>
                         {/* Data real do status (pode ter acontecido em outro dia). */}
                         <Input type="date" className="h-7 w-44 text-xs" aria-label="Data do status" title="Data real do status"
@@ -717,7 +734,7 @@ function Page() {
                     {isBuyer && saved ? (
                       // A aprovação libera o primeiro pedido; um pedido já salvo continua editável.
                       <Input className="h-8" value={orders[saved.id] ?? saved.order_number ?? ""} onChange={(e) => setOrders((o) => ({ ...o, [saved.id]: e.target.value }))}
-                        disabled={!canEditPurchaseOrder(saved.status, saved.order_number)} title={!canEditPurchaseOrder(saved.status, saved.order_number) ? "O primeiro pedido de compras só pode ser lançado com o item APROVADO" : undefined}
+                        disabled={!canEditPurchaseOrder(saved.status, saved.order_number)} title={!canEditPurchaseOrder(saved.status, saved.order_number) ? "O pedido de compras só pode ser lançado com o item COMPRADO" : undefined}
                         onBlur={() => { const v = orders[saved.id]; if (v !== undefined && v !== (saved.order_number ?? "")) setItem.mutate({ item: saved.id, status: saved.status, order: v }); }} />
                     ) : saved?.order_number ?? "—"}
                     {saved && (saved.order_file_path || (isBuyer && saved.order_number)) && (

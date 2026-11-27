@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import { canEditPurchaseOrder, fileMatchesOrder, purchaseOrdersFolder } from "./purchase-orders";
 
 describe("edição do pedido de compras", () => {
-  it("permite corrigir um pedido já salvo mesmo sem status APROVADO", () => {
+  it("permite corrigir um pedido já salvo em qualquer status", () => {
     expect(canEditPurchaseOrder("COMPRADO", "35828")).toBe(true);
     expect(canEditPurchaseOrder("COMPRA PARCIAL", "35828; 35829")).toBe(true);
   });
-  it("exige aprovação para incluir o primeiro pedido", () => {
-    expect(canEditPurchaseOrder("APROVADO", null)).toBe(true);
-    expect(canEditPurchaseOrder("SOLICITAÇÃO ENVIADA", null)).toBe(false);
-    expect(canEditPurchaseOrder("COMPRADO", "")).toBe(false);
-    expect(canEditPurchaseOrder("COMPRADO", "   ")).toBe(false);
+  it("exige o item COMPRADO para incluir o primeiro pedido", () => {
+    expect(canEditPurchaseOrder("COMPRADO", null)).toBe(true);
+    expect(canEditPurchaseOrder("COMPRADO", "")).toBe(true);
+    expect(canEditPurchaseOrder("APROVADO", null)).toBe(false);
+    expect(canEditPurchaseOrder("SOLICITAÇÃO ENVIADA", "   ")).toBe(false);
   });
 });
 
