@@ -90,6 +90,7 @@ function ConferencePage() {
   const [tab, setTab] = useState<"ativos" | "historico">("ativos");
   const [fType, setFType] = useState("all");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("padrao");
   const [checkItem, setCheckItem] = useState<Item | null>(null);
   const [deleteItem, setDeleteItem] = useState<Item | null>(null);
   const [docItem, setDocItem] = useState<Item | null>(null);
@@ -219,7 +220,7 @@ function ConferencePage() {
 
   const rows = useMemo(() => {
     const q = normText(search);
-    return (items.data ?? []).filter((i) => {
+    const list = (items.data ?? []).filter((i) => {
       const active = i.status !== "concluido";
       if (tab === "ativos" ? !active : active) return false;
       if (fType !== "all" && i.type !== fType) return false;
@@ -230,7 +231,15 @@ function ConferencePage() {
       }
       return true;
     });
-  }, [items.data, fType, personById, search, tab]);
+    if (sortBy === "padrao") return list;
+    // Próxima conferência: sem data vai para o fim.
+    const dir = sortBy === "prox_asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      const da = nextCheckOf(a.id), db = nextCheckOf(b.id);
+      if (!da || !db) return Number(!da) - Number(!db);
+      return da.localeCompare(db) * dir;
+    });
+  }, [items.data, fType, personById, search, tab, sortBy, checksByItem]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["conference"] });
 
@@ -463,7 +472,18 @@ function ConferencePage() {
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 p-4 md:grid-cols-3">
+        <CardContent className="grid gap-3 p-4 md:grid-cols-4">
+          <div className="space-y-1">
+            <Label className="text-xs">Ordenar por</Label>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="padrao">Padrão</SelectItem>
+                <SelectItem value="prox_asc">Próxima conferência (mais próxima)</SelectItem>
+                <SelectItem value="prox_desc">Próxima conferência (mais distante)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1">
             <Label className="text-xs">Tipo</Label>
             <Select value={fType} onValueChange={setFType}>

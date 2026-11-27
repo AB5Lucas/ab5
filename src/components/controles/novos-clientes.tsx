@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarClock, Check, ClipboardCheck, ListChecks, Plus, Search, Trash2, Undo2, X } from "lucide-react";
+import { CalendarClock, Check, Download, ClipboardCheck, ListChecks, Plus, Search, Trash2, Undo2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { AppointmentDialog } from "@/components/appointment-dialog";
@@ -143,6 +143,32 @@ export function NewClientDocsPage() {
         || (personById.get(a.collaborator_id)?.full_name ?? "").localeCompare(personById.get(b.collaborator_id)?.full_name ?? "", "pt-BR"));
   }, [onboardings.data, history, fClient, search, personById, clientById]);
 
+  // Baixa a lista filtrada da tela (em acompanhamento ou histórico).
+  const exportExcel = async () => {
+    const XLSX = await import("xlsx");
+    const data = rows.map((o) => {
+      const p = personById.get(o.collaborator_id);
+      const list = docsBy.get(o.id) ?? [];
+      return {
+        Colaborador: p?.full_name ?? "",
+        "Matrícula": p?.registration_number ?? "",
+        Cliente: clientById.get(o.client_id) ?? "",
+        "Situação": o.status === "liberado" ? "Liberado para integrar" : o.status === "concluido" ? "Concluído" : "Pendente",
+        "Enviado em": o.sent_at ? formatDateBR(o.sent_at) : "",
+        "Próxima conferência": o.next_check_date ? formatDateBR(o.next_check_date) : "",
+        "Concluído em": o.completed_at ? formatDateBR(o.completed_at.slice(0, 10)) : "",
+        "Documentos OK": `${list.filter((d) => d.approved).length}/${list.length}`,
+        Documentos: list.map((d) => `${d.approved ? "✓" : "•"} ${docLabel(d)}`).join("; "),
+        "Observações": o.notes ?? "",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = [{ wch: 32 }, { wch: 10 }, { wch: 28 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 13 }, { wch: 12 }, { wch: 60 }, { wch: 40 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Novos Clientes");
+    XLSX.writeFile(wb, `novos-clientes-${today}.xlsx`);
+  };
+
   const openList = (onboardings.data ?? []).filter((o) => o.status !== "concluido");
   const lateCount = openList.filter((o) => o.status === "pendente" && o.next_check_date && o.next_check_date <= today).length;
   const releasedCount = openList.filter((o) => o.status === "liberado").length;
@@ -190,7 +216,7 @@ export function NewClientDocsPage() {
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 p-4 md:grid-cols-4">
+        <CardContent className="grid gap-3 p-4 md:grid-cols-3 lg:grid-cols-6">
           <div className="space-y-1">
             <Label className="text-xs">Cliente</Label>
             <Select value={fClient} onValueChange={setFClient}>
@@ -215,6 +241,12 @@ export function NewClientDocsPage() {
             <Label className="block text-xs">&nbsp;</Label>
             <Button className="w-full" disabled={!canWrite} onClick={() => setAdding(true)}>
               <Plus className="h-4 w-4" /> Incluir
+            </Button>
+          </div>
+          <div className="space-y-1">
+            <Label className="block text-xs">&nbsp;</Label>
+            <Button variant="outline" className="w-full" disabled={!rows.length} onClick={exportExcel}>
+              <Download className="h-4 w-4" /> Exportar Excel
             </Button>
           </div>
         </CardContent>
