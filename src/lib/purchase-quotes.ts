@@ -6,7 +6,8 @@
  * Ranking pelos critérios marcados (valor menor, prazo de entrega menor, prazo de pagamento MAIOR), cada um
  * normalizado de 0 a 1 entre as opções do item e somados; empate = menor valor.
  */
-export type Criterion = "valor" | "prazo" | "pagamento";
+/** "frete" = Frete grátis (toggle à parte): soma 1 ponto às opções de cotação com frete R$ 0. */
+export type Criterion = "valor" | "prazo" | "pagamento" | "frete";
 export const CRITERIA: { value: Criterion; label: string; hint: string }[] = [
   { value: "valor", label: "Valor", hint: "menor valor total" },
   { value: "prazo", label: "Prazo de entrega", hint: "entrega mais rápida" },
@@ -88,7 +89,7 @@ export function itemOptions(item: ScItemLite, quotes: QuoteLite[], qItems: Quote
 }
 
 export function rankOptions(opts: Option[], criteria: Criterion[]): Option[] {
-  const crit = criteria.length ? criteria : (["valor"] as Criterion[]);
+  const crit = criteria.some((c) => c !== "frete") ? criteria : (["valor", ...criteria] as Criterion[]);
   const minTotal = Math.min(...opts.map((o) => o.total).filter((x) => x > 0), Infinity);
   const dels = opts.map((o) => o.deliveryDays).filter((x): x is number => x != null);
   const pays = opts.map((o) => o.paymentDays).filter((x): x is number => x != null);
@@ -99,6 +100,7 @@ export function rankOptions(opts: Option[], criteria: Criterion[]): Option[] {
     if (crit.includes("valor")) s += o.total > 0 && Number.isFinite(minTotal) ? minTotal / o.total : 0;
     if (crit.includes("prazo")) s += o.deliveryDays != null && minDel != null ? (minDel + 1) / (o.deliveryDays + 1) : 0;
     if (crit.includes("pagamento")) s += o.paymentDays != null && maxPay != null ? (o.paymentDays + 1) / (maxPay + 1) : 0;
+    if (crit.includes("frete")) s += o.quote.freight != null && Number(o.quote.freight) === 0 ? 1 : 0;
     o.score = s;
   }
   return [...opts].sort((a, b) => b.score - a.score || a.total - b.total || (a.deliveryDays ?? 1e9) - (b.deliveryDays ?? 1e9));

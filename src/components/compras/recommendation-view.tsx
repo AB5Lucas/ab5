@@ -8,6 +8,7 @@ import { useAccess } from "@/hooks/use-access";
 import { useActionHistory, useUndoRedoKeys, type ActionHistory } from "@/hooks/use-action-history";
 import { UndoRedoButtons } from "@/components/compras/undo-redo";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -248,7 +249,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   };
   const full = (x: RecRow) => d.items.find((i) => i.id === x.item.id)!;
   const supplierOf = (x: RecRow) => x.chosen?.quote.supplier ?? (x.chosen ? "Fornecedor sem nome" : "");
-  const critLabel = criteria.map((c) => CRITERIA.find((k) => k.value === c)?.label ?? c).join(" + ");
+  const critLabel = criteria.map((c) => (c === "frete" ? "Frete grátis" : CRITERIA.find((k) => k.value === c)?.label ?? c)).join(" + ");
 
   const mayDecide = mode === "aprovacao" && !!perms.data?.decide.has(r.id);
   const cols: Col[] = [
@@ -353,7 +354,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
   const overCount = rec.rows.filter((x) => itemsOverBudget([x])).length;
   const applyCriteria = (n: Criterion[]) => {
     const before = criteria;
-    setCriteria.mutate(n, { onSuccess: () => history.push({ label: `Critérios: ${n.map((k) => CRITERIA.find((c) => c.value === k)?.label).join(" + ")}`, undo: () => rpcCriteria(before), redo: () => rpcCriteria(n) }) });
+    setCriteria.mutate(n, { onSuccess: () => history.push({ label: `Critérios: ${n.map((k) => (k === "frete" ? "Frete grátis" : CRITERIA.find((c) => c.value === k)?.label)).join(" + ")}`, undo: () => rpcCriteria(before), redo: () => rpcCriteria(n) }) });
   };
   const partialWaiting = r.fa_state === "em_aprovacao" && !!r.fa_partial_side;
   // Retrato da SC para o resumo da IA (geral).
@@ -487,7 +488,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
                 <button key={c.value} type="button" aria-pressed={on} title={c.hint} disabled={!editable || setCriteria.isPending}
                   onClick={() => {
                     const n = on ? criteria.filter((x) => x !== c.value) : [...criteria, c.value];
-                    if (!n.length) { toast.info("Deixe ao menos um critério"); return; }
+                    if (!n.some((x) => x !== "frete")) { toast.info("Deixe ao menos um critério"); return; }
                     // Desligar o Valor pede confirmação (a escolha deixa de olhar o preço).
                     if (on && c.value === "valor") { setConfirmValor(n); return; }
                     applyCriteria(n);
@@ -498,6 +499,23 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
                 </button>
               );
             })}
+            {(() => {
+              // Frete grátis: liga/desliga à parte; as cotações com frete R$ 0 ganham preferência na melhor escolha.
+              const on = criteria.includes("frete");
+              return (
+                <button type="button" role="switch" aria-checked={on} disabled={!editable || setCriteria.isPending}
+                  title="Preferir cotações com frete grátis (frete R$ 0)"
+                  onClick={() => applyCriteria(on ? criteria.filter((x) => x !== "frete") : [...criteria, "frete"])}
+                  className={cn("ml-1 inline-flex h-8 items-center gap-2 rounded-full border px-2.5 text-xs transition-colors disabled:cursor-default",
+                    on ? "border-orange-400 bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300" : "border-border bg-background text-muted-foreground hover:bg-muted")}>
+                  <span className={cn("relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors", on ? "bg-orange-500" : "bg-muted-foreground/30")}>
+                    <span className={cn("absolute h-3 w-3 rounded-full bg-white shadow transition-transform", on ? "translate-x-3.5" : "translate-x-0.5")} />
+                  </span>
+                  <FreeTruck className={cn("h-5 w-5", on ? "text-orange-500" : "")} />
+                  Frete grátis
+                </button>
+              );
+            })()}
           </div>
         </div>
         <span className="text-xs text-muted-foreground">{readQuotes.length} {readQuotes.length === 1 ? "cotação lida" : "cotações lidas"} · {rec.covered} de {rec.rows.length} itens com cotação</span>
@@ -542,7 +560,7 @@ export function RecommendationView({ requestId, mode, onBack, embedded, history:
         </Table>
       </div>
 
-      {readQuotes.length > 0 && <QuotesTable data={d} purchase={purchaseTotalsByQuote(rec?.rows ?? [])} />}
+      {readQuotes.length > 0 && <QuotesTable data={d} purchase={purchaseTotalsByQuote(rec?.rows ?? [])} editable={editable} onChanged={() => void invalidate()} />}
 
       {attach && <QuotesAttachDialog row={r} onClose={() => setAttach(false)} onDone={() => void invalidate()} />}
       {matching && <QuoteMatchingDialog data={d} onClose={() => setMatching(false)} onFinish={() => { setMatching(false); void invalidate(); }} />}
@@ -711,7 +729,7 @@ function ItemSummary({ row, quotesRead, criteria }: { row: RecRow; quotesRead: n
 }
 
 /** Cotações lidas da SC (fornecedor, condições e arquivo). */
-function QuotesTable({ data, purchase }: { data: RecData; purchase: Map<string, number> }) {
+function QuotesTable({ data, purchase, editable, onChanged }: { data: RecData; purchase: Map<string, number>; editable: boolean; onChanged: () => void }) {
   const read = data.quotes.filter((q) => q.read_status === "lido");
   return (
     <div className="panel overflow-x-auto">
@@ -735,7 +753,8 @@ function QuotesTable({ data, purchase }: { data: RecData; purchase: Map<string, 
               <TableCell>{q.payment_terms ?? "—"}</TableCell>
               <TableCell>{q.payment_days != null ? `${q.payment_days} d` : "—"}</TableCell>
               <TableCell>{q.delivery_days != null ? `${q.delivery_days} d` : "—"}</TableCell>
-              <TableCell className="tabular-nums">{brl(q.freight)}</TableCell>
+              <TableCell className="tabular-nums">{editable ? <FreightInput quoteId={q.id} value={q.freight} onSaved={onChanged} />
+                : q.freight == null ? "—" : Number(q.freight) === 0 ? "Grátis" : brl(q.freight)}</TableCell>
               <TableCell className="tabular-nums">{brl(q.total)}</TableCell>
               <TableCell className="tabular-nums font-medium">{purchase.get(q.id) ? brl(purchase.get(q.id)) : "—"}</TableCell>
               <TableCell className="tabular-nums">{q.min_order == null ? "—" : Number(q.min_order) > 0 ? brl(q.min_order) : "sem mínimo"}</TableCell>
@@ -749,6 +768,45 @@ function QuotesTable({ data, purchase }: { data: RecData; purchase: Map<string, 
           ))}
         </TableBody>
       </Table>
+    </div>
+  );
+}
+
+/** Caminhãozinho com "FREE" (toggle Frete grátis). */
+function FreeTruck({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M1 9h4M2 12h3M3 15h2" />
+      <path d="M7 6h14v12H7z" />
+      <path d="M21 10h5l4 4v4h-9" />
+      <circle cx="11" cy="19.5" r="2" fill="currentColor" stroke="none" />
+      <circle cx="25" cy="19.5" r="2" fill="currentColor" stroke="none" />
+      <rect x="9" y="1" width="11" height="5.5" rx="1.5" />
+      <text x="14.5" y="5.4" textAnchor="middle" fontSize="4.2" fontWeight="700" fill="currentColor" stroke="none">FREE</text>
+    </svg>
+  );
+}
+
+/** Frete da cotação digitado pelo comprador (grava ao sair do campo; vazio = não informado; 0 = grátis). */
+function FreightInput({ quoteId, value, onSaved }: { quoteId: string; value: number | null; onSaved: () => void }) {
+  const fmt = (v: number | null) => (v == null ? "" : String(v).replace(".", ","));
+  const [txt, setTxt] = useState(fmt(value));
+  useEffect(() => { setTxt(fmt(value)); }, [value]);
+  const save = async () => {
+    const t = txt.trim();
+    const v = t === "" ? null : Number(t.replace(/\./g, "").replace(",", "."));
+    if (v != null && (!Number.isFinite(v) || v < 0)) { toast.error("Frete: use só números (0 = grátis)"); setTxt(fmt(value)); return; }
+    if (v === (value == null ? null : Number(value))) return;
+    const { error } = await supabase.from("purchase_quotes").update({ freight: v == null ? null : Math.round(v * 100) / 100 } as never).eq("id", quoteId);
+    if (error) { toast.error(error.message); return; }
+    onSaved();
+  };
+  return (
+    <div className="flex items-center gap-1">
+      <Input className="h-7 w-24 text-xs tabular-nums" inputMode="decimal" placeholder="R$ (0 = grátis)" value={txt}
+        onChange={(e) => setTxt(e.target.value)} onBlur={() => void save()} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        aria-label="Valor do frete" title="Valor do frete desta cotação (0 = frete grátis)" />
+      {txt.trim() !== "" && Number(txt.replace(/\./g, "").replace(",", ".")) === 0 && <span className="text-[10px] font-medium text-orange-500">grátis</span>}
     </div>
   );
 }
