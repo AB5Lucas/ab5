@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAll } from "@/lib/fetch-all";
+import { SearchSelect } from "@/components/search-select";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,7 +79,8 @@ function AccessPage() {
   });
   const exceptions = useQuery({
     queryKey: ["access-exceptions"],
-    queryFn: async () => (await supabase.from("user_page_access").select("user_id, path, allowed").in("path", [...ALL_PATHS, ...FLAG_PATHS])).data ?? [],
+    // Paginado: a tabela já passa de 1.000 linhas e a leitura simples cortava pessoas (a marcação gravada não aparecia).
+    queryFn: async () => fetchAll<{ user_id: string; path: string; allowed: boolean }>((a, b) => supabase.from("user_page_access").select("user_id, path, allowed").in("path", [...ALL_PATHS, ...FLAG_PATHS]).order("id").range(a, b)),
   });
   const invalidate = () => { for (const k of ["access-people", "access-exceptions", "user-access", "my-salary-flag"]) qc.invalidateQueries({ queryKey: [k] }); };
 
@@ -161,6 +164,25 @@ function AccessPage() {
                 <ForemanWorksButton userId={person.id} name={person.full_name || person.email} perWork={person.role === "cliente"} />
               )}
               {person.role === "admin" && <p className="rounded-md bg-muted p-2 text-xs">Administrador: acessa tudo.</p>}
+              {person.role !== "admin" && (
+                // Usuário novo nasce sem páginas: copia as páginas (e marcações @) de alguém com a mesma função, depois ajusta.
+                <div className="space-y-1">
+                  <Label className="block text-xs">Copiar acessos de</Label>
+                  <SearchSelect value="" placeholder="Escolha uma pessoa" searchPlaceholder="Digite o nome"
+                    disabled={setPage.isPending}
+                    options={people_.filter((x) => x.id !== person.id).map((x) => ({ value: x.id, label: x.full_name || x.email }))}
+                    onChange={(id) => {
+                      const src = people_.find((x) => x.id === id); if (!src) return;
+                      const paths = [...ALL_PATHS, ...FLAG_PATHS];
+                      const on = paths.filter((u) => personAllows(src, u)), off = paths.filter((u) => !personAllows(src, u));
+                      setPage.mutate({ p: person, paths: on, allowed: true }, {
+                        onSuccess: () => setPage.mutate({ p: person, paths: off, allowed: false },
+                          { onSuccess: () => toast.success(`Acessos de ${src.full_name || src.email} copiados (${on.filter((u) => !u.startsWith("@")).length} páginas)`) }),
+                      });
+                    }} />
+                  <p className="text-[11px] text-muted-foreground">Substitui todas as páginas desta pessoa pelas da escolhida.</p>
+                </div>
+              )}
               <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
                 {MODULES.map((m) => {
                   const on = m.items.filter((i) => personAllows(person, i.url)).length;
