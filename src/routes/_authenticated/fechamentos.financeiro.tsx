@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { loadResultShared, monthEnd } from "@/lib/results-engine";
-import { FIN_TAX, buildFinanceGroups, financeBatches, financeList, loadFinanceActive, loadFinanceRaws, type FinanceLine } from "@/lib/finance-data";
+import { FIN_TAX, buildFinanceGroupsAsync, financeBatches, financeList, loadFinanceActive, loadFinanceRaws, type FinanceLine } from "@/lib/finance-data";
 
 export const Route = createFileRoute("/_authenticated/fechamentos/financeiro")({
   head: () => ({
@@ -29,6 +29,8 @@ export const Route = createFileRoute("/_authenticated/fechamentos/financeiro")({
   component: FinanceiroPage,
 });
 
+const NO_DATES_FC: string[] = [];
+const NO_WORKS_FC: any[] = [];
 const EMPTY_RAWS = new Map<string, any>();
 // Detalhe (tela Resultados) só é baixado quando o usuário abre um serviço
 const ResultadoPage = lazy(() => import("@/components/resultado-page").then((m) => ({ default: m.ResultadoPage })));
@@ -84,7 +86,14 @@ function FinanceiroPage() {
   const rawByWork = raws.data ?? EMPTY_RAWS;
   const loading = !scope.ready || works.isLoading || active.isLoading || shared.isLoading || (list.length > 0 && raws.isPending);
 
-  const groups = useMemo(() => buildFinanceGroups(list, rawByWork, yms, year, holidays.data ?? [], works.data ?? []), [list, rawByWork, yms, year, holidays.data, works.data]);
+  // Conta em pedaços para não travar a tela; mantém o resultado anterior enquanto refaz.
+  const [groups, setGroups] = useState<NonNullable<Awaited<ReturnType<typeof buildFinanceGroupsAsync>>>>([]);
+  const hol = holidays.data, wk = works.data;
+  useEffect(() => {
+    let cancelled = false;
+    void buildFinanceGroupsAsync(list, rawByWork, yms, year, hol ?? NO_DATES_FC, wk ?? NO_WORKS_FC, () => cancelled).then((g) => { if (!cancelled && g) setGroups(g); });
+    return () => { cancelled = true; };
+  }, [list, rawByWork, yms, year, hol, wk]);
 
   const allGroups = groups;
   const shown = useMemo(() => allGroups.filter((g) => !hidden.includes(g.key)), [allGroups, hidden]);

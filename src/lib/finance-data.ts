@@ -273,7 +273,7 @@ function groupLines(pairs: [any, FinanceLine][]): FinanceGroup[] {
   const by = new Map<string, FinanceGroup>();
   for (const [w, line] of pairs) {
     const key = w.client_id ?? `n:${w.client ?? "Sem cliente"}`;
-    const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] };
+    const g = by.get(key) ?? { key, name: w.clients?.name ?? w.client ?? "Sem cliente", lines: [] as FinanceLine[] };
     g.lines.push(line);
     by.set(key, g);
   }
