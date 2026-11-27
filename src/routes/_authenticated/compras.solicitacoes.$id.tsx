@@ -32,13 +32,17 @@ import { QuotesAttachDialog } from "@/components/compras/quotes";
 import { ReturnScDialog } from "@/components/compras/return-dialog";
 import { RecommendationView, useFaPerms } from "@/components/compras/recommendation-view";
 
+const SC_FROM = ["solicitacoes", "validacao", "comprador", "aprovador"] as const;
+type ScFrom = (typeof SC_FROM)[number];
+
 export const Route = createFileRoute("/_authenticated/compras/solicitacoes/$id")({
   head: () => ({ meta: [{ title: "Solicitação de Compra | AB5 Hub" }, { name: "description", content: "Itens da solicitação de compra (modelo FR-CPS-SC)." }] }),
   // Aberta pelo número = só visualizar; ?edit=1 (lápis em Ações) abre já em edição.
   // ?tab=recomendacao abre direto na Recomendação de compras (comprador).
-  // ?from=comprador = aberta pela tela do Comprador (SC aprovada mostra as duas abas).
-  validateSearch: (s: Record<string, unknown>): { edit?: boolean; tab?: "recomendacao"; from?: "comprador" } => ({
-    ...(s["from"] === "comprador" ? { from: "comprador" as const } : {}),
+  // ?from= tela de origem, que decide as abas em qualquer status: solicitacoes/validacao = só Solicitação;
+  // comprador = Solicitação + Recomendação; aprovador = só Recomendação. Sem origem (ex.: notificação), regra antiga.
+  validateSearch: (s: Record<string, unknown>): { edit?: boolean; tab?: "recomendacao"; from?: ScFrom } => ({
+    ...(typeof s["from"] === "string" && (SC_FROM as readonly string[]).includes(s["from"]) ? { from: s["from"] as ScFrom } : {}),
     ...(s["edit"] === true || s["edit"] === 1 || s["edit"] === "1" || s["edit"] === "true" ? { edit: true } : {}),
     ...(s["tab"] === "recomendacao" ? { tab: "recomendacao" as const } : {}),
   }),
@@ -171,8 +175,12 @@ function Page() {
     || r.fa_decided_by === user.id || r.fa_partial_by === user.id);
   // Na própria SC o solicitante vê a Solicitação normal (só vira tela de aprovação se ele mesmo tiver de decidir agora).
   const ownSc = !!r && r.requester_id === user?.id && !faPerms.data?.decide.has(id);
-  const approverView = !!r && !ownSc && ((r.fa_state === "em_aprovacao" && (!!faPerms.data?.decide.has(id) || isApproverOfSc))
-    || (r.fa_state === "aprovada" && isApproverOfSc && fromParam !== "comprador"));
+  const approverView = !!r && (fromParam === "aprovador" ? true
+    : fromParam ? false
+    : !ownSc && r.stage === "compras" && ((r.fa_state === "em_aprovacao" && (!!faPerms.data?.decide.has(id) || isApproverOfSc))
+      || (r.fa_state === "aprovada" && isApproverOfSc)));
+  // Aberta por Solicitações/Validação: só a aba Solicitação, mesmo para quem também compra.
+  const showRecTab = isBuyer && fromParam !== "solicitacoes" && fromParam !== "validacao";
   useUndoRedoKeys(buyerHistory, isBuyer && !editMode && !approverView);
   const buyerCanEdit = isBuyer && r?.fa_state !== "em_aprovacao";
   const headerEdits = useQuery({
@@ -595,7 +603,7 @@ function Page() {
         {r.buyer_notes && <p className="mt-2 rounded-md bg-muted p-2 text-xs"><b>Comprador:</b> {r.buyer_notes}</p>}
       </div>
 
-      {isBuyer && !approverView && (
+      {showRecTab && !approverView && (
         <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-sm text-muted-foreground" role="tablist">
           {([["itens", "Solicitação"], ["recomendacao", "Recomendação de compras"]] as const).map(([v, l]) => (
             <button key={v} type="button" role="tab" aria-selected={scTab === v} onClick={() => setScTab(v)}
@@ -605,7 +613,7 @@ function Page() {
       )}
       {approverView ? (
         <RecommendationView requestId={id} mode="aprovacao" embedded isGestor={faIsGestor} />
-      ) : isBuyer && scTab === "recomendacao" ? (
+      ) : showRecTab && scTab === "recomendacao" ? (
         <RecommendationView requestId={id} mode="comprador" embedded history={buyerHistory} />
       ) : (
       <>

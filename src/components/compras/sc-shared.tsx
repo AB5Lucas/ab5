@@ -72,7 +72,7 @@ export function StatusFilter({ value, onChange, counts, exclude = [] }: { value:
 export type ScExtraCol = ColumnDef<ScRow> & { cell: (r: ScRow) => ReactNode; className?: string };
 export function ScTable({ rows, clientName, actions, showRequester = true, extraCols = [], endActions, linkFrom }: {
   /** Origem passada ao abrir a SC (ex.: "comprador"). */
-  linkFrom?: "comprador";
+  linkFrom?: "solicitacoes" | "validacao" | "comprador" | "aprovador";
   rows: ScRow[]; clientName: Map<string, string>; actions?: (r: ScRow) => ReactNode; showRequester?: boolean;
   /** Colunas a mais depois do Status (ex.: melhor escolha × verba na Recomendação). */
   extraCols?: ScExtraCol[];
@@ -310,7 +310,7 @@ export function ScHeaderDialog({ open, onOpenChange, editing }: { open: boolean;
       qc.invalidateQueries({ queryKey: ["sc-request", id] });
       onOpenChange(false);
       if (isTotvs) toast.success(totvsDest.current === "compras" ? "SC do TOTVS enviada para o Comprador" : "SC do TOTVS enviada para o validador");
-      else if (!editing) { toast.success("Solicitação criada. Agora inclua os itens."); navigate({ to: "/compras/solicitacoes/$id", params: { id } }); }
+      else if (!editing) { toast.success("Solicitação criada. Agora inclua os itens."); navigate({ to: "/compras/solicitacoes/$id", params: { id }, search: { from: "solicitacoes" } }); }
       else toast.success("Solicitação atualizada");
     },
     onError: (e: Error) => toast.error(e.message),

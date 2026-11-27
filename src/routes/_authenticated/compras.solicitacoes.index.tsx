@@ -62,7 +62,7 @@ function Page() {
       return r;
     },
     // Lápis abre a própria SC já em edição (cabeçalho e itens).
-    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["menu-badges"] }); navigate({ to: "/compras/solicitacoes/$id", params: { id: r.id }, search: { edit: true } }); },
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sc-requests"] }); qc.invalidateQueries({ queryKey: ["menu-badges"] }); navigate({ to: "/compras/solicitacoes/$id", params: { id: r.id }, search: { edit: true, from: "solicitacoes" } }); },
     onError: (e: Error) => toast.error(e.message),
   });
   // Copiar: SC nova (rascunho, número novo, minha) com o mesmo cabeçalho e itens; status, pedidos e datas ficam de fora.
@@ -91,7 +91,7 @@ function Page() {
     onSuccess: (id) => {
       toast.success("Cópia criada. Confira a data prazo e envie.");
       qc.invalidateQueries({ queryKey: ["sc-requests"] });
-      navigate({ to: "/compras/solicitacoes/$id", params: { id } });
+      navigate({ to: "/compras/solicitacoes/$id", params: { id }, search: { from: "solicitacoes" } });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -131,7 +131,7 @@ function Page() {
         <Button className="ml-auto" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nova</Button>
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
-        <ScTable rows={rows} clientName={clientName} showRequester={scope !== "minhas"} actions={(r) => r.requester_id !== uid ? (
+        <ScTable rows={rows} clientName={clientName} linkFrom="solicitacoes" showRequester={scope !== "minhas"} actions={(r) => r.requester_id !== uid ? (
           // Emergência: administrador (diretoria) envia e edita o rascunho de outro solicitante.
           admin && r.stage === "rascunho" ? (
             <div className="flex gap-1">

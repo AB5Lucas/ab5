@@ -82,7 +82,7 @@ function Page() {
         </div>
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
-        <ScTable rows={rows} clientName={clientName} actions={(r) => r.stage === "aprovacao" && (r.approver_id === uid || r.substitute_id === uid) ? (
+        <ScTable rows={rows} clientName={clientName} linkFrom="validacao" actions={(r) => r.stage === "aprovacao" && (r.approver_id === uid || r.substitute_id === uid) ? (
           <div className="flex gap-1">
             <Button size="sm" onClick={() => setDeciding({ row: r, approve: true })}><Check className="h-3.5 w-3.5" /> Validar</Button>
             <Button size="sm" variant="outline" onClick={() => setDeciding({ row: r, approve: false })}><Undo2 className="h-3.5 w-3.5" /> Devolver</Button>

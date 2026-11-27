@@ -90,7 +90,7 @@ function Page() {
         </p>
       </div>
       {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
-        <ScTable rows={rows} clientName={clientName} extraCols={recCols(totals, true)} actions={(r) => (
+        <ScTable rows={rows} clientName={clientName} linkFrom="aprovador" extraCols={recCols(totals, true)} actions={(r) => (
           <Button size="sm" variant="outline" onClick={() => open(r.id)}><Eye className="h-3.5 w-3.5" /> Abrir</Button>
         )} />
       )}
