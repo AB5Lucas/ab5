@@ -15,8 +15,8 @@ export async function exportAllocationDailyPdf(person: string, period: string, r
     reader.readAsDataURL(blob);
   });
   const image = doc.getImageProperties(logo);
-  const widths = [25, 40, 64, 98, 23, 23];
-  const labels = ["Data", "Pedido", "Cliente", "Serviço", "Pernoite", "Motorista"];
+  const widths = [25, 34, 30, 56, 86, 21, 21];
+  const labels = ["Data", "Pedido", "Centro de custo", "Cliente", "Serviço", "Pernoite", "Motorista"];
   const margin = 12;
   const bottom = 194;
   let y = 0;

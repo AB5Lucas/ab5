@@ -9,6 +9,7 @@ import { workedHours } from "@/lib/rdo";
 import { allocationHours } from "@/lib/allocation-hours";
 import { laborShare, monthRange, type LaborShareBy } from "@/lib/labor-share";
 import { filteredDailyAllocations } from "@/lib/allocation-daily-filter";
+import { FilterHead, applyColumnFilters, rowsForColumn, type ColumnDef, type ColumnFilters, type ColumnSort } from "@/components/column-filter";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -72,7 +73,7 @@ type AllocRow = {
   driver: boolean;
   confirmation_status: string;
   daily_schedules: { schedule_date: string } | null;
-  works: { id: string; client_id: string | null; name: string; order_number: string | null; client: string | null; entry_time: string | null; exit_time: string | null; exit_time_weekend: string | null; night_shift: boolean | null; clients: { name: string } | null } | null;
+  works: { id: string; client_id: string | null; name: string; order_number: string | null; client: string | null; entry_time: string | null; exit_time: string | null; exit_time_weekend: string | null; night_shift: boolean | null; cc_suffix: string | null; clients: { name: string; cc_prefix: string | null } | null } | null;
   collaborators: { full_name: string } | null;
 };
 
@@ -82,7 +83,7 @@ async function fetchAllocations(from: string, to: string): Promise<AllocRow[]> {
     const { data, error } = await supabase
       .from("daily_allocations")
       .select(
-        "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(id, name, order_number, client, client_id, entry_time, exit_time, exit_time_weekend, night_shift, clients(name)), collaborators(full_name)",
+        "id, collaborator_id, overnight, driver, confirmation_status, daily_schedules!inner(schedule_date), works(id, name, order_number, client, client_id, entry_time, exit_time, exit_time_weekend, night_shift, cc_suffix, clients(name, cc_prefix)), collaborators(full_name)",
       )
       .gte("daily_schedules.schedule_date", from)
       .lte("daily_schedules.schedule_date", to)
@@ -251,7 +252,10 @@ function Page() {
   }, [data]);
 
   const loading = allocations.isLoading || absences.isLoading || hours.isLoading;
-  const dailyRows = useMemo(() => filteredDailyAllocations(data, person), [data, person]);
+  const baseDaily = useMemo(() => filteredDailyAllocations(data, person), [data, person]);
+  const [colFilters, setColFilters] = useState<ColumnFilters>({});
+  const [colSort, setColSort] = useState<ColumnSort>(null);
+  const dailyRows = useMemo(() => applyColumnFilters(baseDaily, DAILY_COLS, colFilters, colSort), [baseDaily, colFilters, colSort]);
   const personName = (people.data ?? []).find((p) => p.id === person)?.full_name ?? "Colaborador";
   const [exportingPdf, setExportingPdf] = useState(false);
   const exportDailyPdf = async () => {
@@ -262,6 +266,7 @@ function Page() {
       await exportAllocationDailyPdf(personName, `Período de ${fmtDate(from)} a ${fmtDate(to)}`, dailyRows.map((a) => [
         a.daily_schedules ? fmtDate(a.daily_schedules.schedule_date) : "—",
         a.works?.order_number || "—",
+        ccOf(a) || "—",
         a.works?.clients?.name ?? a.works?.client ?? "—",
         a.works?.name ?? "Sem serviço",
         a.overnight ? "Sim" : "—",
@@ -318,12 +323,9 @@ function Page() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Pedido</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Serviço</TableHead>
-                <TableHead>Pernoite</TableHead>
-                <TableHead>Motorista</TableHead>
+                {DAILY_COLS.map((c) => (
+                  <FilterHead key={c.key} column={c} rows={rowsForColumn(baseDaily, DAILY_COLS, colFilters, c.key)} filters={colFilters} setFilters={setColFilters} sort={colSort} setSort={setColSort} />
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -331,13 +333,14 @@ function Page() {
                   <TableRow key={a.id}>
                     <TableCell>{a.daily_schedules ? fmtDate(a.daily_schedules.schedule_date) : "—"}</TableCell>
                     <TableCell>{a.works?.order_number || "—"}</TableCell>
+                    <TableCell>{ccOf(a) || "—"}</TableCell>
                     <TableCell>{a.works?.clients?.name ?? a.works?.client ?? "—"}</TableCell>
                     <TableCell>{a.works?.name ?? "Sem serviço"}</TableCell>
                     <TableCell>{a.overnight ? "Sim" : "—"}</TableCell>
                     <TableCell>{a.driver ? "Sim" : "—"}</TableCell>
                   </TableRow>
                 ))}
-              {!loading && !data.some((a) => a.collaborator_id === person) && <EmptyRow cols={6} />}
+              {!loading && !dailyRows.length && <EmptyRow cols={7} />}
             </TableBody>
           </Table>
         </div>
@@ -745,3 +748,20 @@ function LaborShareTab() {
     </div>
   );
 }
+
+type DailyRow = { daily_schedules: { schedule_date: string } | null; overnight: boolean | null; driver: boolean | null; works: { name: string; order_number: string | null; client: string | null; cc_suffix: string | null; clients: { name: string; cc_prefix: string | null } | null } | null };
+/** Centro de custo do serviço = prefixo do cliente + sufixo do serviço (sem sufixo = rateio 999). */
+function ccOf(a: DailyRow): string {
+  const pre = a.works?.clients?.cc_prefix?.trim();
+  if (!pre) return "";
+  return pre + (a.works?.cc_suffix?.trim() || "999");
+}
+const DAILY_COLS: ColumnDef<DailyRow>[] = [
+  { key: "data", label: "Data", values: (a) => [a.daily_schedules ? fmtDate(a.daily_schedules.schedule_date) : ""], sort: (a) => a.daily_schedules?.schedule_date ?? null },
+  { key: "pedido", label: "Pedido", values: (a) => [a.works?.order_number ?? ""] },
+  { key: "cc", label: "Centro de custo", values: (a) => [ccOf(a)] },
+  { key: "cliente", label: "Cliente", values: (a) => [a.works?.clients?.name ?? a.works?.client ?? ""] },
+  { key: "servico", label: "Serviço", values: (a) => [a.works?.name ?? "Sem serviço"] },
+  { key: "pernoite", label: "Pernoite", values: (a) => [a.overnight ? "Sim" : "Não"] },
+  { key: "motorista", label: "Motorista", values: (a) => [a.driver ? "Sim" : "Não"] },
+];

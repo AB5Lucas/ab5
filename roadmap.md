@@ -70,3 +70,7 @@
 - [x] Veículos: agenda da Logística no quadro, ranking de 30 dias abaixo e quadradinhos anuais no topo.
 
 - [x] Veículos: quadradinhos maiores com silhueta e resumo lateral; agenda sem rolagem e destaque cinza.
+- [x] Alocações: filtro por coluna (ColumnFilter) + coluna Centro de custo entre Pedido e Cliente
+- [x] Acesso do Thiago ao dashboard Financeiro
+- [ ] Auditoria de acessos automáticos (Marcelo Negro / Solicitações)
+- [ ] (aguarda resposta) extinguir grupos de acesso
