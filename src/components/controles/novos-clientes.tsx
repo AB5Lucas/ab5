@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, ClipboardCheck, ListChecks, Plus, Search, Trash2, Undo2, X } from "lucide-react";
+import { CalendarClock, Check, ClipboardCheck, ListChecks, Plus, Search, Trash2, Undo2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { AppointmentDialog } from "@/components/appointment-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,8 @@ export function NewClientDocsPage() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [checkId, setCheckId] = useState<string | null>(null);
+  // Agendar a integração no cliente (ao agendar, o acompanhamento vai sozinho ao histórico).
+  const [booking, setBooking] = useState<{ key: string; collaboratorId: string; clientId: string } | null>(null);
   const [deleteItem, setDeleteItem] = useState<Onboarding | null>(null);
 
   const onboardings = useQuery({
@@ -269,6 +272,10 @@ export function NewClientDocsPage() {
                       </div>
                     ) : canWrite ? (
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Agendar integração neste cliente" aria-label="Agendar integração"
+                          onClick={() => setBooking({ key: `${o.id}|${Date.now()}`, collaboratorId: o.collaborator_id, clientId: o.client_id })}>
+                          <CalendarClock className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" title="Conferir documentos" aria-label="Conferir documentos" onClick={() => setCheckId(o.id)}>
                           <ListChecks className="h-4 w-4" />
                         </Button>
@@ -303,6 +310,16 @@ export function NewClientDocsPage() {
         openKeys={new Set(openList.map((o) => `${o.client_id}|${o.collaborator_id}`))}
         onDone={invalidate}
       />
+
+      {booking && (
+        <AppointmentDialog
+          key={booking.key}
+          type="integracao"
+          open
+          onOpenChange={(v) => { if (!v) { setBooking(null); invalidate(); } }}
+          initialValues={{ collaborator_id: booking.collaboratorId, client_id: booking.clientId }}
+        />
+      )}
 
       {checking && (
         <CheckDialog
