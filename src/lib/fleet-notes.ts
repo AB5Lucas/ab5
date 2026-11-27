@@ -516,6 +516,12 @@ export function currentKm(plan: Pick<MaintenancePlan, "km_reading" | "km_reading
   if (!fromNote) return manual;
   return (fromNote.date ?? "") > (manual.date ?? "") ? fromNote : manual;
 }
+/** Veículo próprio a combustão: a revisão é sempre feita junto com a troca de óleo (BYD/elétrico e alugados ficam fora). */
+export const revisionWithOil = (v: { ownership: string | null; model: string | null }) =>
+  v.ownership !== "alugado" && !/dolphin|byd|el[eé]tric/i.test(v.model ?? "");
+/** "Troca de óleo e filtros" → "Revisão + troca de óleo e filtros" (só serviços de óleo; não repete o "Revisão"). */
+export const withOilRevision = (service: string) =>
+  /[óo]leo/i.test(service) && !/^revis[ãa]o/i.test(service.trim()) ? `Revisão + ${service.trim().charAt(0).toLowerCase()}${service.trim().slice(1)}` : service;
 /** Próximo serviço informado que ainda vale (o de menor km). */
 export const nextService = (plan: Pick<MaintenancePlan, "next_items"> | null) =>
   [...(plan?.next_items ?? [])].filter((i) => i && Number(i.km) > 0).sort((a, b) => Number(a.km) - Number(b.km))[0] ?? null;

@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchAll } from "@/lib/fetch-all";
 import { normalizePlate } from "@/lib/fleet-costs";
-import { closestPlate, currentKm, isoDay, maintenanceState, type MaintenanceState, type NextService } from "@/lib/fleet-notes";
+import { closestPlate, currentKm, isoDay, maintenanceState, revisionWithOil, withOilRevision, type MaintenanceState, type NextService } from "@/lib/fleet-notes";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Vehicle = { id: string; plate: string; model: string | null; ownership: string; status: string | null };
@@ -197,7 +197,11 @@ function PlanDialog({ row, onClose }: { row: Row | null; onClose: () => void }) 
     mutationFn: async () => {
       const vals = { interval_km: toNum(f.km), interval_months: toNum(f.months), base_km: toNum(f.baseKm), reading: toNum(reading.km) };
       if (Object.values(vals).some((v) => Number.isNaN(v))) throw new Error("Use só números.");
-      const next = items.filter((i) => i.service.trim() || i.km.trim()).map((i) => ({ service: i.service.trim() || "Revisão", km: toNum(i.km) }));
+      const oil = revisionWithOil(row!);
+      const next = items.filter((i) => i.service.trim() || i.km.trim()).map((i) => {
+        const service = i.service.trim() || (oil ? "Revisão + troca de óleo e filtros" : "Revisão");
+        return { service: oil ? withOilRevision(service) : service, km: toNum(i.km) };
+      });
       if (next.some((i) => i.km == null || Number.isNaN(i.km))) throw new Error("Informe o km de cada próximo serviço.");
       const { error } = await supabase.from("vehicle_maintenance_plans").upsert({
         vehicle_id: row!.id, interval_km: vals.interval_km == null ? null : Math.round(vals.interval_km), interval_months: vals.interval_months == null ? null : Math.round(vals.interval_months),
@@ -215,7 +219,9 @@ function PlanDialog({ row, onClose }: { row: Row | null; onClose: () => void }) 
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Regra de revisão · {row.plate}</DialogTitle>
-          <DialogDescription>{row.ownership === "alugado" ? "Alugado: informe o km de revisão pedido pela locadora." : "Próprio: revisão preventiva por km e/ou por tempo, o que vencer primeiro."}</DialogDescription>
+          <DialogDescription>{row.ownership === "alugado" ? "Alugado: informe o km de revisão pedido pela locadora."
+            : revisionWithOil(row) ? "Próprio: a revisão é sempre feita junto com a troca de óleo. Informe a próxima troca de óleo (ou o intervalo dela) e ela conta como a próxima revisão."
+            : "Próprio: revisão preventiva por km e/ou por tempo, o que vencer primeiro."}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1"><Label htmlFor="pl-km">A cada (km)</Label><Input id="pl-km" inputMode="numeric" value={f.km} onChange={(e) => setF({ ...f, km: e.target.value })} /></div>
@@ -253,7 +259,8 @@ function PlanDialog({ row, onClose }: { row: Row | null; onClose: () => void }) 
 function RecordDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
   const qc = useQueryClient();
   const [f, setF] = useState({ date: "", km: "", kind: "preventiva", description: "", cost: "" });
-  useEffect(() => { if (row) setF({ date: new Date().toISOString().slice(0, 10), km: row.km != null ? String(Math.round(row.km)) : "", kind: "preventiva", description: "", cost: "" }); }, [row?.id]);
+  // Próprio a combustão: a preventiva é a revisão junto com a troca de óleo.
+  useEffect(() => { if (row) setF({ date: new Date().toISOString().slice(0, 10), km: row.km != null ? String(Math.round(row.km)) : "", kind: "preventiva", description: revisionWithOil(row) ? "Revisão + troca de óleo e filtros" : "", cost: "" }); }, [row?.id]);
   const save = useMutation({
     mutationFn: async () => {
       const kmVal = toNum(f.km), cost = toNum(f.cost);
@@ -271,7 +278,7 @@ function RecordDialog({ row, onClose }: { row: Row | null; onClose: () => void }
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar revisão · {row.plate}</DialogTitle>
-          <DialogDescription>A preventiva zera a contagem da próxima revisão. A corretiva fica só no histórico.</DialogDescription>
+          <DialogDescription>A preventiva zera a contagem da próxima revisão. A corretiva fica só no histórico.{revisionWithOil(row) ? " Neste veículo a revisão é sempre junto com a troca de óleo." : ""}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1"><Label htmlFor="rc-d">Data</Label><Input id="rc-d" type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>

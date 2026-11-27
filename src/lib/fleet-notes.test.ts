@@ -289,3 +289,17 @@ describe("obra adicional com serviço (caminhão/pickup)", () => {
     expect(r.parts.map((p) => [p.cc, p.value])).toEqual([["1001001", 50], ["1001004", 50]]);
   });
 });
+
+import { revisionWithOil, withOilRevision } from "./fleet-notes";
+describe("revisão junto com a troca de óleo", () => {
+  it("só próprio a combustão", () => {
+    expect(revisionWithOil({ ownership: "proprio", model: "Palio" })).toBe(true);
+    expect(revisionWithOil({ ownership: "proprio", model: "Dolphin Mini" })).toBe(false);
+    expect(revisionWithOil({ ownership: "alugado", model: "Onix" })).toBe(false);
+  });
+  it("prefixa só serviços de óleo, sem repetir", () => {
+    expect(withOilRevision("Troca de óleo e filtros")).toBe("Revisão + troca de óleo e filtros");
+    expect(withOilRevision("Revisão + troca de óleo")).toBe("Revisão + troca de óleo");
+    expect(withOilRevision("Verificar freios")).toBe("Verificar freios");
+  });
+});
