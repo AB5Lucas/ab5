@@ -287,8 +287,9 @@
 
 /* Cabeçalho de vidro: sem cantos e só com a linha de baixo. */
 .liquid-glass-bar { border-radius: 0; border-width: 0 0 1px 0; border-color: rgba(0,0,0,0.06);
+  background: linear-gradient(135deg, rgba(255,255,255,0.82), rgba(255,255,255,0.7)); /* menos transparente (27/11) */
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 8px 24px -16px rgba(0,0,0,0.25); }
-.dark .liquid-glass-bar { border-color: rgba(255,255,255,0.08); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+.dark .liquid-glass-bar { background: linear-gradient(135deg, rgba(38,38,38,0.88), rgba(24,24,24,0.8)); border-color: rgba(255,255,255,0.08); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
 
 /* Modo escuro: barras de rolagem escuras (sem isso o navegador desenha brancas). */
 :root { color-scheme: light; }
