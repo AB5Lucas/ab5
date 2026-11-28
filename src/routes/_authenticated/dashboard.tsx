@@ -15,7 +15,8 @@ function Landing() {
   useEffect(() => {
     if (loading) return;
     // Abre o dashboard do primeiro módulo (ordem do menu) em que a pessoa acessa alguma página; Atividades fica de fora.
-    const dash = MENU_GROUPS.find((g) => g.overview && g.overview !== "/atividades" && !g.userMenu && g.items.some((i) => canAccess(i.url)));
+    const mobile = window.innerWidth < 768; // celular não abre dashboards
+    const dash = mobile ? undefined : MENU_GROUPS.find((g) => g.overview && g.overview !== "/atividades" && !g.userMenu && g.items.some((i) => canAccess(i.url)));
     if (dash?.overview) { navigate({ to: dash.overview as never, replace: true }); return; }
     const first = MENU_GROUPS.flatMap((g) => g.items).find((i) => canAccess(i.url));
     if (first) navigate({ to: (first.to ?? first.url) as never, replace: true });

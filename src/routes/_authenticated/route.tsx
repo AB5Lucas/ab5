@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, ROLE_LABEL } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
 import { menuUrlFor, MENU_GROUPS } from "@/lib/menu";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardWarmup } from "@/components/dashboard-warmup";
 import { DashboardSkeleton } from "@/components/dashboard-skeleton";
 
@@ -67,6 +68,16 @@ function AuthenticatedLayout() {
       if (first) navigate({ to: first.url, replace: true });
     }
   }, [isForeman, blocked, pathname, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Celular: dashboards (visão geral dos módulos) não abrem; vai para a 1ª página liberada do módulo.
+  const isMobile = useIsMobile();
+  useEffect(() => {
+    if (!isMobile || accessLoading) return;
+    const p = pathname.replace(/\/$/, "") || "/";
+    const g = MENU_GROUPS.find((m) => m.overview === p);
+    if (!g) return;
+    const first = g.items.find((i) => canAccess(i.url)) ?? MENU_GROUPS.flatMap((m) => m.items).find((i) => canAccess(i.url));
+    if (first) navigate({ to: (first.to ?? first.url) as never, replace: true });
+  }, [isMobile, accessLoading, pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSignOut() {
     await queryClient.cancelQueries();
