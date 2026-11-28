@@ -279,7 +279,7 @@ function WorksPage() {
         description="Cadastro de serviços por cliente, com horários de entrada e saída."
         actions={
           <div className="flex flex-wrap gap-2">
-            {canWrite && (
+            {(role === "coordenador" || role === "admin") && (
               <Button size="sm" onClick={openNew}>
                 <Plus className="h-4 w-4" /> Novo serviço
               </Button>

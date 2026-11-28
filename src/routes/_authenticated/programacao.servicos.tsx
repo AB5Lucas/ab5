@@ -682,7 +682,7 @@ function ServicesPage() {
         <Button variant="outline" disabled={!clientId} onClick={() => setTrOpen(true)}>
           <Car className="h-4 w-4" /> Montar Transporte
         </Button>
-        <Button disabled={!clientId} onClick={() => setNewOpen(true)}>
+        <Button disabled={!clientId || !(role === "coordenador" || role === "admin")} title={role === "coordenador" || role === "admin" ? undefined : "Só coordenadores criam serviços"} onClick={() => setNewOpen(true)}>
           <Plus className="h-4 w-4" /> Novo Serviço
         </Button>
       </div>
